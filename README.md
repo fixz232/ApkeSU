@@ -1,10 +1,3 @@
-频道：https://t.me/+LkrMQKXtXvpmYmNl
-
-## 🙏 致谢
-感谢 [KernelSU](https://github.com/tiann/KernelSU) 近乎完美的开源生态体系。向核心作者 **tiann**、**weishu** 及全体贡献者致以最崇高的敬意！
-
----
-
 ## 👑 少羽 — 传奇永不落幕
 
 > 少羽巅峰时期，随便拿出一个事迹都够一个主播封神了。开挂？他不开照样牛逼。
@@ -20,3 +13,10 @@
 - **2024** — 联手刺头有了 Logo，担任追猎天花板、超体天花板、对掏天花板、歼灭天花板，筷子代言人羽家
 
 少羽，无需多言。🔥
+
+---
+
+频道：https://t.me/+LkrMQKXtXvpmYmNl
+
+## 🙏 致谢
+感谢 [KernelSU](https://github.com/tiann/KernelSU) 近乎完美的开源生态体系。向核心作者 **tiann**、**weishu** 及全体贡献者致以最崇高的敬意！
