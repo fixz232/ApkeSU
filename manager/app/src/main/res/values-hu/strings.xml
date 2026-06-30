@@ -25,7 +25,7 @@
     <string name="profile_name">Profil neve</string>
     <string name="profile_namespace">Névtér csatlakoztatása</string>
     <string name="profile_namespace_inherited">Örökölt</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="profile_namespace_individual">Különálló</string>
     <string name="profile_groups">Csoportok</string>
     <string name="profile_capabilities">Jogosultságok</string>

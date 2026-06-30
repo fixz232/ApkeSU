@@ -69,7 +69,7 @@
     <string name="home_kernel">कर्नल</string>
     <string name="home_not_installed">इंस्टाल नहीं हुआ</string>
     <string name="failed_to_update_app_profile">%s के लिए ऐप प्रोफ़ाइल अपडेट करने में विफल</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="failed_to_update_sepolicy">%s के लिए SELinux नियमों को अपटेड करने में विफल</string>
     <string name="reboot_bootloader">बुटलोडर में रिबूट करें</string>
     <string name="home_manager_version">मैनेजर वर्जन</string>

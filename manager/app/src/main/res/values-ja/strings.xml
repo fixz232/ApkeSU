@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">再起動すると有効化されます</string>
     <string name="module_magisk_conflict">モジュールが Magisk との競合により利用できません!</string>
     <string name="home_learn_kernelsu">ApkeSU について</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/ja_JP/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">ApkeSU のインストール方法やモジュールの使い方はこちら</string>
     <string name="home_support_title">支援する</string>
     <string name="home_support_content">ApkeSU はこれからもずっと無料でオープンソースです。寄付をして頂くことで、開発を支援していただけます。</string>

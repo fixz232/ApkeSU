@@ -130,7 +130,7 @@
     <string name="reboot_to_apply">重启生效</string>
     <string name="module_magisk_conflict">因与 Magisk 有冲突，所有模块不可用！</string>
     <string name="home_learn_kernelsu">了解 ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/zh_CN/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">了解安装步骤与模块开发指南</string>
     <string name="home_support_title">支持开发</string>
     <string name="home_support_content">ApkeSU 将保持免费开源，向开发者捐赠以表示支持</string>

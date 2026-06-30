@@ -45,7 +45,7 @@
     <string name="reboot_to_apply">將在重新啟動時生效</string>
     <string name="module_magisk_conflict">與 Magisk 發生衝突，無法使用模組功能！</string>
     <string name="home_learn_kernelsu">深入瞭解 ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/zh_TW/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">知曉安裝、使用 ApkeSU 本體與其模組功能的方法</string>
     <string name="home_support_title">協助發展</string>
     <string name="home_support_content">ApkeSU 一向以免費與開放原始碼自居，矢志不渝。若想協助我們，可以用小額捐款表達你對專案發展的大力支持。</string>

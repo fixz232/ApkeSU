@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">রিবুট এপ্লাই</string>
     <string name="module_magisk_conflict">মডিউলগুলি অক্ষম কারণ তারা ম্যাজিস্কের সাথে বিরোধিতা করে!</string>
     <string name="home_learn_kernelsu">লার্ন কার্নেলএসইউ</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">কিভাবে কার্নেলএসইউ ইনস্টল করতে হয় এবং মডিউল ব্যবহার করতে হয় তা শিখুন।</string>
     <string name="home_support_title">সাপোর্ট টাইটেল</string>
     <string name="home_support_content">কার্নেলএসইউ ফ্রি ও ওপেন সোর্স, এবং সবসময় এমনই থাকবে। তবে, আপনি অনুদান দিয়ে আপনার কৃতজ্ঞতা প্রদর্শন করতে পারেন।</string>

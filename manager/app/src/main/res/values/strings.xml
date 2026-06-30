@@ -176,7 +176,7 @@
     <string name="reboot_to_apply">Reboot to take effect</string>
     <string name="module_magisk_conflict">Modules are unavailable due to a conflict with Magisk!</string>
     <string name="home_learn_kernelsu">Learn ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Learn how to install ApkeSU and use modules.</string>
     <string name="home_support_title">Support Us</string>
     <string name="home_support_content">ApkeSU is, and always will be, free, and open source. However, you can show us that you care by making a donation.</string>

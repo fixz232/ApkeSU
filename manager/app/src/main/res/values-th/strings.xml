@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">รีบูตเพื่อให้มีผล</string>
     <string name="module_magisk_conflict">โมดูลไม่สามารถใช้งานได้ เนื่องจากขัดแย้งกับ Magisk!</string>
     <string name="home_learn_kernelsu">เรียนรู้เกี่ยวกับ ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">เรียนรู้วิธีการติดตั้ง ApkeSU และวิธีใช้งานโมดูลต่าง ๆ</string>
     <string name="home_support_title">สนับสนุนพวกเรา</string>
     <string name="home_support_content">ApkeSU จะเป็นโอเพ่นซอร์สฟรีเสมอ อย่างไรก็ตาม คุณสามารถแสดงความห่วงใยได้ด้วยการบริจาค</string>

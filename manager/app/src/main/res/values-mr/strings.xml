@@ -41,7 +41,7 @@
     <string name="safe_mode">सुरक्षित मोड</string>
     <string name="reboot_to_apply">प्रभावी होण्यासाठी रीबूट करा</string>
     <string name="home_learn_kernelsu">ApkeSU शिका</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="module_magisk_conflict">मॉड्यूल अक्षम केले आहेत कारण ते Magisk च्या विरोधाभास आहे!</string>
     <string name="home_click_to_learn_kernelsu">ApkeSU कसे स्थापित करायचे आणि मॉड्यूल कसे वापरायचे ते शिका</string>
     <string name="home_support_content">ApkeSU विनामूल्य आणि मुक्त स्रोत आहे, आणि नेहमीच असेल. तथापि, देणगी देऊन तुम्ही आम्हाला दाखवू शकता की तुमची काळजी आहे.</string>

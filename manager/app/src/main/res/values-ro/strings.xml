@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">Repornește pentru ca modificările să intre în vigoare</string>
     <string name="module_magisk_conflict">Modulele sunt dezactivate deoarece sunt în conflict cu cele ale Magisk-ului!</string>
     <string name="home_learn_kernelsu">Află mai multe despre ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Află cum să instalezi ApkeSU și să utilizezi module</string>
     <string name="home_support_title">Suport</string>
     <string name="home_support_content">ApkeSU este, și va fi întotdeauna, gratuit și cu codul sursă deschis. Cu toate acestea, ne poți arăta că îți pasă făcând o donație.</string>

@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">Mulai ulang untuk menerapkan</string>
     <string name="module_magisk_conflict">Modul tidak tersedia karena konflik dengan Magisk!</string>
     <string name="home_learn_kernelsu">Pelajari ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/id_ID/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Pelajari cara memasang ApkeSU dan menggunakan modul.</string>
     <string name="home_support_title">Dukung Kami</string>
     <string name="home_support_content">ApkeSU akan selalu menjadi aplikasi gratis dan serta bersumber terbuka. Bagaimanapun juga, Anda dapat menunjukan kepedulian Anda kepada kami dengan memberikan sedikit donasi.</string>

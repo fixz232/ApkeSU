@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">Перезавантажте, щоб застосувати</string>
     <string name="module_magisk_conflict">Модулі недоступні через конфлікт з Magisk!</string>
     <string name="home_learn_kernelsu">Дізнайтеся про ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Дізнайтеся, як інсталювати ApkeSU і використовувати модулі.</string>
     <string name="home_support_title">Підтримати нас</string>
     <string name="home_support_content">ApkeSU є і завжди буде безкоштовним програмним забезпеченням з відкритим вихідним кодом. Однак ви можете показати нам, що вам небайдужа наша допомога, зробивши пожертву.</string>

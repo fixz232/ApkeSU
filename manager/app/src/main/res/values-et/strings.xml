@@ -16,7 +16,7 @@
     <string name="safe_mode">Turvarežiim</string>
     <string name="reboot_to_apply">Muudatuste rakendamiseks taaskäivita</string>
     <string name="home_learn_kernelsu">Õpi ApkeSUd</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="profile_default">Vaikimisi</string>
     <string name="profile_namespace">Haagi nimeruum</string>
     <string name="profile_umount_modules">Lahtihaagitud moodulid</string>

@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">Qüvvəyə minməsi üçün yenidən başlat</string>
     <string name="module_magisk_conflict">Modular deaktiv edilir,çünki o Magisk-in modulları ilə toqquşur!</string>
     <string name="home_learn_kernelsu">ApkeSU-yu öyrən</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_support_title">Bizi dəstəkləyin</string>
     <string name="home_click_to_learn_kernelsu">ApkeSU-yu necə quraşdırılacağını və modulların necə istifadə ediləcəyini öyrən</string>
     <string name="profile_template">Şablon</string>

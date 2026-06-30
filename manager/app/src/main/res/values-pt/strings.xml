@@ -67,7 +67,7 @@
     <string name="module_start_downloading">Iniciar o download: %s</string>
     <string name="module_downloading">Baixando módulo: %s</string>
     <string name="failed_to_update_sepolicy">Falha ao atualizar as regras do SELinux para: %s</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="restart_app">Reiniciar</string>
     <string name="launch_app">Lançar</string>
     <string name="force_stop_app">Forçar parada</string>

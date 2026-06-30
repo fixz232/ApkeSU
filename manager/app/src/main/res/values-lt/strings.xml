@@ -25,7 +25,7 @@
     <string name="safe_mode">Saugus rėžimas</string>
     <string name="reboot_to_apply">Paleiskite iš naujo, kad įsigaliotų</string>
     <string name="module_magisk_conflict">Moduliai yra išjungti, nes jie konfliktuoja su Magisk\'s!</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_learn_kernelsu">Sužinokite apie ApkeSU</string>
     <string name="home_click_to_learn_kernelsu">Sužinokite, kaip įdiegti ApkeSU ir naudoti modulius</string>
     <string name="profile_default">Numatytas</string>

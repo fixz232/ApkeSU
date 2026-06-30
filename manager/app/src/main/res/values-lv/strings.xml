@@ -43,7 +43,7 @@
     <string name="send_log">Sūtīt žurnālus</string>
     <string name="reboot_to_apply">Restartējiet, lai stātos spēkā</string>
     <string name="home_learn_kernelsu">Uzzināt par ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Uzzināt, kā instalēt ApkeSU un izmantot moduļus</string>
     <string name="home_support_title">Atbalsti mūs</string>
     <string name="profile_default">Noklusējums</string>

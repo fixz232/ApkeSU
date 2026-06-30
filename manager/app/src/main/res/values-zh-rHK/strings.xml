@@ -45,7 +45,7 @@
     <string name="reboot_to_apply">重新啟動後生效</string>
     <string name="module_magisk_conflict">模組已停用，因與 Magisk 有衝突！</string>
     <string name="home_learn_kernelsu">深入了解 ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/zh_TW/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">了解如何安裝 ApkeSU 及使用模組</string>
     <string name="home_support_title">支持開發</string>
     <string name="home_support_content">ApkeSU 承諾永久免費且開源，歡迎捐款支持</string>

@@ -43,7 +43,7 @@
     <string name="reboot_to_apply">Değişikliklerin uygulanması için cihazı yeniden başlat</string>
     <string name="module_magisk_conflict">Magisk ile çakışma nedeniyle modüller kullanılamıyor!</string>
     <string name="home_learn_kernelsu">ApkeSU\'yu öğrenin</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">ApkeSU\'nun nasıl kurulacağını ve modüllerin nasıl kullanılacağını öğrenin.</string>
     <string name="home_support_title">Bizi Destekleyin</string>
     <string name="home_support_content">ApkeSU ücretsiz ve açık kaynaklı bir yazılımdır ve her zaman öyle kalacaktır. Ancak bağış yaparak bize destek olduğunuzu gösterebilirsiniz.</string>

@@ -28,7 +28,7 @@
     <string name="safe_mode">Sikker tilstand</string>
     <string name="reboot_to_apply">Genstart for at tage effekt</string>
     <string name="home_learn_kernelsu">Lær ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Lær hvordan man installerer ApkeSU og moduler.</string>
     <string name="profile_default">Standard</string>
     <string name="profile_template">Skabelon</string>

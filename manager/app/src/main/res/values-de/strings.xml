@@ -15,7 +15,7 @@
     <string name="module_author">Autor</string>
     <string name="about">Über ApkeSU</string>
     <string name="module_magisk_conflict">Module sind aufgrund eines Konfliktes mit Magisk nicht verfügbar!</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Erfahre, wie ApkeSU installiert wird und wie Module verwendet werden.</string>
     <string name="home_support_title">Unterstütze uns</string>
     <string name="home_support_content">ApkeSU ist und wird immer frei und quelloffen sein. Du kannst uns jedoch deine Unterstützung zeigen, indem du eine Spende tätigst.</string>

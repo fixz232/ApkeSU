@@ -45,7 +45,7 @@
     <string name="home_click_to_learn_kernelsu">ApkeSU 설치 및 모듈 사용 방법을 확인합니다.</string>
     <string name="home_support_title">지원하기</string>
     <string name="home_support_content">ApkeSU는 현재와 미래에도 항상 무료이며 오픈 소스입니다. 기부를 통해 여러분의 관심과 지원을 표현해 주세요.</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="settings_umount_modules_default_summary">앱 프로필 메뉴의 \"모듈 마운트 해제\" 설정에 대한 전역 기본값을 지정합니다. 활성화하면 개별 프로필이 설정되지 않은 앱에는 시스템에 대한 모듈의 모든 수정 사항이 제외됩니다.</string>
     <string name="restart_app">다시 시작</string>
     <string name="profile_selinux_rules">규칙</string>

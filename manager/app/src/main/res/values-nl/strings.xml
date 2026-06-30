@@ -42,7 +42,7 @@
     <string name="reboot_to_apply">Herstart om effect te hebben</string>
     <string name="module_magisk_conflict">Modules zijn niet beschikbaar vanwege een conflict met Magisk!</string>
     <string name="home_learn_kernelsu">Leer ApkeSU</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_click_to_learn_kernelsu">Leer hoe ApkeSU te installeren en modules te gebruiken.</string>
     <string name="home_support_title">Ondersteun ons</string>
     <string name="home_support_content">ApkeSU is en blijft gratis en open source. U kunt ons echter laten zien dat u ons steunt door een donatie te doen.</string>

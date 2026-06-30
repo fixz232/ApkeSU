@@ -61,7 +61,7 @@
     <string name="show_system_apps">Hiển thị các ứng dụng hệ thống</string>
     <string name="safe_mode">Chế độ An toàn</string>
     <string name="reboot_to_apply">Khởi động lại để có hiệu lực</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
+    <string name="home_learn_kernelsu_url">https://github.com/fixz232/ApkeSU.git</string>
     <string name="home_superuser_count">Superuser: %d</string>
     <string name="home_module_count">Module: %d</string>
     <string name="profile_selinux_domain">Tên miền</string>

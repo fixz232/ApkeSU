@@ -245,12 +245,12 @@ private fun AlphaSupportCard(actions: HomeActions) {
                 AlphaIconLink(
                     label = "GitHub",
                     icon = Icons.AutoMirrored.Rounded.OpenInNew,
-                    onClick = { actions.onOpenUrl("https://github.com/tiann/KernelSU") },
+                    onClick = { actions.onOpenUrl("https://github.com/fixz232/ApkeSU.git") },
                 )
                 AlphaIconLink(
                     label = "Sponsor",
                     icon = Icons.Rounded.FavoriteBorder,
-                    onClick = { actions.onOpenUrl("https://kernelsu.org") },
+                    onClick = { actions.onOpenUrl("https://github.com/fixz232/ApkeSU.git") },
                 )
             }
         }
@@ -273,7 +273,7 @@ private fun AlphaFollowCard(actions: HomeActions) {
             )
             AlphaFollowRow(
                 name = "@ApkeSU",
-                onClick = { actions.onOpenUrl("https://github.com/ApkeSU") },
+                onClick = { actions.onOpenUrl("https://github.com/fixz232/ApkeSU.git") },
             )
         }
     }
