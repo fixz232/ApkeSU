@@ -455,11 +455,14 @@ private fun MainActivityUiState.effectiveCustomBackground(mainPage: Int): Custom
 private fun ManagerUpdatePrompt() {
     val context = LocalContext.current
     var updateInfo by remember { mutableStateOf<ManagerUpdateInfo?>(null) }
-    val updateTitle = stringResource(R.string.manager_update_title)
+    val forceUpdate = updateInfo?.force == true
+    val updateTitle = stringResource(
+        if (forceUpdate) R.string.manager_force_update_title else R.string.manager_update_title
+    )
     val downloadText = stringResource(R.string.download)
     val updateContent = updateInfo?.let { latest ->
         val version = stringResource(
-            R.string.manager_update_message,
+            if (latest.force) R.string.manager_force_update_message else R.string.manager_update_message,
             latest.versionName,
             latest.versionCode,
         )
@@ -474,7 +477,11 @@ private fun ManagerUpdatePrompt() {
         onConfirm = {
             updateInfo?.let { ManagerUpdateChecker.download(context, it) }
         },
-        onDismiss = { updateInfo = null },
+        onDismiss = {
+            if (updateInfo?.force != true) {
+                updateInfo = null
+            }
+        },
     )
 
     LaunchedEffect(updateInfo, updateContent, updateTitle, downloadText) {
@@ -485,6 +492,7 @@ private fun ManagerUpdatePrompt() {
             content = content,
             markdown = latest.changelog.isNotBlank(),
             confirm = downloadText,
+            dismissible = !latest.force,
         )
     }
 

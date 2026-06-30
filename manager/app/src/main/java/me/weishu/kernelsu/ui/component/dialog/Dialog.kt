@@ -35,6 +35,7 @@ interface ConfirmDialogVisuals : Parcelable {
     val isHtml: Boolean
     val confirm: String?
     val dismiss: String?
+    val dismissible: Boolean
 }
 
 @Parcelize
@@ -45,9 +46,10 @@ private data class ConfirmDialogVisualsImpl(
     override val isHtml: Boolean,
     override val confirm: String?,
     override val dismiss: String?,
+    override val dismissible: Boolean,
 ) : ConfirmDialogVisuals {
     companion object {
-        val Empty: ConfirmDialogVisuals = ConfirmDialogVisualsImpl("", "", isMarkdown = false, isHtml = false, confirm = null, dismiss = null)
+        val Empty: ConfirmDialogVisuals = ConfirmDialogVisualsImpl("", "", isMarkdown = false, isHtml = false, confirm = null, dismiss = null, dismissible = true)
     }
 }
 
@@ -77,7 +79,8 @@ interface ConfirmDialogHandle : DialogHandle {
         markdown: Boolean = false,
         html: Boolean = false,
         confirm: String? = null,
-        dismiss: String? = null
+        dismiss: String? = null,
+        dismissible: Boolean = true,
     )
 
     suspend fun awaitConfirm(
@@ -86,7 +89,8 @@ interface ConfirmDialogHandle : DialogHandle {
         markdown: Boolean = false,
         html: Boolean = false,
         confirm: String? = null,
-        dismiss: String? = null
+        dismiss: String? = null,
+        dismissible: Boolean = true,
     ): ConfirmResult
 }
 
@@ -248,10 +252,11 @@ private class ConfirmDialogHandleImpl(
         markdown: Boolean,
         html: Boolean,
         confirm: String?,
-        dismiss: String?
+        dismiss: String?,
+        dismissible: Boolean,
     ) {
         coroutineScope.launch {
-            updateVisuals(ConfirmDialogVisualsImpl(title, content, markdown, html, confirm, dismiss))
+            updateVisuals(ConfirmDialogVisualsImpl(title, content, markdown, html, confirm, dismiss, dismissible))
             show()
         }
     }
@@ -262,10 +267,11 @@ private class ConfirmDialogHandleImpl(
         markdown: Boolean,
         html: Boolean,
         confirm: String?,
-        dismiss: String?
+        dismiss: String?,
+        dismissible: Boolean,
     ): ConfirmResult {
         coroutineScope.launch {
-            updateVisuals(ConfirmDialogVisualsImpl(title, content, markdown, html, confirm, dismiss))
+            updateVisuals(ConfirmDialogVisualsImpl(title, content, markdown, html, confirm, dismiss, dismissible))
             show()
         }
         return awaitResult()

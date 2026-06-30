@@ -48,8 +48,10 @@ fun ConfirmDialogMaterial(
     if (showDialog.value) {
         AlertDialog(
             onDismissRequest = {
-                dismiss()
-                showDialog.value = false
+                if (visuals.dismissible) {
+                    dismiss()
+                    showDialog.value = false
+                }
             },
             title = { Text(visuals.title) },
             text = {
@@ -71,16 +73,18 @@ fun ConfirmDialogMaterial(
                     Text(visuals.confirm ?: stringResource(id = android.R.string.ok))
                 }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        dismiss()
-                        showDialog.value = false
+            dismissButton = if (visuals.dismissible) {
+                {
+                    TextButton(
+                        onClick = {
+                            dismiss()
+                            showDialog.value = false
+                        }
+                    ) {
+                        Text(visuals.dismiss ?: stringResource(id = android.R.string.cancel))
                     }
-                ) {
-                    Text(visuals.dismiss ?: stringResource(id = android.R.string.cancel))
                 }
-            }
+            } else null
         )
     }
 }

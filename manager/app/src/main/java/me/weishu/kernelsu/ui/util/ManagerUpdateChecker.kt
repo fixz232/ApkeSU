@@ -14,6 +14,7 @@ data class ManagerUpdateInfo(
     val fileName: String,
     val downloadUrl: String,
     val changelog: String,
+    val force: Boolean,
 )
 
 object ManagerUpdateChecker {
@@ -23,12 +24,20 @@ object ManagerUpdateChecker {
     private val apkNamePattern = Regex("""^ApkeSU_(.+)_(\d+)(?:-[^.]+)?\.apk$""", RegexOption.IGNORE_CASE)
     private val trailingVersionCodePattern = Regex("""_(\d+)(?:-[^.]+)?\.apk$""", RegexOption.IGNORE_CASE)
     private val releaseVersionCodePattern = Regex("""(?im)^\s*versionCode\s*[:=]\s*(\d+)\s*$""")
+    private val forceUpdatePattern = Regex("""(?im)^\s*(forceUpdate|force_update|mandatoryUpdate|mandatory_update)\s*[:=]\s*(true|1|yes|on)\s*$""")
+    private val forceUpdateBelowPattern = Regex(
+        """(?im)^\s*(forceUpdateBelowVersionCode|forceUpdateBelow|force_update_below|minimumSupportedVersionCode|minVersionCode)\s*[:=]\s*(\d+)\s*$"""
+    )
+    private val updateDirectiveLinePattern = Regex(
+        """(?im)^\s*(versionCode|forceUpdate|force_update|mandatoryUpdate|mandatory_update|forceUpdateBelowVersionCode|forceUpdateBelow|force_update_below|minimumSupportedVersionCode|minVersionCode)\s*[:=].*(?:\r?\n)?"""
+    )
 
     suspend fun checkLatest(context: Context): ManagerUpdateInfo? = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PREF_CHECK_UPDATE, true) || BuildConfig.IS_PR_BUILD) {
+        if (BuildConfig.IS_PR_BUILD) {
             return@withContext null
         }
+        val allowOptionalUpdate = prefs.getBoolean(PREF_CHECK_UPDATE, true)
 
         runCatching {
             val request = Request.Builder()
@@ -39,6 +48,7 @@ object ManagerUpdateChecker {
             ksuApp.okhttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@runCatching null
                 parseRelease(JSONObject(response.body.string()))
+                    ?.takeIf { allowOptionalUpdate || it.force }
             }
         }.getOrNull()
     }
@@ -57,11 +67,13 @@ object ManagerUpdateChecker {
         val releaseName = release.optString("name")
             .ifBlank { release.optString("tag_name") }
             .ifBlank { "latest" }
-        val changelog = release.optString("body")
-        val releaseVersionCode = releaseVersionCodePattern.find(changelog)
+        val rawChangelog = release.optString("body")
+        val changelog = sanitizeChangelog(rawChangelog)
+        val releaseVersionCode = releaseVersionCodePattern.find(rawChangelog)
             ?.groupValues
             ?.getOrNull(1)
             ?.toIntOrNull()
+        val forceUpdate = shouldForceUpdate(rawChangelog)
         val assets = release.optJSONArray("assets") ?: return null
         var best: ManagerUpdateInfo? = null
 
@@ -73,7 +85,7 @@ object ManagerUpdateChecker {
             val downloadUrl = asset.optString("browser_download_url")
             if (downloadUrl.isBlank()) continue
 
-            val parsed = parseApkAsset(fileName, releaseName, releaseVersionCode, downloadUrl, changelog)
+            val parsed = parseApkAsset(fileName, releaseName, releaseVersionCode, downloadUrl, changelog, forceUpdate)
                 ?: continue
             if (best == null || parsed.versionCode > best.versionCode) {
                 best = parsed
@@ -89,6 +101,7 @@ object ManagerUpdateChecker {
         releaseVersionCode: Int?,
         downloadUrl: String,
         changelog: String,
+        force: Boolean,
     ): ManagerUpdateInfo? {
         val fullMatch = apkNamePattern.matchEntire(fileName)
         if (fullMatch != null) {
@@ -99,6 +112,7 @@ object ManagerUpdateChecker {
                 fileName = fileName,
                 downloadUrl = downloadUrl,
                 changelog = changelog,
+                force = force,
             )
         }
 
@@ -115,6 +129,22 @@ object ManagerUpdateChecker {
             fileName = fileName,
             downloadUrl = downloadUrl,
             changelog = changelog,
+            force = force,
         )
+    }
+
+    private fun shouldForceUpdate(changelog: String): Boolean {
+        if (forceUpdatePattern.containsMatchIn(changelog)) return true
+
+        val forceBelowVersionCode = forceUpdateBelowPattern.find(changelog)
+            ?.groupValues
+            ?.getOrNull(2)
+            ?.toIntOrNull()
+            ?: return false
+        return BuildConfig.VERSION_CODE < forceBelowVersionCode
+    }
+
+    private fun sanitizeChangelog(changelog: String): String {
+        return changelog.replace(updateDirectiveLinePattern, "").trim()
     }
 }

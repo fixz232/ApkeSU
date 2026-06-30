@@ -70,8 +70,10 @@ fun ConfirmDialogMiuix(
         modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)),
         title = visuals.title,
         onDismissRequest = {
-            dismiss()
-            showDialog.value = false
+            if (visuals.dismissible) {
+                dismiss()
+                showDialog.value = false
+            }
         },
         content = {
             Layout(
@@ -88,17 +90,19 @@ fun ConfirmDialogMiuix(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.padding(top = 12.dp)
                     ) {
-                        TextButton(
-                            text = visuals.dismiss ?: stringResource(id = android.R.string.cancel),
-                            onClick = {
-                                dismiss()
-                                dismissState?.invoke()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .globalLiquidGlassButton()
-                        )
-                        Spacer(Modifier.width(20.dp))
+                        if (visuals.dismissible) {
+                            TextButton(
+                                text = visuals.dismiss ?: stringResource(id = android.R.string.cancel),
+                                onClick = {
+                                    dismiss()
+                                    dismissState?.invoke()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .globalLiquidGlassButton()
+                            )
+                            Spacer(Modifier.width(20.dp))
+                        }
                         TextButton(
                             text = visuals.confirm ?: stringResource(id = android.R.string.ok),
                             onClick = {

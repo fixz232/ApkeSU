@@ -257,6 +257,8 @@
     <string name="settings_check_update_summary">Automatically check for updates when opening the app.</string>
     <string name="manager_update_title">Update available</string>
     <string name="manager_update_message">ApkeSU Manager %1$s (%2$d) is available.</string>
+    <string name="manager_force_update_title">Update required</string>
+    <string name="manager_force_update_message">This version is no longer supported. Please update to ApkeSU Manager %1$s (%2$d) to continue.</string>
     <string name="manager_update_changelog">%1$s\n\n%2$s</string>
     <string name="settings_enable_predictive_back">Predictive back gesture</string>
     <string name="settings_enable_predictive_back_summary">Enable predictive back gesture support.</string>

@@ -215,6 +215,11 @@
     <string name="app_profile_affects_following_apps">影响以下应用</string>
     <string name="settings_check_update">检查更新</string>
     <string name="settings_check_update_summary">在应用启动后自动检查是否有最新版</string>
+    <string name="manager_update_title">发现新版本</string>
+    <string name="manager_update_message">ApkeSU 管理器 %1$s (%2$d) 可用。</string>
+    <string name="manager_force_update_title">需要更新</string>
+    <string name="manager_force_update_message">当前版本已停止支持，请更新到 ApkeSU 管理器 %1$s (%2$d) 后继续使用。</string>
+    <string name="manager_update_changelog">%1$s\n\n%2$s</string>
     <string name="settings_enable_predictive_back">预测性返回手势</string>
     <string name="settings_enable_predictive_back_summary">启用对预测性返回手势的支持</string>
     <string name="settings_module_check_update">检查模块更新</string>
