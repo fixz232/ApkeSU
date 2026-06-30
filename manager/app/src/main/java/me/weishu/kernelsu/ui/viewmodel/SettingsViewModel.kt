@@ -19,6 +19,8 @@ import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.theme.ColorMode
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -53,6 +55,8 @@ class SettingsViewModel(
         viewModelScope.launch(refreshExceptionHandler) {
             val checkModuleUpdate = repo.checkModuleUpdate
             val showVersionMismatchWarning = repo.showVersionMismatchWarning
+            val showHomeSupportCard = repo.showHomeSupportCard
+            val showHomeLearnCard = repo.showHomeLearnCard
             val themeMode = repo.themeMode
             val miuixMonet = repo.miuixMonet
             val keyColor = repo.keyColor
@@ -65,6 +69,9 @@ class SettingsViewModel(
             val pageScale = repo.pageScale
             val fontScale = repo.fontScale
             val blurIntensity = repo.blurIntensity
+            val switchStyle = repo.switchStyle
+            val globalSnowEnabled = repo.globalSnowEnabled
+            val globalSnowEffect = repo.globalSnowEffect
             val themeSyncStrategy = repo.themeSyncStrategy
             val customThemePresets = repo.getCustomThemePresets()
             val enableWebDebugging = repo.enableWebDebugging
@@ -126,6 +133,7 @@ class SettingsViewModel(
             val isAvcSpoofEnabled = repo.isAvcSpoofEnabled()
             val isDefaultUmountModules = repo.isDefaultUmountModules()
             val builtinMountStatus = repo.getBuiltinMountStatus()
+            val kPatchNextStatus = repo.getKPatchNextStatus()
             val isEpkesuHideEnabled = repo.getEpkesuHideStatus()
             val autoJailbreak = repo.autoJailbreak
             val isLateLoadMode = Natives.isLateLoadMode
@@ -135,6 +143,8 @@ class SettingsViewModel(
                     uiMode = uiMode,
                     checkModuleUpdate = checkModuleUpdate,
                     showVersionMismatchWarning = showVersionMismatchWarning,
+                    showHomeSupportCard = showHomeSupportCard,
+                    showHomeLearnCard = showHomeLearnCard,
                     themeMode = themeMode,
                     miuixMonet = miuixMonet,
                     keyColor = keyColor,
@@ -146,6 +156,9 @@ class SettingsViewModel(
                     pageScale = pageScale,
                     fontScale = fontScale,
                     blurIntensity = blurIntensity,
+                    switchStyle = switchStyle,
+                    globalSnowEnabled = globalSnowEnabled,
+                    globalSnowEffect = globalSnowEffect,
                     themeSyncStrategy = themeSyncStrategy,
                     customThemePresets = customThemePresets,
                     enableWebDebugging = enableWebDebugging,
@@ -189,6 +202,14 @@ class SettingsViewModel(
                     builtinMountDefaultMode = builtinMountStatus.defaultMode,
                     isBuiltinMountWebUiAvailable = builtinMountStatus.webUi,
                     builtinMountConflict = builtinMountStatus.conflict,
+                    isKPatchNextInstalled = kPatchNextStatus.installed,
+                    isKPatchNextEnabled = kPatchNextStatus.enabled,
+                    isKPatchNextPendingUpdate = kPatchNextStatus.pendingUpdate,
+                    isKPatchNextPendingRemove = kPatchNextStatus.pendingRemove,
+                    isKPatchNextWebUiAvailable = kPatchNextStatus.webUi,
+                    isKPatchNextUnresolved = kPatchNextStatus.unresolved,
+                    kPatchNextVersion = kPatchNextStatus.version,
+                    kPatchNextConflict = kPatchNextStatus.conflict,
                     isEpkesuHideEnabled = isEpkesuHideEnabled,
                     isLkmMode = isLkmMode,
                     autoJailbreak = autoJailbreak,
@@ -289,6 +310,27 @@ class SettingsViewModel(
     fun setShowVersionMismatchWarning(enabled: Boolean) {
         repo.showVersionMismatchWarning = enabled
         _uiState.update { it.copy(showVersionMismatchWarning = enabled) }
+    }
+
+    fun setShowHomeSupportCard(enabled: Boolean) {
+        repo.showHomeSupportCard = enabled
+        _uiState.update { it.copy(showHomeSupportCard = enabled) }
+    }
+
+    fun setShowHomeLearnCard(enabled: Boolean) {
+        repo.showHomeLearnCard = enabled
+        _uiState.update { it.copy(showHomeLearnCard = enabled) }
+    }
+
+    fun setGlobalSnowEnabled(enabled: Boolean) {
+        repo.globalSnowEnabled = enabled
+        _uiState.update { it.copy(globalSnowEnabled = enabled) }
+    }
+
+    fun setGlobalSnowEffectIndex(index: Int) {
+        val effect = GlobalSnowEffect.fromIndex(index)
+        repo.globalSnowEffect = effect.value
+        _uiState.update { it.copy(globalSnowEffect = effect.value) }
     }
 
     fun setLauncherIconByIndex(index: Int) {
@@ -475,6 +517,10 @@ class SettingsViewModel(
         _uiState.update { it.copy(themeMode = effectiveMode, themePreset = ThemePreset.CUSTOM.value) }
     }
 
+    fun setDayNightMode(enabled: Boolean) {
+        setThemeMode(if (enabled) ColorMode.DARK.value else ColorMode.LIGHT.value)
+    }
+
     fun setColorMode(mode: ColorMode) {
         repo.themeMode = mode.value
         _uiState.update { it.copy(themeMode = mode.value, themePreset = ThemePreset.CUSTOM.value) }
@@ -612,6 +658,12 @@ class SettingsViewModel(
     fun setBlurIntensity(intensity: Float) {
         repo.blurIntensity = intensity
         _uiState.update { it.copy(blurIntensity = repo.blurIntensity, themePreset = ThemePreset.CUSTOM.value) }
+    }
+
+    fun setSwitchStyleIndex(index: Int) {
+        val style = SwitchStyle.fromIndex(index).value
+        repo.switchStyle = style
+        _uiState.update { it.copy(switchStyle = style) }
     }
 
     fun saveCustomThemePreset(name: String) {
@@ -781,6 +833,22 @@ class SettingsViewModel(
         }
     }
 
+    fun setKPatchNextEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (repo.setKPatchNextEnabled(enabled)) {
+                refreshKPatchNextStatus()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(ksuApp, R.string.settings_kpatch_next_reboot_required, Toast.LENGTH_LONG).show()
+                }
+            } else {
+                refreshKPatchNextStatus()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(ksuApp, R.string.settings_kpatch_next_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     fun setEpkesuHideEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setEpkesuHideEnabled(enabled)) {
@@ -801,6 +869,22 @@ class SettingsViewModel(
                 builtinMountDefaultMode = status.defaultMode,
                 isBuiltinMountWebUiAvailable = status.webUi,
                 builtinMountConflict = status.conflict,
+            )
+        }
+    }
+
+    private suspend fun refreshKPatchNextStatus() {
+        val status = repo.getKPatchNextStatus()
+        _uiState.update {
+            it.copy(
+                isKPatchNextInstalled = status.installed,
+                isKPatchNextEnabled = status.enabled,
+                isKPatchNextPendingUpdate = status.pendingUpdate,
+                isKPatchNextPendingRemove = status.pendingRemove,
+                isKPatchNextWebUiAvailable = status.webUi,
+                isKPatchNextUnresolved = status.unresolved,
+                kPatchNextVersion = status.version,
+                kPatchNextConflict = status.conflict,
             )
         }
     }

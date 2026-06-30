@@ -41,7 +41,7 @@ def patch_file(path: Path) -> None:
         ("KernelSU", OLD_HASH, OLD_CMP_SIZE, OLD_MOV_SIZE),
         ("SukiSU", SUKISU_HASH, SUKISU_CMP_SIZE, SUKISU_MOV_SIZE),
         ("KOWX712", KOWX_HASH, KOWX_CMP_SIZE, KOWX_MOV_SIZE),
-        ("EpkeSU-new", EPKESU_NEW_HASH, EPKESU_NEW_CMP_SIZE, EPKESU_NEW_MOV_SIZE),
+        ("ApkeSU-new", EPKESU_NEW_HASH, EPKESU_NEW_CMP_SIZE, EPKESU_NEW_MOV_SIZE),
     ]
     matches = [
         variant
@@ -79,7 +79,7 @@ def iter_targets(values: Iterable[str]) -> Iterable[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Patch bundled KernelSU LKM manager identity for the EpkeSU release key."
+        description="Patch bundled KernelSU LKM manager identity for the ApkeSU release key."
     )
     parser.add_argument("targets", nargs="+", help="LKM .ko file or directory")
     args = parser.parse_args()

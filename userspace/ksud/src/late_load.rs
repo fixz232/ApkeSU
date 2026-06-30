@@ -150,6 +150,19 @@ fn resolve_manager_appid(package_name: &str, manager_uid: Option<u32>) -> Option
     })
 }
 
+fn register_manager_appid(appid: Option<u32>) {
+    if let Some(appid) = appid {
+        match ksucalls::set_manager_appid(appid) {
+            Ok(()) => info!("Registered manager appid {appid}"),
+            Err(e) => warn!("set manager appid failed: {e}"),
+        }
+    }
+}
+
+pub fn register_default_manager_appid() {
+    register_manager_appid(resolve_manager_appid(defs::DEFAULT_MANAGER_PACKAGE, None));
+}
+
 pub fn run(
     package_name: &str,
     manager_uid: Option<u32>,
@@ -194,12 +207,7 @@ pub fn run(
         dump_process_info("after load_module");
     }
 
-    if let Some(appid) = manager_appid {
-        match ksucalls::set_manager_appid(appid) {
-            Ok(()) => info!("Registered manager appid {appid}"),
-            Err(e) => warn!("set manager appid failed: {e}"),
-        }
-    }
+    register_manager_appid(manager_appid);
 
     // We need to reset stdin/stdout/stderr; otherwise, sending file descriptors via cmd transactions
     // will be blocked by SELinux because its fsec->sid is still u:r:su:s0 instead of u:r:ksu:s0.

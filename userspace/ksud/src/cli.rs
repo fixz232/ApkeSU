@@ -8,8 +8,8 @@ use log::{LevelFilter, error, info};
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
 use crate::{
-    apk_sign, assets, builtin_mount, debug, defs, epkesu_hide, init_event, ksu_uapi, ksucalls,
-    module, module_config, sulog, utils,
+    apk_sign, assets, builtin_mount, debug, defs, epkesu_hide, init_event, kpatch_next, ksu_uapi,
+    ksucalls, module, module_config, pathmask, sulog, utils,
 };
 
 /// KernelSU userspace cli
@@ -34,10 +34,22 @@ enum Commands {
         command: BuiltinMount,
     },
 
-    /// Manage EpkeSU Hide
+    /// Manage built-in KPatch Next
+    KpatchNext {
+        #[command(subcommand)]
+        command: KpatchNext,
+    },
+
+    /// Manage ApkeSU Hide
     EpkesuHide {
         #[command(subcommand)]
         command: EpkesuHide,
+    },
+
+    /// Manage built-in pathmask LKM
+    Pathmask {
+        #[command(subcommand)]
+        command: Pathmask,
     },
 
     /// Trigger `post-fs-data` event
@@ -399,18 +411,60 @@ enum BuiltinMount {
 }
 
 #[derive(clap::Subcommand, Debug)]
-enum EpkesuHide {
-    /// Print EpkeSU Hide status as JSON
+enum KpatchNext {
+    /// Print built-in KPatch Next status as JSON
     Status,
 
-    /// Enable EpkeSU Hide and apply it now
+    /// Install or enable built-in KPatch Next
     Enable,
 
-    /// Disable EpkeSU Hide
+    /// Disable built-in KPatch Next
+    Disable,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum EpkesuHide {
+    /// Print ApkeSU Hide status as JSON
+    Status,
+
+    /// Enable ApkeSU Hide and apply it now
+    Enable,
+
+    /// Disable ApkeSU Hide
     Disable,
 
-    /// Apply EpkeSU Hide property changes now
+    /// Apply ApkeSU Hide property changes now
     Apply,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Pathmask {
+    /// Print pathmask config and runtime status as JSON
+    Status,
+
+    /// Import pathmask config JSON from file
+    Import {
+        /// config JSON file path
+        file: PathBuf,
+    },
+
+    /// Import pathmask config JSON from an argument
+    ImportJson {
+        /// config JSON content
+        json: String,
+    },
+
+    /// Apply saved config by hot-reloading pathmask LKM
+    Apply,
+
+    /// Unload current pathmask LKM and clear kernel hidden paths
+    Unload,
+
+    /// Print manager and kernel pathmask logs
+    Logs,
+
+    /// Clear manager pathmask logs
+    ClearLogs,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -683,6 +737,17 @@ pub fn run() -> Result<()> {
                 }
             }
         }
+        Commands::KpatchNext { command } => {
+            utils::switch_mnt_ns(1)?;
+            match command {
+                KpatchNext::Status => {
+                    kpatch_next::print_status();
+                    Ok(())
+                }
+                KpatchNext::Enable => kpatch_next::enable(),
+                KpatchNext::Disable => kpatch_next::disable(),
+            }
+        }
         Commands::EpkesuHide { command } => {
             utils::switch_mnt_ns(1)?;
             match command {
@@ -693,6 +758,24 @@ pub fn run() -> Result<()> {
                 EpkesuHide::Enable => epkesu_hide::enable(),
                 EpkesuHide::Disable => epkesu_hide::disable(),
                 EpkesuHide::Apply => epkesu_hide::apply(),
+            }
+        }
+        Commands::Pathmask { command } => {
+            utils::switch_mnt_ns(1)?;
+            match command {
+                Pathmask::Status => {
+                    pathmask::print_status();
+                    Ok(())
+                }
+                Pathmask::Import { file } => pathmask::import_config(&file),
+                Pathmask::ImportJson { json } => pathmask::import_config_text(&json),
+                Pathmask::Apply => pathmask::apply(),
+                Pathmask::Unload => pathmask::unload(),
+                Pathmask::Logs => {
+                    pathmask::print_logs();
+                    Ok(())
+                }
+                Pathmask::ClearLogs => pathmask::clear_logs(),
             }
         }
         Commands::Install { libadbroot } => utils::install(libadbroot),

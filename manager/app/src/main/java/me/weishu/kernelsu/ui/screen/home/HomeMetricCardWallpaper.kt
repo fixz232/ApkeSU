@@ -43,6 +43,7 @@ internal const val HOME_METRIC_CARD_WALLPAPER_ASPECT_RATIO = 1.72f
 
 private const val HOME_LKM_CARD_WALLPAPER_ASPECT_RATIO = 1.08f
 private const val HOME_METRIC_CARD_WALLPAPER_MAX_SIDE = 1200
+private const val HOME_REBOOT_MENU_WALLPAPER_ASPECT_RATIO = 0.72f
 
 internal enum class HomeMetricCardWallpaperTarget(
     private val keyPrefix: String,
@@ -97,6 +98,15 @@ internal enum class HomeMetricCardWallpaperTarget(
         cropLabelRes = R.string.home_system_info_wallpaper_crop,
         previewLabelRes = R.string.home_system_info_wallpaper_preview,
         clearLabelRes = R.string.home_system_info_wallpaper_clear,
+    ),
+    RebootMenu(
+        keyPrefix = "home_reboot_menu_wallpaper",
+        titleRes = R.string.home_card_reboot_menu,
+        aspectRatio = HOME_REBOOT_MENU_WALLPAPER_ASPECT_RATIO,
+        pickLabelRes = R.string.home_reboot_menu_wallpaper_pick,
+        cropLabelRes = R.string.home_reboot_menu_wallpaper_crop,
+        previewLabelRes = R.string.home_reboot_menu_wallpaper_preview,
+        clearLabelRes = R.string.home_reboot_menu_wallpaper_clear,
     );
 
     val uriKey: String get() = "${keyPrefix}_uri"

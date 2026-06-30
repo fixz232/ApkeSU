@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Videocam
@@ -114,7 +115,11 @@ private val homeCardWallpaperSections = listOf(
     HomeCardWallpaperSectionSpec(
         titleRes = R.string.home_card_wallpapers_system_section,
         summaryRes = R.string.home_card_wallpapers_system_section_summary,
-        targets = listOf(HomeMetricCardWallpaperTarget.StatusMonitor, HomeMetricCardWallpaperTarget.SystemInfo),
+        targets = listOf(
+            HomeMetricCardWallpaperTarget.StatusMonitor,
+            HomeMetricCardWallpaperTarget.SystemInfo,
+            HomeMetricCardWallpaperTarget.RebootMenu,
+        ),
     ),
 )
 
@@ -644,6 +649,12 @@ private fun HomeCardWallpaperSampleContent(
                 primaryColor = primaryColor,
                 secondaryColor = secondaryColor,
             )
+
+            HomeMetricCardWallpaperTarget.RebootMenu -> HomeCardWallpaperRebootMenuSample(
+                primaryColor = primaryColor,
+                secondaryColor = secondaryColor,
+                accentColor = accentColor,
+            )
         }
     }
 }
@@ -873,6 +884,54 @@ private fun HomeCardWallpaperSystemInfoSample(
 }
 
 @Composable
+private fun HomeCardWallpaperRebootMenuSample(
+    primaryColor: Color,
+    secondaryColor: Color,
+    accentColor: Color,
+) {
+    val options = listOf(
+        R.string.reboot,
+        R.string.reboot_soft,
+        R.string.reboot_recovery,
+        R.string.reboot_bootloader,
+        R.string.reboot_download,
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                modifier = Modifier.size(18.dp),
+                imageVector = Icons.Rounded.PowerSettingsNew,
+                tint = accentColor,
+                contentDescription = null,
+            )
+            Text(
+                text = stringResource(R.string.home_card_reboot_menu),
+                color = primaryColor,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        options.forEach { labelRes ->
+            Text(
+                text = stringResource(labelRes),
+                color = secondaryColor,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 private fun HomeCardWallpaperInfoLineSample(
     label: String,
     value: String,
@@ -930,6 +989,7 @@ private fun homeCardWallpaperTargetIcon(
     HomeMetricCardWallpaperTarget.Module -> Icons.Rounded.Extension
     HomeMetricCardWallpaperTarget.StatusMonitor -> Icons.Rounded.Security
     HomeMetricCardWallpaperTarget.SystemInfo -> Icons.Rounded.Info
+    HomeMetricCardWallpaperTarget.RebootMenu -> Icons.Rounded.PowerSettingsNew
 }
 
 @Composable

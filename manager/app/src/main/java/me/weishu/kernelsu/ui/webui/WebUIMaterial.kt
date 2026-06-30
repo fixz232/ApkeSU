@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -87,6 +88,7 @@ fun HandleWebUIEventMaterial(
             val state = remember(event) { mutableStateOf(event.defaultValue) }
             if (showDialog.value) {
                 AlertDialog(
+                    modifier = Modifier.imePadding(),
                     onDismissRequest = {
                         webUIState.onPromptResult(null)
                         showDialog.value = false
@@ -117,6 +119,7 @@ fun HandleWebUIEventMaterial(
                                 label = { Text(event.message) },
                                 value = state.value,
                                 onValueChange = { state.value = it },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }

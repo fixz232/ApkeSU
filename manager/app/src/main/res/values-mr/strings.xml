@@ -6,7 +6,7 @@
     <string name="home_working">कार्यरत</string>
     <string name="home_working_version">आवृत्ती: %s</string>
     <string name="home_unsupported">असमर्थित</string>
-    <string name="home_unsupported_reason">EpkeSU आता फक्त GKI कर्नलचे समर्थन करते</string>
+    <string name="home_unsupported_reason">ApkeSU आता फक्त GKI कर्नलचे समर्थन करते</string>
     <string name="home_kernel">कर्नल</string>
     <string name="home_fingerprint">फिंगरप्रिंट</string>
     <string name="home_manager_version">व्यवस्थापक आवृत्ती</string>
@@ -40,11 +40,11 @@
     <string name="send_log">लॉग पाठवा</string>
     <string name="safe_mode">सुरक्षित मोड</string>
     <string name="reboot_to_apply">प्रभावी होण्यासाठी रीबूट करा</string>
-    <string name="home_learn_kernelsu">EpkeSU शिका</string>
+    <string name="home_learn_kernelsu">ApkeSU शिका</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
     <string name="module_magisk_conflict">मॉड्यूल अक्षम केले आहेत कारण ते Magisk च्या विरोधाभास आहे!</string>
-    <string name="home_click_to_learn_kernelsu">EpkeSU कसे स्थापित करायचे आणि मॉड्यूल कसे वापरायचे ते शिका</string>
-    <string name="home_support_content">EpkeSU विनामूल्य आणि मुक्त स्रोत आहे, आणि नेहमीच असेल. तथापि, देणगी देऊन तुम्ही आम्हाला दाखवू शकता की तुमची काळजी आहे.</string>
+    <string name="home_click_to_learn_kernelsu">ApkeSU कसे स्थापित करायचे आणि मॉड्यूल कसे वापरायचे ते शिका</string>
+    <string name="home_support_content">ApkeSU विनामूल्य आणि मुक्त स्रोत आहे, आणि नेहमीच असेल. तथापि, देणगी देऊन तुम्ही आम्हाला दाखवू शकता की तुमची काळजी आहे.</string>
     <string name="home_support_title">आम्हाला पाठिंबा द्या</string>
     <string name="profile_custom">कस्टम</string>
     <string name="profile_namespace">माउंट नेमस्पेस</string>
@@ -52,7 +52,6 @@
     <string name="profile_template">साचा</string>
     <string name="profile_namespace_individual">वैयक्तिक</string>
     <string name="profile_capabilities">क्षमता</string>
-    <string name="about_source_code">%1$s वर स्रोत कोड पहा<br/>आमच्या %2$s चॅनेलमध्ये सामील व्हा</string>
     <string name="profile_name">प्रोफाइल नाव</string>
     <string name="profile_namespace_inherited">इनहेरीटेड</string>
     <string name="profile_namespace_global">जागतिक</string>
@@ -62,7 +61,7 @@
     <string name="failed_to_update_app_profile">%s साठी अॅप प्रोफाइल अपडेट करण्यात अयशस्वी</string>
     <string name="settings_umount_modules_default">डीफॉल्टनुसार मॉड्यूल्स उमाउंट करा</string>
     <string name="settings_umount_modules_default_summary">अॅप प्रोफाइलमधील \"उमाउंट मॉड्यूल्स\" साठी जागतिक डीफॉल्ट मूल्य. सक्षम असल्यास, ते प्रोफाइल सेट नसलेल्या ॲप्लिकेशनचे सिस्टममधील सर्व मॉड्यूल बदल काढून टाकेल.</string>
-    <string name="profile_umount_modules_summary">हा पर्याय सक्षम केल्याने EpkeSU ला या ऍप्लिकेशनसाठी मॉड्यूल्सद्वारे कोणत्याही सुधारित फाइल्स पुनर्संचयित करण्यास अनुमती मिळेल.</string>
+    <string name="profile_umount_modules_summary">हा पर्याय सक्षम केल्याने ApkeSU ला या ऍप्लिकेशनसाठी मॉड्यूल्सद्वारे कोणत्याही सुधारित फाइल्स पुनर्संचयित करण्यास अनुमती मिळेल.</string>
     <string name="failed_to_update_sepolicy">यासाठी SELinux नियम अपडेट करण्यात अयशस्वी: %s</string>
     <string name="profile_selinux_rules">नियम</string>
     <string name="module_update">अपडेट करा</string>
@@ -77,6 +76,6 @@
     <string name="settings_sucompat">su बाइनरी पुन्हा मार्गस्थ करा</string>
     <string name="settings_sucompat_summary">ॲप प्रोफाईलमध्ये सुपरयुझर परवानगी दिलेल्या ॲप्ससाठी /system/bin/su ला ksud वर पुनर्निर्देशित करा; फक्त नवीन प्रक्रियांसाठी प्रभावी.</string>
     <string name="settings_kernel_umount">कर्नल अनमाउंट</string>
-    <string name="settings_kernel_umount_summary">EpkeSU द्वारे नियंत्रित कर्नल-स्तरीय अनमाउंट वर्तन</string>
-    <string name="profile_flags_desc_no_new_privs">या रूट प्रोफाइलच्या संदर्भात EpkeSU द्वारे पुढील अधिकारवाढ रोखते.</string>
+    <string name="settings_kernel_umount_summary">ApkeSU द्वारे नियंत्रित कर्नल-स्तरीय अनमाउंट वर्तन</string>
+    <string name="profile_flags_desc_no_new_privs">या रूट प्रोफाइलच्या संदर्भात ApkeSU द्वारे पुढील अधिकारवाढ रोखते.</string>
 </resources>

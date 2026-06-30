@@ -72,8 +72,10 @@ fun HomePagerAlpha(
                     AlphaWarningsCard(warnings = warnings)
                 }
             }
-            item {
-                AlphaSupportCard(actions = actions)
+            if (state.showHomeSupportCard) {
+                item {
+                    AlphaSupportCard(actions = actions)
+                }
             }
             item {
                 AlphaFollowCard(actions = actions)
@@ -127,7 +129,7 @@ private fun AlphaStatusCard(
                     strong = true,
                 )
                 AlphaInfoLine(
-                    label = "LKM",
+                    label = state.lkmModeLabel,
                     value = alphaYesNo(state.lkmMode == true),
                     strong = true,
                 )
@@ -270,8 +272,8 @@ private fun AlphaFollowCard(actions: HomeActions) {
                 onClick = { actions.onOpenUrl("https://github.com/tiann/KernelSU") },
             )
             AlphaFollowRow(
-                name = "@EpkeSU",
-                onClick = { actions.onOpenUrl("https://github.com/EpkeSU") },
+                name = "@ApkeSU",
+                onClick = { actions.onOpenUrl("https://github.com/ApkeSU") },
             )
         }
     }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
@@ -63,6 +64,7 @@ private fun MaterialThemePresetNameDialog(
     var name by remember(initialName) { mutableStateOf(initialName) }
     val trimmed = name.trim()
     AlertDialog(
+        modifier = Modifier.imePadding(),
         onDismissRequest = onDismissRequest,
         title = { Text(title) },
         text = {
@@ -106,7 +108,10 @@ private fun MiuixThemePresetNameDialog(
         title = title,
         onDismissRequest = onDismissRequest,
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.imePadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 TextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = name,

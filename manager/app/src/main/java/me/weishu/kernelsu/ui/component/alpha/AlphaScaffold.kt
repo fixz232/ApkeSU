@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
 
 private data class AlphaPalette(
     val background: Color,
@@ -411,18 +414,29 @@ fun AlphaSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier.scale(0.88f),
-        enabled = enabled,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = AlphaColors.Accent,
-            checkedTrackColor = AlphaColors.AccentSoft,
-            uncheckedThumbColor = Color.White,
-            uncheckedTrackColor = Color(0xFFD8D8D8),
-        ),
-    )
+    val switchStyle = LocalSwitchStyle.current
+    if (switchStyle == SwitchStyle.Original) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier.scale(0.88f),
+            enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = AlphaColors.Accent,
+                checkedTrackColor = AlphaColors.AccentSoft,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color(0xFFD8D8D8),
+            ),
+        )
+    } else {
+        StyledSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier,
+            enabled = enabled,
+            style = switchStyle,
+        )
+    }
 }
 
 @Composable

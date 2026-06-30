@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_global_snow">全局下雪</string>
+    <string name="settings_global_snow_summary">在整个应用界面显示下雪特效。</string>
+    <string name="settings_global_snow_effect">下雪特效</string>
+    <string name="settings_global_snow_effect_summary">选择全局下雪动画样式。</string>
+    <string name="settings_global_snow_effect_gentle">柔雪</string>
+    <string name="settings_global_snow_effect_blizzard">暴雪</string>
+    <string name="settings_global_snow_effect_starlight">星雪</string>
+    <string name="settings_global_snow_effect_pink">粉雪</string>
+    <string name="settings_global_snow_effect_crystal">冰晶</string>
+</resources>

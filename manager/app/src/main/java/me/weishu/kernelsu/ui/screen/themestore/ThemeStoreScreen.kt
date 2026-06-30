@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
@@ -158,9 +159,12 @@ fun ThemeStoreScreen() {
     var summary by remember { mutableStateOf(readThemeStoreSummary(context)) }
     var busy by rememberSaveable { mutableStateOf(false) }
     var cropTarget by remember { mutableStateOf<CropTarget?>(null) }
+    var pendingCardImageSlot by remember { mutableStateOf<ThemeStoreImageSlot?>(null) }
+    var pendingCardVideoSlot by remember { mutableStateOf<ThemeStoreImageSlot?>(null) }
+    var pendingNavigationIconSlot by remember { mutableStateOf<CustomNavigationIconSlot?>(null) }
     var showWallpaperPreview by rememberSaveable { mutableStateOf(false) }
     var showVideoBackgroundPreview by rememberSaveable { mutableStateOf(false) }
-    var showLkmCardVideoPreview by rememberSaveable { mutableStateOf(false) }
+    var previewCardVideoSlot by rememberSaveable { mutableStateOf<String?>(null) }
     var startupPreviewUri by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun refreshSummary() {
@@ -210,34 +214,38 @@ fun ThemeStoreScreen() {
     val cardImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        val target = cropTarget as? CropTarget.Card ?: return@rememberLauncherForActivityResult
+        val slot = pendingCardImageSlot ?: return@rememberLauncherForActivityResult
+        pendingCardImageSlot = null
         uri ?: return@rememberLauncherForActivityResult
-        val uriString = persistCustomImageReference(context, uri, target.slot.uriKey)
+        val uriString = persistCustomImageReference(context, uri, slot.uriKey)
             ?: uri.toString().also { takePersistableImageReadPermission(context, uri) }
-        setThemeStoreImageSlot(context, target.slot, uriString)
+        setThemeStoreImageSlot(context, slot, uriString)
         refreshSummary()
-        cropTarget = target
+        cropTarget = CropTarget.Card(slot)
     }
-    val lkmCardVideoLauncher = rememberLauncherForActivityResult(
+    val cardVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
+        val slot = pendingCardVideoSlot ?: return@rememberLauncherForActivityResult
+        pendingCardVideoSlot = null
         uri ?: return@rememberLauncherForActivityResult
         takePersistableVideoBackgroundReadPermission(context, uri)
-        setThemeStoreImageSlotVideo(context, ThemeStoreImageSlot.Lkm, uri.toString())
+        setThemeStoreImageSlotVideo(context, slot, uri.toString())
         refreshSummary()
-        cropTarget = CropTarget.Card(ThemeStoreImageSlot.Lkm)
-        showLkmCardVideoPreview = false
+        cropTarget = CropTarget.Card(slot)
+        previewCardVideoSlot = null
     }
     val navigationIconLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        val target = cropTarget as? CropTarget.NavigationIcon ?: return@rememberLauncherForActivityResult
+        val slot = pendingNavigationIconSlot ?: return@rememberLauncherForActivityResult
+        pendingNavigationIconSlot = null
         uri ?: return@rememberLauncherForActivityResult
-        val uriString = persistCustomImageReference(context, uri, target.slot.uriKey)
+        val uriString = persistCustomImageReference(context, uri, slot.uriKey)
             ?: uri.toString().also { takePersistableImageReadPermission(context, uri) }
-        setCustomNavigationIcon(context, target.slot, uriString)
+        setCustomNavigationIcon(context, slot, uriString)
         refreshSummary()
-        cropTarget = target
+        cropTarget = CropTarget.NavigationIcon(slot)
     }
     val wallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -308,30 +316,30 @@ fun ThemeStoreScreen() {
             importLauncher.launch(arrayOf(THEME_STORE_FILE_MIME_TYPE, "application/octet-stream", "*/*"))
         },
         onPickCard = { slot ->
-            cropTarget = CropTarget.Card(slot)
+            pendingCardImageSlot = slot
             cardImageLauncher.launch(arrayOf("image/*"))
         },
         onPickCardVideo = { slot ->
-            if (slot == ThemeStoreImageSlot.Lkm) {
-                cropTarget = null
-                lkmCardVideoLauncher.launch(arrayOf("video/*"))
+            if (slot.supportsVideo) {
+                pendingCardVideoSlot = slot
+                cardVideoLauncher.launch(arrayOf("video/*"))
             }
         },
         onPreviewCardVideo = { slot ->
-            if (slot == ThemeStoreImageSlot.Lkm) {
-                showLkmCardVideoPreview = true
+            if (slot.supportsVideo) {
+                previewCardVideoSlot = slot.name
             }
         },
         onCropCard = { slot -> cropTarget = CropTarget.Card(slot) },
         onClearCard = { slot ->
             setThemeStoreImageSlot(context, slot, null)
             refreshSummary()
-            if (slot == ThemeStoreImageSlot.Lkm) {
-                showLkmCardVideoPreview = false
+            if (slot.name == previewCardVideoSlot) {
+                previewCardVideoSlot = null
             }
         },
         onPickNavigationIcon = { slot ->
-            cropTarget = CropTarget.NavigationIcon(slot)
+            pendingNavigationIconSlot = slot
             navigationIconLauncher.launch(arrayOf("image/*"))
         },
         onCropNavigationIcon = { slot -> cropTarget = CropTarget.NavigationIcon(slot) },
@@ -448,8 +456,8 @@ fun ThemeStoreScreen() {
                     setThemeStoreImageSlotCrop(context, target.slot, it)
                     refreshSummary()
                     cropTarget = null
-                    if (cardState.hasVideoSelected && target.slot == ThemeStoreImageSlot.Lkm) {
-                        showLkmCardVideoPreview = true
+                    if (cardState.hasVideoSelected) {
+                        previewCardVideoSlot = target.slot.name
                     }
                 },
                 onDismissRequest = { cropTarget = null },
@@ -516,11 +524,16 @@ fun ThemeStoreScreen() {
         passthroughOpacity = summary.wallpaper.passthroughOpacity,
         onDismissRequest = { showVideoBackgroundPreview = false },
     )
-    LkmCardVideoPreviewDialog(
-        show = showLkmCardVideoPreview,
-        uriString = summary.lkmCard.videoUriString,
-        crop = summary.lkmCard.crop,
-        onDismissRequest = { showLkmCardVideoPreview = false },
+    val previewVideoSlot = previewCardVideoSlot?.let { slotName ->
+        ThemeStoreImageSlot.entries.firstOrNull { it.name == slotName }
+    }
+    val previewVideoState = previewVideoSlot?.let(summary::cardState)
+    ThemeStoreCardVideoPreviewDialog(
+        show = previewVideoSlot != null,
+        slot = previewVideoSlot,
+        uriString = previewVideoState?.videoUriString,
+        crop = previewVideoState?.crop,
+        onDismissRequest = { previewCardVideoSlot = null },
     )
 
     if (!startupPreviewUri.isNullOrBlank()) {
@@ -675,6 +688,12 @@ private fun ThemeStoreContent(
                 slot = ThemeStoreImageSlot.SystemInfo,
                 state = summary.systemInfoCard,
                 icon = Icons.Rounded.SettingsSuggest,
+                actions = actions,
+            )
+            ThemeStoreCardImageItem(
+                slot = ThemeStoreImageSlot.RebootMenu,
+                state = summary.rebootMenuCard,
+                icon = Icons.Rounded.PowerSettingsNew,
                 actions = actions,
             )
         }
@@ -899,7 +918,7 @@ private fun ThemeStoreCardImageItem(
         maxSide = 900,
         crop = state.crop,
     )
-    val supportsVideo = slot == ThemeStoreImageSlot.Lkm
+    val supportsVideo = slot.supportsVideo
     ThemeStoreSurface {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1395,23 +1414,27 @@ private fun ThemeStoreMediaItem(
 }
 
 @Composable
-private fun LkmCardVideoPreviewDialog(
+private fun ThemeStoreCardVideoPreviewDialog(
     show: Boolean,
+    slot: ThemeStoreImageSlot?,
     uriString: String?,
-    crop: CustomWallpaperCrop,
+    crop: CustomWallpaperCrop?,
     onDismissRequest: () -> Unit,
 ) {
-    if (!show || uriString.isNullOrBlank()) return
+    if (!show || slot == null || uriString.isNullOrBlank() || crop == null) return
 
     val aspectRatio = if (LocalUiMode.current == UiMode.Material) {
-        1.08f
+        slot.aspectRatio
     } else {
-        1.86f
+        when (slot) {
+            ThemeStoreImageSlot.Lkm -> 1.86f
+            else -> slot.aspectRatio
+        }
     }
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text(stringResource(R.string.home_lkm_wallpaper_preview)) },
+        title = { Text(stringResource(slot.titleRes)) },
         text = {
             Box(
                 modifier = Modifier
@@ -1670,6 +1693,7 @@ private val ThemeStoreImageSlot.titleRes: Int
         ThemeStoreImageSlot.Module -> R.string.theme_store_module_card
         ThemeStoreImageSlot.StatusMonitor -> R.string.theme_store_status_monitor_card
         ThemeStoreImageSlot.SystemInfo -> R.string.theme_store_system_info_card
+        ThemeStoreImageSlot.RebootMenu -> R.string.theme_store_reboot_menu_card
     }
 
 private val ThemeStoreImageSlot.cropTitleRes: Int
@@ -1679,6 +1703,7 @@ private val ThemeStoreImageSlot.cropTitleRes: Int
         ThemeStoreImageSlot.Module -> R.string.home_module_wallpaper_crop
         ThemeStoreImageSlot.StatusMonitor -> R.string.home_status_monitor_wallpaper_crop
         ThemeStoreImageSlot.SystemInfo -> R.string.home_system_info_wallpaper_crop
+        ThemeStoreImageSlot.RebootMenu -> R.string.home_reboot_menu_wallpaper_crop
     }
 
 private val ThemeStoreImageSlot.aspectRatio: Float
@@ -1688,7 +1713,11 @@ private val ThemeStoreImageSlot.aspectRatio: Float
         ThemeStoreImageSlot.Module -> 1.72f
         ThemeStoreImageSlot.StatusMonitor -> 2.72f
         ThemeStoreImageSlot.SystemInfo -> 1.36f
+        ThemeStoreImageSlot.RebootMenu -> 0.72f
     }
+
+private val ThemeStoreImageSlot.supportsVideo: Boolean
+    get() = this == ThemeStoreImageSlot.Lkm || this == ThemeStoreImageSlot.RebootMenu
 
 private fun ThemeStoreSummary.cardState(slot: ThemeStoreImageSlot): ThemeStoreImageState {
     return when (slot) {
@@ -1697,6 +1726,7 @@ private fun ThemeStoreSummary.cardState(slot: ThemeStoreImageSlot): ThemeStoreIm
         ThemeStoreImageSlot.Module -> moduleCard
         ThemeStoreImageSlot.StatusMonitor -> statusMonitorCard
         ThemeStoreImageSlot.SystemInfo -> systemInfoCard
+        ThemeStoreImageSlot.RebootMenu -> rebootMenuCard
     }
 }
 

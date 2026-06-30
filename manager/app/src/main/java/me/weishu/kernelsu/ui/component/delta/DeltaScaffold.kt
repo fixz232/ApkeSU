@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
 import me.weishu.kernelsu.ui.theme.LocalDeltaColorVariant
 
@@ -333,22 +336,33 @@ fun DeltaSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier.scale(0.9f),
-        enabled = enabled,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = DeltaColors.Accent,
-            checkedTrackColor = DeltaColors.AccentSoft,
-            checkedBorderColor = DeltaColors.Accent.copy(alpha = 0.6f),
-            uncheckedThumbColor = Color.White,
-            uncheckedTrackColor = DeltaColors.SurfaceDeep,
-            uncheckedBorderColor = DeltaColors.Disabled.copy(alpha = 0.55f),
-            disabledCheckedThumbColor = DeltaColors.Disabled,
-            disabledCheckedTrackColor = DeltaColors.SurfaceDeep,
-        ),
-    )
+    val switchStyle = LocalSwitchStyle.current
+    if (switchStyle == SwitchStyle.Original) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier.scale(0.9f),
+            enabled = enabled,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = DeltaColors.Accent,
+                checkedTrackColor = DeltaColors.AccentSoft,
+                checkedBorderColor = DeltaColors.Accent.copy(alpha = 0.6f),
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = DeltaColors.SurfaceDeep,
+                uncheckedBorderColor = DeltaColors.Disabled.copy(alpha = 0.55f),
+                disabledCheckedThumbColor = DeltaColors.Disabled,
+                disabledCheckedTrackColor = DeltaColors.SurfaceDeep,
+            ),
+        )
+    } else {
+        StyledSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier,
+            enabled = enabled,
+            style = switchStyle,
+        )
+    }
 }
 
 @Composable

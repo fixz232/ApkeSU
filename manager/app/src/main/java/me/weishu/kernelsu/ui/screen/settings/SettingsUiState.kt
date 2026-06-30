@@ -9,6 +9,8 @@ import me.weishu.kernelsu.ui.theme.ThemeAppearanceDefaults
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -27,6 +29,8 @@ data class SettingsUiState(
     val uiMode: String = UiMode.DEFAULT_VALUE,
     val checkModuleUpdate: Boolean = true,
     val showVersionMismatchWarning: Boolean = true,
+    val showHomeSupportCard: Boolean = true,
+    val showHomeLearnCard: Boolean = true,
     val themeMode: Int = 0,
     val miuixMonet: Boolean = false,
     val keyColor: Int = 0,
@@ -40,6 +44,9 @@ data class SettingsUiState(
     val pageScale: Float = 1.0f,
     val fontScale: Float = ThemeAppearanceDefaults.FONT_SCALE,
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,
+    val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
+    val globalSnowEnabled: Boolean = false,
+    val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val themeSyncStrategy: ThemeSyncStrategy = ThemeSyncStrategy.SHARED,
     val customThemePresets: List<CustomThemePreset> = emptyList(),
     val enableWebDebugging: Boolean = false,
@@ -90,7 +97,17 @@ data class SettingsUiState(
     val isBuiltinMountWebUiAvailable: Boolean = false,
     val builtinMountConflict: String? = null,
 
-    // EpkeSU Hide
+    // Built-in KPatch Next
+    val isKPatchNextInstalled: Boolean = false,
+    val isKPatchNextEnabled: Boolean = false,
+    val isKPatchNextPendingUpdate: Boolean = false,
+    val isKPatchNextPendingRemove: Boolean = false,
+    val isKPatchNextWebUiAvailable: Boolean = false,
+    val isKPatchNextUnresolved: Boolean = false,
+    val kPatchNextVersion: String = "",
+    val kPatchNextConflict: String? = null,
+
+    // ApkeSU Hide
     val isEpkesuHideEnabled: Boolean = false,
 
     // ADB Root
@@ -112,8 +129,14 @@ data class SettingsUiState(
 data class SettingsScreenActions(
     val onSetCheckModuleUpdate: (Boolean) -> Unit,
     val onSetShowVersionMismatchWarning: (Boolean) -> Unit,
+    val onSetShowHomeSupportCard: (Boolean) -> Unit,
+    val onSetShowHomeLearnCard: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,
     val onOpenThemeStore: () -> Unit,
+    val onSetDayNightMode: (Boolean) -> Unit,
+    val onSetSwitchStyleIndex: (Int) -> Unit,
+    val onSetGlobalSnowEnabled: (Boolean) -> Unit,
+    val onSetGlobalSnowEffectIndex: (Int) -> Unit,
     val onSetUiModeIndex: (Int) -> Unit,
     val onOpenLauncherIcon: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
@@ -160,6 +183,9 @@ data class SettingsScreenActions(
     val onSetBuiltinMountEnabled: (Boolean) -> Unit,
     val onSetBuiltinMountDefaultMode: (Int) -> Unit,
     val onOpenBuiltinMountWebUi: () -> Unit,
+    val onSetKPatchNextEnabled: (Boolean) -> Unit,
+    val onOpenKPatchNextWebUi: () -> Unit,
+    val onOpenHiddenPathConfig: () -> Unit,
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,
     val onSetAutoJailbreak: (Boolean) -> Unit,

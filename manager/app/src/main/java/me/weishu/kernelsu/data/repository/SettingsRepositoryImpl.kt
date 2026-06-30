@@ -11,6 +11,11 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.magica.BootCompletedReceiver
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -57,6 +62,7 @@ import me.weishu.kernelsu.ui.util.execKsud
 import me.weishu.kernelsu.ui.util.getBuiltinMountStatus as readBuiltinMountStatus
 import me.weishu.kernelsu.ui.util.getFeaturePersistValue
 import me.weishu.kernelsu.ui.util.getFeatureStatus
+import me.weishu.kernelsu.ui.util.getKPatchNextStatus as readKPatchNextStatus
 import me.weishu.kernelsu.ui.util.releaseCustomImageReference
 import me.weishu.kernelsu.ui.util.releasePersistableVideoBackgroundReadPermission
 import me.weishu.kernelsu.ui.util.clearCustomPageBackground as clearPageBackground
@@ -76,6 +82,7 @@ import me.weishu.kernelsu.ui.util.setCustomPageBackgroundVideoDurationSeconds as
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundWallpaper as writeCustomPageBackgroundWallpaper
 import me.weishu.kernelsu.ui.util.setBuiltinMountDefaultMode as writeBuiltinMountDefaultMode
 import me.weishu.kernelsu.ui.util.setBuiltinMountEnabled as writeBuiltinMountEnabled
+import me.weishu.kernelsu.ui.util.setKPatchNextEnabled as writeKPatchNextEnabled
 import me.weishu.kernelsu.ui.util.getEpkesuHideStatus as readEpkesuHideStatus
 import me.weishu.kernelsu.ui.util.setEpkesuHideEnabled as writeEpkesuHideEnabled
 import me.weishu.kernelsu.ui.util.setCustomNavigationIcon as writeCustomNavigationIcon
@@ -99,6 +106,14 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var showVersionMismatchWarning: Boolean
         get() = prefs.getBoolean(SHOW_VERSION_MISMATCH_WARNING_KEY, true)
         set(value) = prefs.edit { putBoolean(SHOW_VERSION_MISMATCH_WARNING_KEY, value) }
+
+    override var showHomeSupportCard: Boolean
+        get() = prefs.getBoolean(SHOW_HOME_SUPPORT_CARD_KEY, true)
+        set(value) = prefs.edit { putBoolean(SHOW_HOME_SUPPORT_CARD_KEY, value) }
+
+    override var showHomeLearnCard: Boolean
+        get() = prefs.getBoolean(SHOW_HOME_LEARN_CARD_KEY, true)
+        set(value) = prefs.edit { putBoolean(SHOW_HOME_LEARN_CARD_KEY, value) }
 
     override var themeMode: Int
         get() = prefs.getInt(themeKey("color_mode"), defaultThemePreset.colorMode.value)
@@ -203,6 +218,22 @@ class SettingsRepositoryImpl : SettingsRepository {
                 sanitizeScale(value, 0.5f, 1.5f, ThemeAppearanceDefaults.BLUR_INTENSITY)
             )
             putString(themeKey("theme_preset"), ThemePreset.CUSTOM.value)
+        }
+
+    override var switchStyle: String
+        get() = SwitchStyle.fromValue(prefs.getString(SWITCH_STYLE_KEY, SwitchStyle.DEFAULT_VALUE)).value
+        set(value) = prefs.edit { putString(SWITCH_STYLE_KEY, SwitchStyle.fromValue(value).value) }
+
+    override var globalSnowEnabled: Boolean
+        get() = prefs.getBoolean(GLOBAL_SNOW_ENABLED_KEY, false)
+        set(value) = prefs.edit { putBoolean(GLOBAL_SNOW_ENABLED_KEY, value) }
+
+    override var globalSnowEffect: String
+        get() = GlobalSnowEffect.fromValue(
+            prefs.getString(GLOBAL_SNOW_EFFECT_KEY, GlobalSnowEffect.DEFAULT_VALUE)
+        ).value
+        set(value) = prefs.edit {
+            putString(GLOBAL_SNOW_EFFECT_KEY, GlobalSnowEffect.fromValue(value).value)
         }
 
     override var themeSyncStrategy: ThemeSyncStrategy
@@ -572,6 +603,10 @@ class SettingsRepositoryImpl : SettingsRepository {
     override fun setBuiltinMountEnabled(enabled: Boolean): Boolean = writeBuiltinMountEnabled(enabled)
 
     override fun setBuiltinMountDefaultMode(mode: String): Boolean = writeBuiltinMountDefaultMode(mode)
+
+    override suspend fun getKPatchNextStatus() = readKPatchNextStatus()
+
+    override fun setKPatchNextEnabled(enabled: Boolean): Boolean = writeKPatchNextEnabled(enabled)
 
     override suspend fun getEpkesuHideStatus(): Boolean = readEpkesuHideStatus().enabled
 

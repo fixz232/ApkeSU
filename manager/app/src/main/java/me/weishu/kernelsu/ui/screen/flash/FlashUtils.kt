@@ -6,9 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Parcelable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.DeleteForever
-import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -48,11 +46,6 @@ enum class FlashingStatus {
 }
 
 enum class UninstallType(val icon: ImageVector, val title: Int, val message: Int) {
-    TEMPORARY(
-        Icons.Rounded.RemoveModerator,
-        R.string.settings_uninstall_temporary,
-        R.string.settings_uninstall_temporary_message
-    ),
     PERMANENT(
         Icons.Rounded.DeleteForever,
         R.string.settings_uninstall_permanent,
@@ -62,8 +55,7 @@ enum class UninstallType(val icon: ImageVector, val title: Int, val message: Int
         Icons.Rounded.RestartAlt,
         R.string.settings_restore_stock_image,
         R.string.settings_restore_stock_image_message
-    ),
-    NONE(Icons.Rounded.Adb, 0, 0)
+    )
 }
 
 @Parcelize
@@ -147,6 +139,9 @@ fun FlashEffect(
     onFlashSuccess: () -> Unit,
     enabled: Boolean = true
 ) {
+    val flashErrorCode = stringResource(R.string.flash_error_code)
+    val flashCheckLog = stringResource(R.string.flash_check_log)
+
     LaunchedEffect(enabled) {
         if (!enabled || text.isNotEmpty()) {
             return@LaunchedEffect
@@ -154,22 +149,30 @@ fun FlashEffect(
         var currentText = text
         val mainHandler = Handler(Looper.getMainLooper())
         withContext(Dispatchers.IO) {
-            flashIt(flashIt, onStdout = {
-                val tempText = "$it\n"
-                if (tempText.startsWith("[H[J")) { // clear command
-                    currentText = tempText.substring(6)
-                } else {
-                    currentText += tempText
-                }
-                mainHandler.post {
-                    onTextUpdate(currentText)
-                }
-                logContent.append(it).append("\n")
-            }, onStderr = {
-                logContent.append(it).append("\n")
-            }).apply {
+            val result = runCatching {
+                flashIt(flashIt, onStdout = {
+                    val tempText = "$it\n"
+                    if (tempText.startsWith("[H[J")) { // clear command
+                        currentText = tempText.substring(6)
+                    } else {
+                        currentText += tempText
+                    }
+                    mainHandler.post {
+                        onTextUpdate(currentText)
+                    }
+                    logContent.append(it).append("\n")
+                }, onStderr = {
+                    logContent.append(it).append("\n")
+                })
+            }.getOrElse { throwable ->
+                val message = throwable.localizedMessage ?: throwable.javaClass.simpleName
+                logContent.append(message).append("\n")
+                FlashResult(1, message, false)
+            }
+
+            result.apply {
                 if (code != 0) {
-                    currentText += "Error code: $code.\n $err Please save and check the log.\n"
+                    currentText += "$flashErrorCode: $code.\n $err $flashCheckLog\n"
                     mainHandler.post {
                         onTextUpdate(currentText)
                     }
@@ -195,18 +198,32 @@ fun FlashEffect(
 fun saveLog(
     logContent: StringBuilder,
     scope: CoroutineScope,
+    savedMessage: String,
+    failedMessage: String,
     showMessage: (String) -> Unit
 ): () -> Unit {
     return {
         scope.launch {
-            val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
-            val date = format.format(Date())
-            val file = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "KernelSU_install_log_${date}.log"
-            )
-            file.writeText(logContent.toString())
-            showMessage("Log saved to ${file.absolutePath}")
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
+                    val date = format.format(Date())
+                    val downloads =
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    if (!downloads.exists()) {
+                        downloads.mkdirs()
+                    }
+                    val file = File(downloads, "KernelSU_install_log_${date}.log")
+                    file.writeText(logContent.toString())
+                    file.absolutePath
+                }
+            }
+            result.onSuccess { path ->
+                showMessage("$savedMessage: $path")
+            }.onFailure { throwable ->
+                val reason = throwable.localizedMessage ?: throwable.javaClass.simpleName
+                showMessage("$failedMessage: $reason")
+            }
         }
     }
 }

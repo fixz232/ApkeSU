@@ -9,10 +9,10 @@
     <string name="profile_selinux_context">SELinux kontekst</string>
     <string name="profile_umount_modules">Umount module</string>
     <string name="failed_to_update_app_profile">Ažuriranje Profila Aplikacije za %s nije uspjelo</string>
-    <string name="require_kernel_version">Trenutna EpkeSU verzija %1$d je preniska da bi upravitelj ispravno radio. Molimo vas da nadogradite na verziju %2$d ili noviju!</string>
+    <string name="require_kernel_version">Trenutna ApkeSU verzija %1$d je preniska da bi upravitelj ispravno radio. Molimo vas da nadogradite na verziju %2$d ili noviju!</string>
     <string name="settings_umount_modules_default">Umount module po zadanom</string>
     <string name="settings_umount_modules_default_summary">Globalna zadana vrijednost za \"Umount module\" u Profilima Aplikacije. Ako je omogućeno, uklonit će sve izmjene modula na sistemu za aplikacije koje nemaju postavljen Profil.</string>
-    <string name="profile_umount_modules_summary">Uključivanjem ove opcije omogućit će EpkeSU-u da vrati sve izmjenute datoteke od strane modula za ovu aplikaciju.</string>
+    <string name="profile_umount_modules_summary">Uključivanjem ove opcije omogućit će ApkeSU-u da vrati sve izmjenute datoteke od strane modula za ovu aplikaciju.</string>
     <string name="module_update">Ažuriranje</string>
     <string name="module_downloading">Skidanje module: %s</string>
     <string name="module_start_downloading">Započnite sa skidanjem: %s</string>
@@ -25,7 +25,7 @@
     <string name="home_not_installed">Nije instalirano</string>
     <string name="home_click_to_install">Kliknite da instalirate</string>
     <string name="home_unsupported">Nepodržano</string>
-    <string name="home_unsupported_reason">EpkeSU samo podržava GKI kernele sad</string>
+    <string name="home_unsupported_reason">ApkeSU samo podržava GKI kernele sad</string>
     <string name="home_manager_version">Verzija Upravitelja</string>
     <string name="home_fingerprint">Otisak prsta</string>
     <string name="home_selinux_status">SELinux stanje</string>
@@ -40,11 +40,10 @@
     <string name="reboot_to_apply">Ponovo pokrenite da bi proradilo</string>
     <string name="module_magisk_conflict">"Moduli su nedostupni  jer su u sukobu sa Magisk-om!"</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Naučite kako da instalirate EpkeSU i da koristite module</string>
+    <string name="home_click_to_learn_kernelsu">Naučite kako da instalirate ApkeSU i da koristite module</string>
     <string name="home_support_title">Podržite Nas</string>
     <string name="send_log">Pošaljite Izvještaj</string>
-    <string name="home_learn_kernelsu">Naučite EpkeSU</string>
-    <string name="about_source_code">Pogledajte izvornu kodu na %1$s<br/>Pridružite nam se na %2$s kanalu</string>
+    <string name="home_learn_kernelsu">Naučite ApkeSU</string>
     <string name="profile_selinux_domain">Domena</string>
     <string name="profile_selinux_rules">Pravila</string>
     <string name="failed_to_update_sepolicy">Neuspješno ažuriranje SELinux pravila za: %s</string>
@@ -69,7 +68,7 @@
     <string name="selinux_status_disabled">Isključeno</string>
     <string name="about">O</string>
     <string name="module_uninstall_confirm">Jeste li sigurni da želite deinstalirati modulu %s\?</string>
-    <string name="home_support_content">EpkeSU je, i uvijek če biti, besplatan, i otvorenog izvora. Možete nam međutim pokazati da vas je briga s time da napravite donaciju.</string>
+    <string name="home_support_content">ApkeSU je, i uvijek če biti, besplatan, i otvorenog izvora. Možete nam međutim pokazati da vas je briga s time da napravite donaciju.</string>
     <string name="profile_default">Zadano</string>
     <string name="profile_template">Šablon</string>
     <string name="profile_custom">Prilagođeno</string>
@@ -81,6 +80,6 @@
     <string name="settings_sucompat">Preusmjeri su binarnu datoteku</string>
     <string name="settings_sucompat_summary">Preusmjeri /system/bin/su na ksud za aplikacije kojima je dodijeljeno dopuštenje Superuser u Profilu aplikacije; učinkovito samo za nove procese.</string>
     <string name="settings_kernel_umount">Kernel umount</string>
-    <string name="settings_kernel_umount_summary">Ponašanje umount na razini kernela kontrolira EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">Sprječava daljnju eskalaciju privilegija putem EpkeSU-a unutar konteksta ovog root profila.</string>
+    <string name="settings_kernel_umount_summary">Ponašanje umount na razini kernela kontrolira ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">Sprječava daljnju eskalaciju privilegija putem ApkeSU-a unutar konteksta ovog root profila.</string>
 </resources>

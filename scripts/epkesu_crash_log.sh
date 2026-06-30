@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Collect EpkeSU startup crash logs from Android/Termux or from a PC with adb.
+# Collect ApkeSU startup crash logs from Android/Termux or from a PC with adb.
 
 PKG="io.github.fixz.epkesu"
 WAIT_SECONDS=8

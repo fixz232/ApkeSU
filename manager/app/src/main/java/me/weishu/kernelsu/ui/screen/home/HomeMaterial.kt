@@ -138,7 +138,11 @@ fun HomePagerMaterial(
             )
             WarningSummaryCard(messages = homeWarningMessages(state))
             InfoCard(state = state)
-            SecondaryLinksCard(onOpenUrl = actions.onOpenUrl)
+            SecondaryLinksCard(
+                onOpenUrl = actions.onOpenUrl,
+                showSupport = state.showHomeSupportCard,
+                showLearn = state.showHomeLearnCard,
+            )
             Spacer(Modifier.height(bottomInnerPadding))
         }
     }
@@ -273,11 +277,7 @@ private fun PrimaryStatusTile(
     )
     val lkmVideoUriString = if (showLkmWallpaperActions) wallpaperState.videoUriString else null
     val hasLkmWallpaper = showLkmWallpaperActions && (wallpaperBitmap != null || !lkmVideoUriString.isNullOrBlank())
-    val workingMode = when (state.lkmMode) {
-        true -> "LKM"
-        false -> "GKI"
-        null -> null
-    }
+    val workingMode = state.workingModeLabel
     val statusTitle = when {
         installed -> stringResource(R.string.home_working)
         installable -> stringResource(R.string.home_not_installed)
@@ -534,11 +534,7 @@ private fun StatusCard(
                 ) {
                     when {
                         state.ksuVersion != null -> {
-                            val workingMode = when (state.lkmMode) {
-                                null -> ""
-                                true -> "LKM"
-                                else -> "GKI"
-                            }
+                            val workingMode = state.workingModeLabel.orEmpty()
 
                             StatusHeader(
                                 icon = statusIcon,
@@ -1234,29 +1230,41 @@ private fun WarningSummaryCard(
 }
 
 @Composable
-private fun SecondaryLinksCard(onOpenUrl: (String) -> Unit) {
+private fun SecondaryLinksCard(
+    onOpenUrl: (String) -> Unit,
+    showSupport: Boolean = true,
+    showLearn: Boolean = true,
+) {
+    if (!showSupport && !showLearn) return
+
     val learnUrl = stringResource(R.string.home_learn_kernelsu_url)
     TonalCard {
         Column(modifier = Modifier.fillMaxWidth()) {
-            SecondaryLinkItem(
-                icon = Icons.Rounded.FavoriteBorder,
-                title = stringResource(R.string.home_support_title),
-                summary = stringResource(R.string.home_support_content),
-                onClick = { onOpenUrl("https://patreon.com/weishu") }
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .padding(horizontal = 20.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
-            )
-            SecondaryLinkItem(
-                icon = Icons.Rounded.Info,
-                title = stringResource(R.string.home_learn_kernelsu),
-                summary = stringResource(R.string.home_click_to_learn_kernelsu),
-                onClick = { onOpenUrl(learnUrl) }
-            )
+            if (showSupport) {
+                SecondaryLinkItem(
+                    icon = Icons.Rounded.FavoriteBorder,
+                    title = stringResource(R.string.home_support_title),
+                    summary = stringResource(R.string.home_support_content),
+                    onClick = { onOpenUrl("https://patreon.com/weishu") }
+                )
+            }
+            if (showSupport && showLearn) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .padding(horizontal = 20.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+                )
+            }
+            if (showLearn) {
+                SecondaryLinkItem(
+                    icon = Icons.Rounded.Info,
+                    title = stringResource(R.string.home_learn_kernelsu),
+                    summary = stringResource(R.string.home_click_to_learn_kernelsu),
+                    onClick = { onOpenUrl(learnUrl) }
+                )
+            }
         }
     }
 }

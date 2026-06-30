@@ -6,7 +6,7 @@
     <string name="home_working">يعمل</string>
     <string name="home_working_version">الإصدار: %s</string>
     <string name="home_unsupported">غير مدعوم</string>
-    <string name="home_unsupported_reason">EpkeSU يدعم GKI kernels فقط</string>
+    <string name="home_unsupported_reason">ApkeSU يدعم GKI kernels فقط</string>
     <string name="home_kernel">إصدار النواة</string>
     <string name="home_manager_version">إصدار المدير</string>
     <string name="home_fingerprint">البصمة</string>
@@ -41,12 +41,11 @@
     <string name="safe_mode">الوضع الآمن</string>
     <string name="reboot_to_apply">إعادة التشغيل لتطبيق التغييرات</string>
     <string name="module_magisk_conflict">الوحدات غير متاحة بسبب تعارضها مع Magisk!</string>
-    <string name="home_learn_kernelsu">تعلم EpkeSU</string>
+    <string name="home_learn_kernelsu">تعلم ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">تعرف على كيفية تثبيت EpkeSU واستخدام الإضافات</string>
+    <string name="home_click_to_learn_kernelsu">تعرف على كيفية تثبيت ApkeSU واستخدام الإضافات</string>
     <string name="home_support_title">إدعمنا</string>
-    <string name="home_support_content">EpkeSU سيظل دائماً مجانياً ومفتوح المصدر. مع ذلك، يمكنك متى ما استطعت أن تظهر لنا أنك تهتم بالتبرع.</string>
-    <string name="about_source_code"><![CDATA[أنظر إلى مصدر البرمجة في %1$s<br/>إنضم إلى قناتنا في %2$s ]]></string>
+    <string name="home_support_content">ApkeSU سيظل دائماً مجانياً ومفتوح المصدر. مع ذلك، يمكنك متى ما استطعت أن تظهر لنا أنك تهتم بالتبرع.</string>
     <string name="profile_capabilities">القدرات</string>
     <string name="module_update">تحديث</string>
     <string name="module_downloading">تحميل الإضافة: %s</string>
@@ -67,13 +66,13 @@
     <string name="force_stop_app">ايقاف إجباري</string>
     <string name="settings_umount_modules_default">الغاء تحميل الإضافات بشكل افتراضي</string>
     <string name="settings_umount_modules_default_summary">القيمة الافتراضية العامة لـ\"إلغاء تحميل الإضافات\" في ملفات تعريف التطبيقات. إذا تم تمكينه، إزالة جميع تعديلات الإضافات على النظام للتطبيقات التي لا تحتوي على مجموعة ملف تعريف.</string>
-    <string name="profile_umount_modules_summary">سيسمح تمكين هذا الخيار لـEpkeSU باستعادة أي ملفات معدلة بواسطة الإضافات لهذا التطبيق.</string>
+    <string name="profile_umount_modules_summary">سيسمح تمكين هذا الخيار لـApkeSU باستعادة أي ملفات معدلة بواسطة الإضافات لهذا التطبيق.</string>
     <string name="profile_selinux_domain">المجال</string>
     <string name="profile_selinux_rules">القواعد</string>
     <string name="restart_app">إعادة تشغيل التطبيق</string>
     <string name="failed_to_update_sepolicy">فشل تحديث قواعد SELinux لـ %s</string>
     <string name="profile_name">اسم الملف الشخصي</string>
-    <string name="require_kernel_version">إصدار EpkeSU الحالي %1$d منخفض جدًا بحيث لا يعمل المدير بشكل صحيح. الرجاء الترقية إلى الإصدار %2$d أو أعلى!</string>
+    <string name="require_kernel_version">إصدار ApkeSU الحالي %1$d منخفض جدًا بحيث لا يعمل المدير بشكل صحيح. الرجاء الترقية إلى الإصدار %2$d أو أعلى!</string>
     <string name="module_changelog">سجل التغييرات</string>
     <string name="app_profile_template_import_success">تم الاستيراد بنجاح</string>
     <string name="app_profile_export_to_clipboard">تصدير إلى الحافظة</string>
@@ -113,13 +112,13 @@
     <string name="settings_uninstall_temporary">إلغاء التثبيت مؤقتًا</string>
     <string name="settings_uninstall_permanent">إلغاء التثبيت بشكل دائم</string>
     <string name="settings_restore_stock_image">استعادة الصورة الاصلية</string>
-    <string name="settings_uninstall_permanent_message">‬إلغاء تثبيت EpkeSU .(الجذر وجميع الوحدات) بشكل كامل ودائم.</string>
+    <string name="settings_uninstall_permanent_message">‬إلغاء تثبيت ApkeSU .(الجذر وجميع الوحدات) بشكل كامل ودائم.</string>
     <string name="flashing">تركيب</string>
     <string name="flash_success">نجح التركيب</string>
     <string name="flash_failed">فشل التركيب</string>
     <string name="selected_lkm">LKM المحددة: %s</string>
-    <string name="settings_restore_stock_image_message">استعادة صورة المصنع المخزنة (في حالة وجود نسخة احتياطية)، والتي تُستخدم عادة قبل OTA؛ إذا كنت بحاجة إلى إلغاء تثبيت EpkeSU، فيرجى استخدام \"إلغاء التثبيت الدائم\".</string>
-    <string name="settings_uninstall_temporary_message">قم بإلغاء تثبيت EpkeSU مؤقتًا، واستعد إلى حالته الأصلية بعد إعادة التشغيل التالية.</string>
+    <string name="settings_restore_stock_image_message">استعادة صورة المصنع المخزنة (في حالة وجود نسخة احتياطية)، والتي تُستخدم عادة قبل OTA؛ إذا كنت بحاجة إلى إلغاء تثبيت ApkeSU، فيرجى استخدام \"إلغاء التثبيت الدائم\".</string>
+    <string name="settings_uninstall_temporary_message">قم بإلغاء تثبيت ApkeSU مؤقتًا، واستعد إلى حالته الأصلية بعد إعادة التشغيل التالية.</string>
     <string name="save_log">حفظ السجلات</string>
     <string name="action">إجراء</string>
     <string name="log_saved">السجلات محفوظة</string>
@@ -131,6 +130,6 @@
     <string name="settings_sucompat">إعادة توجيه ثنائي su</string>
     <string name="settings_sucompat_summary">يسمح للتطبيقات التي تم منحها صلاحيات Superuser في ملف تعريف التطبيق بالحصول على shell superuser من خلال تنفيذ /system/bin/su؛ فعال فقط للعمليات الجديدة.</string>
     <string name="settings_kernel_umount">إلغاء تحميل النواة</string>
-    <string name="settings_kernel_umount_summary">سلوك إلغاء تحميل مستوى النواة الذي يسيطر عليه EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">يمنع المزيد من تصعيد الصلاحيات عبر EpkeSU من داخل سياق ملف تعريف الروت هذا.</string>
+    <string name="settings_kernel_umount_summary">سلوك إلغاء تحميل مستوى النواة الذي يسيطر عليه ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">يمنع المزيد من تصعيد الصلاحيات عبر ApkeSU من داخل سياق ملف تعريف الروت هذا.</string>
 </resources>

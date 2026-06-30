@@ -79,6 +79,15 @@ enum class ThemeStoreImageSlot(
         cropRightKey = "home_system_info_wallpaper_crop_right",
         cropBottomKey = "home_system_info_wallpaper_crop_bottom",
     ),
+    RebootMenu(
+        id = "reboot_menu",
+        uriKey = "home_reboot_menu_wallpaper_uri",
+        videoUriKey = "home_reboot_menu_wallpaper_video_uri",
+        cropLeftKey = "home_reboot_menu_wallpaper_crop_left",
+        cropTopKey = "home_reboot_menu_wallpaper_crop_top",
+        cropRightKey = "home_reboot_menu_wallpaper_crop_right",
+        cropBottomKey = "home_reboot_menu_wallpaper_crop_bottom",
+    ),
 }
 
 data class ThemeStoreImageState(
@@ -117,6 +126,7 @@ data class ThemeStoreSummary(
     val moduleCard: ThemeStoreImageState,
     val statusMonitorCard: ThemeStoreImageState,
     val systemInfoCard: ThemeStoreImageState,
+    val rebootMenuCard: ThemeStoreImageState,
     val navigationIcons: CustomNavigationIconSet,
     val pageBackgrounds: CustomPageBackgroundSet,
     val wallpaper: ThemeStoreWallpaperState,
@@ -132,6 +142,7 @@ data class ThemeStoreSummary(
                 moduleCard.hasSelected,
                 statusMonitorCard.hasSelected,
                 systemInfoCard.hasSelected,
+                rebootMenuCard.hasSelected,
                 wallpaper.hasSelected,
                 !startupSoundUri.isNullOrBlank(),
                 !startupAnimationUri.isNullOrBlank(),
@@ -152,6 +163,7 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
         moduleCard = prefs.readImageSlot(ThemeStoreImageSlot.Module),
         statusMonitorCard = prefs.readImageSlot(ThemeStoreImageSlot.StatusMonitor),
         systemInfoCard = prefs.readImageSlot(ThemeStoreImageSlot.SystemInfo),
+        rebootMenuCard = prefs.readImageSlot(ThemeStoreImageSlot.RebootMenu),
         navigationIcons = prefs.readCustomNavigationIconSet(),
         pageBackgrounds = prefs.readCustomPageBackgroundSet(),
         wallpaper = ThemeStoreWallpaperState(

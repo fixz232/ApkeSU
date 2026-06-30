@@ -164,6 +164,7 @@ private fun InstallInputPanel(
             state = state,
             onSelected = actions.onSelectMethod,
             onSelectBootImage = actions.onSelectBootImage,
+            onSelectHiddenPathLkmBootImage = actions.onSelectHiddenPathLkmBootImage,
             onSelectAnyKernel = actions.onSelectAnyKernel,
         )
         OptionalSettingsCard(state = state, actions = actions)
@@ -236,11 +237,15 @@ private fun OptionalSettingsCard(
                     onSelectPartition = actions.onSelectPartition,
                 )
             }
-            LocalLkmFileRow(
-                lkmSelection = state.lkmSelection,
-                onUploadLkm = actions.onUploadLkm,
-                onClearLkm = actions.onClearLkm,
-            )
+            if (state.installMethod is InstallMethod.HiddenPathLkmPatch) {
+                HiddenPathLkmInfoRow(lkmSelection = state.lkmSelection)
+            } else {
+                LocalLkmFileRow(
+                    lkmSelection = state.lkmSelection,
+                    onUploadLkm = actions.onUploadLkm,
+                    onClearLkm = actions.onClearLkm,
+                )
+            }
             AdvancedOptionsPanel(
                 state = state,
                 actions = actions,
@@ -310,6 +315,27 @@ private fun LocalLkmFileRow(
                 TrailingArrow()
             }
         }
+    )
+}
+
+@Composable
+private fun HiddenPathLkmInfoRow(
+    lkmSelection: LkmSelection,
+) {
+    BasicComponent(
+        title = stringResource(id = R.string.hidden_path_lkm_builtin_title),
+        summary = (lkmSelection as? LkmSelection.PathMaskKmiString)?.let {
+            stringResource(id = R.string.hidden_path_lkm_selected_kmi, it.value)
+        } ?: stringResource(id = R.string.hidden_path_lkm_builtin_summary),
+        onClick = {},
+        startAction = {
+            Icon(
+                MiuixIcons.MoveFile,
+                tint = colorScheme.onSurface,
+                modifier = Modifier.padding(end = 12.dp),
+                contentDescription = null
+            )
+        },
     )
 }
 
@@ -397,6 +423,7 @@ private fun SelectInstallMethod(
     state: InstallUiState,
     onSelected: (InstallMethod) -> Unit,
     onSelectBootImage: () -> Unit,
+    onSelectHiddenPathLkmBootImage: () -> Unit,
     onSelectAnyKernel: () -> Unit,
 ) {
     val confirmDialog = rememberConfirmDialog(
@@ -410,6 +437,7 @@ private fun SelectInstallMethod(
     val onClick = { option: InstallMethod ->
         when (option) {
             is InstallMethod.SelectFile -> onSelectBootImage()
+            is InstallMethod.HiddenPathLkmPatch -> onSelectHiddenPathLkmBootImage()
             is InstallMethod.DirectInstall -> onSelected(option)
             is InstallMethod.DirectInstallToInactiveSlot -> confirmDialog.showConfirm(dialogTitle, dialogContent)
             is InstallMethod.AnyKernel -> onSelectAnyKernel()

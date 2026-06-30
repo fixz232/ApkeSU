@@ -395,17 +395,9 @@ fn enforce_epkesu_lkm_identity(kernelsu_ko: &[u8], source: &str) -> Result<()> {
         kernelsu_ko
             .windows(MANAGER_CERT_HASH.len())
             .any(|window| window == MANAGER_CERT_HASH),
-        "{source} does not contain the EpkeSU manager certificate hash; rebuild or patch the LKM assets before patching a boot image"
+        "{source} does not contain the ApkeSU manager certificate hash; rebuild or patch the LKM assets before patching a boot image"
     );
     Ok(())
-}
-
-fn enforce_epkesu_patched_image(cpio: &Cpio, source: &str) -> Result<()> {
-    let kernelsu_ko = cpio
-        .entry_by_name("kernelsu.ko")
-        .and_then(CpioEntry::data)
-        .ok_or_else(|| anyhow!("{source} is not patched by EpkeSU"))?;
-    enforce_epkesu_lkm_identity(kernelsu_ko, &format!("{source} kernelsu.ko"))
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -492,6 +484,10 @@ pub struct BootPatchArgs {
     /// Do not load custom rc
     #[arg(long, default_value = "false")]
     no_custom_rc: bool,
+
+    /// Add built-in pathmask LKM for hidden path patching
+    #[arg(long, default_value = "false")]
+    pathmask_lkm: bool,
 }
 
 pub fn patch(args: BootPatchArgs) -> Result<()> {
@@ -509,6 +505,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             enable_adbd,
             adb_debug_prop,
             no_install,
+            pathmask_lkm,
             #[cfg(target_os = "android")]
             ota,
             #[cfg(target_os = "android")]
@@ -536,6 +533,10 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                 "init and module must not be specified."
             );
         }
+        ensure!(
+            !(pathmask_lkm && no_install),
+            "pathmask LKM patch cannot be used with no-install"
+        );
 
         let kmi = kmi.map_or_else(
             || -> Result<_> {
@@ -647,11 +648,8 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                 "Cannot work with Magisk patched image"
             );
 
-            println!("- Adding EpkeSU LKM");
+            println!("- Adding ApkeSU LKM");
             let is_kernelsu_patched = cpio.exists("kernelsu.ko");
-            if is_kernelsu_patched {
-                enforce_epkesu_patched_image(&cpio, "existing boot image")?;
-            }
 
             if !is_kernelsu_patched && cpio.exists("init") {
                 cpio.mv("init", "init.real")?;
@@ -659,6 +657,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
 
             cpio.add("init", CpioEntry::regular(0o755, ksu_init))?;
             cpio.add("kernelsu.ko", CpioEntry::regular(0o755, kernelsu_ko))?;
+            apply_pathmask_lkm(&mut cpio, pathmask_lkm, &kmi)?;
 
             #[cfg(target_os = "android")]
             if !is_kernelsu_patched
@@ -869,7 +868,10 @@ pub fn restore(args: BootRestoreArgs) -> Result<()> {
             bail!("No compatible ramdisk found.")
         };
 
-    enforce_epkesu_patched_image(&cpio, "boot image")?;
+    ensure!(
+        cpio.exists("kernelsu.ko"),
+        "boot image is not patched by ApkeSU"
+    );
 
     #[cfg(target_os = "android")]
     let mut stock_boot: Option<PathBuf> = None;
@@ -954,8 +956,9 @@ fn rebuild_without_ksu(
     cpio: &mut Cpio,
     vendor_ramdisk_idx: Option<usize>,
 ) -> Result<Vec<u8>> {
-    println!("- Removing EpkeSU from boot image");
+    println!("- Removing ApkeSU from boot image");
     cpio.rm("kernelsu.ko", false);
+    cpio.rm("pathmask.ko", false);
     if cpio.exists("init.real") {
         cpio.mv("init.real", "init")?;
     }
@@ -974,4 +977,19 @@ fn rebuild_without_ksu(
     let mut buf = Cursor::new(Vec::<u8>::with_capacity(boot_image.get_size()));
     patcher.patch(&mut buf)?;
     Ok(buf.into_inner())
+}
+
+fn apply_pathmask_lkm(cpio: &mut Cpio, enabled: bool, kmi: &str) -> Result<()> {
+    if !enabled {
+        cpio.rm("pathmask.ko", false);
+        return Ok(());
+    }
+
+    ensure!(!kmi.is_empty(), "KMI is required for pathmask LKM patch");
+    let name = format!("{kmi}_pathmask.ko");
+    let pathmask = assets::get_asset(&name)
+        .with_context(|| format!("Failed to load built-in pathmask LKM for {kmi}"))?;
+    println!("- Adding hidden path LKM: {name}");
+    cpio.add("pathmask.ko", CpioEntry::regular(0o755, pathmask))?;
+    Ok(())
 }

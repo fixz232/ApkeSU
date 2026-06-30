@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.screen.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +30,8 @@ import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +52,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproDivider
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
@@ -99,6 +104,34 @@ fun SettingPagerSkrootpro(
                 expanded = appearanceExpanded,
                 onExpandedChange = { appearanceExpanded = it },
             ) {
+                val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_day_night_switch),
+                    summary = stringResource(R.string.settings_day_night_switch_summary),
+                    checked = dayNightChecked,
+                    onCheckedChange = actions.onSetDayNightMode,
+                    trailingContent = { checked, enabled, onCheckedChange ->
+                        DayNightSwitch(
+                            checked = checked,
+                            enabled = enabled,
+                            onCheckedChange = onCheckedChange,
+                        )
+                    },
+                )
+                SkrootproSwitchStylePicker(
+                    selectedStyle = uiState.switchStyle,
+                    onStyleSelected = actions.onSetSwitchStyleIndex,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_global_snow),
+                    summary = stringResource(R.string.settings_global_snow_summary),
+                    checked = uiState.globalSnowEnabled,
+                    onCheckedChange = actions.onSetGlobalSnowEnabled,
+                )
+                SkrootproSnowEffectPicker(
+                    selectedEffect = uiState.globalSnowEffect,
+                    onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_theme),
                     summary = stringResource(R.string.settings_theme_summary),
@@ -133,6 +166,18 @@ fun SettingPagerSkrootpro(
                     summary = stringResource(R.string.home_card_wallpapers_summary),
                     leadingIcon = Icons.Rounded.Wallpaper,
                     onClick = actions.onOpenHomeCardWallpapers,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_show_home_support_card),
+                    summary = stringResource(R.string.settings_show_home_support_card_summary),
+                    checked = uiState.showHomeSupportCard,
+                    onCheckedChange = actions.onSetShowHomeSupportCard,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_show_home_learn_card),
+                    summary = stringResource(R.string.settings_show_home_learn_card_summary),
+                    checked = uiState.showHomeLearnCard,
+                    onCheckedChange = actions.onSetShowHomeLearnCard,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_backgrounds),
@@ -285,6 +330,35 @@ fun SettingPagerSkrootpro(
                     },
                 )
                 SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_kpatch_next),
+                    summary = kPatchNextSummary(uiState),
+                    checked = uiState.isKPatchNextEnabled,
+                    onCheckedChange = actions.onSetKPatchNextEnabled,
+                    enabled = uiState.canToggleKPatchNext,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_kpatch_next_webui),
+                    summary = stringResource(
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            R.string.settings_kpatch_next_webui_summary
+                        } else {
+                            R.string.settings_kpatch_next_webui_disabled_summary
+                        }
+                    ),
+                    leadingIcon = Icons.Rounded.Apps,
+                    onClick = {
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            actions.onOpenKPatchNextWebUi()
+                        }
+                    },
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.hidden_path_config),
+                    summary = stringResource(R.string.hidden_path_config_summary),
+                    leadingIcon = Icons.Rounded.Visibility,
+                    onClick = actions.onOpenHiddenPathConfig,
+                )
+                SkrootproSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
                     checked = uiState.enableWebDebugging,
                     onCheckedChange = actions.onSetEnableWebDebugging,
@@ -347,6 +421,118 @@ private fun SkrootproStylePicker(
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkrootproSwitchStylePicker(
+    selectedStyle: String,
+    onStyleSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_switch_style),
+            color = SkrootproColors.Text,
+            fontSize = skrootproSp(15f, maxScale = 1.04f),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(SkrootproColors.BarSurface, CircleShape)
+                .horizontalScroll(rememberScrollState())
+                .padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            SwitchStyle.entries.forEachIndexed { index, style ->
+                val selected = SwitchStyle.fromValue(selectedStyle) == style
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .background(
+                            color = if (selected) SkrootproColors.Purple else Color.Transparent,
+                            shape = CircleShape,
+                        )
+                        .clickable { onStyleSelected(index) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(style.labelRes),
+                        color = if (selected) Color.White else SkrootproColors.Muted,
+                        fontSize = skrootproSp(13f, maxScale = 1.0f),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkrootproSnowEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_global_snow_effect),
+            color = SkrootproColors.Text,
+            fontSize = skrootproSp(15f, maxScale = 1.04f),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(SkrootproColors.BarSurface, CircleShape)
+                .horizontalScroll(rememberScrollState())
+                .padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            GlobalSnowEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .background(
+                            color = if (selected) SkrootproColors.Purple else Color.Transparent,
+                            shape = CircleShape,
+                        )
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else SkrootproColors.Muted,
+                        fontSize = skrootproSp(13f, maxScale = 1.0f),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -569,9 +755,11 @@ private fun SkrootproActionRow(
 @Composable
 private fun SkrootproSwitchRow(
     title: String,
+    summary: String = "",
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
+    trailingContent: (@Composable (Boolean, Boolean, (Boolean) -> Unit) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -582,19 +770,43 @@ private fun SkrootproSwitchRow(
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = title,
-            color = if (enabled) SkrootproColors.Text else SkrootproColors.DisabledText,
-            fontSize = skrootproSp(16f, maxScale = 1.05f),
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = if (enabled) SkrootproColors.Text else SkrootproColors.DisabledText,
+                fontSize = skrootproSp(16f, maxScale = 1.05f),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (summary.isNotBlank()) {
+                Text(
+                    text = summary,
+                    color = SkrootproColors.Muted,
+                    fontSize = skrootproSp(12.5f, maxScale = 1.05f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (trailingContent != null) {
+            trailingContent(checked, enabled, onCheckedChange)
+        } else {
+            val switchStyle = LocalSwitchStyle.current
+            if (switchStyle == SwitchStyle.Original) {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                    enabled = enabled,
+                )
+            } else {
+                StyledSwitch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                    enabled = enabled,
+                    style = switchStyle,
+                )
+            }
+        }
     }
 }

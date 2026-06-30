@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::io::{ErrorKind, Write};
 
 use anyhow::{Context, Result};
@@ -113,8 +113,23 @@ pub fn init() -> Result<()> {
         log::info!("KernelSU may be already loaded in kernel, skip!");
     } else {
         log::info!("Loading kernelsu.ko..");
-        if let Err(e) = load_module_from_path("/kernelsu.ko") {
+        let params = std::fs::read("/ksu_config").unwrap_or_default();
+        let params = unsafe { CString::from_vec_unchecked(params) };
+        if let Err(e) = load_module_from_path("/kernelsu.ko", &params) {
             log::error!("Cannot load kernelsu.ko: {:?}", e);
+        }
+    }
+
+    if access("/pathmask.ko", Access::EXISTS).is_ok() {
+        let params = std::fs::read("/pathmask_config").unwrap_or_default();
+        if params.is_empty() {
+            log::info!("pathmask.ko found but no /pathmask_config, defer loading to ksud");
+        } else {
+            log::info!("Loading pathmask.ko..");
+            let params = unsafe { CString::from_vec_unchecked(params) };
+            if let Err(e) = load_module_from_path("/pathmask.ko", &params) {
+                log::error!("Cannot load pathmask.ko: {:?}", e);
+            }
         }
     }
 
@@ -132,11 +147,9 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-fn load_module_from_path(path: &str) -> Result<()> {
+fn load_module_from_path(path: &str, params: &CStr) -> Result<()> {
     anyhow::ensure!(rustix::process::getpid().is_init(), "Invalid process");
     let buffer = std::fs::read(path).with_context(|| format!("Cannot read file {}", path))?;
-    let params = std::fs::read("/ksu_config").unwrap_or_default();
-    let params = unsafe { CString::from_vec_unchecked(params) };
-    log::info!("load kernelsu with params {params:?}");
+    log::info!("load {path} with params {params:?}");
     ksuinit::load_module(&buffer, &params)
 }

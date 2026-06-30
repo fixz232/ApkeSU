@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_show_home_support_card">顯示支援開發卡片</string>
+    <string name="settings_show_home_support_card_summary">在首頁顯示支援開發卡片。</string>
+    <string name="settings_show_home_learn_card">顯示了解 ApkeSU 卡片</string>
+    <string name="settings_show_home_learn_card_summary">在首頁顯示了解 ApkeSU 卡片。</string>
+</resources>

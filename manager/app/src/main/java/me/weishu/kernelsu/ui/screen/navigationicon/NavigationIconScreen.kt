@@ -162,6 +162,8 @@ fun NavigationIconScreen() {
     val cropSlot = cropTarget.value?.let(::navigationIconSlotFromId)
     if (cropSlot != null) {
         val iconState = uiState.customNavigationIcons[cropSlot]
+        val cropTitle = stringResource(cropSlot.cropTitleRes)
+        val emptyText = stringResource(R.string.settings_navigation_icon_not_selected)
         SettingsWallpaperCropDialog(
             show = iconState.hasSelected,
             uriString = iconState.uriString,
@@ -173,8 +175,8 @@ fun NavigationIconScreen() {
             onDismissRequest = {
                 cropTarget.value = null
             },
-            title = context.getString(cropSlot.cropTitleRes),
-            emptyText = context.getString(R.string.settings_navigation_icon_not_selected),
+            title = cropTitle,
+            emptyText = emptyText,
             editorAspectRatio = 1f,
             cropAspectRatio = 1f,
             defaultCrop = DEFAULT_CUSTOM_NAVIGATION_ICON_CROP,

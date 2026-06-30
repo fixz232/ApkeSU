@@ -10,11 +10,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -34,6 +36,8 @@ fun FlashScreen(flashIt: FlashIt) {
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
     val uiMode = LocalUiMode.current
     val snackbarHost = remember { SnackbarHostState() }
+    val logSavedMessage = stringResource(R.string.log_saved)
+    val logSaveFailedMessage = stringResource(R.string.log_save_failed)
 
     fun showMessage(message: String) {
         scope.launch {
@@ -64,7 +68,9 @@ fun FlashScreen(flashIt: FlashIt) {
     )
     val actions = FlashScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
-        onSaveLog = saveLog(logContent, scope) { showMessage(it) },
+        onSaveLog = saveLog(logContent, scope, logSavedMessage, logSaveFailedMessage) {
+            showMessage(it)
+        },
         onReboot = {
             KernelStatusEvents.requestRefresh()
             scope.launch {

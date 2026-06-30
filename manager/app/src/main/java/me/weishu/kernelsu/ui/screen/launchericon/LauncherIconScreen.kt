@@ -91,6 +91,8 @@ fun LauncherIconScreen() {
     var customIconUri by remember { mutableStateOf<String?>(null) }
     var customIconCrop by remember { mutableStateOf(FullImageCrop) }
     var showCustomIconCrop by remember { mutableStateOf(false) }
+    val customIconFailedMessage = stringResource(R.string.settings_app_icon_custom_failed)
+    val defaultManagerName = stringResource(R.string.app_name)
     val customIconPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -114,11 +116,11 @@ fun LauncherIconScreen() {
             if (bitmap == null) {
                 Toast.makeText(
                     context,
-                    context.getString(R.string.settings_app_icon_custom_failed),
+                    customIconFailedMessage,
                     Toast.LENGTH_LONG
                 ).show()
             } else {
-                val managerName = uiState.customManagerName.ifBlank { context.getString(R.string.app_name) }
+                val managerName = uiState.customManagerName.ifBlank { defaultManagerName }
                 Shortcut.createManagerShortcut(context, bitmap, managerName)
             }
             showCustomIconCrop = false

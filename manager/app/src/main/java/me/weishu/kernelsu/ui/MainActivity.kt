@@ -59,6 +59,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -81,7 +82,10 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
+import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.bottombar.BottomBar
 import me.weishu.kernelsu.ui.component.bottombar.MainPagerState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
@@ -108,6 +112,7 @@ import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
+import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
@@ -245,6 +250,7 @@ class MainActivity : ComponentActivity() {
                 LocalInterfaceStyle provides uiState.interfaceStyle,
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
+                LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
             ) {
                 KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
                     HandleDeepLink(intentState = intentState.collectAsStateWithLifecycle())
@@ -289,6 +295,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Backgrounds> { BackgroundSettingsScreen() }
                                 entry<Route.SoundEffects> { SoundEffectsScreen() }
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
+                                entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
@@ -349,6 +356,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+
+                        GlobalSnowEffectOverlay(
+                            enabled = uiState.globalSnowEnabled,
+                            effectValue = uiState.globalSnowEffect,
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
                         if (showStartupAnimation && !startupAnimationUri.isNullOrBlank()) {
                             StartupAnimationOverlay(
@@ -412,6 +425,21 @@ private fun MainActivityUiState.effectiveCustomBackground(mainPage: Int): Custom
 private fun ManagerUpdatePrompt() {
     val context = LocalContext.current
     var updateInfo by remember { mutableStateOf<ManagerUpdateInfo?>(null) }
+    val updateTitle = stringResource(R.string.manager_update_title)
+    val downloadText = stringResource(R.string.download)
+    val updateContent = updateInfo?.let { latest ->
+        val version = stringResource(
+            R.string.manager_update_message,
+            latest.versionName,
+            latest.versionCode,
+        )
+        val changelog = latest.changelog.trim().take(MAX_MANAGER_UPDATE_CHANGELOG_LENGTH)
+        if (changelog.isBlank()) {
+            version
+        } else {
+            stringResource(R.string.manager_update_changelog, version, changelog)
+        }
+    }
     val updateDialog = rememberConfirmDialog(
         onConfirm = {
             updateInfo?.let { ManagerUpdateChecker.download(context, it) }
@@ -419,29 +447,21 @@ private fun ManagerUpdatePrompt() {
         onDismiss = { updateInfo = null },
     )
 
+    LaunchedEffect(updateInfo, updateContent, updateTitle, downloadText) {
+        val latest = updateInfo ?: return@LaunchedEffect
+        val content = updateContent ?: return@LaunchedEffect
+        updateDialog.showConfirm(
+            title = updateTitle,
+            content = content,
+            markdown = latest.changelog.isNotBlank(),
+            confirm = downloadText,
+        )
+    }
+
     LaunchedEffect(Unit) {
         val latest = ManagerUpdateChecker.checkLatest(context) ?: return@LaunchedEffect
         updateInfo = latest
-        updateDialog.showConfirm(
-            title = context.getString(R.string.manager_update_title),
-            content = formatManagerUpdateMessage(context, latest),
-            markdown = latest.changelog.isNotBlank(),
-            confirm = context.getString(R.string.download),
-        )
     }
-}
-
-private fun formatManagerUpdateMessage(context: android.content.Context, updateInfo: ManagerUpdateInfo): String {
-    val version = context.getString(
-        R.string.manager_update_message,
-        updateInfo.versionName,
-        updateInfo.versionCode
-    )
-    val changelog = updateInfo.changelog.trim().take(MAX_MANAGER_UPDATE_CHANGELOG_LENGTH)
-    if (changelog.isBlank()) {
-        return version
-    }
-    return context.getString(R.string.manager_update_changelog, version, changelog)
 }
 
 @Composable

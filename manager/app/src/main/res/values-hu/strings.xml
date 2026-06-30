@@ -2,7 +2,7 @@
 <resources>
     <string name="home_working">Működik</string>
     <string name="home_working_version">Verzió: %s</string>
-    <string name="home_unsupported_reason">A EpkeSU jelenleg csak GKI kerneleket támogat</string>
+    <string name="home_unsupported_reason">A ApkeSU jelenleg csak GKI kerneleket támogat</string>
     <string name="home_kernel">Kernel</string>
     <string name="home_manager_version">Alkalmazás verziója</string>
     <string name="home_fingerprint">Ujjlenyomat</string>
@@ -16,11 +16,9 @@
     <string name="show_system_apps">Rendszeralkalmazások megjelenítése</string>
     <string name="safe_mode">Biztonságos mód</string>
     <string name="module_magisk_conflict">A modulok nem érhetők el a Magiskkel való ütközés miatt!</string>
-    <string name="home_learn_kernelsu">Tudjon meg többet a EpkeSU-ról</string>
-    <string name="home_click_to_learn_kernelsu">Ismerje meg a EpkeSU telepítését és a modulok használatát</string>
+    <string name="home_learn_kernelsu">Tudjon meg többet a ApkeSU-ról</string>
+    <string name="home_click_to_learn_kernelsu">Ismerje meg a ApkeSU telepítését és a modulok használatát</string>
     <string name="home_support_title">Támogasson minket</string>
-    <string name="about_source_code">Tekintse meg a forráskódot a %1$s-on<br/>
-Csatlakozzon a %2$s csatornánkhoz</string>
     <string name="profile_default">Alapértelmezett</string>
     <string name="profile_template">Sablon</string>
     <string name="profile_custom">Egyedi</string>
@@ -33,7 +31,7 @@ Csatlakozzon a %2$s csatornánkhoz</string>
     <string name="profile_capabilities">Jogosultságok</string>
     <string name="profile_selinux_context">SELinux kontextus</string>
     <string name="settings_umount_modules_default">Modulok leválasztása alapértelmezetten</string>
-    <string name="profile_umount_modules_summary">Ha engedélyezi ezt az opciót, a EpkeSU visszaállíthatja az alkalmazás moduljai által módosított fájlokat.</string>
+    <string name="profile_umount_modules_summary">Ha engedélyezi ezt az opciót, a ApkeSU visszaállíthatja az alkalmazás moduljai által módosított fájlokat.</string>
     <string name="profile_selinux_domain">Tartomány</string>
     <string name="profile_selinux_rules">Szabályok</string>
     <string name="module_update">Frissítés</string>
@@ -67,14 +65,14 @@ Csatlakozzon a %2$s csatornánkhoz</string>
     <string name="module_version">Verzió</string>
     <string name="send_log">Naplók küldése</string>
     <string name="reboot_to_apply">Indítsa újra a készüléket a változások érvényesítéséhez</string>
-    <string name="home_support_content">A EpkeSU ingyenes, nyílt forráskódú és mindig is az lesz. Ön azonban adományozással megmutathatja, hogy törődik a projekttel.</string>
+    <string name="home_support_content">A ApkeSU ingyenes, nyílt forráskódú és mindig is az lesz. Ön azonban adományozással megmutathatja, hogy törődik a projekttel.</string>
     <string name="profile_namespace_global">Globális</string>
     <string name="profile_umount_modules">Modulok leválasztása</string>
     <string name="failed_to_update_app_profile">Nem sikerült frissíteni az App Profilt ehhez: %s</string>
     <string name="settings_umount_modules_default_summary">A \"Modulok leválasztása\" globális alapértelmezett értéke az App Profile-ban. Ha engedélyezve van, eltávolít minden modulmódosítást a rendszerből azon alkalmazások esetében, amelyeknek nincs profilja beállítva.</string>
     <string name="new_version_available">Elérhető az új, %s verzió, kattintson a frissítéshez.</string>
     <string name="failed_to_update_sepolicy">Nem sikerült frissíteni az SELinux szabályokat a következőhöz: %s</string>
-    <string name="require_kernel_version">A jelenlegi EpkeSU verzió %1$d túlságosan elavult a megfelelő működéshez. Kérjük frissítsen a %2$d verzióra vagy újabbra!</string>
+    <string name="require_kernel_version">A jelenlegi ApkeSU verzió %1$d túlságosan elavult a megfelelő működéshez. Kérjük frissítsen a %2$d verzióra vagy újabbra!</string>
     <string name="app_profile_template_import_success">Sikeresen importálva</string>
     <string name="app_profile_export_to_clipboard">Exportálás a vágólapról</string>
     <string name="app_profile_template_export_empty">Nem található helyi sablon az exportáláshoz!</string>
@@ -104,7 +102,7 @@ Csatlakozzon a %2$s csatornánkhoz</string>
     <string name="select_kmi">KMI kiválasztása</string>
     <string name="install_next">Következő</string>
     <string name="settings_uninstall_temporary">Ideiglenes eltávolítás</string>
-    <string name="settings_uninstall_temporary_message">A EpkeSU ideiglenes eltávolítása, az eredeti állapot visszaállítása a következő újraindítás után.</string>
+    <string name="settings_uninstall_temporary_message">A ApkeSU ideiglenes eltávolítása, az eredeti állapot visszaállítása a következő újraindítás után.</string>
     <string name="settings_uninstall">Eltávolítás</string>
     <string name="flashing">Telepítés</string>
     <string name="flash_success">Sikeres telepítés</string>
@@ -113,18 +111,18 @@ Csatlakozzon a %2$s csatornánkhoz</string>
     <string name="grant_root_failed">A root jog megadása sikertelen!</string>
     <string name="install_inactive_slot">Telepítés inaktív helyre (OTA után)</string>
     <string name="select_file">Fájl kiválasztása</string>
-    <string name="settings_uninstall_permanent_message">A EpkeSU eltávolítása (root és az összes modul) teljesen és véglegesen.</string>
+    <string name="settings_uninstall_permanent_message">A ApkeSU eltávolítása (root és az összes modul) teljesen és véglegesen.</string>
     <string name="settings_restore_stock_image">Eredeti képfájl visszaállítása</string>
     <string name="action">Művelet</string>
     <string name="direct_install">Közvetlen telepítés (Ajánlott)</string>
     <string name="install_inactive_slot_warning">Az eszköze **KÉNYSZERÍTETTEN** a jelenleg inaktív helyről fog indulni újraindítás után!\nCsak az OTA befejezése után használja.\nFolytatja?</string>
-    <string name="settings_restore_stock_image_message">Állítsa vissza a gyári képfájlt (ha létezik biztonsági mentés). Általában OTA előtt használják. Ha a EpkeSU-t szeretné eltávolítani, használja a végleges eltávolítás opciót.</string>
+    <string name="settings_restore_stock_image_message">Állítsa vissza a gyári képfájlt (ha létezik biztonsági mentés). Általában OTA előtt használják. Ha a ApkeSU-t szeretné eltávolítani, használja a végleges eltávolítás opciót.</string>
     <string name="settings_check_update">Frissítés ellenőrzése</string>
     <string name="settings_check_update_summary">Automatikusan keressen frissítéseket az alkalmazás megnyitásakor</string>
     <string name="log_saved">Mentett naplók</string>
     <string name="settings_sucompat">su bináris átirányítása</string>
     <string name="settings_sucompat_summary">Lehetővé teszi az App Profile-ban Superuser engedéllyel rendelkező alkalmazások számára, hogy superuser shell-t kapjanak a /system/bin/su végrehajtásával; csak új folyamatoknál hatékony.</string>
     <string name="settings_kernel_umount">Kernel leválasztása</string>
-    <string name="settings_kernel_umount_summary">EpkeSU által vezérelt kernel szintű leválasztási viselkedés</string>
-    <string name="profile_flags_desc_no_new_privs">Megakadályozza a jogosultságok további kiterjesztését a EpkeSU-n keresztül ezen root profil kontextusán belül.</string>
+    <string name="settings_kernel_umount_summary">ApkeSU által vezérelt kernel szintű leválasztási viselkedés</string>
+    <string name="profile_flags_desc_no_new_privs">Megakadályozza a jogosultságok további kiterjesztését a ApkeSU-n keresztül ezen root profil kontextusán belül.</string>
 </resources>

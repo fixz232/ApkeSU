@@ -21,6 +21,7 @@ pub fn on_post_data_fs() -> Result<()> {
     }
 
     ksucalls::report_post_fs_data();
+    crate::late_load::register_default_manager_appid();
 
     utils::umask(0);
 
@@ -106,6 +107,8 @@ pub fn on_post_data_fs() -> Result<()> {
     } else if let Err(e) = crate::feature::init_features() {
         warn!("init features failed: {e}");
     }
+
+    crate::pathmask::apply_if_configured();
 
     // execute metamodule post-fs-data script first (priority)
     if let Err(e) = metamodule::exec_stage_script("post-fs-data", true) {

@@ -77,7 +77,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
@@ -104,7 +106,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
+import me.weishu.kernelsu.ui.component.miuix.SunMoonSwitchPreference as SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -214,6 +216,7 @@ fun SettingPagerMiuix(
                         expanded = appearanceExpanded,
                         onExpandedChange = { appearanceExpanded = it },
                     ) {
+                        val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
                         OverlayDropdownPreference(
                             title = stringResource(id = R.string.settings_ui_mode),
                             summary = stringResource(id = R.string.settings_ui_mode_summary),
@@ -228,6 +231,56 @@ fun SettingPagerMiuix(
                             },
                             selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                             onSelectedIndexChange = actions.onSetUiModeIndex
+                        )
+                        DayNightMiuixPreference(
+                            title = stringResource(id = R.string.settings_day_night_switch),
+                            summary = stringResource(id = R.string.settings_day_night_switch_summary),
+                            checked = dayNightChecked,
+                            onCheckedChange = actions.onSetDayNightMode,
+                        )
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.settings_switch_style),
+                            summary = stringResource(id = R.string.settings_switch_style_summary),
+                            items = SwitchStyle.entries.map { stringResource(it.labelRes) },
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Palette,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_switch_style),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            selectedIndex = SwitchStyle.selectedIndex(uiState.switchStyle),
+                            onSelectedIndexChange = actions.onSetSwitchStyleIndex
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_global_snow),
+                            summary = stringResource(id = R.string.settings_global_snow_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_global_snow),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            checked = uiState.globalSnowEnabled,
+                            onCheckedChange = actions.onSetGlobalSnowEnabled
+                        )
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.settings_global_snow_effect),
+                            summary = stringResource(id = R.string.settings_global_snow_effect_summary),
+                            items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_global_snow_effect),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
+                            onSelectedIndexChange = actions.onSetGlobalSnowEffectIndex
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_theme),
@@ -316,6 +369,34 @@ fun SettingPagerMiuix(
                                 )
                             },
                             onClick = actions.onOpenHomeCardWallpapers
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_show_home_support_card),
+                            summary = stringResource(id = R.string.settings_show_home_support_card_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_show_home_support_card),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            checked = uiState.showHomeSupportCard,
+                            onCheckedChange = actions.onSetShowHomeSupportCard
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_show_home_learn_card),
+                            summary = stringResource(id = R.string.settings_show_home_learn_card_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_show_home_learn_card),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            checked = uiState.showHomeLearnCard,
+                            onCheckedChange = actions.onSetShowHomeLearnCard
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_backgrounds),
@@ -661,6 +742,65 @@ fun SettingPagerMiuix(
                             )
 
                             SwitchPreference(
+                                title = stringResource(id = R.string.settings_kpatch_next),
+                                summary = kPatchNextSummary(uiState),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.DeveloperMode,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_kpatch_next),
+                                        tint = if (uiState.canToggleKPatchNext) {
+                                            colorScheme.onBackground
+                                        } else {
+                                            colorScheme.disabledOnSecondaryVariant
+                                        }
+                                    )
+                                },
+                                enabled = uiState.canToggleKPatchNext,
+                                checked = uiState.isKPatchNextEnabled,
+                                onCheckedChange = actions.onSetKPatchNextEnabled
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(id = R.string.settings_kpatch_next_webui),
+                                summary = stringResource(
+                                    id = if (uiState.canOpenKPatchNextWebUi) {
+                                        R.string.settings_kpatch_next_webui_summary
+                                    } else {
+                                        R.string.settings_kpatch_next_webui_disabled_summary
+                                    }
+                                ),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Apps,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_kpatch_next_webui),
+                                        tint = if (uiState.canOpenKPatchNextWebUi) {
+                                            colorScheme.onBackground
+                                        } else {
+                                            colorScheme.disabledOnSecondaryVariant
+                                        }
+                                    )
+                                },
+                                enabled = uiState.canOpenKPatchNextWebUi,
+                                onClick = actions.onOpenKPatchNextWebUi
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(id = R.string.hidden_path_config),
+                                summary = stringResource(id = R.string.hidden_path_config_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Visibility,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.hidden_path_config),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onOpenHiddenPathConfig
+                            )
+
+                            SwitchPreference(
                                 title = stringResource(id = R.string.enable_web_debugging),
                                 summary = stringResource(id = R.string.enable_web_debugging_summary),
                                 startAction = {
@@ -910,13 +1050,62 @@ private fun CollapsibleMiuixSection(
 
 private const val UPDATES_ITEM_COUNT = 2
 private const val ROOT_FEATURES_ITEM_COUNT = 7
-private const val ADVANCED_ITEM_COUNT = 6
+private const val ADVANCED_ITEM_COUNT = 9
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    var count = 10
+    var count = 16
     if (customStartupAnimationUri != null) count += 2
 
     return count
+}
+
+@Composable
+private fun DayNightMiuixPreference(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Rounded.Palette,
+            modifier = Modifier.padding(end = 12.dp),
+            contentDescription = title,
+            tint = colorScheme.onBackground,
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = title,
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = summary,
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DayNightSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
 }
 
 private fun SettingsUiState.maintenanceSectionItemCount(): Int {

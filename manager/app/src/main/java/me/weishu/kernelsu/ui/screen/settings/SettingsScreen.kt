@@ -28,6 +28,7 @@ import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MIME_TYPES
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_MIME_TYPES
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
 import me.weishu.kernelsu.ui.util.HYBRID_MOUNT_MODULE_ID
+import me.weishu.kernelsu.ui.util.KPATCH_NEXT_MODULE_ID
 import me.weishu.kernelsu.ui.util.isCustomVideoBackground
 import me.weishu.kernelsu.ui.util.persistCustomImageReference
 import me.weishu.kernelsu.ui.util.releasePersistableStartupAnimationReadPermission
@@ -101,8 +102,14 @@ fun SettingPager(
     val actions = SettingsScreenActions(
         onSetCheckModuleUpdate = viewModel::setCheckModuleUpdate,
         onSetShowVersionMismatchWarning = viewModel::setShowVersionMismatchWarning,
+        onSetShowHomeSupportCard = viewModel::setShowHomeSupportCard,
+        onSetShowHomeLearnCard = viewModel::setShowHomeLearnCard,
         onOpenTheme = { navigator.push(Route.ColorPalette) },
         onOpenThemeStore = { navigator.push(Route.ThemeStore) },
+        onSetDayNightMode = viewModel::setDayNightMode,
+        onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
+        onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
+        onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
         onSetUiModeIndex = { index ->
             viewModel.setUiMode(InterfaceStyle.fromIndex(index).value)
         },
@@ -184,6 +191,15 @@ fun SettingPager(
                     .putExtra("id", HYBRID_MOUNT_MODULE_ID)
             )
         },
+        onSetKPatchNextEnabled = viewModel::setKPatchNextEnabled,
+        onOpenKPatchNextWebUi = {
+            context.startActivity(
+                Intent(context, WebUIActivity::class.java)
+                    .setData("kernelsu://webui/$KPATCH_NEXT_MODULE_ID".toUri())
+                    .putExtra("id", KPATCH_NEXT_MODULE_ID)
+            )
+        },
+        onOpenHiddenPathConfig = { navigator.push(Route.HiddenPathConfig) },
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,
         onSetAutoJailbreak = viewModel::setAutoJailbreak,

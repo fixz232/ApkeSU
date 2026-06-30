@@ -9,13 +9,18 @@ import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.KPatchNextStatus
 
 const val SHOW_VERSION_MISMATCH_WARNING_KEY = "show_version_mismatch_warning"
+const val SHOW_HOME_SUPPORT_CARD_KEY = "show_home_support_card"
+const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
 
 interface SettingsRepository {
     var uiMode: String
     var checkModuleUpdate: Boolean
     var showVersionMismatchWarning: Boolean
+    var showHomeSupportCard: Boolean
+    var showHomeLearnCard: Boolean
     var themeMode: Int
     var miuixMonet: Boolean
     var keyColor: Int
@@ -29,6 +34,9 @@ interface SettingsRepository {
     var pageScale: Float
     var fontScale: Float
     var blurIntensity: Float
+    var switchStyle: String
+    var globalSnowEnabled: Boolean
+    var globalSnowEffect: String
     var themeSyncStrategy: ThemeSyncStrategy
     var enableWebDebugging: Boolean
     var autoJailbreak: Boolean
@@ -94,6 +102,9 @@ interface SettingsRepository {
     suspend fun getBuiltinMountStatus(): BuiltinMountStatus
     fun setBuiltinMountEnabled(enabled: Boolean): Boolean
     fun setBuiltinMountDefaultMode(mode: String): Boolean
+
+    suspend fun getKPatchNextStatus(): KPatchNextStatus
+    fun setKPatchNextEnabled(enabled: Boolean): Boolean
 
     suspend fun getEpkesuHideStatus(): Boolean
     fun setEpkesuHideEnabled(enabled: Boolean): Boolean

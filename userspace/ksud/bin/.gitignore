@@ -1,2 +1,3 @@
 **/*.ko
+!**/*_pathmask.ko
 **/ksuinit

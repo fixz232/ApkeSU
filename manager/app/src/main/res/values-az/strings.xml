@@ -6,7 +6,7 @@
     <string name="home_click_to_install">Yükləmək üçün toxunun</string>
     <string name="home_working">İşləyir</string>
     <string name="home_working_version">Versiya: %s</string>
-    <string name="home_unsupported_reason">Hal-hazırda EpkeSU yalnız GKI nüvələrini dəstəkləyir</string>
+    <string name="home_unsupported_reason">Hal-hazırda ApkeSU yalnız GKI nüvələrini dəstəkləyir</string>
     <string name="home_unsupported">Dəstəklənmir</string>
     <string name="module_install">Yüklə</string>
     <string name="install">Yüklə</string>
@@ -41,16 +41,14 @@
     <string name="safe_mode">Təhlükəsiz rejimi</string>
     <string name="reboot_to_apply">Qüvvəyə minməsi üçün yenidən başlat</string>
     <string name="module_magisk_conflict">Modular deaktiv edilir,çünki o Magisk-in modulları ilə toqquşur!</string>
-    <string name="home_learn_kernelsu">EpkeSU-yu öyrən</string>
+    <string name="home_learn_kernelsu">ApkeSU-yu öyrən</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
     <string name="home_support_title">Bizi dəstəkləyin</string>
-    <string name="home_click_to_learn_kernelsu">EpkeSU-yu necə quraşdırılacağını və modulların necə istifadə ediləcəyini öyrən</string>
+    <string name="home_click_to_learn_kernelsu">ApkeSU-yu necə quraşdırılacağını və modulların necə istifadə ediləcəyini öyrən</string>
     <string name="profile_template">Şablon</string>
     <string name="profile_default">Defolt</string>
     <string name="profile_custom">Özəl</string>
-    <string name="home_support_content">EpkeSU pulsuz və açıq mənbəlidir,həmişə belə olacaqdır. Bununla belə, ianə etməklə bizə qayğı göstərdiyinizi göstərə bilərsiniz.</string>
-    <string name="about_source_code">Mənbə kodlarımıza baxın %1$s<br/>
-Kanalımıza %2$s qoşulun</string>
+    <string name="home_support_content">ApkeSU pulsuz və açıq mənbəlidir,həmişə belə olacaqdır. Bununla belə, ianə etməklə bizə qayğı göstərdiyinizi göstərə bilərsiniz.</string>
     <string name="profile_name">Profil adı</string>
     <string name="profile_capabilities">Bacarıqlar</string>
     <string name="profile_umount_modules">Modulları umount et</string>
@@ -69,13 +67,13 @@ Kanalımıza %2$s qoşulun</string>
     <string name="module_start_downloading">Endirməni başlat: %s</string>
     <string name="new_version_available">Yeni versiya: %s əlçatandır, endirmək üçün toxunun</string>
     <string name="module_downloading">Modul yüklənir: %s</string>
-    <string name="profile_umount_modules_summary">Bu seçimi aktivləşdirmək EpkeSU-ya bu proqram üçün modullar tərəfindən hər hansı dəyişdirilmiş faylları bərpa etməyə imkan verəcək.</string>
+    <string name="profile_umount_modules_summary">Bu seçimi aktivləşdirmək ApkeSU-ya bu proqram üçün modullar tərəfindən hər hansı dəyişdirilmiş faylları bərpa etməyə imkan verəcək.</string>
     <string name="launch_app">Aç</string>
     <string name="force_stop_app">Məcburi dayandır</string>
     <string name="restart_app">Təkrar başlat</string>
     <string name="failed_to_update_sepolicy">%s görə SELinux qaydalarını güncəlləmək mümkün olmadı</string>
     <string name="save_log">Girişləri Saxla</string>
-    <string name="require_kernel_version">Cari EpkeSU versiyası %1$d menecerin düzgün işləməsi üçün çox aşağıdır. Lütfən, %2$d və ya daha yüksək versiyaya təkmilləşdirin!</string>
+    <string name="require_kernel_version">Cari ApkeSU versiyası %1$d menecerin düzgün işləməsi üçün çox aşağıdır. Lütfən, %2$d və ya daha yüksək versiyaya təkmilləşdirin!</string>
     <string name="module_install_prompt_with_name">Aşağıdakı modullar quraşdırılacaq: %1$s</string>
     <string name="confirm">Təsdiq edin</string>
     <string name="module_sort_action_first">Sıralama (ilk hərəkət)</string>
@@ -97,6 +95,6 @@ Kanalımıza %2$s qoşulun</string>
     <string name="settings_sucompat">su binary yönləndirmə</string>
     <string name="settings_sucompat_summary">Tətbiq Profilinə Superuser icazəsi verilmiş proqramları /system/bin/su vasitəsilə superuser shell əldə etməyə icazə verir; yalnız yeni proseslər üçün effektivdir.</string>
     <string name="settings_kernel_umount">Nüvə umount</string>
-    <string name="settings_kernel_umount_summary">EpkeSU tərəfindən idarə olunan nüvə səviyyəsində umount davranışı</string>
-    <string name="profile_flags_desc_no_new_privs">Bu root profili kontekstində EpkeSU vasitəsilə əlavə səlahiyyət yüksəltməsinin qarşısını alır.</string>
+    <string name="settings_kernel_umount_summary">ApkeSU tərəfindən idarə olunan nüvə səviyyəsində umount davranışı</string>
+    <string name="profile_flags_desc_no_new_privs">Bu root profili kontekstində ApkeSU vasitəsilə əlavə səlahiyyət yüksəltməsinin qarşısını alır.</string>
 </resources>

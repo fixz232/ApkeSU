@@ -6,7 +6,7 @@
     <string name="home_working">Em execução</string>
     <string name="home_working_version">Versão: %s</string>
     <string name="home_unsupported">Sem suporte</string>
-    <string name="home_unsupported_reason">EpkeSU suporta apenas kernels GKI agora</string>
+    <string name="home_unsupported_reason">ApkeSU suporta apenas kernels GKI agora</string>
     <string name="home_kernel">Versão do kernel</string>
     <string name="home_manager_version">Versão do gerenciador</string>
     <string name="home_fingerprint">Impressão digital</string>
@@ -41,12 +41,11 @@
     <string name="safe_mode">Modo de segurança</string>
     <string name="reboot_to_apply">Reinicie para entrar em vigor</string>
     <string name="module_magisk_conflict">Os módulos estão indisponíveis devido a um conflito com Magisk!</string>
-    <string name="home_learn_kernelsu">Saiba mais sobre o EpkeSU</string>
+    <string name="home_learn_kernelsu">Saiba mais sobre o ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/pt_BR/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Saiba como instalar o EpkeSU e usar os módulos</string>
+    <string name="home_click_to_learn_kernelsu">Saiba como instalar o ApkeSU e usar os módulos</string>
     <string name="home_support_title">Apoie-nos</string>
-    <string name="home_support_content">EpkeSU sempre foi e sempre será, gratuito e de código aberto. No entanto, você pode nos ajudar enviando uma pequena doação.</string>
-    <string name="about_source_code"><![CDATA[Veja o código-fonte no %1$s<br/>Junte-se ao nosso canal do %2$s]]></string>
+    <string name="home_support_content">ApkeSU sempre foi e sempre será, gratuito e de código aberto. No entanto, você pode nos ajudar enviando uma pequena doação.</string>
     <string name="profile" translatable="false">Perfil do Aplicativo</string>
     <string name="profile_default">Padrão</string>
     <string name="profile_template">Modelo</string>
@@ -63,7 +62,7 @@
     <string name="failed_to_update_app_profile">Falha ao atualizar o Perfil do Aplicativo para %s</string>
     <string name="settings_umount_modules_default">Desmontar módulos por padrão</string>
     <string name="settings_umount_modules_default_summary">O valor padrão global para \"Desmontar módulos\" em Perfil do Aplicativo. Se ativado, ele removerá todas as modificações do módulo no sistema para apps que não possuem um perfil definido.</string>
-    <string name="profile_umount_modules_summary">Ativar esta opção permitirá que o EpkeSU restaure quaisquer arquivos modificados pelos módulos para este app.</string>
+    <string name="profile_umount_modules_summary">Ativar esta opção permitirá que o ApkeSU restaure quaisquer arquivos modificados pelos módulos para este app.</string>
     <string name="profile_selinux_domain">Domínio</string>
     <string name="profile_selinux_rules">Regras</string>
     <string name="module_update">Atualizar</string>
@@ -74,7 +73,7 @@
     <string name="force_stop_app">Forçar parada</string>
     <string name="restart_app">Reiniciar</string>
     <string name="failed_to_update_sepolicy">Falha ao atualizar as regras do SELinux para %s</string>
-    <string name="require_kernel_version">A versão atual do EpkeSU %1$d é muito baixa para o gerenciador funcionar corretamente. Por favor, atualize para a versão %2$d ou superior!</string>
+    <string name="require_kernel_version">A versão atual do ApkeSU %1$d é muito baixa para o gerenciador funcionar corretamente. Por favor, atualize para a versão %2$d ou superior!</string>
     <string name="module_changelog">Registro de alterações</string>
     <string name="app_profile_template_import_success">Importado com sucesso</string>
     <string name="app_profile_export_to_clipboard">Exportar para a área de transferência</string>
@@ -114,9 +113,9 @@
     <string name="settings_uninstall_temporary">Desinstalar temporariamente</string>
     <string name="settings_uninstall_permanent">Desinstalar permanentemente</string>
     <string name="settings_restore_stock_image">Restaurar imagem de fábrica</string>
-    <string name="settings_restore_stock_image_message">Restaure a imagem de fábrica (se existir um backup), geralmente usada antes do OTA. Se você precisar desinstalar o EpkeSU, use \"Desinstalar permanentemente\".</string>
-    <string name="settings_uninstall_temporary_message">Desinstale temporariamente o EpkeSU e restaure ao estado original após a próxima reinicialização.</string>
-    <string name="settings_uninstall_permanent_message">Desinstale o EpkeSU (root e todos os módulos) completamente e permanentemente.</string>
+    <string name="settings_restore_stock_image_message">Restaure a imagem de fábrica (se existir um backup), geralmente usada antes do OTA. Se você precisar desinstalar o ApkeSU, use \"Desinstalar permanentemente\".</string>
+    <string name="settings_uninstall_temporary_message">Desinstale temporariamente o ApkeSU e restaure ao estado original após a próxima reinicialização.</string>
+    <string name="settings_uninstall_permanent_message">Desinstale o ApkeSU (root e todos os módulos) completamente e permanentemente.</string>
     <string name="selected_lkm">LKM selecionado: %s</string>
     <string name="flash_failed">Flash falhou</string>
     <string name="flashing">Flashando</string>
@@ -132,6 +131,6 @@
     <string name="settings_sucompat">Redirecionar binário su</string>
     <string name="settings_sucompat_summary">Permite que aplicativos com permissão de Superusuário no Perfil do App obtenham um shell de superusuário executando /system/bin/su; efetivo apenas para novos processos.</string>
     <string name="settings_kernel_umount">Desmontar kernel</string>
-    <string name="settings_kernel_umount_summary">Comportamento de desmontagem no nível do kernel controlado pelo EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">Impede uma escalada adicional de privilégios via EpkeSU no contexto deste perfil root.</string>
+    <string name="settings_kernel_umount_summary">Comportamento de desmontagem no nível do kernel controlado pelo ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">Impede uma escalada adicional de privilégios via ApkeSU no contexto deste perfil root.</string>
 </resources>

@@ -93,6 +93,7 @@ internal fun InstallScreenMaterial(
                 state = uiState,
                 onSelected = actions.onSelectMethod,
                 onSelectBootImage = actions.onSelectBootImage,
+                onSelectHiddenPathLkmBootImage = actions.onSelectHiddenPathLkmBootImage,
                 onSelectAnyKernel = actions.onSelectAnyKernel,
             )
 
@@ -109,7 +110,24 @@ internal fun InstallScreenMaterial(
                             icon = Icons.Filled.Edit
                         )
                     }
-                    add {
+                    if (uiState.installMethod is InstallMethod.HiddenPathLkmPatch) add {
+                        SegmentedListItem(
+                            leadingContent = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.DriveFileMove,
+                                    null
+                                )
+                            },
+                            headlineContent = { Text(stringResource(R.string.hidden_path_lkm_builtin_title)) },
+                            supportingContent = {
+                                Text(
+                                    (uiState.lkmSelection as? LkmSelection.PathMaskKmiString)?.let {
+                                        stringResource(R.string.hidden_path_lkm_selected_kmi, it.value)
+                                    } ?: stringResource(R.string.hidden_path_lkm_builtin_summary)
+                                )
+                            },
+                        )
+                    } else add {
                         SegmentedListItem(
                             leadingContent = {
                                 Icon(
@@ -213,6 +231,7 @@ private fun SelectInstallMethod(
     state: InstallUiState,
     onSelected: (InstallMethod) -> Unit,
     onSelectBootImage: () -> Unit,
+    onSelectHiddenPathLkmBootImage: () -> Unit,
     onSelectAnyKernel: () -> Unit,
 ) {
     val confirmDialog = rememberConfirmDialog(
@@ -227,6 +246,7 @@ private fun SelectInstallMethod(
     val onClick = { option: InstallMethod ->
         when (option) {
             is InstallMethod.SelectFile -> onSelectBootImage()
+            is InstallMethod.HiddenPathLkmPatch -> onSelectHiddenPathLkmBootImage()
             is InstallMethod.DirectInstall -> onSelected(option)
             is InstallMethod.DirectInstallToInactiveSlot -> confirmDialog.showConfirm(dialogTitle, dialogContent)
             is InstallMethod.AnyKernel -> onSelectAnyKernel()

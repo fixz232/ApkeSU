@@ -29,6 +29,8 @@ mod feature;
 #[cfg(target_os = "android")]
 mod init_event;
 #[cfg(target_os = "android")]
+mod kpatch_next;
+#[cfg(target_os = "android")]
 mod ksucalls;
 #[cfg(target_os = "android")]
 mod late_load;
@@ -40,6 +42,8 @@ mod metamodule;
 mod module;
 #[cfg(target_os = "android")]
 mod module_config;
+#[cfg(target_os = "android")]
+mod pathmask;
 #[cfg(target_os = "android")]
 mod profile;
 #[cfg(target_os = "android")]

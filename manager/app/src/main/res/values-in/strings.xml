@@ -6,7 +6,7 @@
     <string name="home_working">Berfungsi</string>
     <string name="home_working_version">Versi: %s</string>
     <string name="home_unsupported">Tidak didukung</string>
-    <string name="home_unsupported_reason">EpkeSU sekarang hanya mendukung kernel GKI, tetapi Anda dapat menambal image untuk perangkat GKI.</string>
+    <string name="home_unsupported_reason">ApkeSU sekarang hanya mendukung kernel GKI, tetapi Anda dapat menambal image untuk perangkat GKI.</string>
     <string name="home_kernel">Versi kernel</string>
     <string name="home_manager_version">Versi manajer</string>
     <string name="home_fingerprint">Identitas</string>
@@ -41,12 +41,11 @@
     <string name="safe_mode">Mode aman</string>
     <string name="reboot_to_apply">Mulai ulang untuk menerapkan</string>
     <string name="module_magisk_conflict">Modul tidak tersedia karena konflik dengan Magisk!</string>
-    <string name="home_learn_kernelsu">Pelajari EpkeSU</string>
+    <string name="home_learn_kernelsu">Pelajari ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/id_ID/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Pelajari cara memasang EpkeSU dan menggunakan modul.</string>
+    <string name="home_click_to_learn_kernelsu">Pelajari cara memasang ApkeSU dan menggunakan modul.</string>
     <string name="home_support_title">Dukung Kami</string>
-    <string name="home_support_content">EpkeSU akan selalu menjadi aplikasi gratis dan serta bersumber terbuka. Bagaimanapun juga, Anda dapat menunjukan kepedulian Anda kepada kami dengan memberikan sedikit donasi.</string>
-    <string name="about_source_code"><![CDATA[Lihat kode sumber di %1$s<br/>Gabung saluran %2$s kami]]></string>
+    <string name="home_support_content">ApkeSU akan selalu menjadi aplikasi gratis dan serta bersumber terbuka. Bagaimanapun juga, Anda dapat menunjukan kepedulian Anda kepada kami dengan memberikan sedikit donasi.</string>
     <string name="profile">Profil Aplikasi</string>
     <string name="profile_default">Default</string>
     <string name="profile_template">Templat</string>
@@ -63,7 +62,7 @@
     <string name="failed_to_update_app_profile">Gagal memperbarui Profil Apl untuk %s</string>
     <string name="settings_umount_modules_default">Umount modul secara default</string>
     <string name="settings_umount_modules_default_summary">Nilai default global untuk \"Umount modul\" pada Profil Aplikasi. Jika diaktifkan, ini akan menghapus semua modifikasi modul ke sistem untuk aplikasi yang tidak memiliki profil yang ditetapkan.</string>
-    <string name="profile_umount_modules_summary">Mengaktifkan opsi ini akan memungkinkan EpkeSU untuk memulihkan berkas apa pun yang telah dimodifikasi oleh modul untuk aplikasi ini.</string>
+    <string name="profile_umount_modules_summary">Mengaktifkan opsi ini akan memungkinkan ApkeSU untuk memulihkan berkas apa pun yang telah dimodifikasi oleh modul untuk aplikasi ini.</string>
     <string name="profile_selinux_domain">Domain</string>
     <string name="profile_selinux_rules">Aturan</string>
     <string name="module_update">Perbarui</string>
@@ -76,7 +75,7 @@
     <string name="force_stop_app">Paksa berhenti</string>
     <string name="restart_app">Mulai ulang apl</string>
     <string name="failed_to_update_sepolicy">Gagal memperbarui aturan SELinux untuk %s</string>
-    <string name="require_kernel_version">Versi EpkeSU saat ini %1$d terlalu rendah agar manajer berfungsi dengan baik. Silakan perbarui ke versi %2$d atau lebih baru!</string>
+    <string name="require_kernel_version">Versi ApkeSU saat ini %1$d terlalu rendah agar manajer berfungsi dengan baik. Silakan perbarui ke versi %2$d atau lebih baru!</string>
     <string name="module_changelog">Catatan perubahan</string>
     <string name="app_profile_template_import_success">Berhasil diimpor</string>
     <string name="app_profile_export_to_clipboard">Ekspor ke papan klip</string>
@@ -112,13 +111,13 @@
     <string name="open">Buka</string>
     <string name="settings_check_update">Periksa pembaruan</string>
     <string name="settings_check_update_summary">Memeriksa pembaruan secara otomatis saat membuka aplikasi.</string>
-    <string name="settings_uninstall_permanent_message">Menghapus EpkeSU (root dan semua modul) sepenuhnya dan secara permanen.</string>
+    <string name="settings_uninstall_permanent_message">Menghapus ApkeSU (root dan semua modul) sepenuhnya dan secara permanen.</string>
     <string name="settings_uninstall_temporary">Hapus sementara</string>
     <string name="settings_restore_stock_image">Pulihkan image asli</string>
     <string name="settings_uninstall">Hapus</string>
-    <string name="settings_uninstall_temporary_message">Hapus sementara EpkeSU, dipulihkan ke keadaan semula setelah mulai ulang berikutnya.</string>
+    <string name="settings_uninstall_temporary_message">Hapus sementara ApkeSU, dipulihkan ke keadaan semula setelah mulai ulang berikutnya.</string>
     <string name="settings_uninstall_permanent">Hapus permanen</string>
-    <string name="settings_restore_stock_image_message">Pulihkan image asli (jika cadangan ada), biasanya digunakan sebelum OTA; jika Anda perlu menghapus EpkeSU, silakan gunakan \"Hapus permanen\".</string>
+    <string name="settings_restore_stock_image_message">Pulihkan image asli (jika cadangan ada), biasanya digunakan sebelum OTA; jika Anda perlu menghapus ApkeSU, silakan gunakan \"Hapus permanen\".</string>
     <string name="flash_success">Pemasangan berhasil</string>
     <string name="selected_lkm">LKM dipilih: %s</string>
     <string name="flashing">Memasang</string>
@@ -213,7 +212,7 @@
     <string name="color_blue_grey">Abu-abu kebiruan</string>
     <string name="color_amber">Amber</string>
     <string name="color_sakura">Sakura</string>
-    <string name="home_version_mismatch">Versi manajer (%1$d) dan versi driver EpkeSU (%2$d) tidak sesuai.</string>
+    <string name="home_version_mismatch">Versi manajer (%1$d) dan versi driver ApkeSU (%2$d) tidak sesuai.</string>
     <string name="reboot_soft">Mulai ulang cepat</string>
     <string name="jailbreak_mode">Mode jailbreak</string>
     <string name="jailbreak_timeout">Proses jailbreak mungkin gagal, silakan periksa log</string>
@@ -255,5 +254,5 @@
     <string name="download_install">Pasang</string>
     <string name="home_jailbreak">Jailbreak</string>
     <string name="settings_enable_blur">Blur</string>
-    <string name="profile_flags_desc_no_new_privs">Mencegah eskalasi hak akses lebih lanjut melalui EpkeSU dalam konteks profil root ini.</string>
+    <string name="profile_flags_desc_no_new_privs">Mencegah eskalasi hak akses lebih lanjut melalui ApkeSU dalam konteks profil root ini.</string>
 </resources>

@@ -3,7 +3,7 @@
     <string name="home_working">Arbejder</string>
     <string name="home_unsupported">Ikke understøttet</string>
     <string name="home_kernel">Kernel-version</string>
-    <string name="home_unsupported_reason">EpkeSU understøtter nu kun GKI-kerner.</string>
+    <string name="home_unsupported_reason">ApkeSU understøtter nu kun GKI-kerner.</string>
     <string name="home_manager_version">Manager version</string>
     <string name="home_selinux_status">SELinux-status</string>
     <string name="selinux_status_disabled">Deaktiveret</string>
@@ -27,10 +27,9 @@
     <string name="send_log">Send logfiler</string>
     <string name="safe_mode">Sikker tilstand</string>
     <string name="reboot_to_apply">Genstart for at tage effekt</string>
-    <string name="home_learn_kernelsu">Lær EpkeSU</string>
+    <string name="home_learn_kernelsu">Lær ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Lær hvordan man installerer EpkeSU og moduler.</string>
-    <string name="about_source_code"><![CDATA[View source code at %1$s<br/>Join our %2$s channel]]></string>
+    <string name="home_click_to_learn_kernelsu">Lær hvordan man installerer ApkeSU og moduler.</string>
     <string name="profile_default">Standard</string>
     <string name="profile_template">Skabelon</string>
     <string name="profile_namespace">Monter namespace</string>
@@ -41,7 +40,7 @@
     <string name="profile_selinux_context">SELinux-kontext</string>
     <string name="profile_umount_modules">Afmonteret moduler</string>
     <string name="settings_umount_modules_default">Afmontere moduler</string>
-    <string name="profile_umount_modules_summary">Hvis denne indstilling aktiveres, kan EpkeSU gendanne alle ændrede filer af modulerne til denne app.</string>
+    <string name="profile_umount_modules_summary">Hvis denne indstilling aktiveres, kan ApkeSU gendanne alle ændrede filer af modulerne til denne app.</string>
     <string name="module_update">Opdatering</string>
     <string name="module_downloading">Downloader modulet: %s</string>
     <string name="new_version_available">Ny version %s er tilgængelig, klik for at opgradere!</string>
@@ -64,7 +63,7 @@
     <string name="show_system_apps">Vis system-apps</string>
     <string name="module_magisk_conflict">Moduler er utilgængelige på grund af en konflikt med Magisk!</string>
     <string name="home_support_title">Støt Os</string>
-    <string name="home_support_content">EpkeSU er, og vil altid være, gratis og åben kildekode. Du kan dog vise os, at du holder af os, ved at give en donation.</string>
+    <string name="home_support_content">ApkeSU er, og vil altid være, gratis og åben kildekode. Du kan dog vise os, at du holder af os, ved at give en donation.</string>
     <string name="profile_custom">Brugerdefineret</string>
     <string name="profile_name">Profilnavn</string>
     <string name="profile_namespace_individual">Individuel</string>
@@ -73,7 +72,7 @@
     <string name="profile_selinux_domain">Domæne</string>
     <string name="profile_selinux_rules">Regler</string>
     <string name="restart_app">Genstart</string>
-    <string name="require_kernel_version">Den nuværende EpkeSU-version %1$d er for lav til, at manageren fungerer korrekt. Opgrader venligst til version %2$d eller højere!</string>
+    <string name="require_kernel_version">Den nuværende ApkeSU-version %1$d er for lav til, at manageren fungerer korrekt. Opgrader venligst til version %2$d eller højere!</string>
     <string name="save_log">Gem logs</string>
     <string name="module_install_prompt_with_name">Følgende moduler installeres: %1$s</string>
     <string name="module_sort_action_first">Sorter (Handling først)</string>
@@ -118,9 +117,9 @@
     <string name="settings_uninstall_temporary">Afinstaller midlertidigt</string>
     <string name="settings_uninstall_permanent">Afinstaller permanent</string>
     <string name="settings_restore_stock_image">Gendan systemets standardbillede</string>
-    <string name="settings_uninstall_temporary_message">Afinstaller EpkeSU midlertidigt, og gendan til den oprindelige tilstand efter næste genstart.</string>
-    <string name="settings_uninstall_permanent_message">Afinstallation af EpkeSU (root og alle moduler) fuldstændigt og permanent.</string>
-    <string name="settings_restore_stock_image_message">Gendan det originale fabriksbillede (hvis en sikkerhedskopi eksisterer), hvilket normalt bruges før en OTA-opdatering; hvis du skal afinstallere EpkeSU, skal du bruge \"Afinstaller permanent\".</string>
+    <string name="settings_uninstall_temporary_message">Afinstaller ApkeSU midlertidigt, og gendan til den oprindelige tilstand efter næste genstart.</string>
+    <string name="settings_uninstall_permanent_message">Afinstallation af ApkeSU (root og alle moduler) fuldstændigt og permanent.</string>
+    <string name="settings_restore_stock_image_message">Gendan det originale fabriksbillede (hvis en sikkerhedskopi eksisterer), hvilket normalt bruges før en OTA-opdatering; hvis du skal afinstallere ApkeSU, skal du bruge \"Afinstaller permanent\".</string>
     <string name="flashing">Flashing</string>
     <string name="flash_success">Flash-succes</string>
     <string name="flash_failed">Flash mislykkedes</string>
@@ -132,11 +131,11 @@
     <string name="settings_sucompat">Omdiriger su binary</string>
     <string name="settings_sucompat_summary">Tillader apps med Superuser-tilladelse i App Profile at få superuser shell ved at udføre /system/bin/su; gælder kun for nye processer.</string>
     <string name="settings_kernel_umount">Kernel umount</string>
-    <string name="settings_kernel_umount_summary">Kernel-niveau umount adfærd kontrolleret af EpkeSU</string>
+    <string name="settings_kernel_umount_summary">Kernel-niveau umount adfærd kontrolleret af ApkeSU</string>
     <string name="processing">Behandler…</string>
     <string name="refresh_pulling">Træk ned for at opdatere</string>
     <string name="refresh_release">Slip for at opdatere</string>
     <string name="refresh_refresh">Opdaterer…</string>
     <string name="refresh_complete">Opdateret</string>
-    <string name="profile_flags_desc_no_new_privs">Forhindrer yderligere priviligeringseskalering via EpkeSU inden for konteksten af denne root-profil.</string>
+    <string name="profile_flags_desc_no_new_privs">Forhindrer yderligere priviligeringseskalering via ApkeSU inden for konteksten af denne root-profil.</string>
 </resources>

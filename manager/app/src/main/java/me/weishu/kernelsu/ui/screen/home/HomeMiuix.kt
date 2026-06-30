@@ -183,7 +183,11 @@ fun HomePagerMiuix(
                         )
                         WarningSummaryCard(messages = homeWarningMessages(state))
                         InfoCard(systemInfo = state.systemInfo)
-                        SecondaryLinksCard(onOpenUrl = actions.onOpenUrl)
+                        SecondaryLinksCard(
+                            onOpenUrl = actions.onOpenUrl,
+                            showSupport = state.showHomeSupportCard,
+                            showLearn = state.showHomeLearnCard,
+                        )
                     }
                     Spacer(Modifier.height(bottomInnerPadding))
                 }
@@ -257,11 +261,7 @@ private fun ActivatedStatusCard(
         } else {
             Color(0xFF1FAF55)
         }
-        val workingMode = when (state.lkmMode) {
-            null -> null
-            true -> "LKM"
-            else -> "GKI"
-        }
+        val workingMode = state.workingModeLabel
         val wallpaperState = rememberLkmCardWallpaperState(
             onWallpaperSelected = {}
         )
@@ -1368,7 +1368,13 @@ private fun WarningSummaryCard(
 }
 
 @Composable
-private fun SecondaryLinksCard(onOpenUrl: (String) -> Unit) {
+private fun SecondaryLinksCard(
+    onOpenUrl: (String) -> Unit,
+    showSupport: Boolean = true,
+    showLearn: Boolean = true,
+) {
+    if (!showSupport && !showLearn) return
+
     val learnUrl = stringResource(R.string.home_learn_kernelsu_url)
     Card(
         modifier = Modifier
@@ -1376,59 +1382,65 @@ private fun SecondaryLinksCard(onOpenUrl: (String) -> Unit) {
             .homeLiquidGlassSurface(),
         colors = liquidGlassMiuixCardColors(),
     ) {
-        BasicComponent(
-            title = stringResource(R.string.home_support_title),
-            summary = stringResource(R.string.home_support_content),
-            startAction = {
-                Icon(
-                    modifier = Modifier
-                        .padding(end = 12.dp)
-                        .size(22.dp),
-                    imageVector = Icons.Rounded.FavoriteBorder,
-                    tint = colorScheme.primary,
-                    contentDescription = null
-                )
-            },
-            endActions = {
-                Icon(
-                    imageVector = MiuixIcons.Basic.ArrowRight,
-                    tint = colorScheme.onSurfaceVariantActions,
-                    contentDescription = null
-                )
-            },
-            onClick = { onOpenUrl("https://patreon.com/weishu") },
-            insideMargin = PaddingValues(horizontal = 18.dp, vertical = 13.dp)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .padding(start = 52.dp, end = 18.dp)
-                .background(colorScheme.outline.copy(alpha = 0.2f))
-        )
-        BasicComponent(
-            title = stringResource(R.string.home_learn_kernelsu),
-            summary = stringResource(R.string.home_click_to_learn_kernelsu),
-            startAction = {
-                Icon(
-                    modifier = Modifier
-                        .padding(end = 12.dp)
-                        .size(22.dp),
-                    imageVector = Icons.Rounded.Info,
-                    tint = colorScheme.primary,
-                    contentDescription = null
-                )
-            },
-            endActions = {
-                Icon(
-                    imageVector = MiuixIcons.Basic.ArrowRight,
-                    tint = colorScheme.onSurfaceVariantActions,
-                    contentDescription = null
-                )
-            },
-            onClick = { onOpenUrl(learnUrl) },
-            insideMargin = PaddingValues(horizontal = 18.dp, vertical = 13.dp)
-        )
+        if (showSupport) {
+            BasicComponent(
+                title = stringResource(R.string.home_support_title),
+                summary = stringResource(R.string.home_support_content),
+                startAction = {
+                    Icon(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(22.dp),
+                        imageVector = Icons.Rounded.FavoriteBorder,
+                        tint = colorScheme.primary,
+                        contentDescription = null
+                    )
+                },
+                endActions = {
+                    Icon(
+                        imageVector = MiuixIcons.Basic.ArrowRight,
+                        tint = colorScheme.onSurfaceVariantActions,
+                        contentDescription = null
+                    )
+                },
+                onClick = { onOpenUrl("https://patreon.com/weishu") },
+                insideMargin = PaddingValues(horizontal = 18.dp, vertical = 13.dp)
+            )
+        }
+        if (showSupport && showLearn) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .padding(start = 52.dp, end = 18.dp)
+                    .background(colorScheme.outline.copy(alpha = 0.2f))
+            )
+        }
+        if (showLearn) {
+            BasicComponent(
+                title = stringResource(R.string.home_learn_kernelsu),
+                summary = stringResource(R.string.home_click_to_learn_kernelsu),
+                startAction = {
+                    Icon(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(22.dp),
+                        imageVector = Icons.Rounded.Info,
+                        tint = colorScheme.primary,
+                        contentDescription = null
+                    )
+                },
+                endActions = {
+                    Icon(
+                        imageVector = MiuixIcons.Basic.ArrowRight,
+                        tint = colorScheme.onSurfaceVariantActions,
+                        contentDescription = null
+                    )
+                },
+                onClick = { onOpenUrl(learnUrl) },
+                insideMargin = PaddingValues(horizontal = 18.dp, vertical = 13.dp)
+            )
+        }
     }
 }
 

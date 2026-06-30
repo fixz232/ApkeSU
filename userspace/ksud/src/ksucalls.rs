@@ -367,13 +367,6 @@ fn verify_manager_appid(appid: u32) -> std::io::Result<()> {
     }
 }
 
-fn set_manager_appid_reboot(appid: u32) -> std::io::Result<()> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        format!("reboot manager appid fallback is unsupported for {appid}"),
-    ))
-}
-
 fn set_manager_appid_sysfs(appid: u32) -> std::io::Result<()> {
     std::fs::write(
         "/sys/module/kernelsu/parameters/ksu_debug_manager_appid",
@@ -391,17 +384,13 @@ pub fn set_manager_appid(appid: u32) -> std::io::Result<()> {
         Ok(()) => return Ok(()),
         Err(e) => e,
     };
-    let reboot_err = match set_manager_appid_reboot(appid) {
-        Ok(()) => return Ok(()),
-        Err(e) => e,
-    };
     let sysfs_err = match set_manager_appid_sysfs(appid) {
         Ok(()) => return Ok(()),
         Err(e) => e,
     };
 
     Err(io::Error::other(format!(
-        "failed to set manager appid {appid}; ioctl: {ioctl_err}; reboot: {reboot_err}; sysfs: {sysfs_err}"
+        "failed to set manager appid {appid}; ioctl: {ioctl_err}; sysfs: {sysfs_err}"
     )))
 }
 

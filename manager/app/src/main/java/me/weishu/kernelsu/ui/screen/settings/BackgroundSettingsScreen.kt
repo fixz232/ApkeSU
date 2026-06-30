@@ -70,6 +70,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.rememberCustomWallpaperPreviewBitmap
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -691,10 +694,19 @@ private fun SharedBackgroundOptions(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Switch(
-                    checked = uiState.customWallpaperPassthroughEnabled,
-                    onCheckedChange = actions.onPassthroughEnabledChange,
-                )
+                val switchStyle = LocalSwitchStyle.current
+                if (switchStyle == SwitchStyle.Original) {
+                    Switch(
+                        checked = uiState.customWallpaperPassthroughEnabled,
+                        onCheckedChange = actions.onPassthroughEnabledChange,
+                    )
+                } else {
+                    StyledSwitch(
+                        checked = uiState.customWallpaperPassthroughEnabled,
+                        onCheckedChange = actions.onPassthroughEnabledChange,
+                        style = switchStyle,
+                    )
+                }
             }
 
             if (uiState.customWallpaperPassthroughEnabled) {

@@ -8,13 +8,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -92,17 +94,25 @@ fun HandleWebUIEventMiuix(
 
         is WebUIEvent.ShowPrompt -> {
             val showDialog = remember(event) { mutableStateOf(true) }
-            val state = rememberTextFieldState(event.defaultValue)
+            var text by remember(event) { mutableStateOf(event.defaultValue) }
             WindowDialog(
                 show = showDialog.value,
-                onDismissRequest = { webUIState.onPromptResult(null) },
+                modifier = Modifier.imePadding(),
+                onDismissRequest = {
+                    webUIState.onPromptResult(null)
+                    showDialog.value = false
+                },
                 content = {
                     Column {
                         Text(event.message)
                         Spacer(Modifier.height(12.dp))
                         TextField(
-                            modifier = Modifier.padding(bottom = 16.dp),
-                            state = state
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            value = text,
+                            maxLines = 1,
+                            onValueChange = { text = it },
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -119,7 +129,7 @@ fun HandleWebUIEventMiuix(
                             Spacer(modifier = Modifier.width(20.dp))
                             TextButton(
                                 onClick = {
-                                    webUIState.onPromptResult(state.text.toString())
+                                    webUIState.onPromptResult(text)
                                     showDialog.value = false
                                 },
                                 text = stringResource(R.string.confirm),

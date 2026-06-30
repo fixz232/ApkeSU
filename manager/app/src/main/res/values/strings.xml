@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">EpkeSU</string>
+    <string name="app_name" translatable="false">ApkeSU</string>
     <string name="home_title" translatable="false">KernelSU</string>
     <string name="home">Home</string>
     <string name="home_not_installed">Ready to install</string>
     <string name="home_click_to_install">Tap to install</string>
     <string name="home_install_preparing">Preparing install</string>
-    <string name="home_working">EpkeSU active</string>
+    <string name="home_working">ApkeSU active</string>
     <string name="home_working_version">Installed version: %s</string>
     <string name="home_active">Active</string>
     <string name="home_inactive">Inactive</string>
@@ -38,8 +38,16 @@
     <string name="home_system_info_wallpaper_crop">Crop system info wallpaper</string>
     <string name="home_system_info_wallpaper_preview">Preview system info wallpaper</string>
     <string name="home_system_info_wallpaper_clear">Clear system info wallpaper</string>
+    <string name="home_reboot_menu_wallpaper_pick">Choose reboot menu wallpaper</string>
+    <string name="home_reboot_menu_wallpaper_crop">Crop reboot menu wallpaper</string>
+    <string name="home_reboot_menu_wallpaper_preview">Preview reboot menu wallpaper</string>
+    <string name="home_reboot_menu_wallpaper_clear">Clear reboot menu wallpaper</string>
     <string name="home_card_wallpapers">Home card wallpapers</string>
     <string name="home_card_wallpapers_summary">Choose image or video wallpapers for every card on the Home page.</string>
+    <string name="settings_show_home_support_card">Show support card</string>
+    <string name="settings_show_home_support_card_summary">Show the support development card on the home screen.</string>
+    <string name="settings_show_home_learn_card">Show learn ApkeSU card</string>
+    <string name="settings_show_home_learn_card_summary">Show the learn ApkeSU card on the home screen.</string>
     <string name="home_card_wallpapers_main_section">Main card</string>
     <string name="home_card_wallpapers_main_section_summary">Set the large status card wallpaper.</string>
     <string name="home_card_wallpapers_metric_section">Metric cards</string>
@@ -51,6 +59,7 @@
     <string name="home_card_module">Module card</string>
     <string name="home_card_status_monitor">Status monitor card</string>
     <string name="home_card_system_info">System info card</string>
+    <string name="home_card_reboot_menu">Reboot menu card</string>
     <string name="home_card_wallpaper_pick_image">Image</string>
     <string name="home_card_wallpaper_pick_video">Video</string>
     <string name="home_card_wallpaper_crop_action">Crop</string>
@@ -70,8 +79,8 @@
     <string name="module_wallpaper_clear">Clear module wallpaper</string>
     <string name="module_wallpaper_preview_hint">Module card preview</string>
     <string name="home_unsupported">Unsupported kernel</string>
-    <string name="home_unsupported_reason">EpkeSU currently supports GKI kernels only. Patch the boot image on a GKI device to continue.</string>
-    <string name="home_version_mismatch">Manager version (%1$d) and EpkeSU driver version (%2$d) mismatch.</string>
+    <string name="home_unsupported_reason">ApkeSU currently supports GKI kernels only. Patch the boot image on a GKI device to continue.</string>
+    <string name="home_version_mismatch">Manager version (%1$d) and ApkeSU driver version (%2$d) mismatch.</string>
     <string name="home_device_model">Device model</string>
     <string name="home_kernel">Kernel version</string>
     <string name="home_manager_version">Manager version</string>
@@ -122,7 +131,7 @@
     <string name="sulog_entry_unknown_event">Unknown event</string>
     <string name="sulog_entry_description_sucompat">Intercepted /system/bin/su request</string>
     <string name="sulog_entry_title_root_grant_request">Root grant request</string>
-    <string name="sulog_entry_description_ioctl_grant_root">Granted root access via EpkeSU ioctl</string>
+    <string name="sulog_entry_description_ioctl_grant_root">Granted root access via ApkeSU ioctl</string>
     <string name="sulog_entry_title_daemon_restarted">Daemon restarted</string>
     <string name="sulog_entry_title_dropped_events">Dropped events</string>
     <string name="module_failed_to_enable">Failed to enable module: %s</string>
@@ -166,14 +175,14 @@
     <string name="safe_mode_module_disabled">Module installation is disabled in safe mode</string>
     <string name="reboot_to_apply">Reboot to take effect</string>
     <string name="module_magisk_conflict">Modules are unavailable due to a conflict with Magisk!</string>
-    <string name="home_learn_kernelsu">Learn EpkeSU</string>
+    <string name="home_learn_kernelsu">Learn ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Learn how to install EpkeSU and use modules.</string>
+    <string name="home_click_to_learn_kernelsu">Learn how to install ApkeSU and use modules.</string>
     <string name="home_support_title">Support Us</string>
-    <string name="home_support_content">EpkeSU is, and always will be, free, and open source. However, you can show us that you care by making a donation.</string>
+    <string name="home_support_content">ApkeSU is, and always will be, free, and open source. However, you can show us that you care by making a donation.</string>
     <string name="home_gki_warning">Starting from v3.0.0, the GKI work mode will be used only in testing environments. We do not recommend it for daily use, and image files will no longer be provided.</string>
-    <string name="home_manager_identity_warning">EpkeSU is active, but this app is not recognized as the manager by the kernel. Reinstall the matching Manager APK or rebuild the kernel with this app signature.</string>
-    <string name="about_source_code"><![CDATA[View source code at %1$s<br/>Join our %2$s channel]]></string>
+    <string name="home_manager_identity_warning">ApkeSU is active, but this app is not recognized as the manager by the kernel. Reinstall the matching Manager APK or rebuild the kernel with this app signature.</string>
+    <string name="about_join_qq_group">加入我的QQ群（莫晨又菜又爱玩①群）</string>
     <string name="profile" translatable="false">App Profile</string>
     <string name="profile_default">Default</string>
     <string name="profile_template">Template</string>
@@ -189,9 +198,9 @@
     <string name="profile_selinux_context">SELinux context</string>
     <string name="profile_umount_modules">Umount modules</string>
     <string name="failed_to_update_app_profile">Failed to update App Profile for %s</string>
-    <string name="uapi_mismatch">Manager uapi version (%1$d) and EpkeSU driver uapi version (%2$d) mismatch.</string>
-    <string name="require_manager_version">The current EpkeSU manager version %1$d is too low for EpkeSU to work properly. Please upgrade manager to version %2$d or higher!</string>
-    <string name="require_kernel_version">The current EpkeSU version %1$d is too low for the manager to work properly. Please upgrade to version %2$d or higher!</string>
+    <string name="uapi_mismatch">Manager uapi version (%1$d) and ApkeSU driver uapi version (%2$d) mismatch.</string>
+    <string name="require_manager_version">The current ApkeSU manager version %1$d is too low for ApkeSU to work properly. Please upgrade manager to version %2$d or higher!</string>
+    <string name="require_kernel_version">The current ApkeSU version %1$d is too low for the manager to work properly. Please upgrade to version %2$d or higher!</string>
     <string name="settings_umount_modules_default">Umount modules by default</string>
     <string name="settings_umount_modules_default_summary">The global default value for \"Umount modules\" in App Profile. If enabled, it will remove all module modifications to the system for apps that don\'t have a profile set.</string>
     <string name="settings_builtin_mount">Enable built-in mount</string>
@@ -206,7 +215,7 @@
     <string name="settings_builtin_mount_webui_disabled_summary">Enable built-in mount and reboot first to open Hybrid Mount WebUI.</string>
     <string name="settings_builtin_mount_reboot_required">Reboot to apply built-in mount changes.</string>
     <string name="settings_builtin_mount_failed">Failed to update built-in mount.</string>
-    <string name="profile_umount_modules_summary">Enabling this option will allow EpkeSU to restore any modified files by the modules for this app.</string>
+    <string name="profile_umount_modules_summary">Enabling this option will allow ApkeSU to restore any modified files by the modules for this app.</string>
     <string name="profile_selinux_domain">Domain</string>
     <string name="profile_selinux_rules">Rules</string>
     <string name="recently_installed">Recently installed</string>
@@ -247,14 +256,14 @@
     <string name="settings_check_update">Check for updates</string>
     <string name="settings_check_update_summary">Automatically check for updates when opening the app.</string>
     <string name="manager_update_title">Update available</string>
-    <string name="manager_update_message">EpkeSU Manager %1$s (%2$d) is available.</string>
+    <string name="manager_update_message">ApkeSU Manager %1$s (%2$d) is available.</string>
     <string name="manager_update_changelog">%1$s\n\n%2$s</string>
     <string name="settings_enable_predictive_back">Predictive back gesture</string>
     <string name="settings_enable_predictive_back_summary">Enable predictive back gesture support.</string>
     <string name="settings_module_check_update">Check for module updates</string>
     <string name="settings_module_check_update_summary">Automatically check installed modules for available updates.</string>
     <string name="settings_version_mismatch_warning">Version mismatch warning</string>
-    <string name="settings_version_mismatch_warning_summary">Show a warning when the Manager and EpkeSU driver versions do not match.</string>
+    <string name="settings_version_mismatch_warning_summary">Show a warning when the Manager and ApkeSU driver versions do not match.</string>
     <string name="grant_root_failed">Failed to grant root!</string>
     <string name="home_pr_build_warning">This is a PR debug build. Do NOT use it in production!</string>
     <string name="home_pr_kernel_warning">The kernel was built with PR signature support. This is not a production kernel!</string>
@@ -268,6 +277,13 @@
     <string name="enable_web_debugging_summary">Can be used to debug WebUI. Please enable only when needed.</string>
     <string name="direct_install">Direct install (Recommended)</string>
     <string name="select_file">Select a file</string>
+    <string name="hidden_path_lkm_patch">Hidden path LKM patch</string>
+    <string name="hidden_path_lkm_patch_summary">Patch a boot/init_boot image and add the matching built-in pathmask LKM.</string>
+    <string name="hidden_path_lkm_builtin_title">Built-in pathmask LKM</string>
+    <string name="hidden_path_lkm_builtin_summary">The matching pathmask LKM will be selected after choosing KMI.</string>
+    <string name="hidden_path_lkm_selected_kmi">Selected KMI: %s</string>
+    <string name="hidden_path_config">Hidden path config</string>
+    <string name="hidden_path_config_summary">Configure pathmask LKM paths, target apps, and logs.</string>
     <string name="install_inactive_slot">Install to inactive slot (After OTA)</string>
     <string name="install_inactive_slot_warning">Your device will be **FORCED** to boot to the current inactive slot after a reboot!\nOnly use this option after OTA is done.\nContinue?</string>
     <string name="flash_module">Flash module</string>
@@ -286,15 +302,18 @@
     <string name="settings_uninstall_temporary">Uninstall temporarily</string>
     <string name="settings_uninstall_permanent">Uninstall permanently</string>
     <string name="settings_restore_stock_image">Restore stock image</string>
-    <string name="settings_uninstall_temporary_message">Temporarily uninstall EpkeSU, restore to original state after next reboot.</string>
-    <string name="settings_uninstall_permanent_message">Uninstalling EpkeSU (root and all modules) completely and permanently.</string>
-    <string name="settings_restore_stock_image_message">Restore the stock factory image (if a backup exists), usually used before OTA; if you need to uninstall EpkeSU, please use \"Uninstall permanently\".</string>
+    <string name="settings_uninstall_temporary_message">Temporarily uninstall ApkeSU, restore to original state after next reboot.</string>
+    <string name="settings_uninstall_permanent_message">Uninstalling ApkeSU (root and all modules) completely and permanently.</string>
+    <string name="settings_restore_stock_image_message">Restore the stock factory image (if a backup exists), usually used before OTA; if you need to uninstall ApkeSU, please use \"Uninstall permanently\".</string>
     <string name="flashing">Flashing</string>
     <string name="flash_success">Flash success</string>
     <string name="flash_failed">Flash failed</string>
+    <string name="flash_error_code">Error code</string>
+    <string name="flash_check_log">Please save and check the log.</string>
     <string name="selected_lkm">Selected LKM: %s</string>
     <string name="save_log">Save logs</string>
     <string name="log_saved">Logs saved</string>
+    <string name="log_save_failed">Failed to save logs</string>
     <string name="settings_sucompat">Classic SU command</string>
     <string name="settings_sucompat_summary">Allow root access via /system/bin/su, in new processes.</string>
     <string name="settings_kernel_umount">Kernel umount</string>
@@ -304,12 +323,12 @@
     <string name="settings_selinux_hide_reboot_required">Reboot to take effect</string>
     <string name="settings_selinux_hide_failed">Error: %d</string>
     <string name="settings_sulog">SU Log</string>
-    <string name="settings_sulog_summary">Record root-related events into EpkeSU sulog files.</string>
+    <string name="settings_sulog_summary">Record root-related events into ApkeSU sulog files.</string>
     <string name="settings_avc_spoof">AVC log spoofing</string>
     <string name="settings_avc_spoof_summary">Hide KernelSU SELinux domains in AVC audit logs.</string>
-    <string name="settings_epkesu_hide">EpkeSU Hide</string>
+    <string name="settings_epkesu_hide">ApkeSU Hide</string>
     <string name="settings_epkesu_hide_summary">把Bootloader解锁状态藏起来</string>
-    <string name="settings_epkesu_hide_failed">Failed to update EpkeSU Hide.</string>
+    <string name="settings_epkesu_hide_failed">Failed to update ApkeSU Hide.</string>
     <string name="feature_status_unsupported_summary">Kernel does not support this feature</string>
     <string name="feature_status_managed_summary">This feature is managed by a module</string>
     <string name="settings_mode_enable_by_default">Enable (Default)</string>
@@ -318,7 +337,17 @@
     <string name="settings_kernelsu_toolkit">KernelSU Toolkit</string>
     <string name="settings_kernelsu_toolkit_summary">Utilities for extra KernelSU features.</string>
     <string name="settings_kpatch_next">KPatch Next</string>
-    <string name="settings_kpatch_next_summary">Standalone KPM support implementation.</string>
+    <string name="settings_kpatch_next_summary">Install and enable the built-in KPatch Next module. No KPM package is loaded by default.</string>
+    <string name="settings_kpatch_next_installed_summary">Built-in KPatch Next %s is installed. Reboot after changes.</string>
+    <string name="settings_kpatch_next_conflict_summary">Disabled because %s is present.</string>
+    <string name="settings_kpatch_next_pending_update_summary">KPatch Next will be updated after reboot.</string>
+    <string name="settings_kpatch_next_pending_remove_summary">KPatch Next is marked for removal.</string>
+    <string name="settings_kpatch_next_unresolved_summary">KPatch did not respond on last boot. Disable it if the device is unstable.</string>
+    <string name="settings_kpatch_next_webui">KPatch Next WebUI</string>
+    <string name="settings_kpatch_next_webui_summary">Open KPatch Next WebUI to manage KPM packages and exclude rules.</string>
+    <string name="settings_kpatch_next_webui_disabled_summary">Enable KPatch Next and reboot first to open its WebUI.</string>
+    <string name="settings_kpatch_next_reboot_required">Reboot to apply KPatch Next changes.</string>
+    <string name="settings_kpatch_next_failed">Failed to update KPatch Next.</string>
     <string name="processing">Processing…</string>
     <string name="refresh_pulling">Pull down to refresh</string>
     <string name="refresh_release">Release to refresh</string>
@@ -334,6 +363,24 @@
     <string name="settings_theme_mode_light">Light</string>
     <string name="settings_theme_mode_dark">Dark</string>
     <string name="settings_theme_mode_amoled">AMOLED</string>
+    <string name="settings_day_night_switch">Sun and moon switch</string>
+    <string name="settings_day_night_switch_summary">Quickly switch between day and night theme styles.</string>
+    <string name="settings_switch_style">Switch style</string>
+    <string name="settings_switch_style_summary">Choose the global style used by all on/off switches.</string>
+    <string name="settings_switch_style_original">Original</string>
+    <string name="settings_switch_style_sun_moon">Sun and moon</string>
+    <string name="settings_switch_style_capsule">Capsule</string>
+    <string name="settings_switch_style_minimal">Minimal</string>
+    <string name="settings_switch_style_neon">Neon</string>
+    <string name="settings_global_snow">Global snow</string>
+    <string name="settings_global_snow_summary">Show a snow effect across the whole app.</string>
+    <string name="settings_global_snow_effect">Snow effect</string>
+    <string name="settings_global_snow_effect_summary">Choose the global snow animation style.</string>
+    <string name="settings_global_snow_effect_gentle">Gentle snow</string>
+    <string name="settings_global_snow_effect_blizzard">Blizzard</string>
+    <string name="settings_global_snow_effect_starlight">Starlight snow</string>
+    <string name="settings_global_snow_effect_pink">Pink snow</string>
+    <string name="settings_global_snow_effect_crystal">Crystal snow</string>
     <string name="settings_monet">Enable Monet</string>
     <string name="settings_key_color">Key color</string>
     <string name="settings_key_color_default">Default</string>
@@ -473,6 +520,7 @@
     <string name="theme_store_module_card">Module card wallpaper</string>
     <string name="theme_store_status_monitor_card">Status monitor wallpaper</string>
     <string name="theme_store_system_info_card">System info wallpaper</string>
+    <string name="theme_store_reboot_menu_card">Reboot menu wallpaper</string>
     <string name="theme_store_item_selected">Selected. Export will include this media file.</string>
     <string name="theme_store_item_empty">No media selected.</string>
     <string name="settings_startup_sound">启动音效</string>
@@ -672,5 +720,5 @@
     <string name="sort_by_install_time">Install time</string>
     <string name="sort_by_update_time">Update time</string>
     <string name="sort_reverse">Reverse</string>
-    <string name="profile_flags_desc_no_new_privs">Prevent further privilege escalation via EpkeSU from within the context of this root profile.</string>
+    <string name="profile_flags_desc_no_new_privs">Prevent further privilege escalation via ApkeSU from within the context of this root profile.</string>
 </resources>

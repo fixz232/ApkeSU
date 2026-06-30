@@ -107,9 +107,12 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.Module
 import me.weishu.kernelsu.data.model.ModuleUpdateInfo
 import me.weishu.kernelsu.ui.component.ListPopupDefaults
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.ObserveAsEvents
 import me.weishu.kernelsu.ui.component.ScrollToTopOnChange
 import me.weishu.kernelsu.ui.component.SearchStatus
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
@@ -145,12 +148,12 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.SnackbarResult
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
+import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -963,13 +966,25 @@ fun ModuleItem(
                             textDecoration = textDecoration
                         )
                     }
-                    Switch(
-                        enabled = !module.update,
-                        checked = module.enabled,
-                        onCheckedChange = {
-                            if (it != module.enabled) onCheckChanged(it)
-                        }
-                    )
+                    val switchStyle = LocalSwitchStyle.current
+                    if (switchStyle == SwitchStyle.Original) {
+                        MiuixSwitch(
+                            enabled = !module.update,
+                            checked = module.enabled,
+                            onCheckedChange = {
+                                if (it != module.enabled) onCheckChanged(it)
+                            }
+                        )
+                    } else {
+                        StyledSwitch(
+                            enabled = !module.update,
+                            checked = module.enabled,
+                            onCheckedChange = {
+                                if (it != module.enabled) onCheckChanged(it)
+                            },
+                            style = switchStyle,
+                        )
+                    }
                 }
 
                 if (hasDescription) {

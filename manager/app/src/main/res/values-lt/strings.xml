@@ -26,9 +26,8 @@
     <string name="reboot_to_apply">Paleiskite iš naujo, kad įsigaliotų</string>
     <string name="module_magisk_conflict">Moduliai yra išjungti, nes jie konfliktuoja su Magisk\'s!</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_learn_kernelsu">Sužinokite apie EpkeSU</string>
-    <string name="home_click_to_learn_kernelsu">Sužinokite, kaip įdiegti EpkeSU ir naudoti modulius</string>
-    <string name="about_source_code">Peržiūrėkite šaltinio kodą %1$s<br/>Prisijunkite prie mūsų %2$s kanalo</string>
+    <string name="home_learn_kernelsu">Sužinokite apie ApkeSU</string>
+    <string name="home_click_to_learn_kernelsu">Sužinokite, kaip įdiegti ApkeSU ir naudoti modulius</string>
     <string name="profile_default">Numatytas</string>
     <string name="profile_template">Šablonas</string>
     <string name="profile_custom">Pasirinktinis</string>
@@ -42,7 +41,7 @@
     <string name="profile_selinux_context">SELinux kontekstas</string>
     <string name="profile_umount_modules">Atjungti modulius</string>
     <string name="settings_umount_modules_default">Atjungti modulius pagal numatytuosius parametrus</string>
-    <string name="profile_umount_modules_summary">Įjungus šią parinktį, EpkeSU galės atkurti visus modulių modifikuotus failus šiai programai.</string>
+    <string name="profile_umount_modules_summary">Įjungus šią parinktį, ApkeSU galės atkurti visus modulių modifikuotus failus šiai programai.</string>
     <string name="profile_selinux_domain">Domenas</string>
     <string name="profile_selinux_rules">Taisyklės</string>
     <string name="module_update">Atnaujinti</string>
@@ -55,7 +54,7 @@
     <string name="failed_to_update_sepolicy">Nepavyko atnaujinti SELinux taisyklių: %s</string>
     <string name="home">Namai</string>
     <string name="home_not_installed">Neįdiegta</string>
-    <string name="home_unsupported_reason">EpkeSU dabar palaiko tik GKI branduolius</string>
+    <string name="home_unsupported_reason">ApkeSU dabar palaiko tik GKI branduolius</string>
     <string name="home_click_to_install">Spustelėkite norėdami įdiegti</string>
     <string name="home_working">Veikia</string>
     <string name="home_working_version">Versija: %s</string>
@@ -70,15 +69,15 @@
     <string name="reboot_edl">Perkrauti į EDL</string>
     <string name="module_uninstall_confirm">Ar tikrai norite išdiegti modulį %s\?</string>
     <string name="home_support_title">Paremkite mus</string>
-    <string name="home_support_content">EpkeSU yra ir visada bus nemokamas ir atvirojo kodo. Tačiau galite parodyti, kad jums rūpi, paaukodami mums.</string>
+    <string name="home_support_content">ApkeSU yra ir visada bus nemokamas ir atvirojo kodo. Tačiau galite parodyti, kad jums rūpi, paaukodami mums.</string>
     <string name="failed_to_update_app_profile">Nepavyko atnaujinti programos profilio %s</string>
     <string name="settings_umount_modules_default_summary">Visuotinė numatytoji „Modulių atjungimo“ reikšmė programų profiliuose. Jei įjungta, ji pašalins visus sistemos modulio pakeitimus programoms, kurios neturi profilio.</string>
     <string name="module_changelog">Keitimų žurnalas</string>
-    <string name="require_kernel_version">Ši EpkeSU versija %1$d yra per žema, kad šis vadybininkas galėtų tinkamai funkcionuoti. Prašome atsinaujinti į versiją %2$d ar aukščiau!</string>
+    <string name="require_kernel_version">Ši ApkeSU versija %1$d yra per žema, kad šis vadybininkas galėtų tinkamai funkcionuoti. Prašome atsinaujinti į versiją %2$d ar aukščiau!</string>
     <string name="save_log">Saglabāt Žurnālus</string>
     <string name="settings_sucompat">Nukreipti su dvejetainį failą</string>
     <string name="settings_sucompat_summary">Nukreipti /system/bin/su į ksud programoms, kurioms suteiktas Superuser leidimas programos profilyje; veiksminga tik naujiems procesams.</string>
     <string name="settings_kernel_umount">Branduolio atjungimas</string>
-    <string name="settings_kernel_umount_summary">Branduolio lygio atjungimo elgsena, valdoma EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">Neleidžia toliau didinti privilegijų per EpkeSU šio root profilio kontekste.</string>
+    <string name="settings_kernel_umount_summary">Branduolio lygio atjungimo elgsena, valdoma ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">Neleidžia toliau didinti privilegijų per ApkeSU šio root profilio kontekste.</string>
 </resources>

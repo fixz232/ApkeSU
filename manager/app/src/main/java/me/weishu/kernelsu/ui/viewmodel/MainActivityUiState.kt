@@ -2,6 +2,8 @@ package me.weishu.kernelsu.ui.viewmodel
 
 import androidx.compose.runtime.Immutable
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.AppSettings
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
@@ -16,6 +18,9 @@ data class MainActivityUiState(
     val enableBlur: Boolean,
     val enableFloatingBottomBar: Boolean,
     val enableFloatingBottomBarBlur: Boolean,
+    val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
+    val globalSnowEnabled: Boolean = false,
+    val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val uiMode: UiMode,
     val interfaceStyle: String,
     val customWallpaperUri: String?,

@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.alpha.AlphaCard
 import me.weishu.kernelsu.ui.component.alpha.AlphaColors
 import me.weishu.kernelsu.ui.component.alpha.AlphaShapes
@@ -100,6 +102,34 @@ fun SettingPagerAlpha(
                 title = stringResource(R.string.settings_section_appearance),
                 collapsible = true,
             ) {
+                val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_day_night_switch),
+                    summary = stringResource(R.string.settings_day_night_switch_summary),
+                    checked = dayNightChecked,
+                    onCheckedChange = actions.onSetDayNightMode,
+                    trailingContent = { checked, enabled, onCheckedChange ->
+                        DayNightSwitch(
+                            checked = checked,
+                            enabled = enabled,
+                            onCheckedChange = onCheckedChange,
+                        )
+                    },
+                )
+                AlphaSwitchStylePicker(
+                    selectedStyle = uiState.switchStyle,
+                    onStyleSelected = actions.onSetSwitchStyleIndex,
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_global_snow),
+                    summary = stringResource(R.string.settings_global_snow_summary),
+                    checked = uiState.globalSnowEnabled,
+                    onCheckedChange = actions.onSetGlobalSnowEnabled,
+                )
+                AlphaSnowEffectPicker(
+                    selectedEffect = uiState.globalSnowEffect,
+                    onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_theme),
                     summary = stringResource(R.string.settings_theme_summary),
@@ -136,6 +166,18 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.home_card_wallpapers_summary),
                     icon = Icons.Rounded.Wallpaper,
                     onClick = actions.onOpenHomeCardWallpapers,
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_show_home_support_card),
+                    summary = stringResource(R.string.settings_show_home_support_card_summary),
+                    checked = uiState.showHomeSupportCard,
+                    onCheckedChange = actions.onSetShowHomeSupportCard,
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_show_home_learn_card),
+                    summary = stringResource(R.string.settings_show_home_learn_card_summary),
+                    checked = uiState.showHomeLearnCard,
+                    onCheckedChange = actions.onSetShowHomeLearnCard,
                 )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_backgrounds),
@@ -258,6 +300,35 @@ fun SettingPagerAlpha(
                             actions.onOpenBuiltinMountWebUi()
                         }
                     },
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_kpatch_next),
+                    summary = kPatchNextSummary(uiState),
+                    checked = uiState.isKPatchNextEnabled,
+                    enabled = uiState.canToggleKPatchNext,
+                    onCheckedChange = actions.onSetKPatchNextEnabled,
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_kpatch_next_webui),
+                    summary = stringResource(
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            R.string.settings_kpatch_next_webui_summary
+                        } else {
+                            R.string.settings_kpatch_next_webui_disabled_summary
+                        }
+                    ),
+                    icon = Icons.Rounded.Apps,
+                    onClick = {
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            actions.onOpenKPatchNextWebUi()
+                        }
+                    },
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.hidden_path_config),
+                    summary = stringResource(R.string.hidden_path_config_summary),
+                    icon = Icons.Rounded.Visibility,
+                    onClick = actions.onOpenHiddenPathConfig,
                 )
                 AlphaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
@@ -425,6 +496,106 @@ private fun AlphaStylePicker(
 }
 
 @Composable
+private fun AlphaSwitchStylePicker(
+    selectedStyle: String,
+    onStyleSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_switch_style),
+            color = AlphaColors.Text,
+            fontSize = alphaSp(15f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SwitchStyle.entries.forEachIndexed { index, style ->
+                val selected = SwitchStyle.fromValue(selectedStyle) == style
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(AlphaShapes.Control)
+                        .background(if (selected) AlphaColors.Accent else AlphaColors.SurfaceStrong)
+                        .clickable { onStyleSelected(index) }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(style.labelRes),
+                        color = if (selected) Color.White else AlphaColors.Muted,
+                        fontSize = alphaSp(13f, maxScale = 1.0f),
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlphaSnowEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_global_snow_effect),
+            color = AlphaColors.Text,
+            fontSize = alphaSp(15f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            GlobalSnowEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(AlphaShapes.Control)
+                        .background(if (selected) AlphaColors.Accent else AlphaColors.SurfaceStrong)
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else AlphaColors.Muted,
+                        fontSize = alphaSp(13f, maxScale = 1.0f),
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun AlphaActionRow(
     title: String,
     summary: String,
@@ -478,6 +649,7 @@ private fun AlphaSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
+    trailingContent: (@Composable (Boolean, Boolean, (Boolean) -> Unit) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -507,11 +679,15 @@ private fun AlphaSwitchRow(
                 )
             }
         }
-        AlphaSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-        )
+        if (trailingContent != null) {
+            trailingContent(checked, enabled, onCheckedChange)
+        } else {
+            AlphaSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        }
     }
 }
 

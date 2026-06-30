@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.delta.DeltaCard
 import me.weishu.kernelsu.ui.component.delta.DeltaColors
 import me.weishu.kernelsu.ui.component.delta.DeltaScreen
@@ -102,6 +105,34 @@ fun SettingPagerDelta(
                 title = stringResource(R.string.settings_section_appearance),
                 collapsible = true,
             ) {
+                val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_day_night_switch),
+                    summary = stringResource(R.string.settings_day_night_switch_summary),
+                    checked = dayNightChecked,
+                    onCheckedChange = actions.onSetDayNightMode,
+                    trailingContent = { checked, enabled, onCheckedChange ->
+                        DayNightSwitch(
+                            checked = checked,
+                            enabled = enabled,
+                            onCheckedChange = onCheckedChange,
+                        )
+                    },
+                )
+                DeltaSwitchStylePicker(
+                    selectedStyle = uiState.switchStyle,
+                    onStyleSelected = actions.onSetSwitchStyleIndex,
+                )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_global_snow),
+                    summary = stringResource(R.string.settings_global_snow_summary),
+                    checked = uiState.globalSnowEnabled,
+                    onCheckedChange = actions.onSetGlobalSnowEnabled,
+                )
+                DeltaSnowEffectPicker(
+                    selectedEffect = uiState.globalSnowEffect,
+                    onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
                 DeltaColorVariantPicker(
                     selectedVariant = uiState.deltaColorVariant,
                     onVariantSelected = actions.onSetDeltaColorVariant,
@@ -142,6 +173,18 @@ fun SettingPagerDelta(
                     summary = stringResource(R.string.home_card_wallpapers_summary),
                     icon = Icons.Rounded.Wallpaper,
                     onClick = actions.onOpenHomeCardWallpapers,
+                )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_show_home_support_card),
+                    summary = stringResource(R.string.settings_show_home_support_card_summary),
+                    checked = uiState.showHomeSupportCard,
+                    onCheckedChange = actions.onSetShowHomeSupportCard,
+                )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_show_home_learn_card),
+                    summary = stringResource(R.string.settings_show_home_learn_card_summary),
+                    checked = uiState.showHomeLearnCard,
+                    onCheckedChange = actions.onSetShowHomeLearnCard,
                 )
                 DeltaActionRow(
                     title = stringResource(R.string.settings_backgrounds),
@@ -266,6 +309,35 @@ fun SettingPagerDelta(
                     },
                 )
                 DeltaSwitchRow(
+                    title = stringResource(R.string.settings_kpatch_next),
+                    summary = kPatchNextSummary(uiState),
+                    checked = uiState.isKPatchNextEnabled,
+                    enabled = uiState.canToggleKPatchNext,
+                    onCheckedChange = actions.onSetKPatchNextEnabled,
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.settings_kpatch_next_webui),
+                    summary = stringResource(
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            R.string.settings_kpatch_next_webui_summary
+                        } else {
+                            R.string.settings_kpatch_next_webui_disabled_summary
+                        }
+                    ),
+                    icon = Icons.Rounded.Apps,
+                    onClick = {
+                        if (uiState.canOpenKPatchNextWebUi) {
+                            actions.onOpenKPatchNextWebUi()
+                        }
+                    },
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.hidden_path_config),
+                    summary = stringResource(R.string.hidden_path_config_summary),
+                    icon = Icons.Rounded.Visibility,
+                    onClick = actions.onOpenHiddenPathConfig,
+                )
+                DeltaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
                     summary = stringResource(R.string.enable_web_debugging_summary),
                     checked = uiState.enableWebDebugging,
@@ -339,6 +411,102 @@ private fun DeltaColorVariantPicker(
                 onClick = { onVariantSelected(DeltaColorVariant.Red.value) },
                 modifier = Modifier.weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun DeltaSwitchStylePicker(
+    selectedStyle: String,
+    onStyleSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_switch_style),
+            color = DeltaColors.Ink,
+            fontSize = deltaSp(14f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .clip(DeltaShapes.Control)
+                .background(DeltaColors.SurfaceDeep)
+                .horizontalScroll(rememberScrollState())
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SwitchStyle.entries.forEachIndexed { index, style ->
+                val selected = SwitchStyle.fromValue(selectedStyle) == style
+                DeltaColorOption(
+                    text = stringResource(style.labelRes),
+                    selected = selected,
+                    selectedBackground = DeltaColors.Accent,
+                    selectedForeground = Color.White,
+                    onClick = { onStyleSelected(index) },
+                    modifier = Modifier
+                        .height(30.dp)
+                        .width(88.dp)
+                        .padding(horizontal = 1.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeltaSnowEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_global_snow_effect),
+            color = DeltaColors.Ink,
+            fontSize = deltaSp(14f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .clip(DeltaShapes.Control)
+                .background(DeltaColors.SurfaceDeep)
+                .horizontalScroll(rememberScrollState())
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GlobalSnowEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                DeltaColorOption(
+                    text = stringResource(effect.labelRes),
+                    selected = selected,
+                    selectedBackground = DeltaColors.Accent,
+                    selectedForeground = Color.White,
+                    onClick = { onEffectSelected(index) },
+                    modifier = Modifier
+                        .height(30.dp)
+                        .width(96.dp)
+                        .padding(horizontal = 1.dp),
+                )
+            }
         }
     }
 }
@@ -561,6 +729,7 @@ private fun DeltaSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     enabled: Boolean = true,
+    trailingContent: (@Composable (Boolean, Boolean, (Boolean) -> Unit) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -590,11 +759,15 @@ private fun DeltaSwitchRow(
                 )
             }
         }
-        DeltaSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-        )
+        if (trailingContent != null) {
+            trailingContent(checked, enabled, onCheckedChange)
+        } else {
+            DeltaSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+            )
+        }
     }
 }
 

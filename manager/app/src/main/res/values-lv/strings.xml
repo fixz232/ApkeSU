@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="profile_umount_modules_summary">Iespējojot šo opciju, EpkeSU varēs atjaunot visus moduļos šīs lietojumprogrammas modificētos failus.</string>
+    <string name="profile_umount_modules_summary">Iespējojot šo opciju, ApkeSU varēs atjaunot visus moduļos šīs lietojumprogrammas modificētos failus.</string>
     <string name="failed_to_update_sepolicy">Neizdevās atjaunināt SELinux noteikumus: %s</string>
     <string name="settings_profile_template_summary">Pārvaldiet vietējo un tiešsaistes lietotņu profila veidni</string>
     <string name="app_profile_template_id_invalid">Nederīgs veidnes id</string>
@@ -14,7 +14,7 @@
     <string name="home_working">Darbojas</string>
     <string name="home_working_version">Versija: %s</string>
     <string name="home_unsupported">Neatbalstīts</string>
-    <string name="home_unsupported_reason">EpkeSU pagaidām atbalsta tikai GKI kodolus</string>
+    <string name="home_unsupported_reason">ApkeSU pagaidām atbalsta tikai GKI kodolus</string>
     <string name="home_kernel">Kodols</string>
     <string name="home_manager_version">Pārvaldnieka versija</string>
     <string name="home_fingerprint">Pirkstu nospiedums</string>
@@ -42,11 +42,10 @@
     <string name="show_system_apps">Rādīt sistēmas lietotnes</string>
     <string name="send_log">Sūtīt žurnālus</string>
     <string name="reboot_to_apply">Restartējiet, lai stātos spēkā</string>
-    <string name="home_learn_kernelsu">Uzzināt par EpkeSU</string>
+    <string name="home_learn_kernelsu">Uzzināt par ApkeSU</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
-    <string name="home_click_to_learn_kernelsu">Uzzināt, kā instalēt EpkeSU un izmantot moduļus</string>
+    <string name="home_click_to_learn_kernelsu">Uzzināt, kā instalēt ApkeSU un izmantot moduļus</string>
     <string name="home_support_title">Atbalsti mūs</string>
-    <string name="about_source_code">Skatiet avota kodu vietnē %1$s<br/> Pievienojies mūsu %2$s kanālam</string>
     <string name="profile_default">Noklusējums</string>
     <string name="profile_template">Veidne</string>
     <string name="profile_custom">Pielāgots</string>
@@ -89,10 +88,10 @@
     <string name="module_version">Versija</string>
     <string name="safe_mode">Drošais režīms</string>
     <string name="module_magisk_conflict">Moduļi nav pieejami dēļ konflikta ar Magisk!</string>
-    <string name="home_support_content">EpkeSU ir un vienmēr būs bezmaksas un atvērtā koda. Tomēr jūs varat parādīt mums, ka jums rūp, veicot ziedojumu.</string>
+    <string name="home_support_content">ApkeSU ir un vienmēr būs bezmaksas un atvērtā koda. Tomēr jūs varat parādīt mums, ka jums rūp, veicot ziedojumu.</string>
     <string name="profile_groups">Grupas</string>
     <string name="profile_namespace_global">Globāli</string>
-    <string name="require_kernel_version">Pašreizējā EpkeSU versija %1$d ir pārāk zema, lai pārvaldnieks darbotos pareizi. Lūdzu, atjauniniet uz versiju %2$d vai jaunāku!</string>
+    <string name="require_kernel_version">Pašreizējā ApkeSU versija %1$d ir pārāk zema, lai pārvaldnieks darbotos pareizi. Lūdzu, atjauniniet uz versiju %2$d vai jaunāku!</string>
     <string name="enable_web_debugging">Iespējot WebView atkļūdošanu</string>
     <string name="select_file_tip">Ieteicams %1$s nodalījuma attēls</string>
     <string name="install_next">Nākamais</string>
@@ -106,9 +105,9 @@
     <string name="settings_uninstall">Atinstalēt</string>
     <string name="settings_uninstall_temporary">Pagaidu atinstalēšana</string>
     <string name="settings_restore_stock_image">Atjaunot oriģinālo attēlu</string>
-    <string name="settings_uninstall_temporary_message">Īslaicīgi atinstalēt EpkeSU, pēc nākamās restartēšanas atjaunot sākotnējo stāvokli.</string>
-    <string name="settings_uninstall_permanent_message">EpkeSU (saknes un visu moduļu) pilnīga atinstalēšana.</string>
-    <string name="settings_restore_stock_image_message">Atjaunojot rūpnīcas attēlu (ja ir dublējums), ko parasti izmanto pirms OTA; ja nepieciešams atinstalēt EpkeSU, lūdzu, izmantojiet \"Neatgriezeniski atinstalēt\".</string>
+    <string name="settings_uninstall_temporary_message">Īslaicīgi atinstalēt ApkeSU, pēc nākamās restartēšanas atjaunot sākotnējo stāvokli.</string>
+    <string name="settings_uninstall_permanent_message">ApkeSU (saknes un visu moduļu) pilnīga atinstalēšana.</string>
+    <string name="settings_restore_stock_image_message">Atjaunojot rūpnīcas attēlu (ja ir dublējums), ko parasti izmanto pirms OTA; ja nepieciešams atinstalēt ApkeSU, lūdzu, izmantojiet \"Neatgriezeniski atinstalēt\".</string>
     <string name="selected_lkm">Izvēlētais lkm: %s</string>
     <string name="grant_root_failed">Neizdevās piešķirt sakni!</string>
     <string name="open">Atvērt</string>
@@ -127,6 +126,6 @@
     <string name="settings_sucompat">Pārvirzīt su bināro failu</string>
     <string name="settings_sucompat_summary">Pārvirzīt /system/bin/su uz ksud lietotnēm, kurām piešķirta Superuser atļauja lietotnes profilā; efektīva tikai jauniem procesiem.</string>
     <string name="settings_kernel_umount">Kodola atvienošana</string>
-    <string name="settings_kernel_umount_summary">Kodola līmeņa atvienošanas uzvedība, ko kontrolē EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">Novērš turpmāku privilēģiju paaugstināšanu, izmantojot EpkeSU, šī root profila kontekstā.</string>
+    <string name="settings_kernel_umount_summary">Kodola līmeņa atvienošanas uzvedība, ko kontrolē ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">Novērš turpmāku privilēģiju paaugstināšanu, izmantojot ApkeSU, šī root profila kontekstā.</string>
 </resources>

@@ -3,6 +3,10 @@ package me.weishu.kernelsu.ui.screen.home
 import androidx.compose.runtime.Immutable
 import me.weishu.kernelsu.KernelVersion
 
+private const val LKM_MODE_LABEL = "LKM"
+private const val HIDDEN_PATH_LKM_MODE_LABEL = "\u9690\u85cf\u8def\u5f84LKM"
+private const val GKI_MODE_LABEL = "GKI"
+
 @Immutable
 data class HomeUiState(
     val kernelVersion: KernelVersion,
@@ -10,6 +14,7 @@ data class HomeUiState(
     val managerUAPIVersion: Int,
     val kernelUAPIVersion: Int?,
     val lkmMode: Boolean?,
+    val hiddenPathLkmMode: Boolean = false,
     val isManager: Boolean,
     val isManagerPrBuild: Boolean,
     val isKernelPrBuild: Boolean,
@@ -20,6 +25,8 @@ data class HomeUiState(
     val isLateLoadMode: Boolean,
     val currentManagerVersionCode: Long,
     val showVersionMismatchWarningSetting: Boolean,
+    val showHomeSupportCard: Boolean = true,
+    val showHomeLearnCard: Boolean = true,
     val superuserCount: Int,
     val moduleCount: Int,
     val systemInfo: SystemInfo,
@@ -32,6 +39,16 @@ data class HomeUiState(
 
     val showGkiWarning: Boolean
         get() = ksuVersion != null && lkmMode == false
+
+    val lkmModeLabel: String
+        get() = if (hiddenPathLkmMode) HIDDEN_PATH_LKM_MODE_LABEL else LKM_MODE_LABEL
+
+    val workingModeLabel: String?
+        get() = when (lkmMode) {
+            true -> lkmModeLabel
+            false -> GKI_MODE_LABEL
+            null -> null
+        }
 
     val showRequireKernelWarning: Boolean
         get() = isManager && requiresNewKernel

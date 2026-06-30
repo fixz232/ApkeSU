@@ -51,6 +51,7 @@ fun InstallScreen() {
     var lkmSelection by rememberSaveable { mutableStateOf<LkmSelection>(LkmSelection.KmiNone) }
     var partitionSelectionIndex by rememberSaveable { mutableIntStateOf(0) }
     var hasCustomSelected by rememberSaveable { mutableStateOf(false) }
+    var hiddenPathImagePickerPending by rememberSaveable { mutableStateOf(false) }
     val showChooseKmiDialog = rememberSaveable { mutableStateOf(false) }
     var advancedOptionsShown by rememberSaveable { mutableStateOf(false) }
     var allowShell by rememberSaveable { mutableStateOf(false) }
@@ -65,9 +66,18 @@ fun InstallScreen() {
 
     val selectFileTip = stringResource(id = R.string.select_file_tip, defaultPartition)
     val selectFileTipNoGki = stringResource(id = R.string.select_file_tip_nogki)
-    val installMethodOptions = remember(rootAvailable, isAbDevice, isGkiDevice, selectFileTip, selectFileTipNoGki) {
+    val hiddenPathLkmPatchSummary = stringResource(id = R.string.hidden_path_lkm_patch_summary)
+    val installMethodOptions = remember(
+        rootAvailable,
+        isAbDevice,
+        isGkiDevice,
+        selectFileTip,
+        selectFileTipNoGki,
+        hiddenPathLkmPatchSummary,
+    ) {
         buildList {
             add(InstallMethod.SelectFile(summary = if (isGkiDevice) selectFileTip else selectFileTipNoGki))
+            add(InstallMethod.HiddenPathLkmPatch(summary = hiddenPathLkmPatchSummary))
             if (rootAvailable) add(InstallMethod.AnyKernel())
             if (rootAvailable && isGkiDevice) {
                 add(InstallMethod.DirectInstall)
@@ -110,20 +120,36 @@ fun InstallScreen() {
             if (method is InstallMethod.SelectFile && method.uri == null) {
                 return@let
             }
+            if (method is InstallMethod.HiddenPathLkmPatch && method.uri == null) {
+                return@let
+            }
             if (method is InstallMethod.AnyKernel) {
                 method.uri?.let { uri -> navigator.push(Route.Flash(FlashIt.FlashAnyKernel(uri))) }
                 return@let
             }
-            val selectedPartition = if (method is InstallMethod.SelectFile) {
+            val patchLkm = if (method is InstallMethod.HiddenPathLkmPatch) {
+                when (selectedLkm) {
+                    is LkmSelection.PathMaskKmiString -> selectedLkm
+                    else -> LkmSelection.PathMaskAuto
+                }
+            } else {
+                selectedLkm
+            }
+            val selectedPartition = if (method is InstallMethod.SelectFile || method is InstallMethod.HiddenPathLkmPatch) {
                 null
             } else {
                 partitions.getOrNull(partitionSelectionIndex)
             }
+            val bootUri = when (method) {
+                is InstallMethod.SelectFile -> method.uri
+                is InstallMethod.HiddenPathLkmPatch -> method.uri
+                else -> null
+            }
             navigator.push(
                 Route.Flash(
                     FlashIt.FlashBoot(
-                        boot = if (method is InstallMethod.SelectFile) method.uri else null,
-                        lkm = selectedLkm,
+                        boot = bootUri,
+                        lkm = patchLkm,
                         ota = method is InstallMethod.DirectInstallToInactiveSlot,
                         partition = selectedPartition,
                         allowShell = allowShell,
@@ -139,7 +165,11 @@ fun InstallScreen() {
         onDismissRequest = { showChooseKmiDialog.value = false },
         onSelected = { kmi ->
             kmi?.let {
-                val selectedLkm = LkmSelection.KmiString(it)
+                val selectedLkm = if (installMethod is InstallMethod.HiddenPathLkmPatch) {
+                    LkmSelection.PathMaskKmiString(it)
+                } else {
+                    LkmSelection.KmiString(it)
+                }
                 lkmSelection = selectedLkm
                 onInstall(selectedLkm)
             }
@@ -168,21 +198,35 @@ fun InstallScreen() {
                 val fileName = uri.getFileName(context)?.takeUnless { name -> name.isBlank() }
                     ?: uri.lastPathSegment
                     ?: if (isGkiDevice) selectFileTip else selectFileTipNoGki
-                installMethod = InstallMethod.SelectFile(uri, summary = fileName)
+                installMethod = if (hiddenPathImagePickerPending) {
+                    lkmSelection = LkmSelection.KmiNone
+                    InstallMethod.HiddenPathLkmPatch(uri, summary = fileName)
+                } else {
+                    InstallMethod.SelectFile(uri, summary = fileName)
+                }
+                hiddenPathImagePickerPending = false
             }
+        } else {
+            hiddenPathImagePickerPending = false
         }
     }
     val selectAnyKernelLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         if (it.resultCode == Activity.RESULT_OK) {
-            it.data?.data?.let { uri -> installMethod = InstallMethod.AnyKernel(uri) }
+            it.data?.data?.let { uri ->
+                val fileName = uri.getFileName(context)?.takeUnless { name -> name.isBlank() }
+                    ?: uri.lastPathSegment
+                    ?: resources.getString(R.string.anykernel_install)
+                installMethod = InstallMethod.AnyKernel(uri, summary = fileName)
+            }
         }
     }
 
     val canInstall = when (val method = installMethod) {
         null -> false
         is InstallMethod.SelectFile -> method.uri != null
+        is InstallMethod.HiddenPathLkmPatch -> method.uri != null
         is InstallMethod.AnyKernel -> method.uri != null
         else -> true
     }
@@ -203,8 +247,18 @@ fun InstallScreen() {
     )
     val actions = InstallScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
-        onSelectMethod = { method -> installMethod = method },
+        onSelectMethod = { method ->
+            installMethod = method
+            if (method !is InstallMethod.HiddenPathLkmPatch && lkmSelection is LkmSelection.PathMaskKmiString) {
+                lkmSelection = LkmSelection.KmiNone
+            }
+        },
         onSelectBootImage = {
+            hiddenPathImagePickerPending = false
+            selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply { type = "application/octet-stream" })
+        },
+        onSelectHiddenPathLkmBootImage = {
+            hiddenPathImagePickerPending = true
             selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply { type = "application/octet-stream" })
         },
         onSelectAnyKernel = {
@@ -221,11 +275,14 @@ fun InstallScreen() {
             partitionSelectionIndex = index
         },
         onNext = {
+            val method = installMethod
+            val isHiddenPathMode = method is InstallMethod.HiddenPathLkmPatch
             val isLkmSelected = lkmSelection != LkmSelection.KmiNone
             val isKmiUnknown = currentKmi.isBlank()
-            val isSelectFileMode = installMethod is InstallMethod.SelectFile
-            val isAnyKernelMode = installMethod is InstallMethod.AnyKernel
-            if (!isAnyKernelMode && !isLkmSelected && (isSelectFileMode || isKmiUnknown)) {
+            val isSelectFileMode = method is InstallMethod.SelectFile
+            val isAnyKernelMode = method is InstallMethod.AnyKernel
+            val needsHiddenPathKmi = isHiddenPathMode && lkmSelection !is LkmSelection.PathMaskKmiString
+            if (!isAnyKernelMode && (needsHiddenPathKmi || (!isLkmSelected && (isSelectFileMode || isKmiUnknown)))) {
                 showChooseKmiDialog.value = true
             } else {
                 onInstall(lkmSelection)

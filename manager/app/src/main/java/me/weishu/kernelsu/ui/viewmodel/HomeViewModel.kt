@@ -19,6 +19,8 @@ import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
+import me.weishu.kernelsu.data.repository.SHOW_HOME_LEARN_CARD_KEY
+import me.weishu.kernelsu.data.repository.SHOW_HOME_SUPPORT_CARD_KEY
 import me.weishu.kernelsu.data.repository.SHOW_VERSION_MISMATCH_WARNING_KEY
 import me.weishu.kernelsu.getKernelVersion
 import me.weishu.kernelsu.ksuApp
@@ -28,6 +30,7 @@ import me.weishu.kernelsu.ui.screen.home.getManagerVersion
 import me.weishu.kernelsu.ui.util.getModuleCount
 import me.weishu.kernelsu.ui.util.getSELinuxStatusRaw
 import me.weishu.kernelsu.ui.util.getSuperuserCount
+import me.weishu.kernelsu.ui.util.isHiddenPathLkmMode
 import me.weishu.kernelsu.ui.util.resolveDeviceName
 import me.weishu.kernelsu.ui.util.rootAvailable
 
@@ -37,9 +40,16 @@ class HomeViewModel(
 
     private val prefs = ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == SHOW_VERSION_MISMATCH_WARNING_KEY) {
+        if (key == SHOW_VERSION_MISMATCH_WARNING_KEY ||
+            key == SHOW_HOME_SUPPORT_CARD_KEY ||
+            key == SHOW_HOME_LEARN_CARD_KEY
+        ) {
             _uiState.update {
-                it.copy(showVersionMismatchWarningSetting = repo.showVersionMismatchWarning)
+                it.copy(
+                    showVersionMismatchWarningSetting = repo.showVersionMismatchWarning,
+                    showHomeSupportCard = repo.showHomeSupportCard,
+                    showHomeLearnCard = repo.showHomeLearnCard,
+                )
             }
         }
     }
@@ -83,12 +93,16 @@ class HomeViewModel(
             if (kernelVersion.isGKI()) runCatching { Natives.isLkmMode }.getOrNull() else null
         }
         val isRootAvailable = runCatching { rootAvailable() }.getOrDefault(false)
+        val hiddenPathLkmMode = lkmMode == true &&
+            isRootAvailable &&
+            runCatching { isHiddenPathLkmMode() }.getOrDefault(false)
         val managerVersion = getManagerVersion(ksuApp)
 
         return HomeUiState(
             kernelVersion = kernelVersion,
             ksuVersion = ksuVersion,
             lkmMode = lkmMode,
+            hiddenPathLkmMode = hiddenPathLkmMode,
             isManager = isManager,
             isManagerPrBuild = BuildConfig.IS_PR_BUILD,
             isKernelPrBuild = runCatching { Natives.isPrBuild }.getOrDefault(false),
@@ -101,6 +115,8 @@ class HomeViewModel(
             isLateLoadMode = runCatching { Natives.isLateLoadMode }.getOrDefault(false),
             currentManagerVersionCode = managerVersion.versionCode,
             showVersionMismatchWarningSetting = repo.showVersionMismatchWarning,
+            showHomeSupportCard = repo.showHomeSupportCard,
+            showHomeLearnCard = repo.showHomeLearnCard,
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0),
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0),
             systemInfo = SystemInfo(
@@ -137,6 +153,8 @@ class HomeViewModel(
             showVersionMismatchWarningSetting = runCatching {
                 repo.showVersionMismatchWarning
             }.getOrDefault(true),
+            showHomeSupportCard = runCatching { repo.showHomeSupportCard }.getOrDefault(true),
+            showHomeLearnCard = runCatching { repo.showHomeLearnCard }.getOrDefault(true),
             superuserCount = 0,
             moduleCount = 0,
             systemInfo = SystemInfo(

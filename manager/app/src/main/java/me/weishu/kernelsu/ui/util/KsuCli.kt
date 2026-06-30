@@ -39,8 +39,11 @@ private const val SHELL_JOB_TIMEOUT_MILLIS = 10_000L
 private const val ANDROID_16_API = 36
 private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
+const val KPATCH_NEXT_MODULE_ID = "KPatch-Next"
 const val BUILTIN_MOUNT_MODE_OVERLAY = "overlay"
 const val BUILTIN_MOUNT_MODE_MAGIC = "magic"
+const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
+const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
 
 private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
@@ -64,9 +67,60 @@ data class BuiltinMountStatus(
     val webUi: Boolean = false,
 )
 
+data class KPatchNextStatus(
+    val moduleId: String = KPATCH_NEXT_MODULE_ID,
+    val moduleName: String = "KPatch-Next",
+    val modulePath: String = "/data/adb/modules/KPatch-Next",
+    val version: String = "",
+    val versionCode: String = "",
+    val installed: Boolean = false,
+    val enabled: Boolean = false,
+    val pendingUpdate: Boolean = false,
+    val pendingRemove: Boolean = false,
+    val webUi: Boolean = false,
+    val unresolved: Boolean = false,
+    val dataDir: Boolean = false,
+    val builtinAvailable: Boolean = false,
+    val conflict: String? = null,
+)
+
 data class EpkesuHideStatus(
     val enabled: Boolean = false,
 )
+
+data class HiddenPathConfigState(
+    val targetPaths: List<String> = emptyList(),
+    val appPackages: List<String> = emptyList(),
+    val useAppScope: Boolean = true,
+    val hideDirents: Boolean = true,
+    val hideIsolated: Boolean = true,
+    val loaded: Boolean = false,
+    val currentKmi: String = "",
+    val resolvedCount: String = "",
+    val activeTargetPaths: String = "",
+    val lastLog: String = "",
+)
+
+fun HiddenPathConfigState.toConfigJson(): String {
+    return JSONObject()
+        .put("targetPaths", JSONArray(targetPaths.cleanConfigList()))
+        .put("appPackages", JSONArray(appPackages.cleanConfigList()))
+        .put("useAppScope", useAppScope)
+        .put("hideDirents", hideDirents)
+        .put("hideIsolated", hideIsolated)
+        .toString(2)
+}
+
+fun parseHiddenPathConfigJson(content: String, current: HiddenPathConfigState = HiddenPathConfigState()): HiddenPathConfigState {
+    val obj = JSONObject(content)
+    return current.copy(
+        targetPaths = obj.optJSONArray("targetPaths").toStringList().cleanConfigList(),
+        appPackages = obj.optJSONArray("appPackages").toStringList().cleanConfigList(),
+        useAppScope = obj.optBoolean("useAppScope", current.useAppScope),
+        hideDirents = obj.optBoolean("hideDirents", current.hideDirents),
+        hideIsolated = obj.optBoolean("hideIsolated", current.hideIsolated),
+    )
+}
 
 object KsuCli {
     private val shellLock = Any()
@@ -246,6 +300,61 @@ fun setBuiltinMountDefaultMode(mode: String): Boolean {
     return execKsud("builtin-mount set-default-mode $normalized", true)
 }
 
+suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext KPatchNextStatus()
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${getKsuDaemonPath()} kpatch-next status")
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            Log.w(TAG, "kpatch-next status timed out")
+            KsuCli.reset()
+            return@runCatching KPatchNextStatus()
+        }
+
+        if (!result.isSuccess) {
+            Log.w(TAG, "kpatch-next status failed: ${stderr.joinToString("\n")}")
+            return@runCatching KPatchNextStatus()
+        }
+
+        val obj = JSONObject(stdout.joinToString("\n"))
+        KPatchNextStatus(
+            moduleId = obj.optString("moduleId", KPATCH_NEXT_MODULE_ID),
+            moduleName = obj.optString("moduleName", "KPatch-Next"),
+            modulePath = obj.optString("modulePath", "/data/adb/modules/KPatch-Next"),
+            version = obj.optString("version", ""),
+            versionCode = obj.optString("versionCode", ""),
+            installed = obj.optBoolean("installed", false),
+            enabled = obj.optBoolean("enabled", false),
+            pendingUpdate = obj.optBoolean("pendingUpdate", false),
+            pendingRemove = obj.optBoolean("pendingRemove", false),
+            webUi = obj.optBoolean("webui", false),
+            unresolved = obj.optBoolean("unresolved", false),
+            dataDir = obj.optBoolean("dataDir", false),
+            builtinAvailable = obj.optBoolean("builtinAvailable", false),
+            conflict = obj.optString("conflict").takeIf { it.isNotBlank() && it != "null" },
+        )
+    }.getOrElse {
+        Log.w(TAG, "kpatch-next status unavailable", it)
+        KsuCli.reset()
+        KPatchNextStatus()
+    }
+}
+
+fun setKPatchNextEnabled(enabled: Boolean): Boolean {
+    val command = if (enabled) "enable" else "disable"
+    return execKsud("kpatch-next $command", true)
+}
+
 suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
         return@withContext EpkesuHideStatus()
@@ -278,6 +387,152 @@ suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO
 fun setEpkesuHideEnabled(enabled: Boolean): Boolean {
     val command = if (enabled) "enable" else "disable"
     return execKsud("epkesu-hide $command", true)
+}
+
+suspend fun getHiddenPathConfig(): HiddenPathConfigState = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext HiddenPathConfigState()
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${getKsuDaemonPath()} pathmask status")
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            Log.w(TAG, "pathmask status timed out")
+            KsuCli.reset()
+            return@runCatching HiddenPathConfigState()
+        }
+
+        if (!result.isSuccess) {
+            Log.w(TAG, "pathmask status failed: ${stderr.joinToString("\n")}")
+            return@runCatching HiddenPathConfigState()
+        }
+
+        val obj = JSONObject(stdout.joinToString("\n"))
+        HiddenPathConfigState(
+            targetPaths = obj.optJSONArray("targetPaths").toStringList(),
+            appPackages = obj.optJSONArray("appPackages").toStringList(),
+            useAppScope = obj.optBoolean("useAppScope", true),
+            hideDirents = obj.optBoolean("hideDirents", true),
+            hideIsolated = obj.optBoolean("hideIsolated", true),
+            loaded = obj.optBoolean("loaded", false),
+            currentKmi = obj.optString("currentKmi", ""),
+            resolvedCount = obj.optString("resolvedCount", ""),
+            activeTargetPaths = obj.optString("activeTargetPaths", ""),
+            lastLog = obj.optString("lastLog", ""),
+        )
+    }.getOrElse {
+        Log.w(TAG, "pathmask status unavailable", it)
+        KsuCli.reset()
+        HiddenPathConfigState()
+    }
+}
+
+suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): Boolean = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext false
+    }
+
+    runCatching {
+        val json = JSONObject()
+            .put("targetPaths", JSONArray(config.targetPaths))
+            .put("appPackages", JSONArray(config.appPackages))
+            .put("useAppScope", config.useAppScope)
+            .put("hideDirents", config.hideDirents)
+            .put("hideIsolated", config.hideIsolated)
+        val importDir = "/data/adb/ksu/pathmask"
+        val errFile = "$importDir/import.err"
+        val logFile = "$importDir/pathmask.log"
+        val ksud = shellQuote(getKsuDaemonPath())
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val importCmd = "$ksud pathmask import-json ${shellQuote(json.toString())}"
+        val applyCmd = "$ksud pathmask apply"
+        val command = "mkdir -p ${shellQuote(importDir)} && " +
+            "($importCmd && $applyCmd) 2> ${shellQuote(errFile)}; " +
+            "code=${'$'}?; " +
+            "if [ ${'$'}code -ne 0 ]; then " +
+            "printf '[manager] pathmask apply command failed (code=%s)\\n' \"${'$'}code\" >> ${shellQuote(logFile)}; " +
+            "cat ${shellQuote(errFile)} >> ${shellQuote(logFile)}; " +
+            "cat ${shellQuote(errFile)} >&2; " +
+            "fi; " +
+            "rm -f ${shellQuote(errFile)}; " +
+            "[ ${'$'}code -eq 0 ]"
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * 6) {
+            getRootShell().newJob()
+                .add(command)
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            Log.w(TAG, "pathmask apply timed out")
+            KsuCli.reset()
+            return@runCatching false
+        }
+
+        if (!result.isSuccess) {
+            Log.w(TAG, "pathmask apply failed: ${stderr.joinToString("\n")}")
+        }
+        result.isSuccess
+    }.getOrElse {
+        Log.w(TAG, "pathmask apply unavailable", it)
+        KsuCli.reset()
+        false
+    }
+}
+
+suspend fun getHiddenPathLogs(): String = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext ""
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${getKsuDaemonPath()} pathmask logs")
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            KsuCli.reset()
+            return@runCatching ""
+        }
+        if (result.isSuccess) stdout.joinToString("\n") else stderr.joinToString("\n")
+    }.getOrElse {
+        Log.w(TAG, "pathmask logs unavailable", it)
+        KsuCli.reset()
+        ""
+    }
+}
+
+fun clearHiddenPathLogs(): Boolean {
+    return execKsud("pathmask clear-logs", true)
+}
+
+fun unloadHiddenPathKernelPaths(): Boolean {
+    return execKsud("pathmask unload", true)
+}
+
+fun isHiddenPathLkmMode(): Boolean {
+    return runCatching {
+        withNewRootShell(globalMnt = true) {
+            newJob()
+                .add("[ -f /pathmask.ko ] || grep -q '^pathmask ' /proc/modules")
+                .exec()
+                .isSuccess
+        }
+    }.getOrDefault(false)
 }
 
 suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.IO) {
@@ -466,6 +721,18 @@ private fun flashWithIoAk3(
     }
 }
 
+private fun copyUriToCache(uri: Uri, fileName: String): File {
+    val file = File(ksuApp.cacheDir, fileName)
+    val input = ksuApp.contentResolver.openInputStream(uri)
+        ?: error("Unable to open selected file: $uri")
+    input.use { source ->
+        file.outputStream().use { output ->
+            source.copyTo(output)
+        }
+    }
+    return file
+}
+
 fun flashModule(
     uri: Uri,
     onStdout: (String) -> Unit,
@@ -473,19 +740,15 @@ fun flashModule(
 ): FlashResult {
     install()
 
-    val resolver = ksuApp.contentResolver
-    with(resolver.openInputStream(uri)) {
-        val file = File(ksuApp.cacheDir, "module.zip")
-        file.outputStream().use { output ->
-            this?.copyTo(output)
-        }
+    val file = copyUriToCache(uri, "module.zip")
+    try {
         val cmd = "module install ${file.absolutePath}"
         val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
         Log.i("KernelSU", "install module $uri result: $result")
 
-        file.delete()
-
         return FlashResult(result)
+    } finally {
+        file.delete()
     }
 }
 
@@ -537,6 +800,12 @@ sealed class LkmSelection : Parcelable {
     data class KmiString(val value: String) : LkmSelection()
 
     @Parcelize
+    data class PathMaskKmiString(val value: String) : LkmSelection()
+
+    @Parcelize
+    data object PathMaskAuto : LkmSelection()
+
+    @Parcelize
     data object KmiNone : LkmSelection()
 }
 
@@ -550,18 +819,7 @@ fun installBoot(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit,
 ): FlashResult {
-    val resolver = ksuApp.contentResolver
-
-    val bootFile = bootUri?.let { uri ->
-        with(resolver.openInputStream(uri)) {
-            val bootFile = File(ksuApp.cacheDir, "boot.img")
-            bootFile.outputStream().use { output ->
-                this?.copyTo(output)
-            }
-
-            bootFile
-        }
-    }
+    val bootFile = bootUri?.let { uri -> copyUriToCache(uri, "boot.img") }
 
     var cmd = "boot-patch"
 
@@ -587,19 +845,20 @@ fun installBoot(
     var lkmFile: File? = null
     when (lkm) {
         is LkmSelection.LkmUri -> {
-            lkmFile = with(resolver.openInputStream(lkm.uri)) {
-                val file = File(ksuApp.cacheDir, "kernelsu-tmp-lkm.ko")
-                file.outputStream().use { output ->
-                    this?.copyTo(output)
-                }
-
-                file
-            }
+            lkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
             cmd += " -m ${lkmFile.absolutePath}"
         }
 
         is LkmSelection.KmiString -> {
             cmd += " --kmi ${lkm.value}"
+        }
+
+        is LkmSelection.PathMaskKmiString -> {
+            cmd += " --pathmask-lkm --kmi ${lkm.value}"
+        }
+
+        LkmSelection.PathMaskAuto -> {
+            cmd += " --pathmask-lkm"
         }
 
         LkmSelection.KmiNone -> {
@@ -618,18 +877,23 @@ fun installBoot(
         cmd += " --partition $part"
     }
 
-    val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
-    Log.i("KernelSU", "install boot result: ${result.isSuccess}")
+    return try {
+        val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
+        Log.i("KernelSU", "install boot result: ${result.isSuccess}")
 
-    bootFile?.delete()
-    lkmFile?.delete()
+        if (result.isSuccess) {
+            // Keep /data/adb/ksud available after reboot for both direct flash and
+            // manually flashed patched images.
+            install()
+        }
 
-    // if boot uri is empty, it is direct install, when success, we should show reboot button
-    val showReboot = bootUri == null && result.isSuccess // we create a temporary val here, to avoid calc showReboot double
-    if (showReboot) { // because we decide do not update ksud when startActivity
-        install() // install ksud here
+        // if boot uri is empty, it is direct install, when success, we should show reboot button
+        val showReboot = bootUri == null && result.isSuccess
+        FlashResult(result, showReboot)
+    } finally {
+        bootFile?.delete()
+        lkmFile?.delete()
     }
-    return FlashResult(result, showReboot)
 }
 
 fun reboot(reason: String = "") {
@@ -650,15 +914,8 @@ fun flashAnyKernelZip(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
-    val resolver = ksuApp.contentResolver
-
     val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val tmpFile = File(ksuApp.cacheDir, "anykernel_${timestamp}.zip")
-    resolver.openInputStream(uri).use { input ->
-        tmpFile.outputStream().use { out ->
-            input?.copyTo(out)
-        }
-    }
+    val tmpFile = copyUriToCache(uri, "anykernel_${timestamp}.zip")
 
     val destZip = tmpFile.absolutePath
     val destZipName = tmpFile.name
@@ -809,22 +1066,40 @@ fun listAppProfileTemplates(): List<String> {
 
 fun getAppProfileTemplate(id: String): String {
     val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile get-template '${id}'")
+    return shell.newJob().add("${getKsuDaemonPath()} profile get-template ${shellQuote(id)}")
         .to(ArrayList(), null).exec().out.joinToString("\n")
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
     val shell = getRootShell()
-    val escapedTemplate = template.replace("\"", "\\\"")
-    val cmd = """${getKsuDaemonPath()} profile set-template "$id" "$escapedTemplate'""""
+    val cmd = "${getKsuDaemonPath()} profile set-template ${shellQuote(id)} ${shellQuote(template)}"
     return shell.newJob().add(cmd)
         .to(ArrayList(), null).exec().isSuccess
 }
 
 fun deleteAppProfileTemplate(id: String): Boolean {
     val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile delete-template '${id}'")
+    return shell.newJob().add("${getKsuDaemonPath()} profile delete-template ${shellQuote(id)}")
         .to(ArrayList(), null).exec().isSuccess
+}
+
+private fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
+
+private fun JSONArray?.toStringList(): List<String> {
+    if (this == null) {
+        return emptyList()
+    }
+    return buildList {
+        for (index in 0 until length()) {
+            optString(index).trim().takeIf { it.isNotEmpty() }?.let(::add)
+        }
+    }
+}
+
+private fun List<String>.cleanConfigList(): List<String> {
+    return map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinct()
 }
 
 fun forceStopApp(packageName: String, userId: Int? = null) {

@@ -13,6 +13,11 @@ import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.AppSettings
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -82,6 +87,9 @@ class MainActivityViewModel(
             enableBlur = if (isLiquidGlassInterface) false else settingRepo.enableBlur,
             enableFloatingBottomBar = settingRepo.enableFloatingBottomBar,
             enableFloatingBottomBarBlur = if (isLiquidGlassInterface) false else settingRepo.enableFloatingBottomBarBlur,
+            switchStyle = settingRepo.switchStyle,
+            globalSnowEnabled = settingRepo.globalSnowEnabled,
+            globalSnowEffect = settingRepo.globalSnowEffect,
             uiMode = UiMode.fromValue(interfaceStyle),
             interfaceStyle = interfaceStyle,
             customWallpaperUri = settingRepo.customWallpaperUri,
@@ -118,6 +126,9 @@ class MainActivityViewModel(
             enableBlur = false,
             enableFloatingBottomBar = false,
             enableFloatingBottomBarBlur = false,
+            switchStyle = SwitchStyle.DEFAULT_VALUE,
+            globalSnowEnabled = false,
+            globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
             uiMode = UiMode.fromValue(InterfaceStyle.Miuix.value),
             interfaceStyle = InterfaceStyle.Miuix.value,
             customWallpaperUri = null,
@@ -153,6 +164,9 @@ class MainActivityViewModel(
             addAll(
                 listOf(
             "ui_mode",
+            SWITCH_STYLE_KEY,
+            GLOBAL_SNOW_ENABLED_KEY,
+            GLOBAL_SNOW_EFFECT_KEY,
             DELTA_COLOR_VARIANT_KEY,
             "custom_wallpaper_uri",
             "custom_wallpaper_opacity",

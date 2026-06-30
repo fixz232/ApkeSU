@@ -72,7 +72,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
+import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedDropdownItem
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
@@ -161,6 +163,7 @@ private fun SettingsMaterialContent(
     var rootFeaturesExpanded by rememberSaveable { mutableStateOf(false) }
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     var maintenanceExpanded by rememberSaveable { mutableStateOf(false) }
+    val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
 
     Spacer(modifier = Modifier.height(8.dp))
     KsuIsValid {
@@ -206,6 +209,51 @@ private fun SettingsMaterialContent(
                     items = InterfaceStyle.entries.map { stringResource(it.labelRes) },
                     selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                     onItemSelected = actions.onSetUiModeIndex
+                )
+            }
+            add {
+                SegmentedListItem(
+                    onClick = { actions.onSetDayNightMode(!dayNightChecked) },
+                    headlineContent = { Text(stringResource(id = R.string.settings_day_night_switch)) },
+                    supportingContent = { Text(stringResource(id = R.string.settings_day_night_switch_summary)) },
+                    leadingContent = {
+                        Icon(Icons.Filled.Palette, stringResource(id = R.string.settings_day_night_switch))
+                    },
+                    trailingContent = {
+                        DayNightSwitch(
+                            checked = dayNightChecked,
+                            onCheckedChange = actions.onSetDayNightMode,
+                        )
+                    }
+                )
+            }
+            add {
+                SegmentedDropdownItem(
+                    icon = Icons.Filled.Palette,
+                    title = stringResource(id = R.string.settings_switch_style),
+                    summary = stringResource(id = R.string.settings_switch_style_summary),
+                    items = SwitchStyle.entries.map { stringResource(it.labelRes) },
+                    selectedIndex = SwitchStyle.selectedIndex(uiState.switchStyle),
+                    onItemSelected = actions.onSetSwitchStyleIndex
+                )
+            }
+            add {
+                SegmentedSwitchItem(
+                    icon = Icons.Filled.Visibility,
+                    title = stringResource(id = R.string.settings_global_snow),
+                    summary = stringResource(id = R.string.settings_global_snow_summary),
+                    checked = uiState.globalSnowEnabled,
+                    onCheckedChange = actions.onSetGlobalSnowEnabled
+                )
+            }
+            add {
+                SegmentedDropdownItem(
+                    icon = Icons.Filled.Visibility,
+                    title = stringResource(id = R.string.settings_global_snow_effect),
+                    summary = stringResource(id = R.string.settings_global_snow_effect_summary),
+                    items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
+                    selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
+                    onItemSelected = actions.onSetGlobalSnowEffectIndex
                 )
             }
             add {
@@ -308,6 +356,24 @@ private fun SettingsMaterialContent(
                             null
                         )
                         }
+                    )
+                }
+                add {
+                    SegmentedSwitchItem(
+                        icon = Icons.Filled.Visibility,
+                        title = stringResource(id = R.string.settings_show_home_support_card),
+                        summary = stringResource(id = R.string.settings_show_home_support_card_summary),
+                        checked = uiState.showHomeSupportCard,
+                        onCheckedChange = actions.onSetShowHomeSupportCard
+                    )
+                }
+                add {
+                    SegmentedSwitchItem(
+                        icon = Icons.Filled.Visibility,
+                        title = stringResource(id = R.string.settings_show_home_learn_card),
+                        summary = stringResource(id = R.string.settings_show_home_learn_card_summary),
+                        checked = uiState.showHomeLearnCard,
+                        onCheckedChange = actions.onSetShowHomeLearnCard
                     )
                 }
                 add {
@@ -599,6 +665,59 @@ private fun SettingsMaterialContent(
                             Icon(
                                 Icons.Filled.DeveloperMode,
                                 stringResource(id = R.string.settings_builtin_mount_webui)
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    )
+                },
+                {
+                    SegmentedSwitchItem(
+                        icon = Icons.Filled.DeveloperMode,
+                        title = stringResource(id = R.string.settings_kpatch_next),
+                        summary = kPatchNextSummary(uiState),
+                        enabled = uiState.canToggleKPatchNext,
+                        checked = uiState.isKPatchNextEnabled,
+                        onCheckedChange = actions.onSetKPatchNextEnabled
+                    )
+                },
+                {
+                    SegmentedListItem(
+                        onClick = actions.onOpenKPatchNextWebUi,
+                        enabled = uiState.canOpenKPatchNextWebUi,
+                        headlineContent = { Text(stringResource(id = R.string.settings_kpatch_next_webui)) },
+                        supportingContent = {
+                            Text(
+                                stringResource(
+                                    id = if (uiState.canOpenKPatchNextWebUi) {
+                                        R.string.settings_kpatch_next_webui_summary
+                                    } else {
+                                        R.string.settings_kpatch_next_webui_disabled_summary
+                                    }
+                                )
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Apps,
+                                stringResource(id = R.string.settings_kpatch_next_webui)
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    )
+                },
+                {
+                    SegmentedListItem(
+                        onClick = actions.onOpenHiddenPathConfig,
+                        headlineContent = { Text(stringResource(id = R.string.hidden_path_config)) },
+                        supportingContent = { Text(stringResource(id = R.string.hidden_path_config_summary)) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Visibility,
+                                stringResource(id = R.string.hidden_path_config)
                             )
                         },
                         trailingContent = {

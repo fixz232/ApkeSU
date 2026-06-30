@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +60,7 @@ private fun MaterialManagerNameDialog(
 ) {
     var name by remember(initialName) { mutableStateOf(initialName) }
     AlertDialog(
+        modifier = Modifier.imePadding(),
         onDismissRequest = onDismissRequest,
         title = { Text(stringResource(R.string.settings_manager_name)) },
         text = {
@@ -103,7 +105,10 @@ private fun MiuixManagerNameDialog(
         title = stringResource(R.string.settings_manager_name),
         onDismissRequest = onDismissRequest,
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.imePadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 Text(stringResource(R.string.settings_manager_name_dialog_summary))
                 TextField(
                     modifier = Modifier.fillMaxWidth(),

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#1C1C1E</color>
+    <color name="ic_launcher_image_background">#087CFF</color>
     <color name="neko_star_background">#FFFFFF</color>
     <color name="anime_blue_hair_background">#F8F7FB</color>
     <color name="anime_eyepatch_background">#BFD2DD</color>

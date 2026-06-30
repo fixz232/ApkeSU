@@ -9,18 +9,17 @@
     <string name="failed_to_update_app_profile">Cập nhật Hồ sơ ứng dụng cho %s thất bại</string>
     <string name="settings_umount_modules_default">Umount modules</string>
     <string name="settings_umount_modules_default_summary">Giá trị mặc định chung cho \"Umount modules\" trong Hồ sơ ứng dụng. Nếu được bật, mọi thay đổi hệ thống do các module gây ra sẽ bị gỡ bỏ khỏi hệ thống và các ứng dụng chưa thiết lập hồ sơ.</string>
-    <string name="profile_umount_modules_summary">Bật tùy chọn này sẽ cho phép EpkeSU khôi phục mọi file đã được các module sửa đổi trong ứng dụng này.</string>
+    <string name="profile_umount_modules_summary">Bật tùy chọn này sẽ cho phép ApkeSU khôi phục mọi file đã được các module sửa đổi trong ứng dụng này.</string>
     <string name="module_update">Cập nhật</string>
     <string name="module_downloading">Đang tải xuống module: %s</string>
     <string name="module_start_downloading">Bắt đầu tải xuống: %s</string>
     <string name="start_downloading">Bắt đầu tải xuống</string>
     <string name="download_failed">Tải xuống thất bại: %s</string>
     <string name="new_version_available">Phiên bản mới %s đã có sẵn, nhấn để cập nhật!</string>
-    <string name="home_learn_kernelsu">Tìm hiểu về EpkeSU</string>
-    <string name="home_click_to_learn_kernelsu">Tìm hiểu cách cài đặt EpkeSU và sử dụng các module.</string>
+    <string name="home_learn_kernelsu">Tìm hiểu về ApkeSU</string>
+    <string name="home_click_to_learn_kernelsu">Tìm hiểu cách cài đặt ApkeSU và sử dụng các module.</string>
     <string name="home_support_title">Ủng hộ chúng tôi</string>
-    <string name="home_support_content">EpkeSU sẽ luôn là miễn phí và mã nguồn mở. Tuy nhiên, bạn có thể cho chúng tôi thấy rằng bạn quan tâm bằng cách quyên góp!</string>
-    <string name="about_source_code"><![CDATA[Xem mã nguồn tại %1$s<br/>Tham gia kênh %2$s của chúng tôi]]></string>
+    <string name="home_support_content">ApkeSU sẽ luôn là miễn phí và mã nguồn mở. Tuy nhiên, bạn có thể cho chúng tôi thấy rằng bạn quan tâm bằng cách quyên góp!</string>
     <string name="module_magisk_conflict">Các module bị vô hiệu hoá do xung đột với Magisk!</string>
     <string name="module_uninstall_confirm">Bạn có THẬT SỰ muốn gỡ cài đặt module %s không?</string>
     <string name="send_log">Gửi nhật ký</string>
@@ -30,7 +29,7 @@
     <string name="home_working">Đang hoạt động</string>
     <string name="home_working_version">Phiên bản: %s</string>
     <string name="home_unsupported">Không được hỗ trợ</string>
-    <string name="home_unsupported_reason">EpkeSU hiện tại chỉ hỗ trợ Kernel GKI, nhưng bạn có thể patch file .img của thiết bị GKI mà bạn cần.</string>
+    <string name="home_unsupported_reason">ApkeSU hiện tại chỉ hỗ trợ Kernel GKI, nhưng bạn có thể patch file .img của thiết bị GKI mà bạn cần.</string>
     <string name="home_kernel">Phiên bản Kernel</string>
     <string name="home_manager_version">Phiên bản Trình quản lý</string>
     <string name="home_fingerprint">Fingerprint</string>
@@ -78,7 +77,7 @@
     <string name="profile_namespace_individual">Riêng biệt</string>
     <string name="profile_selinux_context">Ngữ cảnh SELinux</string>
     <string name="profile_umount_modules">Umount modules</string>
-    <string name="require_kernel_version">Phiên bản EpkeSU hiện tại %1$d quá thấp để Trình quản lý hoạt động bình thường. Vui lòng cập nhật lên phiên bản %2$d hoặc cao hơn!</string>
+    <string name="require_kernel_version">Phiên bản ApkeSU hiện tại %1$d quá thấp để Trình quản lý hoạt động bình thường. Vui lòng cập nhật lên phiên bản %2$d hoặc cao hơn!</string>
     <string name="app_profile_template_import_success">Đã nhập thành công</string>
     <string name="app_profile_export_to_clipboard">Xuất vào bộ nhớ tạm</string>
     <string name="app_profile_template_export_empty">Không tìm thấy mẫu cục bộ để xuất!</string>
@@ -111,7 +110,7 @@
     <string name="open">Mở</string>
     <string name="install_inactive_slot">Cài đặt vào phân vùng không hoạt động (Sau OTA)</string>
     <string name="install_inactive_slot_warning">Thiết bị của bạn sẽ **BUỘC** phải khởi động vào phân vùng không hoạt động hiện tại sau khi khởi động lại!\nChỉ dùng tùy chọn này khi cập nhật OTA đã hoàn tất!\nTiếp tục?</string>
-    <string name="settings_uninstall_temporary_message">Gỡ cài đặt tạm thời EpkeSU, khôi phục lại trạng thái ban đầu sau lần khởi động lại tiếp theo.</string>
+    <string name="settings_uninstall_temporary_message">Gỡ cài đặt tạm thời ApkeSU, khôi phục lại trạng thái ban đầu sau lần khởi động lại tiếp theo.</string>
     <string name="select_kmi">Chọn KMI</string>
     <string name="anykernel_install">Flashing AnyKernel</string>
     <string name="flash_module">Flashing Module</string>
@@ -122,8 +121,8 @@
     <string name="settings_uninstall_temporary">Gỡ cài đặt tạm thời</string>
     <string name="settings_uninstall_permanent">Gỡ cài đặt vĩnh viễn</string>
     <string name="settings_restore_stock_image">Khôi phục image gốc</string>
-    <string name="settings_uninstall_permanent_message">Gỡ cài đặt EpkeSU (root và tất cả các module) sạch hoàn toàn, trả về trạng thái ban đầu.</string>
-    <string name="settings_restore_stock_image_message">Khôi phục lại image gốc (nếu có bản sao lưu), thường được sử dụng trước OTA; nếu bạn cần gỡ hẳn EpkeSU, hãy sử dụng \"Gỡ cài đặt vĩnh viễn\".</string>
+    <string name="settings_uninstall_permanent_message">Gỡ cài đặt ApkeSU (root và tất cả các module) sạch hoàn toàn, trả về trạng thái ban đầu.</string>
+    <string name="settings_restore_stock_image_message">Khôi phục lại image gốc (nếu có bản sao lưu), thường được sử dụng trước OTA; nếu bạn cần gỡ hẳn ApkeSU, hãy sử dụng \"Gỡ cài đặt vĩnh viễn\".</string>
     <string name="flashing">Đang Flash…</string>
     <string name="flash_success">Flash thành công</string>
     <string name="flash_failed">Flash thất bại</string>
@@ -215,7 +214,7 @@
     <string name="color_amber">Hổ phách</string>
     <string name="color_blue_grey">Xám xanh</string>
     <string name="color_sakura">Hoa anh đào</string>
-    <string name="home_version_mismatch">Phiên bản Trình quản lý (%1$d) và phiên bản driver của EpkeSU (%2$d) không khớp.</string>
+    <string name="home_version_mismatch">Phiên bản Trình quản lý (%1$d) và phiên bản driver của ApkeSU (%2$d) không khớp.</string>
     <string name="reboot_soft">Khởi động lại mềm</string>
     <string name="jailbreak_mode">Chế độ Jailbreak</string>
     <string name="home_jailbreak">Jailbreak</string>
@@ -257,5 +256,5 @@
     <string name="download">Tải xuống</string>
     <string name="download_cancel">Hủy bỏ</string>
     <string name="download_install">Cài đặt</string>
-    <string name="profile_flags_desc_no_new_privs">Ngăn việc leo thang đặc quyền thêm thông qua EpkeSU trong ngữ cảnh của hồ sơ root này.</string>
+    <string name="profile_flags_desc_no_new_privs">Ngăn việc leo thang đặc quyền thêm thông qua ApkeSU trong ngữ cảnh của hồ sơ root này.</string>
 </resources>

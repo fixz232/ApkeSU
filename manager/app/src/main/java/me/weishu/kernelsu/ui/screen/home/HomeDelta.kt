@@ -98,8 +98,10 @@ fun HomePagerDelta(
                     DeltaWarningsCard(warnings = warnings)
                 }
             }
-            item {
-                DeltaSupportCard(actions = actions)
+            if (state.showHomeSupportCard) {
+                item {
+                    DeltaSupportCard(actions = actions)
+                }
             }
         }
     }

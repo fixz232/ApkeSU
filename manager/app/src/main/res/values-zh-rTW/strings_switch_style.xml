@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_switch_style">滑塊樣式</string>
+    <string name="settings_switch_style_summary">選擇所有開關使用的全域滑塊樣式。</string>
+    <string name="settings_switch_style_original">原滑塊</string>
+    <string name="settings_switch_style_sun_moon">日月</string>
+    <string name="settings_switch_style_capsule">膠囊</string>
+    <string name="settings_switch_style_minimal">極簡</string>
+    <string name="settings_switch_style_neon">霓虹</string>
+</resources>

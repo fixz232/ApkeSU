@@ -27,7 +27,6 @@ fun UninstallDialogMaterial(
 ) {
     val navigator = LocalNavigator.current
     val options = listOf(
-        // TEMPORARY,
         PERMANENT,
         RESTORE_STOCK_IMAGE
     )
@@ -38,7 +37,6 @@ fun UninstallDialogMaterial(
         when (type) {
             PERMANENT -> navigator.push(Route.Flash(FlashIt.FlashUninstall))
             RESTORE_STOCK_IMAGE -> navigator.push(Route.Flash(FlashIt.FlashRestore))
-            else -> Unit
         }
     }
 

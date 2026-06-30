@@ -15,7 +15,7 @@
     <string name="send_log">Saada logid</string>
     <string name="safe_mode">Turvarežiim</string>
     <string name="reboot_to_apply">Muudatuste rakendamiseks taaskäivita</string>
-    <string name="home_learn_kernelsu">Õpi EpkeSUd</string>
+    <string name="home_learn_kernelsu">Õpi ApkeSUd</string>
     <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
     <string name="profile_default">Vaikimisi</string>
     <string name="profile_namespace">Haagi nimeruum</string>
@@ -33,7 +33,7 @@
     <string name="home_click_to_install">Klõpsa paigaldamiseks</string>
     <string name="home_not_installed">Pole paigaldatud</string>
     <string name="home_unsupported">Mittetoetatud</string>
-    <string name="home_unsupported_reason">EpkeSU toetab hetkel vaid GSI tuumasid</string>
+    <string name="home_unsupported_reason">ApkeSU toetab hetkel vaid GSI tuumasid</string>
     <string name="home_selinux_status">SELinuxi olek</string>
     <string name="selinux_status_disabled">Keelatud</string>
     <string name="selinux_status_enforcing">Jõustav</string>
@@ -55,13 +55,11 @@
     <string name="module_version">Versioon</string>
     <string name="show_system_apps">Kuva süsteemirakendused</string>
     <string name="module_magisk_conflict">Moodulid pole saadaval Magiski konflikti tõttu!</string>
-    <string name="home_click_to_learn_kernelsu">Õpi EpkeSUd paigaldama ja mooduleid kasutama</string>
+    <string name="home_click_to_learn_kernelsu">Õpi ApkeSUd paigaldama ja mooduleid kasutama</string>
     <string name="home_support_title">Toeta meid</string>
     <string name="profile_groups">Grupid</string>
-    <string name="home_support_content">EpkeSU on, ja alati jääb, tasuta ning avatud lähtekoodiga kättesaadavaks. Sellegipoolest võid sa näidata, et hoolid, ning teha annetuse.</string>
+    <string name="home_support_content">ApkeSU on, ja alati jääb, tasuta ning avatud lähtekoodiga kättesaadavaks. Sellegipoolest võid sa näidata, et hoolid, ning teha annetuse.</string>
     <string name="profile_template">Mall</string>
-    <string name="about_source_code">Vaata lähtekoodi %1$sis<br/>
-Liitu meie %2$si kanaliga</string>
     <string name="profile_name">Profiili nimi</string>
     <string name="profile_custom">Kohandatud</string>
     <string name="profile_namespace_inherited">Päritud</string>
@@ -70,7 +68,7 @@ Liitu meie %2$si kanaliga</string>
     <string name="profile_capabilities">Võimekused</string>
     <string name="app_profile_template_id_invalid">Sobimatu malli ID</string>
     <string name="profile_selinux_context">SELinux kontekst</string>
-    <string name="require_kernel_version">Praegune EpkeSU versioon %1$d on liiga madal, haldur ei saa korrektselt töötada. Palun täienda versioonile %2$d või kõrgem!</string>
+    <string name="require_kernel_version">Praegune ApkeSU versioon %1$d on liiga madal, haldur ei saa korrektselt töötada. Palun täienda versioonile %2$d või kõrgem!</string>
     <string name="profile_selinux_domain">Domeen</string>
     <string name="launch_app">Käivita</string>
     <string name="force_stop_app">Sundpeata</string>
@@ -92,7 +90,7 @@ Liitu meie %2$si kanaliga</string>
     <string name="app_profile_template_save_failed">Malli salvestamine ebaõnnestus</string>
     <string name="app_profile_template_create">Loo mall</string>
     <string name="settings_profile_template_summary">Halda kohalikke ja võrgusolevaid rakenduseprofiili malle</string>
-    <string name="profile_umount_modules_summary">Selle valiku lubamine lubab EpkeSU-l taastada selle rakenduse moodulite poolt mistahes muudetud faile.</string>
+    <string name="profile_umount_modules_summary">Selle valiku lubamine lubab ApkeSU-l taastada selle rakenduse moodulite poolt mistahes muudetud faile.</string>
     <string name="app_profile_template_export_empty">Ei saa eksportida, kohalikku malli ei leitud!</string>
     <string name="settings_umount_modules_default_summary">Globaalne vaikeväärtus \"Lahtihaagitud moodulitele\" rakenduseprofiilis. Lubamisel eemaldab see kõik moodulite süsteemimuudatused rakendustele, millel ei ole profiili määratud.</string>
     <string name="enable_web_debugging_summary">Saab kasutada WebUI silumiseks, palun luba ainult vajadusel.</string>
@@ -107,9 +105,9 @@ Liitu meie %2$si kanaliga</string>
     <string name="install_next">Edasi</string>
     <string name="install_inactive_slot_warning">Sinu seade **SUNNITAKSE** pärast taaskäivitust ebaaktiivsesse lahtrisse käivituma!\nKasuta seda valikut vaid siis, kui tegid üle-õhu uuenduse.\nJätkad?</string>
     <string name="settings_uninstall">Eemalda</string>
-    <string name="settings_uninstall_temporary_message">Eemalda EpkeSU ajutiselt, taasta pärast taaskäivitust algseisu.</string>
-    <string name="settings_uninstall_permanent_message">EpkeSU eemaldamine (juurkasutaja ja kõik moodulid) täielikult ja püsivalt.</string>
-    <string name="settings_restore_stock_image_message">Taasta tehase-vaiketõmmis (kui varundus eksisteerib), tavaliselt kasutatakse enne üle-õhu uuendust; kui soovid EpkeSU-d eemaldada, palun kasuta \"Eemalda püsivalt\".</string>
+    <string name="settings_uninstall_temporary_message">Eemalda ApkeSU ajutiselt, taasta pärast taaskäivitust algseisu.</string>
+    <string name="settings_uninstall_permanent_message">ApkeSU eemaldamine (juurkasutaja ja kõik moodulid) täielikult ja püsivalt.</string>
+    <string name="settings_restore_stock_image_message">Taasta tehase-vaiketõmmis (kui varundus eksisteerib), tavaliselt kasutatakse enne üle-õhu uuendust; kui soovid ApkeSU-d eemaldada, palun kasuta \"Eemalda püsivalt\".</string>
     <string name="flashing">Välgutamine</string>
     <string name="flash_success">Välgutamine õnnestus</string>
     <string name="flash_failed">Välgutamine ebaõnnestus</string>
@@ -123,6 +121,6 @@ Liitu meie %2$si kanaliga</string>
     <string name="settings_sucompat">Suuna su binaarfail ümber</string>
     <string name="settings_sucompat_summary">Võimaldab rakendustel, kellele on antud Superuser luba rakenduse profiilis, saada superuser shell, käivitades /system/bin/su; kehtib ainult uute protsesside puhul.</string>
     <string name="settings_kernel_umount">Kernel umount</string>
-    <string name="settings_kernel_umount_summary">Kerneli tasemel lahtihaakimise käitumine, mida kontrollib EpkeSU</string>
-    <string name="profile_flags_desc_no_new_privs">Takistab õiguste edasist tõstmist EpkeSU kaudu selle root-profiili kontekstis.</string>
+    <string name="settings_kernel_umount_summary">Kerneli tasemel lahtihaakimise käitumine, mida kontrollib ApkeSU</string>
+    <string name="profile_flags_desc_no_new_privs">Takistab õiguste edasist tõstmist ApkeSU kaudu selle root-profiili kontekstis.</string>
 </resources>

@@ -1,6 +1,6 @@
-# EpkeSU OnePlus/Realme GKI Build Repository
+# ApkeSU OnePlus/Realme GKI Build Repository
 
-This repository can build EpkeSU GKI AnyKernel3 packages for OnePlus, OPPO/OPlus,
+This repository can build ApkeSU GKI AnyKernel3 packages for OnePlus, OPPO/OPlus,
 and Realme devices that match the GKI families used by these reference
 repositories:
 
@@ -30,7 +30,7 @@ The dedicated workflow is `.github/workflows/gki-oneplus-realme.yml`.
 2. Open `Actions`.
 3. Run `Build OnePlus/Realme GKI`.
 4. Choose `target_chip`.
-5. Choose `EpkeSU` or `EpkeSU+SUSFS`.
+5. Choose `ApkeSU` or `ApkeSU+SUSFS`.
 6. Download the uploaded `AnyKernel3` artifact after the workflow completes.
 
 The default patch level is `latest`. For the reference versions above, the
@@ -51,11 +51,11 @@ run. Each output artifact name includes `OnePlus-Realme-SM8650`,
 
 ## Notes
 
-This workflow intentionally reuses the existing EpkeSU GKI pipeline instead of
+This workflow intentionally reuses the existing ApkeSU GKI pipeline instead of
 copying the extra tuning patches from the reference repositories. That keeps the
-first EpkeSU build path focused on root integration, SUSFS, kernel branding, and
+first ApkeSU build path focused on root integration, SUSFS, kernel branding, and
 AnyKernel3 packaging. Add optional device tuning patches later only after one
-plain EpkeSU build boots on the target device.
+plain ApkeSU build boots on the target device.
 
 The MTK entries are GKI builds with matching chip-family labels and GKI patch
 levels. They do not copy the reference repositories' OKI device-source archive
