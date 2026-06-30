@@ -9,7 +9,9 @@ import me.weishu.kernelsu.ui.theme.ThemeAppearanceDefaults
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
@@ -47,6 +49,9 @@ data class SettingsUiState(
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
+    val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,
+    val globalScrollEffectEnabled: Boolean = false,
+    val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
     val themeSyncStrategy: ThemeSyncStrategy = ThemeSyncStrategy.SHARED,
     val customThemePresets: List<CustomThemePreset> = emptyList(),
     val enableWebDebugging: Boolean = false,
@@ -137,6 +142,9 @@ data class SettingsScreenActions(
     val onSetSwitchStyleIndex: (Int) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,
+    val onSetNightBackgroundEffectIndex: (Int) -> Unit,
+    val onSetGlobalScrollEffectEnabled: (Boolean) -> Unit,
+    val onSetGlobalScrollEffectIndex: (Int) -> Unit,
     val onSetUiModeIndex: (Int) -> Unit,
     val onOpenLauncherIcon: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,

@@ -53,7 +53,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.alpha.AlphaCard
 import me.weishu.kernelsu.ui.component.alpha.AlphaColors
@@ -129,6 +131,20 @@ fun SettingPagerAlpha(
                 AlphaSnowEffectPicker(
                     selectedEffect = uiState.globalSnowEffect,
                     onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
+                AlphaNightBackgroundEffectPicker(
+                    selectedEffect = uiState.nightBackgroundEffect,
+                    onEffectSelected = actions.onSetNightBackgroundEffectIndex,
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_scroll_animation),
+                    summary = stringResource(R.string.settings_scroll_animation_summary),
+                    checked = uiState.globalScrollEffectEnabled,
+                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled,
+                )
+                AlphaScrollEffectPicker(
+                    selectedEffect = uiState.globalScrollEffect,
+                    onEffectSelected = actions.onSetGlobalScrollEffectIndex,
                 )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_theme),
@@ -572,6 +588,106 @@ private fun AlphaSnowEffectPicker(
         ) {
             GlobalSnowEffect.entries.forEachIndexed { index, effect ->
                 val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(AlphaShapes.Control)
+                        .background(if (selected) AlphaColors.Accent else AlphaColors.SurfaceStrong)
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else AlphaColors.Muted,
+                        fontSize = alphaSp(13f, maxScale = 1.0f),
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlphaNightBackgroundEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_night_background_effect),
+            color = AlphaColors.Text,
+            fontSize = alphaSp(15f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            NightBackgroundEffect.entries.forEachIndexed { index, effect ->
+                val selected = NightBackgroundEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(AlphaShapes.Control)
+                        .background(if (selected) AlphaColors.Accent else AlphaColors.SurfaceStrong)
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else AlphaColors.Muted,
+                        fontSize = alphaSp(13f, maxScale = 1.0f),
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlphaScrollEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_scroll_animation_effect),
+            color = AlphaColors.Text,
+            fontSize = alphaSp(15f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            GlobalScrollEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalScrollEffect.fromValue(selectedEffect) == effect
                 Box(
                     modifier = Modifier
                         .height(34.dp)

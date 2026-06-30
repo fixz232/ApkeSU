@@ -19,7 +19,9 @@ import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.theme.ColorMode
@@ -72,6 +74,9 @@ class SettingsViewModel(
             val switchStyle = repo.switchStyle
             val globalSnowEnabled = repo.globalSnowEnabled
             val globalSnowEffect = repo.globalSnowEffect
+            val nightBackgroundEffect = repo.nightBackgroundEffect
+            val globalScrollEffectEnabled = repo.globalScrollEffectEnabled
+            val globalScrollEffect = repo.globalScrollEffect
             val themeSyncStrategy = repo.themeSyncStrategy
             val customThemePresets = repo.getCustomThemePresets()
             val enableWebDebugging = repo.enableWebDebugging
@@ -159,6 +164,9 @@ class SettingsViewModel(
                     switchStyle = switchStyle,
                     globalSnowEnabled = globalSnowEnabled,
                     globalSnowEffect = globalSnowEffect,
+                    nightBackgroundEffect = nightBackgroundEffect,
+                    globalScrollEffectEnabled = globalScrollEffectEnabled,
+                    globalScrollEffect = globalScrollEffect,
                     themeSyncStrategy = themeSyncStrategy,
                     customThemePresets = customThemePresets,
                     enableWebDebugging = enableWebDebugging,
@@ -331,6 +339,23 @@ class SettingsViewModel(
         val effect = GlobalSnowEffect.fromIndex(index)
         repo.globalSnowEffect = effect.value
         _uiState.update { it.copy(globalSnowEffect = effect.value) }
+    }
+
+    fun setNightBackgroundEffectIndex(index: Int) {
+        val effect = NightBackgroundEffect.fromIndex(index)
+        repo.nightBackgroundEffect = effect.value
+        _uiState.update { it.copy(nightBackgroundEffect = effect.value) }
+    }
+
+    fun setGlobalScrollEffectEnabled(enabled: Boolean) {
+        repo.globalScrollEffectEnabled = enabled
+        _uiState.update { it.copy(globalScrollEffectEnabled = enabled) }
+    }
+
+    fun setGlobalScrollEffectIndex(index: Int) {
+        val effect = GlobalScrollEffect.fromIndex(index)
+        repo.globalScrollEffect = effect.value
+        _uiState.update { it.copy(globalScrollEffect = effect.value) }
     }
 
     fun setLauncherIconByIndex(index: Int) {

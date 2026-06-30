@@ -54,7 +54,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.delta.DeltaCard
 import me.weishu.kernelsu.ui.component.delta.DeltaColors
@@ -132,6 +134,20 @@ fun SettingPagerDelta(
                 DeltaSnowEffectPicker(
                     selectedEffect = uiState.globalSnowEffect,
                     onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
+                DeltaNightBackgroundEffectPicker(
+                    selectedEffect = uiState.nightBackgroundEffect,
+                    onEffectSelected = actions.onSetNightBackgroundEffectIndex,
+                )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_scroll_animation),
+                    summary = stringResource(R.string.settings_scroll_animation_summary),
+                    checked = uiState.globalScrollEffectEnabled,
+                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled,
+                )
+                DeltaScrollEffectPicker(
+                    selectedEffect = uiState.globalScrollEffect,
+                    onEffectSelected = actions.onSetGlobalScrollEffectIndex,
                 )
                 DeltaColorVariantPicker(
                     selectedVariant = uiState.deltaColorVariant,
@@ -495,6 +511,102 @@ private fun DeltaSnowEffectPicker(
         ) {
             GlobalSnowEffect.entries.forEachIndexed { index, effect ->
                 val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                DeltaColorOption(
+                    text = stringResource(effect.labelRes),
+                    selected = selected,
+                    selectedBackground = DeltaColors.Accent,
+                    selectedForeground = Color.White,
+                    onClick = { onEffectSelected(index) },
+                    modifier = Modifier
+                        .height(30.dp)
+                        .width(96.dp)
+                        .padding(horizontal = 1.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeltaNightBackgroundEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_night_background_effect),
+            color = DeltaColors.Ink,
+            fontSize = deltaSp(14f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .clip(DeltaShapes.Control)
+                .background(DeltaColors.SurfaceDeep)
+                .horizontalScroll(rememberScrollState())
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NightBackgroundEffect.entries.forEachIndexed { index, effect ->
+                val selected = NightBackgroundEffect.fromValue(selectedEffect) == effect
+                DeltaColorOption(
+                    text = stringResource(effect.labelRes),
+                    selected = selected,
+                    selectedBackground = DeltaColors.Accent,
+                    selectedForeground = Color.White,
+                    onClick = { onEffectSelected(index) },
+                    modifier = Modifier
+                        .height(30.dp)
+                        .width(96.dp)
+                        .padding(horizontal = 1.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeltaScrollEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_scroll_animation_effect),
+            color = DeltaColors.Ink,
+            fontSize = deltaSp(14f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .clip(DeltaShapes.Control)
+                .background(DeltaColors.SurfaceDeep)
+                .horizontalScroll(rememberScrollState())
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GlobalScrollEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalScrollEffect.fromValue(selectedEffect) == effect
                 DeltaColorOption(
                     text = stringResource(effect.labelRes),
                     selected = selected,

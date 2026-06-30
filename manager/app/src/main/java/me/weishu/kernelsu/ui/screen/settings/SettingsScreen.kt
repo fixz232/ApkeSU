@@ -110,6 +110,9 @@ fun SettingPager(
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
         onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
+        onSetNightBackgroundEffectIndex = viewModel::setNightBackgroundEffectIndex,
+        onSetGlobalScrollEffectEnabled = viewModel::setGlobalScrollEffectEnabled,
+        onSetGlobalScrollEffectIndex = viewModel::setGlobalScrollEffectIndex,
         onSetUiModeIndex = { index ->
             viewModel.setUiMode(InterfaceStyle.fromIndex(index).value)
         },

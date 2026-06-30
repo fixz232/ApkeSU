@@ -72,7 +72,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
@@ -254,6 +256,35 @@ private fun SettingsMaterialContent(
                     items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
                     selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
                     onItemSelected = actions.onSetGlobalSnowEffectIndex
+                )
+            }
+            add {
+                SegmentedDropdownItem(
+                    icon = Icons.Filled.Visibility,
+                    title = stringResource(id = R.string.settings_night_background_effect),
+                    summary = stringResource(id = R.string.settings_night_background_effect_summary),
+                    items = NightBackgroundEffect.entries.map { stringResource(it.labelRes) },
+                    selectedIndex = NightBackgroundEffect.selectedIndex(uiState.nightBackgroundEffect),
+                    onItemSelected = actions.onSetNightBackgroundEffectIndex
+                )
+            }
+            add {
+                SegmentedSwitchItem(
+                    icon = Icons.Filled.PlayCircle,
+                    title = stringResource(id = R.string.settings_scroll_animation),
+                    summary = stringResource(id = R.string.settings_scroll_animation_summary),
+                    checked = uiState.globalScrollEffectEnabled,
+                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled
+                )
+            }
+            add {
+                SegmentedDropdownItem(
+                    icon = Icons.Filled.PlayCircle,
+                    title = stringResource(id = R.string.settings_scroll_animation_effect),
+                    summary = stringResource(id = R.string.settings_scroll_animation_effect_summary),
+                    items = GlobalScrollEffect.entries.map { stringResource(it.labelRes) },
+                    selectedIndex = GlobalScrollEffect.selectedIndex(uiState.globalScrollEffect),
+                    onItemSelected = actions.onSetGlobalScrollEffectIndex
                 )
             }
             add {

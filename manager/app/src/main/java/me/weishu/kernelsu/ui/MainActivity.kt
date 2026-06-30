@@ -82,8 +82,11 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
+import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
 import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.NightBackgroundEffectOverlay
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.bottombar.BottomBar
@@ -93,6 +96,8 @@ import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
+import me.weishu.kernelsu.ui.component.globalScrollEffectController
+import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.navigation3.HandleDeepLink
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Navigator
@@ -133,6 +138,8 @@ import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
 import me.weishu.kernelsu.ui.util.KernelStatusEvents
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
+import me.weishu.kernelsu.ui.util.LocalScrollAnimation
+import me.weishu.kernelsu.ui.util.LocalScrollAnimationEffect
 import me.weishu.kernelsu.ui.util.ManagerUpdateChecker
 import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
 import me.weishu.kernelsu.ui.util.getFileName
@@ -251,6 +258,8 @@ class MainActivity : ComponentActivity() {
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
+                LocalScrollAnimation provides uiState.globalScrollEffectEnabled,
+                LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(uiState.globalScrollEffect),
             ) {
                 KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
                     HandleDeepLink(intentState = intentState.collectAsStateWithLifecycle())
@@ -323,8 +332,16 @@ class MainActivity : ComponentActivity() {
                     }
                     val globalGlassBackdrop = rememberBlurBackdrop(effectiveEnableBlur)
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage)
+                    val globalScrollEffectState = rememberGlobalScrollEffectState(
+                        enabled = uiState.globalScrollEffectEnabled,
+                        effectValue = uiState.globalScrollEffect,
+                    )
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .globalScrollEffectController(globalScrollEffectState)
+                    ) {
                         CustomWallpaperRoot(
                             uriString = effectiveBackground.wallpaperUriString,
                             videoUriString = effectiveBackground.videoUriString,
@@ -334,24 +351,32 @@ class MainActivity : ComponentActivity() {
                             passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
                         ) {
-                            CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
-                                Box(
-                                    modifier = Modifier
-                                        .customClickSound(clickSoundUri, clickSoundVolume)
-                                        .then(
-                                            if (globalGlassBackdrop != null) {
-                                                Modifier.layerBackdrop(globalGlassBackdrop)
-                                            } else {
-                                                Modifier
-                                            }
-                                        )
-                                ) {
-                                    when (uiMode) {
-                                        UiMode.Material -> androidx.compose.material3.Scaffold(
-                                            containerColor = Color.Transparent
-                                        ) { navDisplay() }
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                NightBackgroundEffectOverlay(
+                                    enabled = darkMode,
+                                    effectValue = uiState.nightBackgroundEffect,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                                CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .customClickSound(clickSoundUri, clickSoundVolume)
+                                            .then(
+                                                if (globalGlassBackdrop != null) {
+                                                    Modifier.layerBackdrop(globalGlassBackdrop)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                    ) {
+                                        when (uiMode) {
+                                            UiMode.Material -> androidx.compose.material3.Scaffold(
+                                                containerColor = Color.Transparent
+                                            ) { navDisplay() }
 
-                                        UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { navDisplay() }
+                                            UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { navDisplay() }
+                                        }
                                     }
                                 }
                             }
@@ -360,6 +385,11 @@ class MainActivity : ComponentActivity() {
                         GlobalSnowEffectOverlay(
                             enabled = uiState.globalSnowEnabled,
                             effectValue = uiState.globalSnowEffect,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
+                        GlobalScrollEffectOverlay(
+                            state = globalScrollEffectState,
                             modifier = Modifier.fillMaxSize(),
                         )
 

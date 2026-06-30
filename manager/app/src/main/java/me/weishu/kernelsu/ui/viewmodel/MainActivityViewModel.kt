@@ -13,9 +13,14 @@ import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.AppSettings
@@ -90,6 +95,9 @@ class MainActivityViewModel(
             switchStyle = settingRepo.switchStyle,
             globalSnowEnabled = settingRepo.globalSnowEnabled,
             globalSnowEffect = settingRepo.globalSnowEffect,
+            nightBackgroundEffect = settingRepo.nightBackgroundEffect,
+            globalScrollEffectEnabled = settingRepo.globalScrollEffectEnabled,
+            globalScrollEffect = settingRepo.globalScrollEffect,
             uiMode = UiMode.fromValue(interfaceStyle),
             interfaceStyle = interfaceStyle,
             customWallpaperUri = settingRepo.customWallpaperUri,
@@ -129,6 +137,9 @@ class MainActivityViewModel(
             switchStyle = SwitchStyle.DEFAULT_VALUE,
             globalSnowEnabled = false,
             globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
+            nightBackgroundEffect = NightBackgroundEffect.DEFAULT_VALUE,
+            globalScrollEffectEnabled = false,
+            globalScrollEffect = GlobalScrollEffect.DEFAULT_VALUE,
             uiMode = UiMode.fromValue(InterfaceStyle.Miuix.value),
             interfaceStyle = InterfaceStyle.Miuix.value,
             customWallpaperUri = null,
@@ -167,6 +178,9 @@ class MainActivityViewModel(
             SWITCH_STYLE_KEY,
             GLOBAL_SNOW_ENABLED_KEY,
             GLOBAL_SNOW_EFFECT_KEY,
+            NIGHT_BACKGROUND_EFFECT_KEY,
+            GLOBAL_SCROLL_EFFECT_ENABLED_KEY,
+            GLOBAL_SCROLL_EFFECT_KEY,
             DELTA_COLOR_VARIANT_KEY,
             "custom_wallpaper_uri",
             "custom_wallpaper_opacity",

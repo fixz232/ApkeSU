@@ -77,7 +77,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
@@ -281,6 +283,50 @@ fun SettingPagerMiuix(
                             },
                             selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
                             onSelectedIndexChange = actions.onSetGlobalSnowEffectIndex
+                        )
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.settings_night_background_effect),
+                            summary = stringResource(id = R.string.settings_night_background_effect_summary),
+                            items = NightBackgroundEffect.entries.map { stringResource(it.labelRes) },
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Visibility,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_night_background_effect),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            selectedIndex = NightBackgroundEffect.selectedIndex(uiState.nightBackgroundEffect),
+                            onSelectedIndexChange = actions.onSetNightBackgroundEffectIndex
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_scroll_animation),
+                            summary = stringResource(id = R.string.settings_scroll_animation_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.PlayCircle,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_scroll_animation),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            checked = uiState.globalScrollEffectEnabled,
+                            onCheckedChange = actions.onSetGlobalScrollEffectEnabled
+                        )
+                        OverlayDropdownPreference(
+                            title = stringResource(id = R.string.settings_scroll_animation_effect),
+                            summary = stringResource(id = R.string.settings_scroll_animation_effect_summary),
+                            items = GlobalScrollEffect.entries.map { stringResource(it.labelRes) },
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.PlayCircle,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_scroll_animation_effect),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            selectedIndex = GlobalScrollEffect.selectedIndex(uiState.globalScrollEffect),
+                            onSelectedIndexChange = actions.onSetGlobalScrollEffectIndex
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_theme),
@@ -1053,7 +1099,7 @@ private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 9
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    var count = 16
+    var count = 19
     if (customStartupAnimationUri != null) count += 2
 
     return count

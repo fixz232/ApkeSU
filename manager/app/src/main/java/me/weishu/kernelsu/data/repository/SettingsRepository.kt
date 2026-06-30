@@ -3,6 +3,7 @@ package me.weishu.kernelsu.data.repository
 import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.util.BuiltinMountStatus
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
@@ -37,6 +38,9 @@ interface SettingsRepository {
     var switchStyle: String
     var globalSnowEnabled: Boolean
     var globalSnowEffect: String
+    var nightBackgroundEffect: String
+    var globalScrollEffectEnabled: Boolean
+    var globalScrollEffect: String
     var themeSyncStrategy: ThemeSyncStrategy
     var enableWebDebugging: Boolean
     var autoJailbreak: Boolean

@@ -52,7 +52,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
@@ -131,6 +133,20 @@ fun SettingPagerSkrootpro(
                 SkrootproSnowEffectPicker(
                     selectedEffect = uiState.globalSnowEffect,
                     onEffectSelected = actions.onSetGlobalSnowEffectIndex,
+                )
+                SkrootproNightBackgroundEffectPicker(
+                    selectedEffect = uiState.nightBackgroundEffect,
+                    onEffectSelected = actions.onSetNightBackgroundEffectIndex,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_scroll_animation),
+                    summary = stringResource(R.string.settings_scroll_animation_summary),
+                    checked = uiState.globalScrollEffectEnabled,
+                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled,
+                )
+                SkrootproScrollEffectPicker(
+                    selectedEffect = uiState.globalScrollEffect,
+                    onEffectSelected = actions.onSetGlobalScrollEffectIndex,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_theme),
@@ -513,6 +529,118 @@ private fun SkrootproSnowEffectPicker(
         ) {
             GlobalSnowEffect.entries.forEachIndexed { index, effect ->
                 val selected = GlobalSnowEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .background(
+                            color = if (selected) SkrootproColors.Purple else Color.Transparent,
+                            shape = CircleShape,
+                        )
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else SkrootproColors.Muted,
+                        fontSize = skrootproSp(13f, maxScale = 1.0f),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkrootproNightBackgroundEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_night_background_effect),
+            color = SkrootproColors.Text,
+            fontSize = skrootproSp(15f, maxScale = 1.04f),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(SkrootproColors.BarSurface, CircleShape)
+                .horizontalScroll(rememberScrollState())
+                .padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NightBackgroundEffect.entries.forEachIndexed { index, effect ->
+                val selected = NightBackgroundEffect.fromValue(selectedEffect) == effect
+                Box(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .background(
+                            color = if (selected) SkrootproColors.Purple else Color.Transparent,
+                            shape = CircleShape,
+                        )
+                        .clickable { onEffectSelected(index) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(effect.labelRes),
+                        color = if (selected) Color.White else SkrootproColors.Muted,
+                        fontSize = skrootproSp(13f, maxScale = 1.0f),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkrootproScrollEffectPicker(
+    selectedEffect: String,
+    onEffectSelected: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_scroll_animation_effect),
+            color = SkrootproColors.Text,
+            fontSize = skrootproSp(15f, maxScale = 1.04f),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(SkrootproColors.BarSurface, CircleShape)
+                .horizontalScroll(rememberScrollState())
+                .padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            GlobalScrollEffect.entries.forEachIndexed { index, effect ->
+                val selected = GlobalScrollEffect.fromValue(selectedEffect) == effect
                 Box(
                     modifier = Modifier
                         .height(34.dp)

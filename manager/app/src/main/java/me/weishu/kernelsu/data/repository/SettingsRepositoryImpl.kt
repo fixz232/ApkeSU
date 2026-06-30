@@ -11,9 +11,14 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.magica.BootCompletedReceiver
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
@@ -234,6 +239,26 @@ class SettingsRepositoryImpl : SettingsRepository {
         ).value
         set(value) = prefs.edit {
             putString(GLOBAL_SNOW_EFFECT_KEY, GlobalSnowEffect.fromValue(value).value)
+        }
+
+    override var nightBackgroundEffect: String
+        get() = NightBackgroundEffect.fromValue(
+            prefs.getString(NIGHT_BACKGROUND_EFFECT_KEY, NightBackgroundEffect.DEFAULT_VALUE)
+        ).value
+        set(value) = prefs.edit {
+            putString(NIGHT_BACKGROUND_EFFECT_KEY, NightBackgroundEffect.fromValue(value).value)
+        }
+
+    override var globalScrollEffectEnabled: Boolean
+        get() = prefs.getBoolean(GLOBAL_SCROLL_EFFECT_ENABLED_KEY, false)
+        set(value) = prefs.edit { putBoolean(GLOBAL_SCROLL_EFFECT_ENABLED_KEY, value) }
+
+    override var globalScrollEffect: String
+        get() = GlobalScrollEffect.fromValue(
+            prefs.getString(GLOBAL_SCROLL_EFFECT_KEY, GlobalScrollEffect.DEFAULT_VALUE)
+        ).value
+        set(value) = prefs.edit {
+            putString(GLOBAL_SCROLL_EFFECT_KEY, GlobalScrollEffect.fromValue(value).value)
         }
 
     override var themeSyncStrategy: ThemeSyncStrategy
