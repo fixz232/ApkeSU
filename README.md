@@ -4,6 +4,8 @@
 
 ![少羽](https://github.com/user-attachments/assets/0068bcf6-fd69-47e7-a5b6-b939c9c50625)
 
+![少羽2](assets/shaoyu2.png)
+
 - **2018** — 少羽杀穿整个自闭城
 - **2019** — 身法创始人
 - **2020** — 双排 9000 淘汰分封顶
