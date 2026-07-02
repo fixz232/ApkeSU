@@ -7,10 +7,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -126,6 +129,10 @@ internal fun InstallScreenMaterial(
                                     } ?: stringResource(R.string.hidden_path_lkm_builtin_summary)
                                 )
                             },
+                            trailingContent = {
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                            },
+                            onClick = actions.onSelectHiddenPathKmi,
                         )
                     } else add {
                         SegmentedListItem(
@@ -222,6 +229,11 @@ internal fun InstallScreenMaterial(
                 enabled = uiState.canInstall,
                 onClick = actions.onNext
             ) { Text(stringResource(R.string.install_next)) }
+            Spacer(
+                modifier = Modifier.height(
+                    WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() + 12.dp
+                )
+            )
         }
     }
 }

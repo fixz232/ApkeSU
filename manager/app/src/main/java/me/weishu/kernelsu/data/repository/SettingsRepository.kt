@@ -39,6 +39,8 @@ interface SettingsRepository {
     var globalSnowEnabled: Boolean
     var globalSnowEffect: String
     var nightBackgroundEffect: String
+    var nightBackgroundPassthrough: Boolean
+    var nightBackgroundPassthroughOpacity: Float
     var globalScrollEffectEnabled: Boolean
     var globalScrollEffect: String
     var themeSyncStrategy: ThemeSyncStrategy

@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -238,7 +237,10 @@ private fun OptionalSettingsCard(
                 )
             }
             if (state.installMethod is InstallMethod.HiddenPathLkmPatch) {
-                HiddenPathLkmInfoRow(lkmSelection = state.lkmSelection)
+                HiddenPathLkmInfoRow(
+                    lkmSelection = state.lkmSelection,
+                    onSelectKmi = actions.onSelectHiddenPathKmi,
+                )
             } else {
                 LocalLkmFileRow(
                     lkmSelection = state.lkmSelection,
@@ -321,13 +323,14 @@ private fun LocalLkmFileRow(
 @Composable
 private fun HiddenPathLkmInfoRow(
     lkmSelection: LkmSelection,
+    onSelectKmi: () -> Unit,
 ) {
     BasicComponent(
         title = stringResource(id = R.string.hidden_path_lkm_builtin_title),
         summary = (lkmSelection as? LkmSelection.PathMaskKmiString)?.let {
             stringResource(id = R.string.hidden_path_lkm_selected_kmi, it.value)
         } ?: stringResource(id = R.string.hidden_path_lkm_builtin_summary),
-        onClick = {},
+        onClick = onSelectKmi,
         startAction = {
             Icon(
                 MiuixIcons.MoveFile,
@@ -335,6 +338,9 @@ private fun HiddenPathLkmInfoRow(
                 modifier = Modifier.padding(end = 12.dp),
                 contentDescription = null
             )
+        },
+        endActions = {
+            TrailingArrow()
         },
     )
 }
@@ -481,7 +487,7 @@ private fun SelectFileCard(
     val hasFile = selectedFileName != null
     val statusText = selectedFileName ?: stringResource(R.string.install_file_not_selected)
     val statusColor = if (hasFile) Color(0xFF1FAF55) else colorScheme.primary
-    val summary = if (selected) (selectedMethod?.summary ?: option.summary) else option.summary
+    val summary = option.summary
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -531,32 +537,28 @@ private fun SelectFileCard(
                 .padding(start = 14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Row(
+            Text(
+                text = stringResource(id = option.label),
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = stringResource(id = option.label),
-                    modifier = Modifier.weight(1f),
-                    color = colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                StatusPill(
-                    text = statusText,
-                    color = statusColor,
-                    modifier = Modifier.widthIn(max = 132.dp),
-                )
-            }
+                color = colorScheme.onSurface,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            StatusPill(
+                text = statusText,
+                color = statusColor,
+                modifier = Modifier.fillMaxWidth(),
+            )
             summary?.let {
                 Text(
                     text = it,
                     color = colorScheme.onSurfaceVariantSummary,
                     fontSize = 14.sp,
                     lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             BootImageTip()
@@ -600,6 +602,7 @@ private fun StatusPill(
         }
         Text(
             text = text,
+            modifier = Modifier.weight(1f),
             color = color,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,

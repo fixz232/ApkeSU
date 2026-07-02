@@ -20,8 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.DeveloperMode
-import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
@@ -56,6 +56,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
+import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.delta.DeltaCard
@@ -121,33 +123,11 @@ fun SettingPagerDelta(
                         )
                     },
                 )
-                DeltaSwitchStylePicker(
-                    selectedStyle = uiState.switchStyle,
-                    onStyleSelected = actions.onSetSwitchStyleIndex,
-                )
-                DeltaSwitchRow(
-                    title = stringResource(R.string.settings_global_snow),
-                    summary = stringResource(R.string.settings_global_snow_summary),
-                    checked = uiState.globalSnowEnabled,
-                    onCheckedChange = actions.onSetGlobalSnowEnabled,
-                )
-                DeltaSnowEffectPicker(
-                    selectedEffect = uiState.globalSnowEffect,
-                    onEffectSelected = actions.onSetGlobalSnowEffectIndex,
-                )
-                DeltaNightBackgroundEffectPicker(
-                    selectedEffect = uiState.nightBackgroundEffect,
-                    onEffectSelected = actions.onSetNightBackgroundEffectIndex,
-                )
-                DeltaSwitchRow(
-                    title = stringResource(R.string.settings_scroll_animation),
-                    summary = stringResource(R.string.settings_scroll_animation_summary),
-                    checked = uiState.globalScrollEffectEnabled,
-                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled,
-                )
-                DeltaScrollEffectPicker(
-                    selectedEffect = uiState.globalScrollEffect,
-                    onEffectSelected = actions.onSetGlobalScrollEffectIndex,
+                DeltaActionRow(
+                    title = stringResource(R.string.settings_section_visual_effects),
+                    summary = stringResource(R.string.settings_visual_effects_summary),
+                    icon = Icons.Rounded.Visibility,
+                    onClick = actions.onOpenVisualEffects,
                 )
                 DeltaColorVariantPicker(
                     selectedVariant = uiState.deltaColorVariant,
@@ -166,21 +146,8 @@ fun SettingPagerDelta(
                     onClick = actions.onOpenThemeStore,
                 )
                 DeltaActionRow(
-                    title = stringResource(R.string.settings_manager_name),
-                    summary = if (uiState.customManagerName.isBlank()) {
-                        stringResource(
-                            R.string.settings_manager_name_default_summary,
-                            stringResource(R.string.app_name)
-                        )
-                    } else {
-                        stringResource(R.string.settings_manager_name_custom_summary, uiState.customManagerName)
-                    },
-                    icon = Icons.Rounded.EditNote,
-                    onClick = actions.onEditCustomManagerName,
-                )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_app_icon),
-                    summary = stringResource(R.string.settings_app_icon_summary),
+                    title = stringResource(R.string.settings_manager_identity),
+                    summary = stringResource(R.string.settings_manager_identity_summary),
                     icon = Icons.Rounded.Apps,
                     onClick = actions.onOpenLauncherIcon,
                 )
@@ -227,21 +194,8 @@ fun SettingPagerDelta(
                         }
                     ),
                     icon = Icons.Rounded.PlayCircle,
-                    onClick = actions.onPickStartupAnimation,
+                    onClick = actions.onOpenStartupAnimation,
                 )
-                if (uiState.customStartupAnimationUri != null) {
-                    DeltaActionRow(
-                        title = stringResource(R.string.settings_startup_animation_preview),
-                        summary = "",
-                        icon = Icons.Rounded.Visibility,
-                        onClick = actions.onPreviewStartupAnimation,
-                    )
-                    DeltaActionRow(
-                        title = stringResource(R.string.settings_startup_animation_clear),
-                        summary = "",
-                        onClick = actions.onClearStartupAnimation,
-                    )
-                }
             }
 
             DeltaSettingsSection(
@@ -353,6 +307,12 @@ fun SettingPagerDelta(
                     icon = Icons.Rounded.Visibility,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
+                DeltaActionRow(
+                    title = stringResource(R.string.settings_ai_chat),
+                    summary = stringResource(R.string.settings_ai_chat_summary),
+                    icon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenAiChat,
+                )
                 DeltaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
                     summary = stringResource(R.string.enable_web_debugging_summary),
@@ -429,6 +389,19 @@ private fun DeltaColorVariantPicker(
             )
         }
     }
+}
+
+@Composable
+private fun DeltaInlineSectionLabel(text: String) {
+    Text(
+        text = text,
+        color = DeltaColors.Accent,
+        fontSize = deltaSp(12.5f),
+        fontWeight = FontWeight.Black,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

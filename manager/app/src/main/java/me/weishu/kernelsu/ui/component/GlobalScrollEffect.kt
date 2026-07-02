@@ -1,7 +1,6 @@
 package me.weishu.kernelsu.ui.component
 
 import android.os.SystemClock
-import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -34,7 +33,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -83,12 +81,11 @@ fun rememberGlobalScrollEffectState(
     enabled: Boolean,
     effectValue: String,
 ): GlobalScrollEffectState {
-    val animationsEnabled = systemAnimationsEnabled()
     val state = remember { GlobalScrollEffectState() }
     val effect = GlobalScrollEffect.fromValue(effectValue)
 
     SideEffect {
-        state.updateConfig(enabled = enabled && animationsEnabled, effect = effect)
+        state.updateConfig(enabled = enabled, effect = effect)
     }
 
     LaunchedEffect(state.enabled, state.effect, state.spawnVersion) {
@@ -111,11 +108,14 @@ fun Modifier.globalScrollEffectController(state: GlobalScrollEffectState): Modif
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 state.updatePointer(down.position)
+                var previousPosition = down.position
                 do {
                     val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                     val current = event.changes.firstOrNull { it.pressed }
                     if (current != null) {
                         state.updatePointer(current.position)
+                        state.emitFromPointerDrag(current.position - previousPosition)
+                        previousPosition = current.position
                     }
                 } while (event.changes.any { it.pressed })
             }
@@ -209,6 +209,16 @@ class GlobalScrollEffectState {
 
     fun updatePointer(position: Offset) {
         lastPointer = position
+    }
+
+    fun emitFromPointerDrag(delta: Offset) {
+        val magnitude = hypot(delta.x.toDouble(), delta.y.toDouble()).toFloat()
+        if (magnitude < POINTER_DRAG_THRESHOLD) return
+
+        emit(
+            delta = delta,
+            strength = (magnitude / 42f).coerceIn(0.5f, 1.15f),
+        )
     }
 
     fun hasPulses(): Boolean {
@@ -437,20 +447,6 @@ private fun DrawScope.drawAuroraPulse(
     }
 }
 
-@Composable
-private fun systemAnimationsEnabled(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
-        runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver,
-                Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) != 0f
-        }.getOrDefault(true)
-    }
-}
-
 private fun durationFor(effect: GlobalScrollEffect): Int {
     return when (effect) {
         GlobalScrollEffect.Trail -> 460
@@ -482,6 +478,7 @@ private fun easeOutQuart(value: Float): Float {
 
 private const val MAX_PULSES = 32
 private const val SCROLL_THRESHOLD = 4f
+private const val POINTER_DRAG_THRESHOLD = 7f
 private const val FLING_THRESHOLD = 900f
 private const val FLING_DELTA = 42f
 private const val MIN_SPAWN_INTERVAL_MILLIS = 34L

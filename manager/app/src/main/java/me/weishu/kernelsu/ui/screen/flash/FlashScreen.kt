@@ -32,7 +32,7 @@ fun FlashScreen(flashIt: FlashIt) {
     val logContent = remember { StringBuilder() }
     var showRebootAction by rememberSaveable { mutableStateOf(false) }
     var flashingStatus by rememberSaveable { mutableStateOf(FlashingStatus.FLASHING) }
-    val needJailbreakWarning = flashIt is FlashIt.FlashBoot && Natives.isLateLoadMode
+    val needJailbreakWarning = flashIt.needsJailbreakFlashWarning() && Natives.isLateLoadMode
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
     val uiMode = LocalUiMode.current
     val snackbarHost = remember { SnackbarHostState() }
@@ -68,7 +68,7 @@ fun FlashScreen(flashIt: FlashIt) {
     )
     val actions = FlashScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
-        onSaveLog = saveLog(logContent, scope, logSavedMessage, logSaveFailedMessage) {
+        onSaveLog = saveLog(context, logContent, scope, logSavedMessage, logSaveFailedMessage) {
             showMessage(it)
         },
         onReboot = {

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.AppSettings
@@ -24,6 +25,8 @@ data class MainActivityUiState(
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,
+    val nightBackgroundPassthrough: Boolean = false,
+    val nightBackgroundPassthroughOpacity: Float = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
     val globalScrollEffectEnabled: Boolean = false,
     val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
     val uiMode: UiMode,

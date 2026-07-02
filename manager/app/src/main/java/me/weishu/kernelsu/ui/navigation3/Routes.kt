@@ -66,11 +66,23 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object StartupAnimation : Route
+
+    @Parcelize
+    @Serializable
     data object HomeCardWallpapers : Route
 
     @Parcelize
     @Serializable
+    data object VisualEffects : Route
+
+    @Parcelize
+    @Serializable
     data object HiddenPathConfig : Route
+
+    @Parcelize
+    @Serializable
+    data object AiChat : Route
 
     @Parcelize
     @Serializable

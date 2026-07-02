@@ -19,8 +19,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -62,7 +60,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -117,10 +114,13 @@ import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
+import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
+import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
+import me.weishu.kernelsu.ui.screen.settings.VisualEffectsScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
@@ -303,8 +303,11 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.NavigationIcons> { NavigationIconScreen() }
                                 entry<Route.Backgrounds> { BackgroundSettingsScreen() }
                                 entry<Route.SoundEffects> { SoundEffectsScreen() }
+                                entry<Route.StartupAnimation> { StartupAnimationScreen() }
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
+                                entry<Route.VisualEffects> { VisualEffectsScreen() }
                                 entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
+                                entry<Route.AiChat> { AiChatScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
@@ -331,7 +334,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     val globalGlassBackdrop = rememberBlurBackdrop(effectiveEnableBlur)
-                    val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage)
+                    val currentRoute = navigator.current() as? Route
+                    val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
                     val globalScrollEffectState = rememberGlobalScrollEffectState(
                         enabled = uiState.globalScrollEffectEnabled,
                         effectValue = uiState.globalScrollEffect,
@@ -352,11 +356,14 @@ class MainActivity : ComponentActivity() {
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                NightBackgroundEffectOverlay(
-                                    enabled = darkMode,
-                                    effectValue = uiState.nightBackgroundEffect,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                                if (!uiState.nightBackgroundPassthrough) {
+                                    NightBackgroundEffectOverlay(
+                                        enabled = darkMode,
+                                        effectValue = uiState.nightBackgroundEffect,
+                                        passthrough = false,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
                                 CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
                                     Box(
                                         modifier = Modifier
@@ -380,6 +387,16 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                        }
+
+                        if (uiState.nightBackgroundPassthrough) {
+                            NightBackgroundEffectOverlay(
+                                enabled = darkMode,
+                                effectValue = uiState.nightBackgroundEffect,
+                                passthrough = true,
+                                passthroughOpacity = uiState.nightBackgroundPassthroughOpacity,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
 
                         GlobalSnowEffectOverlay(
@@ -434,7 +451,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun MainActivityUiState.effectiveCustomBackground(mainPage: Int): CustomBackgroundState {
+private fun MainActivityUiState.effectiveCustomBackground(
+    mainPage: Int,
+    currentRoute: Route?,
+): CustomBackgroundState {
+    val routeBackground = when (currentRoute) {
+        Route.Install -> customPageBackgrounds[CustomPageBackgroundTarget.Install]
+        else -> null
+    }?.takeIf { it.hasMedia }
+    if (routeBackground != null) {
+        return routeBackground
+    }
+
     val pageBackground = CustomPageBackgroundTarget.fromMainPageIndex(mainPage)
         ?.let { customPageBackgrounds[it] }
         ?.takeIf { it.hasMedia }
@@ -534,8 +562,9 @@ private fun Modifier.customClickSound(uriString: String?, volume: Float): Modifi
     }
 }
 
-private const val NAV_TRANSITION_DURATION_MS = 220
-private const val NAV_EXIT_TRANSITION_DURATION_MS = 170
+private const val NAV_ENTER_TRANSITION_DURATION_MS = 120
+private const val NAV_ENTER_TRANSITION_DELAY_MS = 70
+private const val NAV_EXIT_TRANSITION_DURATION_MS = 100
 private const val MAX_MANAGER_UPDATE_CHANGELOG_LENGTH = 4000
 private const val TAG = "MainActivity"
 
@@ -549,55 +578,37 @@ private fun <T : Any> stableNavPopTransition(): AnimatedContentTransitionScope<S
 
 private fun stableNavForwardTransitionContentTransform(): ContentTransform {
     val enterAlphaSpec = tween<Float>(
-        durationMillis = NAV_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
-    val enterOffsetSpec = tween<IntOffset>(
-        durationMillis = NAV_TRANSITION_DURATION_MS,
+        durationMillis = NAV_ENTER_TRANSITION_DURATION_MS,
+        delayMillis = NAV_ENTER_TRANSITION_DELAY_MS,
         easing = FastOutSlowInEasing,
     )
     val exitAlphaSpec = tween<Float>(
         durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
         easing = FastOutSlowInEasing,
     )
-    val exitOffsetSpec = tween<IntOffset>(
-        durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec) +
-            slideInHorizontally(animationSpec = enterOffsetSpec) { width -> width / 10 },
-        initialContentExit = fadeOut(animationSpec = exitAlphaSpec) +
-            slideOutHorizontally(animationSpec = exitOffsetSpec) { width -> -width / 16 },
-        targetContentZIndex = 0f,
-        sizeTransform = SizeTransform(clip = false),
+        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec),
+        initialContentExit = fadeOut(animationSpec = exitAlphaSpec),
+        targetContentZIndex = 1f,
+        sizeTransform = SizeTransform(clip = true),
     )
 }
 
 private fun stableNavPopTransitionContentTransform(): ContentTransform {
     val enterAlphaSpec = tween<Float>(
-        durationMillis = NAV_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
-    val enterOffsetSpec = tween<IntOffset>(
-        durationMillis = NAV_TRANSITION_DURATION_MS,
+        durationMillis = NAV_ENTER_TRANSITION_DURATION_MS,
+        delayMillis = NAV_ENTER_TRANSITION_DELAY_MS,
         easing = FastOutSlowInEasing,
     )
     val exitAlphaSpec = tween<Float>(
         durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
         easing = FastOutSlowInEasing,
     )
-    val exitOffsetSpec = tween<IntOffset>(
-        durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec) +
-            slideInHorizontally(animationSpec = enterOffsetSpec) { width -> -width / 12 },
-        initialContentExit = fadeOut(animationSpec = exitAlphaSpec) +
-            slideOutHorizontally(animationSpec = exitOffsetSpec) { width -> width / 10 },
-        targetContentZIndex = 0f,
-        sizeTransform = SizeTransform(clip = false),
+        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec),
+        initialContentExit = fadeOut(animationSpec = exitAlphaSpec),
+        targetContentZIndex = 1f,
+        sizeTransform = SizeTransform(clip = true),
     )
 }
 

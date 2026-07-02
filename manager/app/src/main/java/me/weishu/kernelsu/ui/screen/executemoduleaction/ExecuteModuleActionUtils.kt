@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -20,7 +19,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
 import me.weishu.kernelsu.ui.util.runModuleAction
-import java.io.File
+import me.weishu.kernelsu.ui.util.saveTextToDownloads
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -156,6 +155,7 @@ private fun openLsposedManager(context: Context): Boolean {
 }
 
 fun saveLog(
+    context: Context,
     logContent: StringBuilder,
     scope: CoroutineScope,
     showMessage: (String) -> Unit
@@ -164,12 +164,19 @@ fun saveLog(
         scope.launch {
             val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
             val date = format.format(Date())
-            val file = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "KernelSU_module_action_log_${date}.log"
-            )
-            file.writeText(logContent.toString())
-            showMessage("Log saved to ${file.absolutePath}")
+            val result = runCatching {
+                saveTextToDownloads(
+                    context = context,
+                    displayName = "KernelSU_module_action_log_${date}.log",
+                    text = logContent.toString(),
+                )
+            }
+            result.onSuccess { path ->
+                showMessage("${context.getString(R.string.log_saved)}: $path")
+            }.onFailure { throwable ->
+                val reason = throwable.localizedMessage ?: throwable.javaClass.simpleName
+                showMessage("${context.getString(R.string.log_save_failed)}: $reason")
+            }
         }
     }
 }

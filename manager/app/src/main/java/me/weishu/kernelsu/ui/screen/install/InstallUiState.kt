@@ -25,6 +25,7 @@ internal data class InstallScreenActions(
     val onSelectMethod: (InstallMethod) -> Unit,
     val onSelectBootImage: () -> Unit,
     val onSelectHiddenPathLkmBootImage: () -> Unit,
+    val onSelectHiddenPathKmi: () -> Unit,
     val onSelectAnyKernel: () -> Unit,
     val onUploadLkm: () -> Unit,
     val onClearLkm: () -> Unit,

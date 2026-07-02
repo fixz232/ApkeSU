@@ -20,8 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.DeveloperMode
-import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
@@ -55,6 +55,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
+import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.alpha.AlphaCard
@@ -118,33 +120,11 @@ fun SettingPagerAlpha(
                         )
                     },
                 )
-                AlphaSwitchStylePicker(
-                    selectedStyle = uiState.switchStyle,
-                    onStyleSelected = actions.onSetSwitchStyleIndex,
-                )
-                AlphaSwitchRow(
-                    title = stringResource(R.string.settings_global_snow),
-                    summary = stringResource(R.string.settings_global_snow_summary),
-                    checked = uiState.globalSnowEnabled,
-                    onCheckedChange = actions.onSetGlobalSnowEnabled,
-                )
-                AlphaSnowEffectPicker(
-                    selectedEffect = uiState.globalSnowEffect,
-                    onEffectSelected = actions.onSetGlobalSnowEffectIndex,
-                )
-                AlphaNightBackgroundEffectPicker(
-                    selectedEffect = uiState.nightBackgroundEffect,
-                    onEffectSelected = actions.onSetNightBackgroundEffectIndex,
-                )
-                AlphaSwitchRow(
-                    title = stringResource(R.string.settings_scroll_animation),
-                    summary = stringResource(R.string.settings_scroll_animation_summary),
-                    checked = uiState.globalScrollEffectEnabled,
-                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled,
-                )
-                AlphaScrollEffectPicker(
-                    selectedEffect = uiState.globalScrollEffect,
-                    onEffectSelected = actions.onSetGlobalScrollEffectIndex,
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_section_visual_effects),
+                    summary = stringResource(R.string.settings_visual_effects_summary),
+                    icon = Icons.Rounded.Visibility,
+                    onClick = actions.onOpenVisualEffects,
                 )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_theme),
@@ -159,21 +139,8 @@ fun SettingPagerAlpha(
                     onClick = actions.onOpenThemeStore,
                 )
                 AlphaActionRow(
-                    title = stringResource(R.string.settings_manager_name),
-                    summary = if (uiState.customManagerName.isBlank()) {
-                        stringResource(
-                            R.string.settings_manager_name_default_summary,
-                            stringResource(R.string.app_name)
-                        )
-                    } else {
-                        stringResource(R.string.settings_manager_name_custom_summary, uiState.customManagerName)
-                    },
-                    icon = Icons.Rounded.EditNote,
-                    onClick = actions.onEditCustomManagerName,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_app_icon),
-                    summary = stringResource(R.string.settings_app_icon_summary),
+                    title = stringResource(R.string.settings_manager_identity),
+                    summary = stringResource(R.string.settings_manager_identity_summary),
                     icon = Icons.Rounded.Apps,
                     onClick = actions.onOpenLauncherIcon,
                 )
@@ -220,21 +187,8 @@ fun SettingPagerAlpha(
                         }
                     ),
                     icon = Icons.Rounded.PlayCircle,
-                    onClick = actions.onPickStartupAnimation,
+                    onClick = actions.onOpenStartupAnimation,
                 )
-                if (uiState.customStartupAnimationUri != null) {
-                    AlphaActionRow(
-                        title = stringResource(R.string.settings_startup_animation_preview),
-                        summary = "",
-                        icon = Icons.Rounded.Visibility,
-                        onClick = actions.onPreviewStartupAnimation,
-                    )
-                    AlphaActionRow(
-                        title = stringResource(R.string.settings_startup_animation_clear),
-                        summary = "",
-                        onClick = actions.onClearStartupAnimation,
-                    )
-                }
             }
 
             AlphaSection(
@@ -346,6 +300,12 @@ fun SettingPagerAlpha(
                     icon = Icons.Rounded.Visibility,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_ai_chat),
+                    summary = stringResource(R.string.settings_ai_chat_summary),
+                    icon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenAiChat,
+                )
                 AlphaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
                     summary = stringResource(R.string.enable_web_debugging_summary),
@@ -420,6 +380,19 @@ private fun AlphaFeatureRows(
         summary = stringResource(R.string.settings_epkesu_hide_summary),
         checked = uiState.isEpkesuHideEnabled,
         onCheckedChange = actions.onSetEpkesuHideEnabled,
+    )
+}
+
+@Composable
+private fun AlphaInlineSectionLabel(text: String) {
+    Text(
+        text = text,
+        color = AlphaColors.Accent,
+        fontSize = alphaSp(12.5f),
+        fontWeight = FontWeight.Black,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 

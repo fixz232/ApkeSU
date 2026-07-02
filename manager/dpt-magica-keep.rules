@@ -1,0 +1,4 @@
+Lme/weishu/kernelsu/KernelSUApplication.*
+Lme/weishu/kernelsu/magica/AppZygotePreload.*
+Lme/weishu/kernelsu/magica/MagicaService.*
+Lme/weishu/kernelsu/magica/BootCompletedReceiver.*

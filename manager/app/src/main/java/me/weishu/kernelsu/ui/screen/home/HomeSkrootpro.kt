@@ -102,12 +102,6 @@ fun HomePagerSkrootpro(
                         onClick = actions.onInstallClick,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(5.dp))
-                    SkrootproButton(
-                        text = stringResource(R.string.skrootpro_uninstall_env),
-                        onClick = actions.onInstallClick,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
 
                     Spacer(modifier = Modifier.height(6.dp))
                     SkrootproSectionTitle(stringResource(R.string.skrootpro_system_env))

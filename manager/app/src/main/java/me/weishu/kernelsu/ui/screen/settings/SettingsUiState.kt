@@ -11,6 +11,7 @@ import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
@@ -50,6 +51,8 @@ data class SettingsUiState(
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,
+    val nightBackgroundPassthrough: Boolean = false,
+    val nightBackgroundPassthroughOpacity: Float = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
     val globalScrollEffectEnabled: Boolean = false,
     val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
     val themeSyncStrategy: ThemeSyncStrategy = ThemeSyncStrategy.SHARED,
@@ -143,16 +146,17 @@ data class SettingsScreenActions(
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,
     val onSetNightBackgroundEffectIndex: (Int) -> Unit,
+    val onSetNightBackgroundPassthrough: (Boolean) -> Unit,
+    val onSetNightBackgroundPassthroughOpacity: (Float) -> Unit,
     val onSetGlobalScrollEffectEnabled: (Boolean) -> Unit,
     val onSetGlobalScrollEffectIndex: (Int) -> Unit,
     val onSetUiModeIndex: (Int) -> Unit,
     val onOpenLauncherIcon: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
+    val onOpenVisualEffects: () -> Unit,
     val onOpenBackgrounds: () -> Unit,
     val onOpenSoundEffects: () -> Unit,
-    val onEditCustomManagerName: () -> Unit,
-    val onSetCustomManagerName: (String) -> Unit,
     val onPickWallpaper: () -> Unit,
     val onPreviewWallpaper: () -> Unit,
     val onEditWallpaperCrop: () -> Unit,
@@ -177,9 +181,7 @@ data class SettingsScreenActions(
     val onDeleteCustomThemePreset: (String) -> Unit,
     val onSetThemeSyncStrategy: (ThemeSyncStrategy) -> Unit,
     val onResetThemeToDefault: () -> Unit,
-    val onPickStartupAnimation: () -> Unit,
-    val onPreviewStartupAnimation: () -> Unit,
-    val onClearStartupAnimation: () -> Unit,
+    val onOpenStartupAnimation: () -> Unit,
     val onOpenProfileTemplate: () -> Unit,
     val onSetSuCompatMode: (Int) -> Unit,
     val onSetKernelUmountEnabled: (Boolean) -> Unit,
@@ -194,6 +196,7 @@ data class SettingsScreenActions(
     val onSetKPatchNextEnabled: (Boolean) -> Unit,
     val onOpenKPatchNextWebUi: () -> Unit,
     val onOpenHiddenPathConfig: () -> Unit,
+    val onOpenAiChat: () -> Unit,
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,
     val onSetAutoJailbreak: (Boolean) -> Unit,

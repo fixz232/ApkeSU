@@ -1,6 +1,7 @@
 package me.weishu.kernelsu.ui.component.rebootlistpopup
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,31 +61,35 @@ fun RebootListPopupMaterial() {
     val hasWallpaper = wallpaperBitmap != null || !wallpaperState.videoUriString.isNullOrBlank()
 
     KsuIsValid {
-        IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.PowerSettingsNew,
-                contentDescription = stringResource(id = R.string.reboot)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = if (hasWallpaper) Color.Transparent else Color.Unspecified,
-        ) {
-            Box(
-                modifier = Modifier
-                    .widthIn(min = 196.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            ) {
-                HomeMetricCardWallpaperBackground(
-                    bitmap = wallpaperBitmap,
-                    videoUriString = wallpaperState.videoUriString,
-                    videoCrop = wallpaperState.crop,
+        Box {
+            IconButton(onClick = { expanded = true }) {
+                Icon(
+                    imageVector = Icons.Filled.PowerSettingsNew,
+                    contentDescription = stringResource(id = R.string.reboot)
                 )
-                RebootDropdownItems(hasWallpaper = hasWallpaper) { reason ->
-                    expanded = false
-                    reboot(reason)
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = if (hasWallpaper) Color.Transparent else Color.Unspecified,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 196.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                ) {
+                    HomeMetricCardWallpaperBackground(
+                        bitmap = wallpaperBitmap,
+                        videoUriString = wallpaperState.videoUriString,
+                        videoCrop = wallpaperState.crop,
+                    )
+                    Column {
+                        RebootDropdownItems(hasWallpaper = hasWallpaper) { reason ->
+                            expanded = false
+                            reboot(reason)
+                        }
+                    }
                 }
             }
         }

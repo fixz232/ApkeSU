@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DesignServices
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FontDownload
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SyncAlt
@@ -101,7 +102,6 @@ import com.materialkolor.rememberDynamicColorScheme
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedDropdownItem
-import me.weishu.kernelsu.ui.component.material.SegmentedRadioItem
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
 import me.weishu.kernelsu.ui.component.material.SegmentedSwitchItem
 import me.weishu.kernelsu.ui.component.material.TonalCard
@@ -159,70 +159,69 @@ fun ColorPaletteScreenMaterial(
                 .padding(paddingValues)
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
+            val currentPreset = ThemePreset.fromValue(uiState.themePreset)
             ThemePreviewCard(
                 keyColor = currentKeyColor,
                 isDark = isDark,
                 paletteStyle = colorStyle,
                 colorSpec = colorSpec,
+                presetLabel = stringResource(currentPreset.titleRes),
+                colorModeLabel = themeColorModeLabel(currentColorMode),
+                keyColorLabel = themeKeyColorLabel(currentKeyColor),
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            ThemeWorkshopMaterial(
+            ThemePresetCardsMaterial(
                 uiMode = uiState.uiMode,
-                currentPreset = ThemePreset.fromValue(uiState.themePreset),
-                customPresets = uiState.customThemePresets,
-                onSaveCustomThemePreset = { showSavePresetDialog = true },
-                onApplyCustomThemePreset = actions.onApplyCustomThemePreset,
-                onRenameCustomThemePreset = { renamePreset = it },
-                onDeleteCustomThemePreset = actions.onDeleteCustomThemePreset,
-                themeSyncStrategy = uiState.themeSyncStrategy,
-                onSetThemeSyncStrategy = actions.onSetThemeSyncStrategy,
-                onResetThemeToDefault = actions.onResetThemeToDefault,
+                currentPreset = currentPreset,
+                isDark = isDark,
                 onApplyThemePreset = actions.onApplyThemePreset,
             )
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                item {
-                    ColorButtonMaterial(
-                        color = Color.Unspecified,
-                        isSelected = currentKeyColor == 0,
-                        isDark = isDark,
-                        paletteStyle = colorStyle,
-                        colorSpec = colorSpec,
-                        onClick = {
-                            actions.onSetKeyColor(0)
-                        }
-                    )
-                }
-
-                items(keyColorOptions) { color ->
-                    ColorButtonMaterial(
-                        color = Color(color),
-                        isSelected = currentKeyColor == color,
-                        isDark = isDark,
-                        paletteStyle = colorStyle,
-                        colorSpec = colorSpec,
-                        onClick = {
-                            actions.onSetKeyColor(color)
-                        }
-                    )
-                }
-            }
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                ThemeSectionHeaderMaterial(
+                    title = stringResource(R.string.theme_section_color_mode),
+                    summary = stringResource(R.string.theme_section_color_mode_summary),
+                )
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    item {
+                        ColorButtonMaterial(
+                            color = Color.Unspecified,
+                            isSelected = currentKeyColor == 0,
+                            isDark = isDark,
+                            paletteStyle = colorStyle,
+                            colorSpec = colorSpec,
+                            onClick = {
+                                actions.onSetKeyColor(0)
+                            }
+                        )
+                    }
+
+                    items(keyColorOptions) { color ->
+                        ColorButtonMaterial(
+                            color = Color(color),
+                            isSelected = currentKeyColor == color,
+                            isDark = isDark,
+                            paletteStyle = colorStyle,
+                            colorSpec = colorSpec,
+                            onClick = {
+                                actions.onSetKeyColor(color)
+                            }
+                        )
+                    }
+                }
+
                 val options = listOf(
                     listOf(ColorMode.SYSTEM) to stringResource(R.string.settings_theme_mode_system),
                     listOf(ColorMode.LIGHT) to stringResource(R.string.settings_theme_mode_light),
@@ -298,9 +297,13 @@ fun ColorPaletteScreenMaterial(
                     )
                 )
 
+                ThemeSectionHeaderMaterial(
+                    title = stringResource(R.string.theme_section_advanced_appearance),
+                    summary = stringResource(R.string.theme_section_advanced_appearance_summary),
+                )
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     SegmentedColumn(
-                        modifier = Modifier.padding(top = 4.dp),
                         content = listOf(
                             {
                                 SegmentedSwitchItem(
@@ -315,7 +318,7 @@ fun ColorPaletteScreenMaterial(
                     )
                 }
 
-                TonalCard(modifier = Modifier.padding(top = 4.dp)) {
+                TonalCard {
                     Column(modifier = Modifier.padding(16.dp)) {
                         AdvancedSliderMaterial(
                             icon = Icons.Rounded.AspectRatio,
@@ -343,6 +346,17 @@ fun ColorPaletteScreenMaterial(
                         )
                     }
                 }
+
+                ThemeCustomPresetsMaterial(
+                    customPresets = uiState.customThemePresets,
+                    onSaveCustomThemePreset = { showSavePresetDialog = true },
+                    onApplyCustomThemePreset = actions.onApplyCustomThemePreset,
+                    onRenameCustomThemePreset = { renamePreset = it },
+                    onDeleteCustomThemePreset = actions.onDeleteCustomThemePreset,
+                    themeSyncStrategy = uiState.themeSyncStrategy,
+                    onSetThemeSyncStrategy = actions.onSetThemeSyncStrategy,
+                    onResetThemeToDefault = actions.onResetThemeToDefault,
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp + navBars.calculateBottomPadding() + captionBar.calculateBottomPadding()))
@@ -367,17 +381,54 @@ fun ColorPaletteScreenMaterial(
 }
 
 @Composable
-private fun ThemeWorkshopMaterial(
+private fun ThemeSectionHeaderMaterial(
+    title: String,
+    summary: String? = null,
+) {
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (summary != null) {
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun themeColorModeLabel(mode: ColorMode): String {
+    val displayMode = if (mode.isMonet) ColorMode.fromValue(mode.toNonMonetMode()) else mode
+    return when (displayMode) {
+        ColorMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
+        ColorMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
+        ColorMode.DARK_AMOLED -> stringResource(R.string.settings_theme_mode_amoled)
+        else -> stringResource(R.string.settings_theme_mode_system)
+    }
+}
+
+@Composable
+private fun themeKeyColorLabel(keyColor: Int): String {
+    return if (keyColor == 0) {
+        stringResource(R.string.settings_key_color_default)
+    } else {
+        "#%06X".format(keyColor and 0x00FFFFFF)
+    }
+}
+
+@Composable
+private fun ThemePresetCardsMaterial(
     uiMode: String,
     currentPreset: ThemePreset,
-    customPresets: List<CustomThemePreset>,
-    onSaveCustomThemePreset: () -> Unit,
-    onApplyCustomThemePreset: (String) -> Unit,
-    onRenameCustomThemePreset: (CustomThemePreset) -> Unit,
-    onDeleteCustomThemePreset: (String) -> Unit,
-    themeSyncStrategy: ThemeSyncStrategy,
-    onSetThemeSyncStrategy: (ThemeSyncStrategy) -> Unit,
-    onResetThemeToDefault: () -> Unit,
+    isDark: Boolean,
     onApplyThemePreset: (ThemePreset) -> Unit,
 ) {
     val compatiblePresets = ThemePreset.workshopPresets.filter { it.isCompatibleWith(uiMode) }
@@ -386,30 +437,155 @@ private fun ThemeWorkshopMaterial(
     } else {
         compatiblePresets
     }
-    val presetItems: List<@Composable () -> Unit> = visiblePresets.map { preset ->
-        @Composable {
-            SegmentedRadioItem(
-                title = stringResource(preset.titleRes),
-                summary = stringResource(preset.summaryRes),
-                selected = currentPreset == preset,
-                enabled = preset != ThemePreset.CUSTOM,
-                onClick = { onApplyThemePreset(preset) },
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            ThemeSectionHeaderMaterial(
+                title = stringResource(R.string.theme_workshop),
+                summary = stringResource(R.string.theme_workshop_summary),
+            )
+        }
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(visiblePresets) { preset ->
+                ThemePresetCardMaterial(
+                    preset = preset,
+                    selected = currentPreset == preset,
+                    enabled = preset != ThemePreset.CUSTOM,
+                    isDark = isDark,
+                    onClick = { onApplyThemePreset(preset) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemePresetCardMaterial(
+    preset: ThemePreset,
+    selected: Boolean,
+    enabled: Boolean,
+    isDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    Surface(
+        onClick = {
+            if (enabled) onClick()
+        },
+        enabled = enabled,
+        modifier = Modifier.width(178.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+        border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PresetMiniPreviewMaterial(preset = preset, isDark = isDark)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Palette,
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(preset.titleRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = stringResource(preset.summaryRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
             )
         }
     }
+}
 
-    SegmentedColumn(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        title = stringResource(R.string.theme_workshop),
-        content = presetItems
+@Composable
+private fun PresetMiniPreviewMaterial(
+    preset: ThemePreset,
+    isDark: Boolean,
+) {
+    val previewIsDark = preset.colorMode.isDark || preset.colorMode.isSystem && isDark
+    val seedColor = if (preset.keyColor == 0) MaterialTheme.colorScheme.primary else Color(preset.keyColor)
+    val previewScheme = rememberDynamicColorScheme(
+        seedColor = seedColor,
+        isDark = previewIsDark,
+        style = preset.paletteStyle,
+        specVersion = preset.colorSpec,
     )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(previewScheme.background)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf(
+            previewScheme.primary,
+            previewScheme.secondaryContainer,
+            previewScheme.tertiaryContainer,
+            previewScheme.surfaceContainerHighest
+        ).forEach { color ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(color)
+            )
+        }
+    }
+}
 
+@Composable
+private fun ThemeCustomPresetsMaterial(
+    customPresets: List<CustomThemePreset>,
+    onSaveCustomThemePreset: () -> Unit,
+    onApplyCustomThemePreset: (String) -> Unit,
+    onRenameCustomThemePreset: (CustomThemePreset) -> Unit,
+    onDeleteCustomThemePreset: (String) -> Unit,
+    themeSyncStrategy: ThemeSyncStrategy,
+    onSetThemeSyncStrategy: (ThemeSyncStrategy) -> Unit,
+    onResetThemeToDefault: () -> Unit,
+) {
     val syncItems = listOf(
         stringResource(R.string.theme_sync_shared),
         stringResource(R.string.theme_sync_per_style),
     )
     SegmentedColumn(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.padding(top = 4.dp),
         title = stringResource(R.string.theme_custom_presets),
         content = buildList {
             add {
@@ -526,6 +702,9 @@ private fun ThemePreviewCard(
     isDark: Boolean,
     paletteStyle: PaletteStyle = PaletteStyle.TonalSpot,
     colorSpec: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2021,
+    presetLabel: String,
+    colorModeLabel: String,
+    keyColorLabel: String,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -558,102 +737,163 @@ private fun ThemePreviewCard(
 
     }
 
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.4f)
-                .aspectRatio(screenRatio),
-            color = colorScheme.background,
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column {
-                // top bar
-                Box(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.TopStart
-                ) {
-                    Row(
+            Surface(
+                modifier = Modifier
+                    .width(168.dp)
+                    .aspectRatio(screenRatio),
+                color = colorScheme.background,
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column {
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(start = 12.dp, top = 16.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(48.dp)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.TopStart
                     ) {
-                        Text(
-                            text = stringResource(id = R.string.app_name),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colorScheme.onSurface
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.TopStart
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TonalCard(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            content = { }
-                        )
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(start = 12.dp, top = 16.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TonalCard(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(32.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                content = { }
-                            )
-                            TonalCard(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(32.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                content = { }
+                            Text(
+                                text = stringResource(id = R.string.app_name),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colorScheme.onSurface
                             )
                         }
-                        TonalCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(96.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            content = { }
-                        )
                     }
-                }
 
-                // bottom bar
-                Surface(
-                    color = colorScheme.surfaceContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
+                    Box(
                         modifier = Modifier
-                            .height(40.dp)
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .weight(1f),
+                        contentAlignment = Alignment.TopStart
                     ) {
-                        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Filled.Home, null, tint = colorScheme.primary)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colorScheme.secondaryContainer)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colorScheme.surfaceContainerHighest)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colorScheme.surfaceContainerHighest)
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(96.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colorScheme.surfaceContainerHigh)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .height(40.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Filled.Home, null, tint = colorScheme.primary)
+                            }
                         }
                     }
                 }
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ThemePreviewInfoMaterial(
+                    label = stringResource(R.string.theme_current_preset),
+                    value = presetLabel,
+                    modifier = Modifier.weight(1f)
+                )
+                ThemePreviewInfoMaterial(
+                    label = stringResource(R.string.theme_current_mode),
+                    value = colorModeLabel,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            ThemePreviewInfoMaterial(
+                label = stringResource(R.string.settings_key_color),
+                value = keyColorLabel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewInfoMaterial(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Adb
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContactPage
@@ -74,6 +75,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
+import me.weishu.kernelsu.ui.component.MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
+import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
 import me.weishu.kernelsu.ui.component.SwitchStyle
@@ -230,61 +233,17 @@ private fun SettingsMaterialContent(
                 )
             }
             add {
-                SegmentedDropdownItem(
-                    icon = Icons.Filled.Palette,
-                    title = stringResource(id = R.string.settings_switch_style),
-                    summary = stringResource(id = R.string.settings_switch_style_summary),
-                    items = SwitchStyle.entries.map { stringResource(it.labelRes) },
-                    selectedIndex = SwitchStyle.selectedIndex(uiState.switchStyle),
-                    onItemSelected = actions.onSetSwitchStyleIndex
-                )
-            }
-            add {
-                SegmentedSwitchItem(
-                    icon = Icons.Filled.Visibility,
-                    title = stringResource(id = R.string.settings_global_snow),
-                    summary = stringResource(id = R.string.settings_global_snow_summary),
-                    checked = uiState.globalSnowEnabled,
-                    onCheckedChange = actions.onSetGlobalSnowEnabled
-                )
-            }
-            add {
-                SegmentedDropdownItem(
-                    icon = Icons.Filled.Visibility,
-                    title = stringResource(id = R.string.settings_global_snow_effect),
-                    summary = stringResource(id = R.string.settings_global_snow_effect_summary),
-                    items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
-                    selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
-                    onItemSelected = actions.onSetGlobalSnowEffectIndex
-                )
-            }
-            add {
-                SegmentedDropdownItem(
-                    icon = Icons.Filled.Visibility,
-                    title = stringResource(id = R.string.settings_night_background_effect),
-                    summary = stringResource(id = R.string.settings_night_background_effect_summary),
-                    items = NightBackgroundEffect.entries.map { stringResource(it.labelRes) },
-                    selectedIndex = NightBackgroundEffect.selectedIndex(uiState.nightBackgroundEffect),
-                    onItemSelected = actions.onSetNightBackgroundEffectIndex
-                )
-            }
-            add {
-                SegmentedSwitchItem(
-                    icon = Icons.Filled.PlayCircle,
-                    title = stringResource(id = R.string.settings_scroll_animation),
-                    summary = stringResource(id = R.string.settings_scroll_animation_summary),
-                    checked = uiState.globalScrollEffectEnabled,
-                    onCheckedChange = actions.onSetGlobalScrollEffectEnabled
-                )
-            }
-            add {
-                SegmentedDropdownItem(
-                    icon = Icons.Filled.PlayCircle,
-                    title = stringResource(id = R.string.settings_scroll_animation_effect),
-                    summary = stringResource(id = R.string.settings_scroll_animation_effect_summary),
-                    items = GlobalScrollEffect.entries.map { stringResource(it.labelRes) },
-                    selectedIndex = GlobalScrollEffect.selectedIndex(uiState.globalScrollEffect),
-                    onItemSelected = actions.onSetGlobalScrollEffectIndex
+                SegmentedListItem(
+                    onClick = actions.onOpenVisualEffects,
+                    headlineContent = { Text(stringResource(id = R.string.settings_section_visual_effects)) },
+                    supportingContent = { Text(stringResource(id = R.string.settings_visual_effects_summary)) },
+                    leadingContent = { Icon(Icons.Filled.Visibility, stringResource(id = R.string.settings_section_visual_effects)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            null
+                        )
+                    }
                 )
             }
             add {
@@ -316,33 +275,11 @@ private fun SettingsMaterialContent(
                 )
             }
             add {
-                val defaultName = stringResource(id = R.string.app_name)
-                val summary = if (uiState.customManagerName.isBlank()) {
-                    stringResource(id = R.string.settings_manager_name_default_summary, defaultName)
-                } else {
-                    stringResource(id = R.string.settings_manager_name_custom_summary, uiState.customManagerName)
-                }
-                SegmentedListItem(
-                    onClick = actions.onEditCustomManagerName,
-                    headlineContent = { Text(stringResource(id = R.string.settings_manager_name)) },
-                    supportingContent = { Text(summary) },
-                    leadingContent = {
-                        Icon(Icons.Filled.EditNote, stringResource(id = R.string.settings_manager_name))
-                    },
-                    trailingContent = {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            null
-                        )
-                    }
-                )
-            }
-            add {
                 SegmentedListItem(
                     onClick = actions.onOpenLauncherIcon,
-                    headlineContent = { Text(stringResource(id = R.string.settings_app_icon)) },
-                    supportingContent = { Text(stringResource(id = R.string.settings_app_icon_summary)) },
-                    leadingContent = { Icon(Icons.Filled.Apps, stringResource(id = R.string.settings_app_icon)) },
+                    headlineContent = { Text(stringResource(id = R.string.settings_manager_identity)) },
+                    supportingContent = { Text(stringResource(id = R.string.settings_manager_identity_summary)) },
+                    leadingContent = { Icon(Icons.Filled.Apps, stringResource(id = R.string.settings_manager_identity)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -442,7 +379,7 @@ private fun SettingsMaterialContent(
                 }
             add {
                 SegmentedListItem(
-                    onClick = actions.onPickStartupAnimation,
+                    onClick = actions.onOpenStartupAnimation,
                     headlineContent = { Text(stringResource(id = R.string.settings_startup_animation)) },
                     supportingContent = {
                         Text(
@@ -465,32 +402,6 @@ private fun SettingsMaterialContent(
                         )
                     }
                 )
-            }
-            if (uiState.customStartupAnimationUri != null) {
-                add {
-                    SegmentedListItem(
-                        onClick = actions.onPreviewStartupAnimation,
-                        headlineContent = { Text(stringResource(id = R.string.settings_startup_animation_preview)) },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Visibility,
-                                stringResource(id = R.string.settings_startup_animation_preview)
-                            )
-                        },
-                    )
-                }
-                add {
-                    SegmentedListItem(
-                        onClick = actions.onClearStartupAnimation,
-                        headlineContent = { Text(stringResource(id = R.string.settings_startup_animation_clear)) },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Close,
-                                stringResource(id = R.string.settings_startup_animation_clear)
-                            )
-                        },
-                    )
-                }
             }
         }
     )
@@ -757,6 +668,22 @@ private fun SettingsMaterialContent(
                     )
                 },
                 {
+                    SegmentedListItem(
+                        onClick = actions.onOpenAiChat,
+                        headlineContent = { Text(stringResource(id = R.string.settings_ai_chat)) },
+                        supportingContent = { Text(stringResource(id = R.string.settings_ai_chat_summary)) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.AutoFixHigh,
+                                stringResource(id = R.string.settings_ai_chat)
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    )
+                },
+                {
                     SegmentedSwitchItem(
                         icon = Icons.Filled.DeveloperMode,
                         title = stringResource(id = R.string.enable_web_debugging),
@@ -859,6 +786,40 @@ private fun CollapsibleSegmentedColumn(
             SegmentedColumn(content = content)
         }
     }
+}
+
+@Composable
+private fun NightBackgroundPassthroughOpacityMaterialItem(
+    opacity: Float,
+    onOpacityChange: (Float) -> Unit,
+) {
+    var sliderValue by remember(opacity) { mutableFloatStateOf(opacity) }
+
+    SegmentedListItem(
+        headlineContent = { Text(stringResource(R.string.settings_night_background_passthrough_opacity)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.settings_night_background_passthrough_opacity_summary))
+                Slider(
+                    value = sliderValue,
+                    onValueChange = {
+                        sliderValue = it
+                        onOpacityChange(it)
+                    },
+                    valueRange = MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY..MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
+                )
+            }
+        },
+        leadingContent = {
+            Icon(Icons.Filled.Visibility, stringResource(R.string.settings_night_background_passthrough_opacity))
+        },
+        trailingContent = {
+            Text(
+                text = "${(sliderValue * 100).roundToInt()}%",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+    )
 }
 
 @Composable

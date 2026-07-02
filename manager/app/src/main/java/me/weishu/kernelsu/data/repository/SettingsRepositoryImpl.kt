@@ -18,9 +18,13 @@ import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_KEY
+import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY
+import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -247,6 +251,21 @@ class SettingsRepositoryImpl : SettingsRepository {
         ).value
         set(value) = prefs.edit {
             putString(NIGHT_BACKGROUND_EFFECT_KEY, NightBackgroundEffect.fromValue(value).value)
+        }
+
+    override var nightBackgroundPassthrough: Boolean
+        get() = prefs.getBoolean(NIGHT_BACKGROUND_PASSTHROUGH_KEY, false)
+        set(value) = prefs.edit { putBoolean(NIGHT_BACKGROUND_PASSTHROUGH_KEY, value) }
+
+    override var nightBackgroundPassthroughOpacity: Float
+        get() = sanitizeNightBackgroundPassthroughOpacity(
+            prefs.getFloat(
+                NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY,
+                DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
+            )
+        )
+        set(value) = prefs.edit {
+            putFloat(NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY, sanitizeNightBackgroundPassthroughOpacity(value))
         }
 
     override var globalScrollEffectEnabled: Boolean

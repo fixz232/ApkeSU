@@ -20,7 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.getKernelVersion
 import me.weishu.kernelsu.ui.LocalUiMode
@@ -53,16 +55,29 @@ fun InstallScreen() {
     var hasCustomSelected by rememberSaveable { mutableStateOf(false) }
     var hiddenPathImagePickerPending by rememberSaveable { mutableStateOf(false) }
     val showChooseKmiDialog = rememberSaveable { mutableStateOf(false) }
+    var installAfterKmiSelection by rememberSaveable { mutableStateOf(false) }
     var advancedOptionsShown by rememberSaveable { mutableStateOf(false) }
     var allowShell by rememberSaveable { mutableStateOf(false) }
     var enableAdb by rememberSaveable { mutableStateOf(false) }
 
-    val currentKmi by produceState(initialValue = "") { value = getCurrentKmi() }
-    val partitions by produceState(initialValue = emptyList()) { value = getAvailablePartitions() }
-    val defaultPartition by produceState(initialValue = "") { value = getDefaultPartition() }
-    val rootAvailable by produceState(initialValue = false) { value = rootAvailable() }
-    val isAbDevice by produceState(initialValue = false) { value = isAbDevice() }
-    val isGkiDevice by produceState(initialValue = false) { value = getKernelVersion().isGKI() }
+    val currentKmi by produceState(initialValue = "") {
+        value = loadInstallState("") { getCurrentKmi() }
+    }
+    val partitions by produceState(initialValue = emptyList<String>()) {
+        value = loadInstallState(emptyList<String>()) { getAvailablePartitions() }
+    }
+    val defaultPartition by produceState(initialValue = "") {
+        value = loadInstallState("") { getDefaultPartition() }
+    }
+    val rootAvailable by produceState(initialValue = false) {
+        value = loadInstallState(false) { withContext(Dispatchers.IO) { rootAvailable() } }
+    }
+    val isAbDevice by produceState(initialValue = false) {
+        value = loadInstallState(false) { isAbDevice() }
+    }
+    val isGkiDevice by produceState(initialValue = false) {
+        value = loadInstallState(false) { withContext(Dispatchers.IO) { getKernelVersion().isGKI() } }
+    }
 
     val selectFileTip = stringResource(id = R.string.select_file_tip, defaultPartition)
     val selectFileTipNoGki = stringResource(id = R.string.select_file_tip_nogki)
@@ -87,7 +102,9 @@ fun InstallScreen() {
     }
 
     val isOta = installMethod is InstallMethod.DirectInstallToInactiveSlot
-    val slotSuffix by produceState(initialValue = "", isOta) { value = getSlotSuffix(isOta) }
+    val slotSuffix by produceState(initialValue = "", isOta) {
+        value = loadInstallState("") { getSlotSuffix(isOta) }
+    }
     val defaultIndex = remember(partitions, defaultPartition) {
         partitions.indexOf(defaultPartition).coerceAtLeast(0)
     }
@@ -130,7 +147,7 @@ fun InstallScreen() {
             val patchLkm = if (method is InstallMethod.HiddenPathLkmPatch) {
                 when (selectedLkm) {
                     is LkmSelection.PathMaskKmiString -> selectedLkm
-                    else -> LkmSelection.PathMaskAuto
+                    else -> return@let
                 }
             } else {
                 selectedLkm
@@ -162,7 +179,10 @@ fun InstallScreen() {
 
     ChooseKmiDialog(
         show = showChooseKmiDialog.value,
-        onDismissRequest = { showChooseKmiDialog.value = false },
+        onDismissRequest = {
+            showChooseKmiDialog.value = false
+            installAfterKmiSelection = false
+        },
         onSelected = { kmi ->
             kmi?.let {
                 val selectedLkm = if (installMethod is InstallMethod.HiddenPathLkmPatch) {
@@ -171,7 +191,10 @@ fun InstallScreen() {
                     LkmSelection.KmiString(it)
                 }
                 lkmSelection = selectedLkm
-                onInstall(selectedLkm)
+                if (installAfterKmiSelection) {
+                    onInstall(selectedLkm)
+                    installAfterKmiSelection = false
+                }
             }
         }
     )
@@ -239,7 +262,9 @@ fun InstallScreen() {
         currentKmi = currentKmi,
         slotSuffix = slotSuffix,
         installMethodOptions = installMethodOptions,
-        canSelectPartition = installMethod is InstallMethod.DirectInstall || installMethod is InstallMethod.DirectInstallToInactiveSlot,
+        canSelectPartition = displayPartitions.isNotEmpty() &&
+                (installMethod is InstallMethod.DirectInstall ||
+                        installMethod is InstallMethod.DirectInstallToInactiveSlot),
         canInstall = canInstall,
         advancedOptionsShown = advancedOptionsShown,
         allowShell = allowShell,
@@ -255,19 +280,33 @@ fun InstallScreen() {
         },
         onSelectBootImage = {
             hiddenPathImagePickerPending = false
-            selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply { type = "application/octet-stream" })
+            selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "application/octet-stream"
+                addCategory(Intent.CATEGORY_OPENABLE)
+            })
         },
         onSelectHiddenPathLkmBootImage = {
             hiddenPathImagePickerPending = true
-            selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply { type = "application/octet-stream" })
+            selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "application/octet-stream"
+                addCategory(Intent.CATEGORY_OPENABLE)
+            })
+        },
+        onSelectHiddenPathKmi = {
+            installAfterKmiSelection = false
+            showChooseKmiDialog.value = true
         },
         onSelectAnyKernel = {
             selectAnyKernelLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
                 type = "application/zip"
+                addCategory(Intent.CATEGORY_OPENABLE)
             })
         },
         onUploadLkm = {
-            selectLkmLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply { type = "application/octet-stream" })
+            selectLkmLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "application/octet-stream"
+                addCategory(Intent.CATEGORY_OPENABLE)
+            })
         },
         onClearLkm = { lkmSelection = LkmSelection.KmiNone },
         onSelectPartition = { index ->
@@ -283,6 +322,7 @@ fun InstallScreen() {
             val isAnyKernelMode = method is InstallMethod.AnyKernel
             val needsHiddenPathKmi = isHiddenPathMode && lkmSelection !is LkmSelection.PathMaskKmiString
             if (!isAnyKernelMode && (needsHiddenPathKmi || (!isLkmSelected && (isSelectFileMode || isKmiUnknown)))) {
+                installAfterKmiSelection = true
                 showChooseKmiDialog.value = true
             } else {
                 onInstall(lkmSelection)
@@ -302,5 +342,13 @@ fun InstallScreen() {
     when (LocalUiMode.current) {
         UiMode.Miuix -> InstallScreenMiuix(state, actions)
         UiMode.Material -> InstallScreenMaterial(state, actions, snackbarHost)
+    }
+}
+
+private suspend fun <T> loadInstallState(defaultValue: T, block: suspend () -> T): T {
+    return try {
+        block()
+    } catch (_: Throwable) {
+        defaultValue
     }
 }

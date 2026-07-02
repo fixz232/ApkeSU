@@ -1,8 +1,6 @@
 package me.weishu.kernelsu.ui.util
 
-import android.content.ContentResolver
 import android.content.Context
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -180,32 +178,47 @@ inline fun <T> withNewRootShell(
 }
 
 fun Uri.getFileName(context: Context): String? {
-    var fileName: String? = null
-    val contentResolver: ContentResolver = context.contentResolver
-    val cursor: Cursor? = contentResolver.query(this, null, null, null, null)
-    cursor?.use {
-        if (it.moveToFirst()) {
-            fileName = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+    return runCatching {
+        context.contentResolver.query(
+            this,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) {
+                return@use null
+            }
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0) cursor.getString(index) else null
         }
-    }
-    return fileName
+    }.getOrNull()
 }
 
 fun createRootShell(globalMnt: Boolean = false): Shell {
     Shell.enableVerboseLogging = BuildConfig.DEBUG
     val builder = Shell.Builder.create()
+    fun buildRootShellOrThrow(label: String, vararg commands: String): Shell {
+        val shell = builder.build(*commands)
+        if (shell.isUsableRoot()) {
+            return shell
+        }
+        shell.closeQuietly()
+        error("$label shell is not root")
+    }
+
     val tryKsuShell = {
         if (globalMnt) {
-            builder.build(getKsuDaemonPath(), "debug", "su", "-g")
+            buildRootShellOrThrow("ksu", getKsuDaemonPath(), "debug", "su", "-g")
         } else {
-            builder.build(getKsuDaemonPath(), "debug", "su")
+            buildRootShellOrThrow("ksu", getKsuDaemonPath(), "debug", "su")
         }
     }
     val trySuShell = {
         if (globalMnt) {
-            builder.build("su", "-mm")
+            buildRootShellOrThrow("su", "su", "-mm")
         } else {
-            builder.build("su")
+            buildRootShellOrThrow("su", "su")
         }
     }
 

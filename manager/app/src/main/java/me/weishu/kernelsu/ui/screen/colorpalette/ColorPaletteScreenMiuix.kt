@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +27,10 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuOpen
@@ -73,6 +77,7 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.component.miuix.ScaleDialog
+import me.weishu.kernelsu.ui.theme.ColorMode
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.keyColorOptions
@@ -165,6 +170,7 @@ fun ColorPaletteScreenMiuix(
                 overscrollEffect = null,
             ) {
                 item {
+                    val currentPreset = ThemePreset.fromValue(uiState.themePreset)
                     Spacer(modifier = Modifier.height(32.dp))
                     ThemePreviewCardMiuix(
                         keyColor = uiState.keyColor,
@@ -178,49 +184,17 @@ fun ColorPaletteScreenMiuix(
                         },
                         paletteStyle = state.currentPaletteStyle,
                         colorSpec = state.currentColorSpec,
+                        presetLabel = stringResource(currentPreset.titleRes),
+                        colorModeLabel = themeColorModeLabel(currentColorMode),
+                        keyColorLabel = themeKeyColorLabel(uiState.keyColor),
                     )
-                    Spacer(modifier = Modifier.height(72.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                    val currentPreset = ThemePreset.fromValue(uiState.themePreset)
-                    val compatiblePresets = ThemePreset.workshopPresets.filter {
-                        it.isCompatibleWith(uiState.uiMode)
-                    }
-                    val visiblePresets = if (currentPreset == ThemePreset.CUSTOM) {
-                        listOf(ThemePreset.CUSTOM) + compatiblePresets
-                    } else {
-                        compatiblePresets
-                    }
-                    val presetItems = visiblePresets.map { stringResource(it.titleRes) }
-                    OverlayDropdownPreference(
-                        title = stringResource(R.string.theme_workshop),
-                        summary = stringResource(R.string.theme_workshop_summary),
-                        items = presetItems,
-                        startAction = {
-                            Icon(
-                                Icons.Rounded.Palette,
-                                modifier = Modifier.padding(end = 6.dp),
-                                contentDescription = stringResource(id = R.string.theme_workshop),
-                                tint = colorScheme.onBackground
-                            )
-                        },
-                        selectedIndex = visiblePresets.indexOf(currentPreset).coerceAtLeast(0),
-                        onSelectedIndexChange = { index ->
-                            val preset = visiblePresets.getOrNull(index)
-                            if (preset != null && preset != ThemePreset.CUSTOM) {
-                                actions.onApplyThemePreset(preset)
-                            }
-                        }
-                    )
-
-                    ThemeCustomPresetsMiuix(
-                        customPresets = uiState.customThemePresets,
-                        themeSyncStrategy = uiState.themeSyncStrategy,
-                        onSaveCustomThemePreset = { showSavePresetDialog = true },
-                        onApplyCustomThemePreset = actions.onApplyCustomThemePreset,
-                        onRenameCustomThemePreset = { renamePreset = it },
-                        onDeleteCustomThemePreset = actions.onDeleteCustomThemePreset,
-                        onSetThemeSyncStrategy = actions.onSetThemeSyncStrategy,
-                        onResetThemeToDefault = actions.onResetThemeToDefault,
+                    ThemePresetCardsMiuix(
+                        uiMode = uiState.uiMode,
+                        currentPreset = currentPreset,
+                        isDark = isDark,
+                        onApplyThemePreset = actions.onApplyThemePreset,
                     )
 
                     if (!isLiquidGlassInterface) {
@@ -476,6 +450,17 @@ fun ColorPaletteScreenMiuix(
                             }
                         )
                     }
+
+                    ThemeCustomPresetsMiuix(
+                        customPresets = uiState.customThemePresets,
+                        themeSyncStrategy = uiState.themeSyncStrategy,
+                        onSaveCustomThemePreset = { showSavePresetDialog = true },
+                        onApplyCustomThemePreset = actions.onApplyCustomThemePreset,
+                        onRenameCustomThemePreset = { renamePreset = it },
+                        onDeleteCustomThemePreset = actions.onDeleteCustomThemePreset,
+                        onSetThemeSyncStrategy = actions.onSetThemeSyncStrategy,
+                        onResetThemeToDefault = actions.onResetThemeToDefault,
+                    )
                 }
                 item {
                     Spacer(
@@ -504,6 +489,179 @@ fun ColorPaletteScreenMiuix(
             onDismissRequest = { renamePreset = null },
             onConfirm = { name -> actions.onRenameCustomThemePreset(preset.id, name) },
         )
+    }
+}
+
+@Composable
+private fun themeColorModeLabel(mode: ColorMode): String {
+    val displayMode = if (mode.isMonet) ColorMode.fromValue(mode.toNonMonetMode()) else mode
+    return when (displayMode) {
+        ColorMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
+        ColorMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
+        ColorMode.DARK_AMOLED -> stringResource(R.string.settings_theme_mode_amoled)
+        else -> stringResource(R.string.settings_theme_mode_system)
+    }
+}
+
+@Composable
+private fun themeKeyColorLabel(keyColor: Int): String {
+    return if (keyColor == 0) {
+        stringResource(R.string.settings_key_color_default)
+    } else {
+        "#%06X".format(keyColor and 0x00FFFFFF)
+    }
+}
+
+@Composable
+private fun ThemeSectionHeaderMiuix(
+    title: String,
+    summary: String? = null,
+) {
+    Column(
+        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title,
+            color = colorScheme.onBackground,
+            fontSize = 17.sp
+        )
+        if (summary != null) {
+            Text(
+                text = summary,
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePresetCardsMiuix(
+    uiMode: String,
+    currentPreset: ThemePreset,
+    isDark: Boolean,
+    onApplyThemePreset: (ThemePreset) -> Unit,
+) {
+    val compatiblePresets = ThemePreset.workshopPresets.filter { it.isCompatibleWith(uiMode) }
+    val visiblePresets = if (currentPreset == ThemePreset.CUSTOM) {
+        listOf(ThemePreset.CUSTOM) + compatiblePresets
+    } else {
+        compatiblePresets
+    }
+
+    ThemeSectionHeaderMiuix(
+        title = stringResource(R.string.theme_workshop),
+        summary = stringResource(R.string.theme_workshop_summary),
+    )
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(visiblePresets) { preset ->
+            ThemePresetCardMiuix(
+                preset = preset,
+                selected = currentPreset == preset,
+                enabled = preset != ThemePreset.CUSTOM,
+                isDark = isDark,
+                onClick = { onApplyThemePreset(preset) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePresetCardMiuix(
+    preset: ThemePreset,
+    selected: Boolean,
+    enabled: Boolean,
+    isDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderColor = if (selected) colorScheme.primary else colorScheme.outline.copy(alpha = 0.45f)
+    Card(
+        modifier = Modifier
+            .width(176.dp)
+            .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(18.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .themeLiquidGlassSurface(),
+        colors = liquidGlassMiuixCardColors(),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PresetMiniPreviewMiuix(preset = preset, isDark = isDark)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Rounded.Palette,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(18.dp),
+                    contentDescription = null,
+                    tint = if (selected) colorScheme.primary else colorScheme.onBackground
+                )
+                Text(
+                    text = stringResource(preset.titleRes),
+                    color = colorScheme.onBackground,
+                    fontSize = 15.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                if (selected) {
+                    Icon(
+                        Icons.Rounded.Tune,
+                        modifier = Modifier.size(18.dp),
+                        contentDescription = null,
+                        tint = colorScheme.primary
+                    )
+                }
+            }
+            Text(
+                text = stringResource(preset.summaryRes),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun PresetMiniPreviewMiuix(
+    preset: ThemePreset,
+    isDark: Boolean,
+) {
+    val previewIsDark = preset.colorMode.isDark || preset.colorMode.isSystem && isDark
+    val seedColor = if (preset.keyColor == 0) colorScheme.primary else Color(preset.keyColor)
+    val previewScheme = rememberDynamicColorScheme(
+        seedColor = seedColor,
+        isDark = previewIsDark,
+        style = preset.paletteStyle,
+        specVersion = preset.colorSpec,
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(previewScheme.background)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf(
+            previewScheme.primary,
+            previewScheme.secondaryContainer,
+            previewScheme.tertiaryContainer,
+            previewScheme.surfaceContainerHighest
+        ).forEach { previewColor ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(previewColor)
+            )
+        }
     }
 }
 
@@ -677,6 +835,9 @@ private fun ThemePreviewCardMiuix(
     enableFloatingBottomBarBlur: Boolean = false,
     paletteStyle: PaletteStyle = PaletteStyle.TonalSpot,
     colorSpec: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2021,
+    presetLabel: String,
+    colorModeLabel: String,
+    keyColorLabel: String,
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.toFloat()
@@ -706,21 +867,27 @@ private fun ThemePreviewCardMiuix(
     val navSelectedColor = colorScheme.onSurfaceContainer
     val navUnselectedColor = colorScheme.onSurfaceContainer.copy(alpha = 0.5f)
 
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
-        contentAlignment = Alignment.TopCenter
+            .padding(top = 12.dp)
+            .themeLiquidGlassSurface(),
+        colors = liquidGlassMiuixCardColors(),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.4f)
-                .aspectRatio(screenRatio)
-                .clip(RoundedCornerShape(20.dp))
-                .background(bgColor)
-                .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column {
+            Box(
+                modifier = Modifier
+                    .width(168.dp)
+                    .aspectRatio(screenRatio)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(bgColor)
+                    .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
+            ) {
+                Column {
                 Row(
                     modifier = Modifier
                         .height(48.dp)
@@ -864,6 +1031,56 @@ private fun ThemePreviewCardMiuix(
                     }
                 }
             }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ThemePreviewInfoMiuix(
+                    label = stringResource(R.string.theme_current_preset),
+                    value = presetLabel,
+                    modifier = Modifier.weight(1f)
+                )
+                ThemePreviewInfoMiuix(
+                    label = stringResource(R.string.theme_current_mode),
+                    value = colorModeLabel,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            ThemePreviewInfoMiuix(
+                label = stringResource(R.string.settings_key_color),
+                value = keyColorLabel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewInfoMiuix(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label,
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp
+            )
+            Text(
+                text = value,
+                color = colorScheme.onBackground,
+                fontSize = 14.sp
+            )
         }
     }
 }

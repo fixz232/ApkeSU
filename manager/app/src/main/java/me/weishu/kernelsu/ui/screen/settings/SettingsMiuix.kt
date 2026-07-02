@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContactPage
@@ -77,11 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.component.GlobalScrollEffect
-import me.weishu.kernelsu.ui.component.GlobalSnowEffect
-import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.KsuIsValid
-import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
@@ -102,7 +99,6 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -240,93 +236,18 @@ fun SettingPagerMiuix(
                             checked = dayNightChecked,
                             onCheckedChange = actions.onSetDayNightMode,
                         )
-                        OverlayDropdownPreference(
-                            title = stringResource(id = R.string.settings_switch_style),
-                            summary = stringResource(id = R.string.settings_switch_style_summary),
-                            items = SwitchStyle.entries.map { stringResource(it.labelRes) },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Palette,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_switch_style),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            selectedIndex = SwitchStyle.selectedIndex(uiState.switchStyle),
-                            onSelectedIndexChange = actions.onSetSwitchStyleIndex
-                        )
-                        SwitchPreference(
-                            title = stringResource(id = R.string.settings_global_snow),
-                            summary = stringResource(id = R.string.settings_global_snow_summary),
+                        ArrowPreference(
+                            title = stringResource(id = R.string.settings_section_visual_effects),
+                            summary = stringResource(id = R.string.settings_visual_effects_summary),
                             startAction = {
                                 Icon(
                                     Icons.Rounded.Visibility,
                                     modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_global_snow),
+                                    contentDescription = stringResource(id = R.string.settings_section_visual_effects),
                                     tint = colorScheme.onBackground
                                 )
                             },
-                            checked = uiState.globalSnowEnabled,
-                            onCheckedChange = actions.onSetGlobalSnowEnabled
-                        )
-                        OverlayDropdownPreference(
-                            title = stringResource(id = R.string.settings_global_snow_effect),
-                            summary = stringResource(id = R.string.settings_global_snow_effect_summary),
-                            items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_global_snow_effect),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
-                            onSelectedIndexChange = actions.onSetGlobalSnowEffectIndex
-                        )
-                        OverlayDropdownPreference(
-                            title = stringResource(id = R.string.settings_night_background_effect),
-                            summary = stringResource(id = R.string.settings_night_background_effect_summary),
-                            items = NightBackgroundEffect.entries.map { stringResource(it.labelRes) },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_night_background_effect),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            selectedIndex = NightBackgroundEffect.selectedIndex(uiState.nightBackgroundEffect),
-                            onSelectedIndexChange = actions.onSetNightBackgroundEffectIndex
-                        )
-                        SwitchPreference(
-                            title = stringResource(id = R.string.settings_scroll_animation),
-                            summary = stringResource(id = R.string.settings_scroll_animation_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.PlayCircle,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_scroll_animation),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            checked = uiState.globalScrollEffectEnabled,
-                            onCheckedChange = actions.onSetGlobalScrollEffectEnabled
-                        )
-                        OverlayDropdownPreference(
-                            title = stringResource(id = R.string.settings_scroll_animation_effect),
-                            summary = stringResource(id = R.string.settings_scroll_animation_effect_summary),
-                            items = GlobalScrollEffect.entries.map { stringResource(it.labelRes) },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.PlayCircle,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_scroll_animation_effect),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            selectedIndex = GlobalScrollEffect.selectedIndex(uiState.globalScrollEffect),
-                            onSelectedIndexChange = actions.onSetGlobalScrollEffectIndex
+                            onClick = actions.onOpenVisualEffects
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_theme),
@@ -355,36 +276,13 @@ fun SettingPagerMiuix(
                             onClick = actions.onOpenThemeStore
                         )
                         ArrowPreference(
-                            title = stringResource(id = R.string.settings_manager_name),
-                            summary = if (uiState.customManagerName.isBlank()) {
-                                stringResource(
-                                    id = R.string.settings_manager_name_default_summary,
-                                    stringResource(id = R.string.app_name)
-                                )
-                            } else {
-                                stringResource(
-                                    id = R.string.settings_manager_name_custom_summary,
-                                    uiState.customManagerName
-                                )
-                            },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.EditNote,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_manager_name),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onEditCustomManagerName
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_app_icon),
-                            summary = stringResource(id = R.string.settings_app_icon_summary),
+                            title = stringResource(id = R.string.settings_manager_identity),
+                            summary = stringResource(id = R.string.settings_manager_identity_summary),
                             startAction = {
                                 Icon(
                                     Icons.Rounded.Apps,
                                     modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_app_icon),
+                                    contentDescription = stringResource(id = R.string.settings_manager_identity),
                                     tint = colorScheme.onBackground
                                 )
                             },
@@ -487,34 +385,8 @@ fun SettingPagerMiuix(
                                     tint = colorScheme.onBackground
                                 )
                             },
-                            onClick = actions.onPickStartupAnimation
+                            onClick = actions.onOpenStartupAnimation
                         )
-                        if (uiState.customStartupAnimationUri != null) {
-                            ArrowPreference(
-                                title = stringResource(id = R.string.settings_startup_animation_preview),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Visibility,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_startup_animation_preview),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onPreviewStartupAnimation
-                            )
-                            ArrowPreference(
-                                title = stringResource(id = R.string.settings_startup_animation_clear),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Close,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_startup_animation_clear),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onClearStartupAnimation
-                            )
-                        }
                     }
 
                     KsuIsValid {
@@ -846,6 +718,20 @@ fun SettingPagerMiuix(
                                 onClick = actions.onOpenHiddenPathConfig
                             )
 
+                            ArrowPreference(
+                                title = stringResource(id = R.string.settings_ai_chat),
+                                summary = stringResource(id = R.string.settings_ai_chat_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.AutoFixHigh,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_ai_chat),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onOpenAiChat
+                            )
+
                             SwitchPreference(
                                 title = stringResource(id = R.string.enable_web_debugging),
                                 summary = stringResource(id = R.string.enable_web_debugging_summary),
@@ -1096,13 +982,10 @@ private fun CollapsibleMiuixSection(
 
 private const val UPDATES_ITEM_COUNT = 2
 private const val ROOT_FEATURES_ITEM_COUNT = 7
-private const val ADVANCED_ITEM_COUNT = 9
+private const val ADVANCED_ITEM_COUNT = 10
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    var count = 19
-    if (customStartupAnimationUri != null) count += 2
-
-    return count
+    return 13
 }
 
 @Composable

@@ -1,7 +1,7 @@
 package me.weishu.kernelsu.ui.screen.flash
 
+import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.Parcelable
@@ -33,8 +33,8 @@ import me.weishu.kernelsu.ui.util.flashAnyKernelZip
 import me.weishu.kernelsu.ui.util.flashModule
 import me.weishu.kernelsu.ui.util.installBoot
 import me.weishu.kernelsu.ui.util.restoreBoot
+import me.weishu.kernelsu.ui.util.saveTextToDownloads
 import me.weishu.kernelsu.ui.util.uninstallPermanently
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,6 +81,17 @@ sealed class FlashIt : Parcelable {
 
     @Parcelize
     data object FlashUninstall : FlashIt()
+}
+
+fun FlashIt.needsJailbreakFlashWarning(): Boolean {
+    return when (this) {
+        is FlashIt.FlashBoot,
+        is FlashIt.FlashAnyKernel,
+        FlashIt.FlashRestore,
+        FlashIt.FlashUninstall -> true
+
+        is FlashIt.FlashModules -> false
+    }
 }
 
 fun flashModulesSequentially(
@@ -196,6 +207,7 @@ fun FlashEffect(
 }
 
 fun saveLog(
+    context: Context,
     logContent: StringBuilder,
     scope: CoroutineScope,
     savedMessage: String,
@@ -205,18 +217,13 @@ fun saveLog(
     return {
         scope.launch {
             val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
-                    val date = format.format(Date())
-                    val downloads =
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    if (!downloads.exists()) {
-                        downloads.mkdirs()
-                    }
-                    val file = File(downloads, "KernelSU_install_log_${date}.log")
-                    file.writeText(logContent.toString())
-                    file.absolutePath
-                }
+                val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
+                val date = format.format(Date())
+                saveTextToDownloads(
+                    context = context,
+                    displayName = "KernelSU_install_log_${date}.log",
+                    text = logContent.toString(),
+                )
             }
             result.onSuccess { path ->
                 showMessage("$savedMessage: $path")

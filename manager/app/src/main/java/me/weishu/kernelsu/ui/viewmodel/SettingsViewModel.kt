@@ -75,6 +75,8 @@ class SettingsViewModel(
             val globalSnowEnabled = repo.globalSnowEnabled
             val globalSnowEffect = repo.globalSnowEffect
             val nightBackgroundEffect = repo.nightBackgroundEffect
+            val nightBackgroundPassthrough = repo.nightBackgroundPassthrough
+            val nightBackgroundPassthroughOpacity = repo.nightBackgroundPassthroughOpacity
             val globalScrollEffectEnabled = repo.globalScrollEffectEnabled
             val globalScrollEffect = repo.globalScrollEffect
             val themeSyncStrategy = repo.themeSyncStrategy
@@ -165,6 +167,8 @@ class SettingsViewModel(
                     globalSnowEnabled = globalSnowEnabled,
                     globalSnowEffect = globalSnowEffect,
                     nightBackgroundEffect = nightBackgroundEffect,
+                    nightBackgroundPassthrough = nightBackgroundPassthrough,
+                    nightBackgroundPassthroughOpacity = nightBackgroundPassthroughOpacity,
                     globalScrollEffectEnabled = globalScrollEffectEnabled,
                     globalScrollEffect = globalScrollEffect,
                     themeSyncStrategy = themeSyncStrategy,
@@ -345,6 +349,16 @@ class SettingsViewModel(
         val effect = NightBackgroundEffect.fromIndex(index)
         repo.nightBackgroundEffect = effect.value
         _uiState.update { it.copy(nightBackgroundEffect = effect.value) }
+    }
+
+    fun setNightBackgroundPassthrough(enabled: Boolean) {
+        repo.nightBackgroundPassthrough = enabled
+        _uiState.update { it.copy(nightBackgroundPassthrough = enabled) }
+    }
+
+    fun setNightBackgroundPassthroughOpacity(opacity: Float) {
+        repo.nightBackgroundPassthroughOpacity = opacity
+        _uiState.update { it.copy(nightBackgroundPassthroughOpacity = repo.nightBackgroundPassthroughOpacity) }
     }
 
     fun setGlobalScrollEffectEnabled(enabled: Boolean) {

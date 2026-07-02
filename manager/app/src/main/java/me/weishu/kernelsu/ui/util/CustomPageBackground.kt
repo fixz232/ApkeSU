@@ -71,6 +71,19 @@ enum class CustomPageBackgroundTarget(
         cropRightKey = "custom_page_background_settings_crop_right",
         cropBottomKey = "custom_page_background_settings_crop_bottom",
         videoDurationSecondsKey = "custom_page_background_settings_video_duration_seconds",
+    ),
+    Install(
+        id = "install",
+        mainPageIndex = -1,
+        titleRes = R.string.settings_page_background_install,
+        wallpaperUriKey = "custom_page_background_install_wallpaper_uri",
+        videoUriKey = "custom_page_background_install_video_uri",
+        opacityKey = "custom_page_background_install_opacity",
+        cropLeftKey = "custom_page_background_install_crop_left",
+        cropTopKey = "custom_page_background_install_crop_top",
+        cropRightKey = "custom_page_background_install_crop_right",
+        cropBottomKey = "custom_page_background_install_crop_bottom",
+        videoDurationSecondsKey = "custom_page_background_install_video_duration_seconds",
     );
 
     companion object {
@@ -104,6 +117,7 @@ data class CustomPageBackgroundSet(
     val superuser: CustomBackgroundState = CustomBackgroundState(),
     val module: CustomBackgroundState = CustomBackgroundState(),
     val settings: CustomBackgroundState = CustomBackgroundState(),
+    val install: CustomBackgroundState = CustomBackgroundState(),
 ) {
     operator fun get(target: CustomPageBackgroundTarget): CustomBackgroundState {
         return when (target) {
@@ -111,6 +125,7 @@ data class CustomPageBackgroundSet(
             CustomPageBackgroundTarget.Superuser -> superuser
             CustomPageBackgroundTarget.Module -> module
             CustomPageBackgroundTarget.Settings -> settings
+            CustomPageBackgroundTarget.Install -> install
         }
     }
 
@@ -239,6 +254,7 @@ internal fun SharedPreferences.readCustomPageBackgroundSet(): CustomPageBackgrou
         superuser = readCustomPageBackgroundState(CustomPageBackgroundTarget.Superuser),
         module = readCustomPageBackgroundState(CustomPageBackgroundTarget.Module),
         settings = readCustomPageBackgroundState(CustomPageBackgroundTarget.Settings),
+        install = readCustomPageBackgroundState(CustomPageBackgroundTarget.Install),
     )
 }
 

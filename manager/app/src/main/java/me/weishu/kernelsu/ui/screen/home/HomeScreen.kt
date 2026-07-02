@@ -15,10 +15,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.magica.MagicaService
 import me.weishu.kernelsu.ui.InterfaceStyle
@@ -46,6 +44,7 @@ fun HomePager(
     val loadingDialog = rememberLoadingDialog()
     val scope = rememberCoroutineScope()
     var installFeedbackActive by remember { mutableStateOf(false) }
+    var jailbreakInProgress by remember { mutableStateOf(false) }
     val refreshTick by KernelStatusEvents.refreshTick.collectAsStateWithLifecycle()
 
     var hasActivated by remember { mutableStateOf(false) }
@@ -76,6 +75,13 @@ fun HomePager(
         }
     }
 
+    LaunchedEffect(uiState.isLateLoadMode, uiState.ksuVersion) {
+        if (jailbreakInProgress && (uiState.isLateLoadMode || uiState.ksuVersion != null)) {
+            jailbreakInProgress = false
+            loadingDialog.hide()
+        }
+    }
+
     val showInlineInstallFeedback = uiState.ksuVersion == null && uiState.kernelVersion.isGKI()
     val actions = HomeActions(
         onInstallClick = {
@@ -96,13 +102,29 @@ fun HomePager(
         onModuleClick = { if (!uiState.showRequireKernelWarning) mainState.animateToPage(2) },
         onOpenUrl = uriHandler::openUri,
         onJailbreakClick = {
+            if (jailbreakInProgress) return@HomeActions
+            if (uiState.isLateLoadMode) {
+                KernelStatusEvents.requestRefresh()
+                return@HomeActions
+            }
             loadingDialog.showLoading()
-            context.startService(Intent(context, MagicaService::class.java))
+            jailbreakInProgress = true
+            val started = runCatching {
+                context.startService(Intent(context, MagicaService::class.java))
+            }
+            if (started.isFailure) {
+                jailbreakInProgress = false
+                loadingDialog.hide()
+                Toast.makeText(context, R.string.jailbreak_timeout, Toast.LENGTH_LONG).show()
+                KernelStatusEvents.requestRefresh()
+                return@HomeActions
+            }
             // Manager will be force-stopped and restarted by late-load on success.
             // If that doesn't happen within timeout, jailbreak likely failed.
-            scope.launch(Dispatchers.IO) {
+            scope.launch {
                 delay(30_000)
-                withContext(Dispatchers.Main) {
+                if (jailbreakInProgress) {
+                    jailbreakInProgress = false
                     loadingDialog.hide()
                     Toast.makeText(context, R.string.jailbreak_timeout, Toast.LENGTH_LONG).show()
                     KernelStatusEvents.requestRefresh()
