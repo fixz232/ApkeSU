@@ -1,12 +1,16 @@
 # ApkeSU
 
-一个专注于 KernelSU 管理器体验与界面扩展的二次修改版本，主要面向 UI、管理器功能与个人设备调试场景。
+ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目，主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
 TG 组织：https://t.me/+vIE0TtF9xxgyYzQ1
 
-## ApkeSU 项目说明
+频道：https://t.me/+LkrMQKXtXvpmYmNl
 
-本项目是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目，完全遵循 **GPL-3.0 开源许可证** 协议分发。
+QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.qq.com/q/8O7qvLM3zq
+
+## 项目说明
+
+本项目完全遵循 **GPL-3.0 开源许可证** 协议分发。
 
 ## 上游项目信息
 
@@ -32,3 +36,7 @@ TG 组织：https://t.me/+vIE0TtF9xxgyYzQ1
 2. 部分金融、游戏、企业办公类 APP 存在 Root 环境风控检测，用户自行承担账号封禁、设备风控限制的使用风险；
 3. 禁止将本工具用于未经授权的设备权限篡改、逆向破解、恶意软件捆绑等违反法律法规的场景，违规使用的法律责任由使用者自行承担；
 4. 本项目仅在开源技术社区交流分发，不提供任何商用付费售卖服务，非官方第三方渠道的安装包安全性无法保证，请自行甄别。
+
+## 致谢
+
+感谢 [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者 tiann、weishu 及全部贡献者致以感谢。
