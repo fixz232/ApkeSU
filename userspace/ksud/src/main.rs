@@ -47,6 +47,8 @@ mod pathmask;
 #[cfg(target_os = "android")]
 mod profile;
 #[cfg(target_os = "android")]
+mod rescue;
+#[cfg(target_os = "android")]
 mod resetprop;
 #[cfg(target_os = "android")]
 mod restorecon;

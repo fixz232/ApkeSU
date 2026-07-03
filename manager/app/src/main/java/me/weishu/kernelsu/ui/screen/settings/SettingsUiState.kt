@@ -197,6 +197,7 @@ data class SettingsScreenActions(
     val onOpenKPatchNextWebUi: () -> Unit,
     val onOpenHiddenPathConfig: () -> Unit,
     val onOpenAiChat: () -> Unit,
+    val onOpenRescueProtection: () -> Unit,
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,
     val onSetAutoJailbreak: (Boolean) -> Unit,

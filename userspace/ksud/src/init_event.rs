@@ -25,6 +25,8 @@ pub fn on_post_data_fs() -> Result<()> {
 
     utils::umask(0);
 
+    crate::rescue::check_on_post_fs_data();
+
     // Clear all temporary module configs early
     if let Err(e) = crate::module_config::clear_all_temp_configs() {
         warn!("clear temp configs failed: {e}");
@@ -193,6 +195,8 @@ pub fn on_boot_completed() {
 
     ksucalls::report_boot_complete();
     info!("on_boot_completed triggered!");
+
+    crate::rescue::mark_boot_completed();
 
     run_stage("boot-completed", false);
     crate::epkesu_hide::apply_if_enabled();

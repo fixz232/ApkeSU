@@ -116,6 +116,7 @@ import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
+import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
@@ -308,6 +309,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
                                 entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
+                                entry<Route.RescueProtection> { RescueProtectionScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }

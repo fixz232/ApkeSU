@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Videocam
@@ -306,6 +307,12 @@ fun SettingPagerDelta(
                     summary = stringResource(R.string.hidden_path_config_summary),
                     icon = Icons.Rounded.Visibility,
                     onClick = actions.onOpenHiddenPathConfig,
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.rescue_protection),
+                    summary = stringResource(R.string.rescue_protection_summary),
+                    icon = Icons.Rounded.Security,
+                    onClick = actions.onOpenRescueProtection,
                 )
                 DeltaActionRow(
                     title = stringResource(R.string.settings_ai_chat),

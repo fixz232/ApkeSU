@@ -99,6 +99,73 @@ data class HiddenPathConfigState(
     val lastLog: String = "",
 )
 
+data class RescueImageState(
+    val name: String = "",
+    val label: String = "",
+    val partition: String = "",
+    val image: String = "",
+    val required: Boolean = false,
+    val custom: Boolean = false,
+    val exists: Boolean = false,
+    val size: Long = 0,
+    val partitionSize: Long = 0,
+    val sha256: String = "",
+    val sha256Ok: Boolean = true,
+    val sizeOk: Boolean = true,
+    val otherSlot: Boolean = false,
+    val restore: Boolean = true,
+)
+
+data class RescueConfigState(
+    val includeDtbo: Boolean = false,
+    val includeVbmeta: Boolean = false,
+    val backupOtherSlot: Boolean = false,
+    val allowDangerousAutoRestore: Boolean = false,
+    val customPartitions: Map<String, String> = emptyMap(),
+)
+
+data class RescueStatus(
+    val enabled: Boolean = false,
+    val config: RescueConfigState = RescueConfigState(),
+    val images: List<RescueImageState> = emptyList(),
+    val bootCount: Int = 0,
+    val autoRestoreAttempts: Int = 0,
+    val pendingBoot: Boolean = false,
+    val currentSlot: String = "",
+    val bootMode: String = "",
+    val device: String = "",
+    val manifestCreatedAt: String = "",
+    val lastRestoreDone: Boolean = false,
+    val ready: Boolean = false,
+    val readyReason: String = "",
+    val log: String = "",
+) {
+    val requiredReady: Boolean
+        get() = ready
+}
+
+data class RescueTestReport(
+    val ok: Boolean = false,
+    val reason: String = "",
+    val text: String = "",
+)
+
+fun RescueConfigState.toConfigJson(): String {
+    val custom = JSONObject()
+    customPartitions.forEach { (key, value) ->
+        if (value.isNotBlank()) {
+            custom.put(key, value)
+        }
+    }
+    return JSONObject()
+        .put("includeDtbo", includeDtbo)
+        .put("includeVbmeta", includeVbmeta)
+        .put("backupOtherSlot", backupOtherSlot)
+        .put("allowDangerousAutoRestore", allowDangerousAutoRestore)
+        .put("customPartitions", custom)
+        .toString()
+}
+
 fun HiddenPathConfigState.toConfigJson(): String {
     return JSONObject()
         .put("targetPaths", JSONArray(targetPaths.cleanConfigList()))
@@ -535,6 +602,182 @@ fun clearHiddenPathLogs(): Boolean {
 
 fun unloadHiddenPathKernelPaths(): Boolean {
     return execKsud("pathmask unload", true)
+}
+
+suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext RescueStatus()
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${getKsuDaemonPath()} rescue status")
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            Log.w(TAG, "rescue status timed out")
+            KsuCli.reset()
+            return@runCatching RescueStatus()
+        }
+
+        if (!result.isSuccess) {
+            Log.w(TAG, "rescue status failed: ${stderr.joinToString("\n")}")
+            return@runCatching RescueStatus()
+        }
+
+        val obj = JSONObject(stdout.joinToString("\n"))
+        val manifest = obj.optJSONObject("manifest")
+        val device = obj.optJSONObject("device")
+        RescueStatus(
+            enabled = obj.optBoolean("enabled", false),
+            config = obj.optJSONObject("config").toRescueConfigState(),
+            images = obj.optJSONArray("images").toRescueImageList(),
+            bootCount = obj.optInt("bootCount", 0),
+            autoRestoreAttempts = obj.optInt("autoRestoreAttempts", 0),
+            pendingBoot = obj.optBoolean("pendingBoot", false),
+            currentSlot = obj.optString("currentSlot", ""),
+            bootMode = obj.optString("bootMode", ""),
+            device = listOf(
+                device?.optString("brand", "").orEmpty(),
+                device?.optString("model", "").orEmpty(),
+            ).filter(String::isNotBlank).joinToString(" "),
+            manifestCreatedAt = manifest?.optString("createdAt", "").orEmpty(),
+            lastRestoreDone = obj.optBoolean("lastRestoreDone", false),
+            ready = obj.optBoolean("ready", false),
+            readyReason = obj.optString("readyReason", ""),
+            log = obj.optString("log", ""),
+        )
+    }.getOrElse {
+        Log.w(TAG, "rescue status unavailable", it)
+        KsuCli.reset()
+        RescueStatus()
+    }
+}
+
+suspend fun runRescueCommand(command: String, timeoutMultiplier: Long = 6): Boolean = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext false
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * timeoutMultiplier) {
+            getRootShell().newJob()
+                .add("${getKsuDaemonPath()} rescue $command")
+                .to(stdout, stderr)
+                .exec()
+        }
+
+        if (result == null) {
+            Log.w(TAG, "rescue $command timed out")
+            KsuCli.reset()
+            return@runCatching false
+        }
+
+        if (!result.isSuccess) {
+            Log.w(TAG, "rescue $command failed: ${stderr.joinToString("\n")}")
+        }
+        result.isSuccess
+    }.getOrElse {
+        Log.w(TAG, "rescue $command unavailable", it)
+        KsuCli.reset()
+        false
+    }
+}
+
+suspend fun saveRescueConfig(config: RescueConfigState): Boolean = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext false
+    }
+
+    runCatching {
+        val stderr = ArrayList<String>()
+        val result = getRootShell().newJob()
+            .add("${getKsuDaemonPath()} rescue import-config-json ${shellQuote(config.toConfigJson())}")
+            .to(null, stderr)
+            .exec()
+        if (!result.isSuccess) {
+            Log.w(TAG, "rescue config save failed: ${stderr.joinToString("\n")}")
+        }
+        result.isSuccess
+    }.getOrElse {
+        Log.w(TAG, "rescue config save unavailable", it)
+        KsuCli.reset()
+        false
+    }
+}
+
+suspend fun importRescueImage(partition: String, sourcePath: String, force: Boolean): Boolean = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext false
+    }
+
+    runCatching {
+        val stderr = ArrayList<String>()
+        val forceArg = if (force) " --force" else ""
+        val result = getRootShell().newJob()
+            .add(
+                "${getKsuDaemonPath()} rescue import-image " +
+                    "${shellQuote(partition)} ${shellQuote(sourcePath)}$forceArg"
+            )
+            .to(null, stderr)
+            .exec()
+        if (!result.isSuccess) {
+            Log.w(TAG, "rescue image import failed: ${stderr.joinToString("\n")}")
+        }
+        result.isSuccess
+    }.getOrElse {
+        Log.w(TAG, "rescue image import unavailable", it)
+        KsuCli.reset()
+        false
+    }
+}
+
+suspend fun testRescueEnvironment(): RescueTestReport = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext RescueTestReport(reason = "ksud command unavailable")
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = getRootShell().newJob()
+            .add("${getKsuDaemonPath()} rescue test")
+            .to(stdout, stderr)
+            .exec()
+        val raw = stdout.joinToString("\n")
+        val obj = JSONObject(raw)
+        RescueTestReport(
+            ok = result.isSuccess && obj.optBoolean("ok", false),
+            reason = obj.optString("reason", stderr.joinToString("\n")),
+            text = raw,
+        )
+    }.getOrElse {
+        Log.w(TAG, "rescue test unavailable", it)
+        KsuCli.reset()
+        RescueTestReport(reason = it.message.orEmpty())
+    }
+}
+
+suspend fun getRescueLogs(): String = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext ""
+    }
+
+    runCatching {
+        val stdout = ArrayList<String>()
+        getRootShell().newJob()
+            .add("${getKsuDaemonPath()} rescue logs")
+            .to(stdout, null)
+            .exec()
+        stdout.joinToString("\n")
+    }.getOrDefault("")
 }
 
 fun isHiddenPathLkmMode(): Boolean {
@@ -1105,6 +1348,59 @@ private fun JSONArray?.toStringList(): List<String> {
     return buildList {
         for (index in 0 until length()) {
             optString(index).trim().takeIf { it.isNotEmpty() }?.let(::add)
+        }
+    }
+}
+
+private fun JSONObject?.toRescueImageState(): RescueImageState {
+    if (this == null) {
+        return RescueImageState()
+    }
+    return RescueImageState(
+        name = optString("name", ""),
+        label = optString("label", ""),
+        partition = optString("partition", ""),
+        image = optString("image", ""),
+        required = optBoolean("required", false),
+        custom = optBoolean("custom", false),
+        exists = optBoolean("exists", false),
+        size = optLong("size", 0),
+        partitionSize = optLong("partitionSize", 0),
+        sha256 = optString("sha256", ""),
+        sha256Ok = optBoolean("sha256Ok", true),
+        sizeOk = optBoolean("sizeOk", true),
+        otherSlot = optBoolean("otherSlot", false),
+        restore = optBoolean("restore", true),
+    )
+}
+
+private fun JSONObject?.toRescueConfigState(): RescueConfigState {
+    if (this == null) {
+        return RescueConfigState()
+    }
+    val custom = optJSONObject("customPartitions")
+    val keys = custom?.keys()
+    val map = mutableMapOf<String, String>()
+    if (keys != null) {
+        while (keys.hasNext()) {
+            val key = keys.next()
+            map[key] = custom.optString(key, "")
+        }
+    }
+    return RescueConfigState(
+        includeDtbo = optBoolean("includeDtbo", false),
+        includeVbmeta = optBoolean("includeVbmeta", false),
+        backupOtherSlot = optBoolean("backupOtherSlot", false),
+        allowDangerousAutoRestore = optBoolean("allowDangerousAutoRestore", false),
+        customPartitions = map,
+    )
+}
+
+private fun JSONArray?.toRescueImageList(): List<RescueImageState> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            add(optJSONObject(index).toRescueImageState())
         }
     }
 }

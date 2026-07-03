@@ -28,7 +28,7 @@ mod android {
     use android_bootimg::cpio::{Cpio, CpioEntry};
     use anyhow::{Context, anyhow, bail, ensure};
     use regex_lite::Regex;
-    use std::fs::OpenOptions;
+    use std::fs::{self, OpenOptions};
     use std::io::Write;
     use std::os::fd::AsRawFd;
     use std::os::unix::fs::PermissionsExt;
@@ -198,10 +198,8 @@ mod android {
         is_replace_kernel: bool,
         partition: &Option<String>,
     ) -> String {
-        let slot_suffix = get_slot_suffix(false);
         let skip_init_boot = kmi.starts_with("android12-");
-        let init_boot_exist =
-            Path::new(&format!("/dev/block/by-name/init_boot{slot_suffix}")).exists();
+        let init_boot_exist = find_partition_path("init_boot", false).is_some();
 
         // if specific partition is specified, use it
         if let Some(part) = partition {
@@ -232,13 +230,19 @@ mod android {
     }
 
     pub fn list_available_partitions() -> Vec<String> {
-        let slot_suffix = get_slot_suffix(false);
         let candidates = vec!["boot", "init_boot", "vendor_boot"];
         candidates
             .into_iter()
-            .filter(|name| Path::new(&format!("/dev/block/by-name/{name}{slot_suffix}")).exists())
+            .filter(|name| find_partition_path(name, false).is_some())
             .map(ToString::to_string)
             .collect()
+    }
+
+    pub fn find_partition_path(name: &str, ota: bool) -> Option<PathBuf> {
+        let slot_suffix = get_slot_suffix(ota);
+        partition_path_candidates(name, &slot_suffix)
+            .into_iter()
+            .find(|path| path.exists())
     }
 
     pub(super) fn auto_boot_partition_path(
@@ -249,7 +253,69 @@ mod android {
     ) -> PathBuf {
         let slot_suffix = get_slot_suffix(ota);
         let name = choose_boot_partition(kmi, is_replace_kernel, partition);
-        PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}"))
+        find_partition_path(&name, ota)
+            .unwrap_or_else(|| PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}")))
+    }
+
+    fn partition_path_candidates(name: &str, slot_suffix: &str) -> Vec<PathBuf> {
+        let mut candidates = vec![
+            PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}")),
+            PathBuf::from(format!("/dev/block/bootdevice/by-name/{name}{slot_suffix}")),
+        ];
+        candidates.extend(platform_by_name_candidates(name, slot_suffix));
+        candidates.extend([
+            PathBuf::from(format!("/dev/block/by-name/{name}")),
+            PathBuf::from(format!("/dev/block/bootdevice/by-name/{name}")),
+            PathBuf::from(format!("/dev/block/{name}")),
+        ]);
+        candidates
+    }
+
+    fn platform_by_name_candidates(name: &str, slot_suffix: &str) -> Vec<PathBuf> {
+        let mut candidates = Vec::new();
+        let platform = Path::new("/dev/block/platform");
+        collect_platform_by_name_candidates(platform, name, slot_suffix, 4, &mut candidates);
+        candidates
+    }
+
+    fn collect_platform_by_name_candidates(
+        base: &Path,
+        name: &str,
+        slot_suffix: &str,
+        depth: u8,
+        candidates: &mut Vec<PathBuf>,
+    ) {
+        push_by_name_children(base, name, slot_suffix, candidates);
+        if depth == 0 {
+            return;
+        }
+
+        let Ok(entries) = fs::read_dir(base) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_platform_by_name_candidates(
+                    &path,
+                    name,
+                    slot_suffix,
+                    depth - 1,
+                    candidates,
+                );
+            }
+        }
+    }
+
+    fn push_by_name_children(
+        base: &Path,
+        name: &str,
+        slot_suffix: &str,
+        candidates: &mut Vec<PathBuf>,
+    ) {
+        let by_name = base.join("by-name");
+        candidates.push(by_name.join(format!("{name}{slot_suffix}")));
+        candidates.push(by_name.join(name));
     }
 
     pub(super) fn post_ota() -> Result<()> {
@@ -756,6 +822,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             println!("- Flashing new boot image");
             let bootdevice = boot_image_file.display().to_string();
             flash_partition(&bootdevice, &new_boot_bytes)?;
+            crate::rescue::mark_next_boot_pending("boot image flashed");
             if ota {
                 post_ota()?;
             }
@@ -928,6 +995,7 @@ pub fn restore(args: BootRestoreArgs) -> Result<()> {
         }
         let bootdevice = boot_image_file.display().to_string();
         flash_partition(&bootdevice, &new_boot_bytes)?;
+        crate::rescue::mark_next_boot_pending("boot image restored");
     }
 
     #[cfg(target_os = "android")]

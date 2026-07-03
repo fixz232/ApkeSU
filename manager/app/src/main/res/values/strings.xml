@@ -286,6 +286,8 @@
     <string name="hidden_path_lkm_selected_kmi">Selected KMI: %s</string>
     <string name="hidden_path_config">Hidden path config</string>
     <string name="hidden_path_config_summary">Configure pathmask LKM paths, target apps, and logs.</string>
+    <string name="rescue_protection">Rescue protection</string>
+    <string name="rescue_protection_summary">Back up boot images and auto-restore them after repeated failed boots.</string>
     <string name="settings_ai_chat">AI chat</string>
     <string name="settings_ai_chat_summary">Use a custom API to chat, upload files/images, and analyze installed modules.</string>
     <string name="ai_chat_title">AI chat</string>

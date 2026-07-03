@@ -3,13 +3,13 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use android_logger::Config;
-use log::{LevelFilter, error, info};
+use log::{LevelFilter, error, info, warn};
 
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
 use crate::{
     apk_sign, assets, builtin_mount, debug, defs, epkesu_hide, init_event, kpatch_next, ksu_uapi,
-    ksucalls, module, module_config, pathmask, sulog, utils,
+    ksucalls, module, module_config, pathmask, rescue, sulog, utils,
 };
 
 /// KernelSU userspace cli
@@ -50,6 +50,12 @@ enum Commands {
     Pathmask {
         #[command(subcommand)]
         command: Pathmask,
+    },
+
+    /// Manage boot rescue protection
+    Rescue {
+        #[command(subcommand)]
+        command: Rescue,
     },
 
     /// Trigger `post-fs-data` event
@@ -197,6 +203,63 @@ enum BootInfo {
         #[arg(short = 'u', long, default_value = "false")]
         ota: bool,
     },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Rescue {
+    /// Print rescue protection status
+    Status,
+
+    /// Print rescue environment test report
+    Test,
+
+    /// Import rescue config JSON from an argument
+    ImportConfigJson {
+        /// JSON config text
+        json: String,
+    },
+
+    /// Import a user supplied partition image as rescue backup
+    ImportImage {
+        /// Partition name: boot/init_boot/vendor_boot/dtbo/vbmeta
+        partition: String,
+
+        /// Source image file path
+        source: PathBuf,
+
+        /// Overwrite existing rescue backup
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Backup boot/vendor_boot/init_boot partitions
+    Backup {
+        /// Overwrite existing rescue backups
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Enable rescue protection
+    Enable,
+
+    /// Disable rescue protection
+    Disable,
+
+    /// Restore boot images without touching user data
+    Restore,
+
+    /// Restore boot images without touching user data
+    RestoreKeepData,
+
+    /// Check rescue protection during recovery boot
+    #[command(hide = true)]
+    RecoveryCheck,
+
+    /// Print rescue logs
+    Logs,
+
+    /// Clear rescue logs
+    ClearLogs,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -776,6 +839,45 @@ pub fn run() -> Result<()> {
                     Ok(())
                 }
                 Pathmask::ClearLogs => pathmask::clear_logs(),
+            }
+        }
+        Commands::Rescue { command } => {
+            if matches!(command, Rescue::RecoveryCheck) {
+                if let Err(err) = utils::switch_mnt_ns(1) {
+                    warn!("continue recovery rescue check without pid 1 mount namespace: {err:#}");
+                }
+            } else {
+                utils::switch_mnt_ns(1)?;
+            }
+            match command {
+                Rescue::Status => {
+                    rescue::print_status();
+                    Ok(())
+                }
+                Rescue::Test => {
+                    rescue::print_test_report();
+                    Ok(())
+                }
+                Rescue::ImportConfigJson { json } => rescue::import_config_text(&json),
+                Rescue::ImportImage {
+                    partition,
+                    source,
+                    force,
+                } => rescue::import_image(&partition, &source, force),
+                Rescue::Backup { force } => rescue::backup(force),
+                Rescue::Enable => rescue::enable(),
+                Rescue::Disable => rescue::disable(),
+                Rescue::Restore => rescue::restore_now(),
+                Rescue::RestoreKeepData => rescue::restore_keep_data_now(),
+                Rescue::RecoveryCheck => {
+                    rescue::check_on_recovery_boot();
+                    Ok(())
+                }
+                Rescue::Logs => {
+                    rescue::print_logs();
+                    Ok(())
+                }
+                Rescue::ClearLogs => rescue::clear_logs(),
             }
         }
         Commands::Install { libadbroot } => utils::install(libadbroot),

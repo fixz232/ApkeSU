@@ -25,6 +25,12 @@ const TARGET_WAIT_SECONDS: u64 = 5;
 const TARGET_WAIT_STEP_MS: u64 = 200;
 const MODULE_UNLOAD_WAIT_MS: u64 = 2000;
 const MODULE_UNLOAD_STEP_MS: u64 = 100;
+const MANAGED_ROOT_PATHS: &[&str] = &[
+    "/data/adb/modules",
+    "/data/adb/modules_update",
+    "/data/adb/ksu",
+    "/data/adb/ap",
+];
 
 #[derive(Clone, Debug)]
 struct PathmaskConfig {
@@ -291,6 +297,7 @@ fn build_module_params(config: &PathmaskConfig) -> Result<String> {
     if config.target_paths.is_empty() {
         bail!("no target path configured");
     }
+    ensure_safe_scope(config)?;
 
     let target_paths = config.target_paths.join(",");
     if target_paths.len() > MAX_TARGET_PATHS_LEN {
@@ -298,7 +305,7 @@ fn build_module_params(config: &PathmaskConfig) -> Result<String> {
     }
 
     let mut params = vec![
-        format!("target_paths={target_paths}"),
+        format!("target_paths={}", quote_module_param_value(&target_paths)),
         format!("hide_dirents={}", bool_param(config.hide_dirents)),
         format!("hide_isolated={}", bool_param(config.hide_isolated)),
     ];
@@ -324,6 +331,32 @@ fn build_module_params(config: &PathmaskConfig) -> Result<String> {
 
 const fn bool_param(value: bool) -> &'static str {
     if value { "1" } else { "0" }
+}
+
+fn ensure_safe_scope(config: &PathmaskConfig) -> Result<()> {
+    if config.use_app_scope {
+        return Ok(());
+    }
+
+    if config.target_paths.iter().any(|path| {
+        MANAGED_ROOT_PATHS
+            .iter()
+            .any(|managed| path == managed || path.starts_with(&format!("{managed}/")))
+    }) {
+        bail!(
+            "managed /data/adb paths must use app UID scope; global scope can break module management"
+        );
+    }
+
+    Ok(())
+}
+
+fn quote_module_param_value(value: &str) -> String {
+    if value.chars().any(char::is_whitespace) {
+        format!("\"{value}\"")
+    } else {
+        value.to_string()
+    }
 }
 
 fn resolve_deny_uids(app_packages: &[String]) -> BTreeSet<u32> {
@@ -405,16 +438,26 @@ fn string_array(value: Option<&Value>) -> Vec<String> {
 }
 
 fn sanitize_target_path(path: &str) -> Option<String> {
-    let path = path.trim();
+    let path = normalize_target_path(path);
     if path.starts_with('/')
         && !path.contains(',')
         && !path.contains('\0')
-        && !path.chars().any(char::is_whitespace)
+        && !path.contains('"')
+        && !path.contains('\\')
     {
-        Some(path.to_owned())
+        Some(path)
     } else {
         append_log(format!("ignored invalid target path: {path}"));
         None
+    }
+}
+
+fn normalize_target_path(path: &str) -> String {
+    let path = path.trim();
+    if path.len() > 1 {
+        path.trim_end_matches('/').to_owned()
+    } else {
+        path.to_owned()
     }
 }
 

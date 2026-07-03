@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Videocam
@@ -716,6 +717,20 @@ fun SettingPagerMiuix(
                                     )
                                 },
                                 onClick = actions.onOpenHiddenPathConfig
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(id = R.string.rescue_protection),
+                                summary = stringResource(id = R.string.rescue_protection_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Security,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.rescue_protection),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onOpenRescueProtection
                             )
 
                             ArrowPreference(

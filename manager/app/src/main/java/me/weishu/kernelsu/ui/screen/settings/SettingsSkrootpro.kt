@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
@@ -327,6 +328,12 @@ fun SettingPagerSkrootpro(
                     summary = stringResource(R.string.hidden_path_config_summary),
                     leadingIcon = Icons.Rounded.Visibility,
                     onClick = actions.onOpenHiddenPathConfig,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.rescue_protection),
+                    summary = stringResource(R.string.rescue_protection_summary),
+                    leadingIcon = Icons.Rounded.Security,
+                    onClick = actions.onOpenRescueProtection,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_ai_chat),

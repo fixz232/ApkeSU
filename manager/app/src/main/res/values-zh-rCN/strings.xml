@@ -242,6 +242,8 @@
     <string name="hidden_path_lkm_selected_kmi">已选择 KMI：%s</string>
     <string name="hidden_path_config">&#x9690;&#x85CF;&#x8DEF;&#x5F84;&#x914D;&#x7F6E;</string>
     <string name="hidden_path_config_summary">&#x914D;&#x7F6E; pathmask LKM &#x7684;&#x8DEF;&#x5F84;&#x3001;&#x5E94;&#x7528;&#x548C;&#x65E5;&#x5FD7;&#x3002;</string>
+    <string name="rescue_protection">救砖保护</string>
+    <string name="rescue_protection_summary">备份 boot/vendor_boot/init_boot，并在连续启动失败后自动回滚。</string>
     <string name="settings_ai_chat">AI 聊天</string>
     <string name="settings_ai_chat_summary">自定义 API 对接聊天，支持上传文件/图片和分析当前模块。</string>
     <string name="ai_chat_title">AI 聊天</string>

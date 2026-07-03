@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.RemoveModerator
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Videocam
@@ -660,6 +661,22 @@ private fun SettingsMaterialContent(
                             Icon(
                                 Icons.Filled.Visibility,
                                 stringResource(id = R.string.hidden_path_config)
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    )
+                },
+                {
+                    SegmentedListItem(
+                        onClick = actions.onOpenRescueProtection,
+                        headlineContent = { Text(stringResource(id = R.string.rescue_protection)) },
+                        supportingContent = { Text(stringResource(id = R.string.rescue_protection_summary)) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Security,
+                                stringResource(id = R.string.rescue_protection)
                             )
                         },
                         trailingContent = {

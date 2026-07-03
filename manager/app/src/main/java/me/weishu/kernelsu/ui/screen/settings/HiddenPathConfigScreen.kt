@@ -22,9 +22,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -163,10 +163,11 @@ private const val TEXT_CLIPBOARD_EMPTY = "\u526a\u8d34\u677f\u91cc\u6ca1\u6709\u
 private const val TEXT_EMPTY_TEMPLATE = "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u914d\u7f6e\u6a21\u677f"
 private const val TEXT_TEMPLATE_NAME_EMPTY = "\u8bf7\u5148\u8f93\u5165\u6a21\u677f\u540d\u79f0"
 private const val TEXT_DUPLICATE_ITEM = "\u8be5\u9879\u5df2\u5b58\u5728"
-private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u5305\u542b\u7a7a\u683c\u6216\u9017\u53f7"
+private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u5305\u542b\u9017\u53f7\u3001\u53cc\u5f15\u53f7\u3001\u53cd\u659c\u6760\u6216\u63a7\u5236\u5b57\u7b26"
 private const val TEXT_INVALID_APP = "\u5305\u540d\u6216 UID \u65e0\u6548\uff1a\u53ea\u80fd\u4f7f\u7528\u6570\u5b57\u3001\u5b57\u6bcd\u3001.\u3001_\u3001-\u3001:"
 private const val TEXT_NO_PATH = "\u8def\u5f84\u5217\u8868\u4e3a\u7a7a\uff0c\u8bf7\u5148\u6dfb\u52a0\u8981\u9690\u85cf\u7684\u8def\u5f84"
 private const val TEXT_NO_APP = "\u5df2\u5f00\u542f\u6309\u5e94\u7528 UID \u9690\u85cf\uff0c\u8bf7\u6dfb\u52a0\u5305\u540d\u6216 UID\uff1b\u8981\u5168\u5c40\u751f\u6548\u5c31\u5173\u95ed\u8fd9\u4e2a\u5f00\u5173"
+private const val TEXT_MANAGED_PATH_GLOBAL_BLOCK = "\u9690\u85cf /data/adb \u6a21\u5757\u76ee\u5f55\u65f6\u5fc5\u987b\u5f00\u542f\u201c\u6309\u5e94\u7528 UID \u9690\u85cf\u201d\uff0c\u5168\u5c40\u9690\u85cf\u4f1a\u5bfc\u81f4\u6a21\u5757\u7ba1\u7406\u5931\u6548"
 private const val TEXT_WAITING_CONFIG = "\u7b49\u5f85\u914d\u7f6e"
 private const val TEXT_WAITING_LOAD = "\u5f85\u52a0\u8f7d"
 private const val TEXT_RUNNING = "\u8fd0\u884c\u4e2d"
@@ -180,6 +181,13 @@ private val COMMON_HIDDEN_PATHS = listOf(
     "/system/bin/su",
     "/system/xbin/su",
     "/vendor/bin/su",
+)
+
+private val MANAGED_ROOT_PATHS = listOf(
+    "/data/adb/modules",
+    "/data/adb/modules_update",
+    "/data/adb/ksu",
+    "/data/adb/ap",
 )
 
 private data class HiddenPathTemplate(
@@ -531,7 +539,6 @@ private fun HiddenPathConfigTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -658,6 +665,8 @@ private fun HiddenPathConfigTab(
                 },
             )
         }
+
+        Spacer(modifier = Modifier.size(96.dp))
     }
 
     if (showAppPicker) {
@@ -865,6 +874,7 @@ private fun HiddenPathConfigState.blockReason(): String? {
     return when {
         targetPaths.isEmpty() -> TEXT_NO_PATH
         targetPaths.any { normalizeHiddenPath(it) == null } -> TEXT_INVALID_PATH
+        !useAppScope && targetPaths.any(::isManagedRootPath) -> TEXT_MANAGED_PATH_GLOBAL_BLOCK
         useAppScope && appPackages.isEmpty() -> TEXT_NO_APP
         useAppScope && appPackages.any { normalizeAppEntry(it) == null } -> TEXT_INVALID_APP
         else -> null
@@ -1308,6 +1318,7 @@ private fun HiddenPathHelpTab() {
         "\u8fd9\u4e2a\u9875\u9762\u914d\u7f6e\u5185\u7f6e pathmask LKM\uff0c\u4e0d\u662f\u666e\u901a\u6a21\u5757 WebUI\u3002",
         "\u8def\u5f84\u914d\u7f6e\u8981\u586b\u7edd\u5bf9\u8def\u5f84\uff0c\u591a\u4e2a\u8def\u5f84\u4f1a\u4ee5 target_paths \u53c2\u6570\u4f20\u7ed9 LKM\u3002",
         "\u5e94\u7528\u9009\u62e9\u652f\u6301\u5305\u540d\u6216 UID\uff0c\u5e94\u7528\u8303\u56f4\u6a21\u5f0f\u4f1a\u89e3\u6790\u6210 deny_uids\u3002",
+        "\u4e3a\u9632\u6b62\u9690\u85cf\u6a21\u5757\u540e\u6a21\u5757\u7ba1\u7406\u5931\u6548\uff0c\u5982\u679c\u76ee\u6807\u8def\u5f84\u662f /data/adb/modules\u3001/data/adb/ksu\u3001/data/adb/ap \u8fd9\u7c7b\u7ba1\u7406\u76ee\u5f55\uff0c\u5fc5\u987b\u5f00\u542f\u201c\u6309\u5e94\u7528 UID \u9690\u85cf\u201d\uff0c\u4e0d\u5141\u8bb8\u5168\u5c40\u9690\u85cf\u3002",
         "\u70b9\u51fb\u786e\u5b9a\u9690\u85cf\u540e\uff0cksud \u4f1a\u7b49\u5f85\u76ee\u6807\u8def\u5f84\u51fa\u73b0\uff0c\u518d\u70ed\u91cd\u8f7d pathmask \u5e76\u5e94\u7528\u65b0\u914d\u7f6e\u3002",
         "\u5982\u679c\u6ca1\u6709\u9690\u85cf\u6548\u679c\uff0c\u5148\u770b\u65e5\u5fd7\u91cc\u7684 resolved_count\u3001KMI \u548c\u5185\u6838 dmesg \u8f93\u51fa\u3002",
     )
@@ -1385,12 +1396,13 @@ private fun HiddenPathAppPickerDialog(
 
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = true),
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.86f)
+                .heightIn(min = 360.dp, max = 560.dp)
+                .imePadding()
                 .padding(horizontal = 16.dp),
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -1592,16 +1604,25 @@ private fun sanitizeHiddenPathConfig(config: HiddenPathConfigState): HiddenPathC
 }
 
 private fun normalizeHiddenPath(rawPath: String): String? {
-    val path = rawPath.trim()
+    val path = rawPath.trim().trimEnd('/').ifEmpty { rawPath.trim() }
     if (
         path.startsWith("/") &&
         !path.contains(",") &&
         !path.contains('\u0000') &&
-        !path.any(Char::isWhitespace)
+        !path.contains('"') &&
+        !path.contains('\\') &&
+        path.none { it.isISOControl() }
     ) {
         return path
     }
     return null
+}
+
+private fun isManagedRootPath(path: String): Boolean {
+    val normalized = normalizeHiddenPath(path) ?: return false
+    return MANAGED_ROOT_PATHS.any { managed ->
+        normalized == managed || normalized.startsWith("$managed/")
+    }
 }
 
 private fun normalizeAppEntry(rawEntry: String): String? {

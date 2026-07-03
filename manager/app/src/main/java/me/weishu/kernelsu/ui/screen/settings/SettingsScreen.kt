@@ -168,6 +168,7 @@ fun SettingPager(
         },
         onOpenHiddenPathConfig = { navigator.push(Route.HiddenPathConfig) },
         onOpenAiChat = { navigator.push(Route.AiChat) },
+        onOpenRescueProtection = { navigator.push(Route.RescueProtection) },
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,
         onSetAutoJailbreak = viewModel::setAutoJailbreak,
