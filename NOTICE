@@ -31,3 +31,5 @@ Third-party components:
   Third-party dependencies remain under their own licenses. When a dependency
   is required at build time, this repository uses source-available/public
   package coordinates whenever possible instead of checked-in opaque binaries.
+  Direct dependency and build-input notices are listed in
+  THIRD_PARTY_NOTICES.md.

@@ -71,3 +71,14 @@ Implementation summary:
     after the post-magica flow.
 
 No separate closed-source Magica binary is distributed by this repository.
+
+5. Third-party dependencies and build inputs
+--------------------------------------------
+
+Direct npm packages, Gradle/Maven artifacts, and LKM/GKI build-time source
+inputs are documented in:
+
+  THIRD_PARTY_NOTICES.md
+
+That file is the release-audit entry point for dependencies that are not part
+of KernelSU/ApkeSU source itself.
