@@ -1,6 +1,8 @@
 package me.weishu.kernelsu.ui.screen.settings
 
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.net.Uri
 import android.util.Base64
 import android.widget.Toast
@@ -33,7 +35,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -77,6 +83,7 @@ import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.getFileName
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -109,13 +116,31 @@ fun AiChatScreen() {
         mutableStateOf(prefs.getString(AI_CHAT_SYSTEM_PROMPT, defaultPrompt) ?: defaultPrompt)
     }
     var input by rememberSaveable { mutableStateOf("") }
-    var configExpanded by rememberSaveable { mutableStateOf(true) }
+    var configExpanded by rememberSaveable {
+        mutableStateOf(
+            (prefs.getString(AI_CHAT_BASE_URL, null).isNullOrBlank() ||
+                prefs.getString(AI_CHAT_MODEL, null).isNullOrBlank())
+        )
+    }
     var sending by rememberSaveable { mutableStateOf(false) }
+    var testingApi by rememberSaveable { mutableStateOf(false) }
     var loadingModules by rememberSaveable { mutableStateOf(false) }
+    var activeCall by remember { mutableStateOf<Call?>(null) }
     var nextMessageId by remember { mutableStateOf(1L) }
     val messages = remember { mutableStateListOf<AiMessage>() }
     val pendingAttachments = remember { mutableStateListOf<AiAttachment>() }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(Unit) {
+        val restored = loadAiChatHistory(prefs)
+        messages.clear()
+        messages.addAll(restored)
+        nextMessageId = (restored.maxOfOrNull { it.id } ?: 0L) + 1L
+    }
+
+    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
+        saveAiChatHistory(prefs, messages)
+    }
 
     fun currentConfig(): AiApiConfig {
         return AiApiConfig(
@@ -130,16 +155,37 @@ fun AiChatScreen() {
         role: AiRole,
         text: String,
         attachments: List<AiAttachment> = emptyList(),
-    ) {
+    ): Long {
+        val id = nextMessageId
         messages.add(
             AiMessage(
-                id = nextMessageId,
+                id = id,
                 role = role,
                 text = text,
                 attachments = attachments,
             )
         )
         nextMessageId += 1
+        return id
+    }
+
+    fun updateMessage(id: Long, text: String) {
+        val index = messages.indexOfFirst { it.id == id }
+        if (index >= 0) {
+            messages[index] = messages[index].copy(text = text)
+        }
+    }
+
+    fun copyMessage(text: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText("ai-chat", text))
+        Toast.makeText(context, R.string.ai_chat_copied, Toast.LENGTH_SHORT).show()
+    }
+
+    fun stopGeneration() {
+        activeCall?.cancel()
+        activeCall = null
+        sending = false
     }
 
     fun sendText(text: String, attachments: List<AiAttachment>) {
@@ -162,19 +208,48 @@ fun AiChatScreen() {
         pendingAttachments.clear()
         sending = true
         scope.launch {
+            var streamedText = ""
+            val assistantId = addMessage(AiRole.Assistant, context.getString(R.string.ai_chat_generating))
             val result = runCatching {
-                requestAiChat(config, messages.toList())
-            }
-            result.onSuccess { reply ->
-                addMessage(AiRole.Assistant, reply)
-            }.onFailure { error ->
-                addMessage(
-                    AiRole.Error,
-                    context.getString(R.string.ai_chat_request_failed, error.message ?: error.javaClass.simpleName)
+                requestAiChatStream(
+                    config = config,
+                    messages = messages.filterNot { it.id == assistantId },
+                    onCall = { call -> scope.launch { activeCall = call } },
+                    onDelta = { delta ->
+                        scope.launch {
+                            streamedText += delta
+                            updateMessage(assistantId, streamedText)
+                        }
+                    },
                 )
             }
+            result.onSuccess { reply ->
+                updateMessage(assistantId, reply.ifBlank { streamedText.ifBlank { context.getString(R.string.ai_chat_empty_response) } })
+            }.onFailure { error ->
+                if (streamedText.isBlank()) {
+                    updateMessage(
+                        assistantId,
+                        context.getString(R.string.ai_chat_request_failed, error.message ?: error.javaClass.simpleName)
+                    )
+                    val index = messages.indexOfFirst { it.id == assistantId }
+                    if (index >= 0) {
+                        messages[index] = messages[index].copy(role = AiRole.Error)
+                    }
+                }
+            }
+            activeCall = null
             sending = false
         }
+    }
+
+    fun retryFrom(message: AiMessage) {
+        val index = messages.indexOfFirst { it.id == message.id }
+        if (index <= 0 || sending) return
+        val previousUser = messages.take(index).lastOrNull { it.role == AiRole.User } ?: return
+        while (messages.size > index) {
+            messages.removeAt(messages.lastIndex)
+        }
+        sendText(previousUser.text, previousUser.attachments)
     }
 
     val fileLauncher = rememberLauncherForActivityResult(
@@ -252,6 +327,7 @@ fun AiChatScreen() {
                 onModelChange = { model = it },
                 systemPrompt = systemPrompt,
                 onSystemPromptChange = { systemPrompt = it },
+                testing = testingApi,
                 onSave = {
                     prefs.edit()
                         .putString(AI_CHAT_BASE_URL, baseUrl.trim())
@@ -261,6 +337,23 @@ fun AiChatScreen() {
                         .apply()
                     Toast.makeText(context, R.string.ai_chat_config_saved, Toast.LENGTH_SHORT).show()
                     configExpanded = false
+                },
+                onTest = {
+                    val config = currentConfig()
+                    if (!config.isValid() || testingApi) return@AiApiConfigCard
+                    testingApi = true
+                    scope.launch {
+                        val ok = runCatching { testAiConnection(config) }
+                        testingApi = false
+                        Toast.makeText(
+                            context,
+                            ok.fold(
+                                onSuccess = { R.string.ai_chat_test_ok },
+                                onFailure = { R.string.ai_chat_test_failed },
+                            ),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 },
             )
 
@@ -291,7 +384,12 @@ fun AiChatScreen() {
                     ),
                 ) {
                     items(messages, key = { it.id }) { message ->
-                        AiMessageBubble(message = message)
+                        AiMessageBubble(
+                            message = message,
+                            sending = sending,
+                            onCopy = { copyMessage(message.text) },
+                            onRetry = { retryFrom(message) },
+                        )
                     }
                 }
             }
@@ -333,7 +431,9 @@ fun AiChatScreen() {
                     messages.clear()
                     pendingAttachments.clear()
                     input = ""
+                    saveAiChatHistory(prefs, emptyList())
                 },
+                onStop = ::stopGeneration,
                 onSend = {
                     sendText(input, pendingAttachments.toList())
                 },
@@ -354,7 +454,9 @@ private fun AiApiConfigCard(
     onModelChange: (String) -> Unit,
     systemPrompt: String,
     onSystemPromptChange: (String) -> Unit,
+    testing: Boolean,
     onSave: () -> Unit,
+    onTest: () -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier
@@ -433,11 +535,25 @@ private fun AiApiConfigCard(
                     onValueChange = onSystemPromptChange,
                     label = { Text(stringResource(id = R.string.ai_chat_system_prompt)) },
                 )
-                Button(
+                Row(
                     modifier = Modifier.align(Alignment.End),
-                    onClick = onSave,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(stringResource(id = R.string.ai_chat_save_config))
+                    OutlinedButton(
+                        enabled = !testing && baseUrl.isNotBlank() && model.isNotBlank(),
+                        onClick = onTest,
+                    ) {
+                        if (testing) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_test_config))
+                    }
+                    Button(onClick = onSave) {
+                        Text(stringResource(id = R.string.ai_chat_save_config))
+                    }
                 }
             }
         }
@@ -445,7 +561,12 @@ private fun AiApiConfigCard(
 }
 
 @Composable
-private fun AiMessageBubble(message: AiMessage) {
+private fun AiMessageBubble(
+    message: AiMessage,
+    sending: Boolean,
+    onCopy: () -> Unit,
+    onRetry: () -> Unit,
+) {
     val isUser = message.role == AiRole.User
     val isError = message.role == AiRole.Error
     Row(
@@ -475,6 +596,23 @@ private fun AiMessageBubble(message: AiMessage) {
                     },
                 )
                 AttachmentChips(attachments = message.attachments)
+                if (!isUser && message.text.isNotBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TextButton(onClick = onCopy) {
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(stringResource(id = R.string.ai_chat_copy))
+                        }
+                        TextButton(
+                            enabled = !sending,
+                            onClick = onRetry,
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(stringResource(id = R.string.ai_chat_retry))
+                        }
+                    }
+                }
             }
         }
     }
@@ -492,8 +630,10 @@ private fun AiChatInputBar(
     onAttachImage: () -> Unit,
     onAnalyzeModules: () -> Unit,
     onClear: () -> Unit,
+    onStop: () -> Unit,
     onSend: () -> Unit,
 ) {
+    var toolsExpanded by rememberSaveable { mutableStateOf(false) }
     Surface(
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -505,34 +645,57 @@ private fun AiChatInputBar(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedButton(onClick = onAttachFile, enabled = !sending) {
-                    Icon(Icons.Rounded.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                OutlinedButton(
+                    onClick = { toolsExpanded = !toolsExpanded },
+                    enabled = !sending,
+                ) {
+                    Icon(Icons.Rounded.MoreHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.size(6.dp))
-                    Text(stringResource(id = R.string.ai_chat_attach_file))
+                    Text(stringResource(id = R.string.ai_chat_tools))
                 }
-                OutlinedButton(onClick = onAttachImage, enabled = !sending) {
-                    Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(stringResource(id = R.string.ai_chat_attach_image))
-                }
-                OutlinedButton(onClick = onAnalyzeModules, enabled = !sending && !loadingModules) {
-                    if (loadingModules) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                if (sending) {
+                    OutlinedButton(onClick = onStop) {
+                        Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_stop))
                     }
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(stringResource(id = R.string.ai_chat_analyze_modules))
                 }
-                TextButton(onClick = onClear, enabled = !sending) {
-                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(stringResource(id = R.string.ai_chat_clear))
+            }
+
+            if (toolsExpanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(onClick = onAttachFile, enabled = !sending) {
+                        Icon(Icons.Rounded.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_attach_file))
+                    }
+                    OutlinedButton(onClick = onAttachImage, enabled = !sending) {
+                        Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_attach_image))
+                    }
+                    OutlinedButton(onClick = onAnalyzeModules, enabled = !sending && !loadingModules) {
+                        if (loadingModules) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_analyze_modules))
+                    }
+                    TextButton(onClick = onClear, enabled = !sending) {
+                        Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(stringResource(id = R.string.ai_chat_clear))
+                    }
                 }
             }
 
@@ -633,11 +796,13 @@ private fun AttachmentChips(attachments: List<AiAttachment>) {
     }
 }
 
-private suspend fun requestAiChat(
+private suspend fun requestAiChatStream(
     config: AiApiConfig,
     messages: List<AiMessage>,
+    onCall: (Call) -> Unit,
+    onDelta: (String) -> Unit,
 ): String = withContext(Dispatchers.IO) {
-    val body = buildChatRequestBody(config, messages).toString()
+    val body = buildChatRequestBody(config, messages, stream = true).toString()
     val requestBuilder = Request.Builder()
         .url(resolveChatEndpoint(config.baseUrl))
         .post(body.toRequestBody(JSON_MEDIA_TYPE))
@@ -646,6 +811,33 @@ private suspend fun requestAiChat(
         requestBuilder.header("Authorization", "Bearer ${config.apiKey}")
     }
 
+    val call = ksuApp.okhttpClient.newCall(requestBuilder.build())
+    onCall(call)
+    call.execute().use { response ->
+        if (!response.isSuccessful) {
+            val responseBody = response.body.string()
+            throw IOException("${response.code} ${response.message}: ${responseBody.take(600)}")
+        }
+        val contentType = response.header("Content-Type").orEmpty()
+        if (!contentType.contains("text/event-stream", ignoreCase = true)) {
+            return@withContext parseAiResponse(response.body.string())
+        }
+        parseAiStreamResponse(response, onDelta)
+    }
+}
+
+private suspend fun testAiConnection(config: AiApiConfig): String = withContext(Dispatchers.IO) {
+    val messages = listOf(AiMessage(id = 1, role = AiRole.User, text = "Reply with OK."))
+    val body = buildChatRequestBody(config, messages, stream = false)
+        .put("max_tokens", 8)
+        .toString()
+    val requestBuilder = Request.Builder()
+        .url(resolveChatEndpoint(config.baseUrl))
+        .post(body.toRequestBody(JSON_MEDIA_TYPE))
+        .header("Content-Type", "application/json")
+    if (config.apiKey.isNotBlank()) {
+        requestBuilder.header("Authorization", "Bearer ${config.apiKey}")
+    }
     ksuApp.okhttpClient.newCall(requestBuilder.build()).execute().use { response ->
         val responseBody = response.body.string()
         if (!response.isSuccessful) {
@@ -658,6 +850,7 @@ private suspend fun requestAiChat(
 private fun buildChatRequestBody(
     config: AiApiConfig,
     messages: List<AiMessage>,
+    stream: Boolean = false,
 ): JSONObject {
     val chatMessages = JSONArray()
     if (config.systemPrompt.isNotBlank()) {
@@ -685,6 +878,7 @@ private fun buildChatRequestBody(
         .put("model", config.model)
         .put("messages", chatMessages)
         .put("temperature", 0.6)
+        .put("stream", stream)
 }
 
 private fun buildMessageContent(message: AiMessage, includeImages: Boolean): Any {
@@ -756,6 +950,38 @@ private fun parseAiResponse(body: String): String {
         }.ifBlank { body.take(MAX_ERROR_BODY_CHARS) }
     }
     return content.toString().ifBlank { body.take(MAX_ERROR_BODY_CHARS) }
+}
+
+private fun parseAiStreamResponse(response: okhttp3.Response, onDelta: (String) -> Unit): String {
+    val builder = StringBuilder()
+    val source = response.body.source()
+    while (!source.exhausted()) {
+        val line = source.readUtf8Line()?.trim() ?: continue
+        if (!line.startsWith("data:")) continue
+        val chunk = line.removePrefix("data:").trim()
+        if (chunk == "[DONE]") break
+        val json = runCatching { JSONObject(chunk) }.getOrNull() ?: continue
+        val delta = json.optJSONArray("choices")
+            ?.optJSONObject(0)
+            ?.optJSONObject("delta")
+            ?.opt("content")
+        val text = when (delta) {
+            is JSONArray -> buildString {
+                for (index in 0 until delta.length()) {
+                    val item = delta.optJSONObject(index) ?: continue
+                    val part = item.optString("text")
+                    if (part.isNotBlank()) append(part)
+                }
+            }
+            null, JSONObject.NULL -> ""
+            else -> delta.toString()
+        }
+        if (text.isNotBlank()) {
+            builder.append(text)
+            onDelta(text)
+        }
+    }
+    return builder.toString()
 }
 
 private fun resolveChatEndpoint(baseUrl: String): String {
@@ -833,12 +1059,25 @@ private fun readBytesLimited(
 }
 
 private fun buildModuleAnalysisPrompt(modules: List<Module>): String {
+    val disabled = modules.count { !it.enabled }
+    val pendingUpdate = modules.count { it.update }
+    val pendingRemove = modules.count { it.remove }
+    val webUi = modules.count { it.hasWebUi }
+    val actionScripts = modules.count { it.hasActionScript }
+    val metamodules = modules.count { it.metamodule }
     return buildString {
-        append("Please analyze the current ApkeSU module state. ")
-        append("Point out disabled modules, modules pending update/removal, WebUI/action script hints, metamodules, and possible risks.\n\n")
-        append("Installed modules: ")
-        append(modules.size)
-        append("\n")
+        append("Please do a deep ApkeSU module health analysis in the user's language.\n")
+        append("Focus on compatibility risk, disabled modules, pending update/removal state, metamodule behavior, WebUI/action script hints, possible conflicts, and safe next steps.\n")
+        append("Do not invent facts. If evidence is insufficient, say what log or file should be checked next.\n\n")
+        append("Summary:\n")
+        append("- installed: ${modules.size}\n")
+        append("- disabled: $disabled\n")
+        append("- pending update: $pendingUpdate\n")
+        append("- pending removal: $pendingRemove\n")
+        append("- modules with WebUI: $webUi\n")
+        append("- modules with action script: $actionScripts\n")
+        append("- metamodules: $metamodules\n\n")
+        append("Module inventory:\n")
         modules.sortedBy { it.name.lowercase() }.forEachIndexed { index, module ->
             append("\n")
             append(index + 1)
@@ -886,6 +1125,45 @@ private fun formatBytes(bytes: Long): String {
         size >= 1024 -> "%.1f KB".format(size / 1024)
         else -> "${bytes} B"
     }
+}
+
+private fun loadAiChatHistory(prefs: android.content.SharedPreferences): List<AiMessage> {
+    val text = prefs.getString(AI_CHAT_HISTORY, null) ?: return emptyList()
+    return runCatching {
+        val array = JSONArray(text)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val role = runCatching { AiRole.valueOf(item.optString("role")) }.getOrNull() ?: continue
+                add(
+                    AiMessage(
+                        id = item.optLong("id", index + 1L),
+                        role = role,
+                        text = item.optString("text"),
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveAiChatHistory(
+    prefs: android.content.SharedPreferences,
+    messages: List<AiMessage>,
+) {
+    val array = JSONArray()
+    messages
+        .takeLast(MAX_SAVED_MESSAGES)
+        .filter { it.attachments.isEmpty() }
+        .forEach { message ->
+            array.put(
+                JSONObject()
+                    .put("id", message.id)
+                    .put("role", message.role.name)
+                    .put("text", message.text)
+            )
+        }
+    prefs.edit().putString(AI_CHAT_HISTORY, array.toString()).apply()
 }
 
 private data class AiApiConfig(
@@ -938,9 +1216,11 @@ private const val AI_CHAT_BASE_URL = "base_url"
 private const val AI_CHAT_API_KEY = "api_key"
 private const val AI_CHAT_MODEL = "model"
 private const val AI_CHAT_SYSTEM_PROMPT = "system_prompt"
+private const val AI_CHAT_HISTORY = "history"
 private const val DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
 private const val DEFAULT_AI_MODEL = "gpt-4o-mini"
 private const val MAX_HISTORY_MESSAGES = 12
+private const val MAX_SAVED_MESSAGES = 40
 private const val MAX_TEXT_ATTACHMENT_BYTES = 192 * 1024
 private const val MAX_TEXT_ATTACHMENT_CHARS = 80_000
 private const val MAX_IMAGE_ATTACHMENT_BYTES = 3 * 1024 * 1024

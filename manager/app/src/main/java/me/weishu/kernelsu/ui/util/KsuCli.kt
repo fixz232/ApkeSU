@@ -816,9 +816,6 @@ sealed class LkmSelection : Parcelable {
     data class PathMaskKmiString(val value: String) : LkmSelection()
 
     @Parcelize
-    data object PathMaskAuto : LkmSelection()
-
-    @Parcelize
     data object KmiNone : LkmSelection()
 }
 
@@ -870,10 +867,6 @@ fun installBoot(
             cmd += " --pathmask-lkm --kmi ${lkm.value}"
         }
 
-        LkmSelection.PathMaskAuto -> {
-            cmd += " --pathmask-lkm"
-        }
-
         LkmSelection.KmiNone -> {
             // do nothing
         }
@@ -891,6 +884,13 @@ fun installBoot(
     }
 
     return try {
+        if (bootFile == null) {
+            // Direct install writes the patched boot immediately. Refresh the
+            // persistent daemon first so the next boot keeps the APK-bundled
+            // ksud/version instead of an older /data/adb/ksud copy.
+            install()
+        }
+
         val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
         Log.i("KernelSU", "install boot result: ${result.isSuccess}")
 

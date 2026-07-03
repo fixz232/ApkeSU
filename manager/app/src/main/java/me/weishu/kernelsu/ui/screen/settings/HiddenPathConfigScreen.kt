@@ -113,6 +113,8 @@ import me.weishu.kernelsu.ui.util.parseHiddenPathConfigJson
 import me.weishu.kernelsu.ui.util.saveAndApplyHiddenPathConfig
 import me.weishu.kernelsu.ui.util.toConfigJson
 import me.weishu.kernelsu.ui.util.unloadHiddenPathKernelPaths
+import org.json.JSONArray
+import org.json.JSONObject
 
 private const val TEXT_CONFIG = "\u914d\u7f6e"
 private const val TEXT_LOG = "\u65e5\u5fd7"
@@ -121,8 +123,12 @@ private const val TEXT_SUSUF_CONFIG = "susuf\u914d\u7f6e"
 private const val TEXT_PATH_CONFIG = "\u8def\u5f84\u914d\u7f6e"
 private const val TEXT_APP_CONFIG = "\u5e94\u7528\u9009\u62e9\u914d\u7f6e"
 private const val TEXT_IMPORT_EXPORT_CONFIG = "\u914d\u7f6e\u5bfc\u5165\u5bfc\u51fa"
+private const val TEXT_TEMPLATE_CONFIG = "\u914d\u7f6e\u6a21\u677f"
 private const val TEXT_IMPORT_CONFIG = "\u5bfc\u5165\u914d\u7f6e"
 private const val TEXT_EXPORT_CONFIG = "\u5bfc\u51fa\u914d\u7f6e"
+private const val TEXT_SAVE_TEMPLATE = "\u4fdd\u5b58\u4e3a\u6a21\u677f"
+private const val TEXT_TEMPLATE_NAME = "\u6a21\u677f\u540d\u79f0"
+private const val TEXT_APPLY_TEMPLATE = "\u5957\u7528"
 private const val TEXT_ADD = "\u6dfb\u52a0"
 private const val TEXT_ADD_APP_FROM_LIST = "\u4ece\u5e94\u7528\u5217\u8868\u9009\u62e9"
 private const val TEXT_APP_PICKER_TITLE = "\u9009\u62e9\u5e94\u7528"
@@ -146,12 +152,26 @@ private const val TEXT_IMPORT_OK = "\u914d\u7f6e\u5df2\u5bfc\u5165\uff0c\u70b9\u
 private const val TEXT_IMPORT_FAIL = "\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u914d\u7f6e\u6587\u4ef6"
 private const val TEXT_EXPORT_OK = "\u914d\u7f6e\u5df2\u5bfc\u51fa"
 private const val TEXT_EXPORT_FAIL = "\u5bfc\u51fa\u5931\u8d25"
+private const val TEXT_TEMPLATE_SAVE_OK = "\u6a21\u677f\u5df2\u4fdd\u5b58"
+private const val TEXT_TEMPLATE_SAVE_FAIL = "\u6a21\u677f\u4fdd\u5b58\u5931\u8d25"
+private const val TEXT_TEMPLATE_APPLY_OK = "\u6a21\u677f\u5df2\u5957\u7528\uff0c\u70b9\u51fb\u786e\u5b9a\u9690\u85cf\u540e\u751f\u6548"
+private const val TEXT_TEMPLATE_DELETE_OK = "\u6a21\u677f\u5df2\u5220\u9664"
 private const val TEXT_LOG_COPY_OK = "\u65e5\u5fd7\u5df2\u590d\u5236"
 private const val TEXT_LOG_EXPORT_OK = "\u65e5\u5fd7\u5df2\u5bfc\u51fa"
 private const val TEXT_LOG_EXPORT_FAIL = "\u65e5\u5fd7\u5bfc\u51fa\u5931\u8d25"
 private const val TEXT_CLIPBOARD_EMPTY = "\u526a\u8d34\u677f\u91cc\u6ca1\u6709\u53ef\u7528\u8def\u5f84"
+private const val TEXT_EMPTY_TEMPLATE = "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u914d\u7f6e\u6a21\u677f"
+private const val TEXT_TEMPLATE_NAME_EMPTY = "\u8bf7\u5148\u8f93\u5165\u6a21\u677f\u540d\u79f0"
+private const val TEXT_DUPLICATE_ITEM = "\u8be5\u9879\u5df2\u5b58\u5728"
+private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u5305\u542b\u7a7a\u683c\u6216\u9017\u53f7"
+private const val TEXT_INVALID_APP = "\u5305\u540d\u6216 UID \u65e0\u6548\uff1a\u53ea\u80fd\u4f7f\u7528\u6570\u5b57\u3001\u5b57\u6bcd\u3001.\u3001_\u3001-\u3001:"
 private const val TEXT_NO_PATH = "\u8def\u5f84\u5217\u8868\u4e3a\u7a7a\uff0c\u8bf7\u5148\u6dfb\u52a0\u8981\u9690\u85cf\u7684\u8def\u5f84"
 private const val TEXT_NO_APP = "\u5df2\u5f00\u542f\u6309\u5e94\u7528 UID \u9690\u85cf\uff0c\u8bf7\u6dfb\u52a0\u5305\u540d\u6216 UID\uff1b\u8981\u5168\u5c40\u751f\u6548\u5c31\u5173\u95ed\u8fd9\u4e2a\u5f00\u5173"
+private const val TEXT_WAITING_CONFIG = "\u7b49\u5f85\u914d\u7f6e"
+private const val TEXT_WAITING_LOAD = "\u5f85\u52a0\u8f7d"
+private const val TEXT_RUNNING = "\u8fd0\u884c\u4e2d"
+private const val PREF_HIDDEN_PATH_TEMPLATES = "hidden_path_config_templates"
+private const val PREF_KEY_TEMPLATES = "templates"
 
 private val COMMON_HIDDEN_PATHS = listOf(
     "/data/adb/ksu",
@@ -160,6 +180,11 @@ private val COMMON_HIDDEN_PATHS = listOf(
     "/system/bin/su",
     "/system/xbin/su",
     "/vendor/bin/su",
+)
+
+private data class HiddenPathTemplate(
+    val name: String,
+    val config: HiddenPathConfigState,
 )
 
 @Composable
@@ -177,6 +202,8 @@ fun HiddenPathConfigScreen() {
     var unloadingActive by remember { mutableStateOf(false) }
     var pathInput by rememberSaveable { mutableStateOf("") }
     var appInput by rememberSaveable { mutableStateOf("") }
+    var templateName by rememberSaveable { mutableStateOf("") }
+    var templates by remember { mutableStateOf(loadHiddenPathTemplates(context)) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument(HIDDEN_PATH_CONFIG_MIME_TYPE),
@@ -212,7 +239,7 @@ fun HiddenPathConfigScreen() {
             }
             imported
                 .onSuccess { next ->
-                    config = next
+                    config = sanitizeHiddenPathConfig(next)
                     Toast.makeText(context, TEXT_IMPORT_OK, Toast.LENGTH_LONG).show()
                 }
                 .onFailure {
@@ -249,14 +276,69 @@ fun HiddenPathConfigScreen() {
         }
     }
 
+    fun addPath(rawPath: String, clearInput: Boolean) {
+        val path = normalizeHiddenPath(rawPath)
+        when {
+            path == null -> Toast.makeText(context, TEXT_INVALID_PATH, Toast.LENGTH_LONG).show()
+            path in config.targetPaths -> Toast.makeText(context, TEXT_DUPLICATE_ITEM, Toast.LENGTH_SHORT).show()
+            else -> {
+                config = config.copy(targetPaths = (config.targetPaths + path).distinct())
+                if (clearInput) {
+                    pathInput = ""
+                }
+            }
+        }
+    }
+
+    fun addAppEntry(rawEntry: String, clearInput: Boolean) {
+        val entry = normalizeAppEntry(rawEntry)
+        when {
+            entry == null -> Toast.makeText(context, TEXT_INVALID_APP, Toast.LENGTH_LONG).show()
+            entry in config.appPackages -> Toast.makeText(context, TEXT_DUPLICATE_ITEM, Toast.LENGTH_SHORT).show()
+            else -> {
+                config = config.copy(appPackages = (config.appPackages + entry).distinct())
+                if (clearInput) {
+                    appInput = ""
+                }
+            }
+        }
+    }
+
+    fun saveTemplate() {
+        val name = templateName.trim()
+        if (name.isBlank()) {
+            Toast.makeText(context, TEXT_TEMPLATE_NAME_EMPTY, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val next = (templates.filterNot { it.name == name } + HiddenPathTemplate(name, sanitizeHiddenPathConfig(config)))
+            .sortedBy { it.name.lowercase() }
+        if (saveHiddenPathTemplates(context, next)) {
+            templates = next
+            templateName = ""
+            Toast.makeText(context, TEXT_TEMPLATE_SAVE_OK, Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, TEXT_TEMPLATE_SAVE_FAIL, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun applyTemplate(template: HiddenPathTemplate) {
+        config = sanitizeHiddenPathConfig(template.config)
+        Toast.makeText(context, TEXT_TEMPLATE_APPLY_OK, Toast.LENGTH_LONG).show()
+    }
+
+    fun deleteTemplate(template: HiddenPathTemplate) {
+        val next = templates.filterNot { it.name == template.name }
+        if (saveHiddenPathTemplates(context, next)) {
+            templates = next
+            Toast.makeText(context, TEXT_TEMPLATE_DELETE_OK, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun applyHiddenPathConfig() {
         scope.launch {
             applying = true
             val ok = saveAndApplyHiddenPathConfig(
-                config.copy(
-                    targetPaths = config.targetPaths.map(String::trim).filter(String::isNotEmpty).distinct(),
-                    appPackages = config.appPackages.map(String::trim).filter(String::isNotEmpty).distinct(),
-                )
+                sanitizeHiddenPathConfig(config)
             )
             config = getHiddenPathConfig()
             logs = getHiddenPathLogs()
@@ -350,10 +432,13 @@ fun HiddenPathConfigScreen() {
                         config = config,
                         pathInput = pathInput,
                         appInput = appInput,
+                        templateName = templateName,
+                        templates = templates,
                         applying = applying,
                         unloadingActive = unloadingActive,
                         onPathInputChange = { pathInput = it },
                         onAppInputChange = { appInput = it },
+                        onTemplateNameChange = { templateName = it },
                         onConfigChange = { config = it },
                         onImportConfig = {
                             importLauncher.launch(arrayOf(HIDDEN_PATH_CONFIG_MIME_TYPE, "text/*", "*/*"))
@@ -361,23 +446,21 @@ fun HiddenPathConfigScreen() {
                         onExportConfig = {
                             exportLauncher.launch(HIDDEN_PATH_CONFIG_FILE_NAME)
                         },
+                        onSaveTemplate = ::saveTemplate,
+                        onApplyTemplate = ::applyTemplate,
+                        onDeleteTemplate = ::deleteTemplate,
                         onAddPath = {
-                            val path = pathInput.trim()
-                            if (path.isNotEmpty()) {
-                                config = config.copy(targetPaths = (config.targetPaths + path).distinct())
-                                pathInput = ""
-                            }
+                            addPath(pathInput, clearInput = true)
                         },
                         onAddApp = {
-                            val app = appInput.trim()
-                            if (app.isNotEmpty()) {
-                                config = config.copy(appPackages = (config.appPackages + app).distinct())
-                                appInput = ""
-                            }
+                            addAppEntry(appInput, clearInput = true)
                         },
                         onUnloadActive = ::unloadActiveHiddenPaths,
-                        onAddAppPackage = { packageName ->
-                            config = config.copy(appPackages = (config.appPackages + packageName).distinct())
+                        onAddPathValue = { path ->
+                            addPath(path, clearInput = false)
+                        },
+                        onAddAppUid = { uid ->
+                            addAppEntry(uid.toString(), clearInput = false)
                         },
                     )
                     1 -> HiddenPathLogTab(
@@ -423,17 +506,24 @@ private fun HiddenPathConfigTab(
     config: HiddenPathConfigState,
     pathInput: String,
     appInput: String,
+    templateName: String,
+    templates: List<HiddenPathTemplate>,
     applying: Boolean,
     unloadingActive: Boolean,
     onPathInputChange: (String) -> Unit,
     onAppInputChange: (String) -> Unit,
+    onTemplateNameChange: (String) -> Unit,
     onConfigChange: (HiddenPathConfigState) -> Unit,
     onImportConfig: () -> Unit,
     onExportConfig: () -> Unit,
+    onSaveTemplate: () -> Unit,
+    onApplyTemplate: (HiddenPathTemplate) -> Unit,
+    onDeleteTemplate: (HiddenPathTemplate) -> Unit,
     onAddPath: () -> Unit,
     onAddApp: () -> Unit,
     onUnloadActive: () -> Unit,
-    onAddAppPackage: (String) -> Unit,
+    onAddPathValue: (String) -> Unit,
+    onAddAppUid: (Int) -> Unit,
 ) {
     val blockReason = config.blockReason()
     var showAppPicker by rememberSaveable { mutableStateOf(false) }
@@ -482,6 +572,21 @@ private fun HiddenPathConfigTab(
         }
 
         ConfigSection(
+            title = TEXT_TEMPLATE_CONFIG,
+            summary = "\u5c06\u5f53\u524d\u8def\u5f84\u3001UID \u548c\u5f00\u5173\u4fdd\u5b58\u4e3a\u6a21\u677f\uff0c\u9700\u8981\u65f6\u4e00\u952e\u5957\u7528\u3002",
+        ) {
+            TemplateControls(
+                templateName = templateName,
+                templates = templates,
+                enabled = !applying && !unloadingActive,
+                onTemplateNameChange = onTemplateNameChange,
+                onSaveTemplate = onSaveTemplate,
+                onApplyTemplate = onApplyTemplate,
+                onDeleteTemplate = onDeleteTemplate,
+            )
+        }
+
+        ConfigSection(
             title = TEXT_SUSUF_CONFIG,
             summary = "\u8fd9\u4e9b\u5f00\u5173\u4f1a\u4e0e\u4e0b\u9762\u7684\u8def\u5f84\u548c\u5e94\u7528\u5217\u8868\u4e00\u8d77\u5199\u5165 pathmask\u3002",
         ) {
@@ -516,9 +621,7 @@ private fun HiddenPathConfigTab(
             SmartPathActions(
                 currentValue = pathInput,
                 onUsePath = onPathInputChange,
-                onAddPath = { path ->
-                    onConfigChange(config.copy(targetPaths = (config.targetPaths + path).distinct()))
-                },
+                onAddPath = onAddPathValue,
             )
             EditableList(
                 items = config.targetPaths,
@@ -559,9 +662,130 @@ private fun HiddenPathConfigTab(
 
     if (showAppPicker) {
         HiddenPathAppPickerDialog(
-            selectedPackages = config.appPackages,
+            selectedEntries = config.appPackages,
             onDismissRequest = { showAppPicker = false },
-            onSelectPackage = onAddAppPackage,
+            onSelectUid = onAddAppUid,
+        )
+    }
+}
+
+@Composable
+private fun TemplateControls(
+    templateName: String,
+    templates: List<HiddenPathTemplate>,
+    enabled: Boolean,
+    onTemplateNameChange: (String) -> Unit,
+    onSaveTemplate: () -> Unit,
+    onApplyTemplate: (HiddenPathTemplate) -> Unit,
+    onDeleteTemplate: (HiddenPathTemplate) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val stacked = maxWidth < 360.dp
+        val nameField: @Composable (Modifier) -> Unit = { modifier ->
+            OutlinedTextField(
+                modifier = modifier,
+                value = templateName,
+                onValueChange = onTemplateNameChange,
+                label = { Text(TEXT_TEMPLATE_NAME) },
+                placeholder = { Text("\u6e38\u620f\u6a21\u677f") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (enabled) onSaveTemplate() }),
+            )
+        }
+        val saveButton: @Composable (Modifier) -> Unit = { modifier ->
+            FilledTonalButton(
+                modifier = modifier,
+                enabled = enabled,
+                onClick = onSaveTemplate,
+            ) {
+                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(TEXT_SAVE_TEMPLATE)
+            }
+        }
+
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                nameField(Modifier.fillMaxWidth())
+                saveButton(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                nameField(Modifier.weight(1f))
+                saveButton(Modifier)
+            }
+        }
+    }
+
+    if (templates.isEmpty()) {
+        EmptyTemplateState()
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        templates.forEachIndexed { index, template ->
+            if (index > 0) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = template.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "\u8def\u5f84 ${template.config.targetPaths.size} / UID ${template.config.appPackages.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    enabled = enabled,
+                    onClick = { onApplyTemplate(template) },
+                ) {
+                    Text(TEXT_APPLY_TEMPLATE)
+                }
+                IconButton(
+                    enabled = enabled,
+                    onClick = { onDeleteTemplate(template) },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = TEXT_DELETE,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyTemplateState() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.45f),
+    ) {
+        Text(
+            modifier = Modifier.padding(12.dp),
+            text = TEXT_EMPTY_TEMPLATE,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -572,6 +796,11 @@ private fun HiddenPathStatusPanel(
     unloadingActive: Boolean,
     onUnloadActive: () -> Unit,
 ) {
+    val statusText = when {
+        config.loaded -> TEXT_RUNNING
+        config.targetPaths.isEmpty() -> TEXT_WAITING_CONFIG
+        else -> TEXT_WAITING_LOAD
+    }
     ConfigSection(title = "\u5f53\u524d\u72b6\u6001") {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -591,7 +820,7 @@ private fun HiddenPathStatusPanel(
                 )
             }
             StatusBadge(
-                text = if (config.loaded) "\u8fd0\u884c\u4e2d" else "\u5f85\u52a0\u8f7d",
+                text = statusText,
                 positive = config.loaded,
             )
         }
@@ -635,7 +864,9 @@ private fun HiddenPathStatusPanel(
 private fun HiddenPathConfigState.blockReason(): String? {
     return when {
         targetPaths.isEmpty() -> TEXT_NO_PATH
+        targetPaths.any { normalizeHiddenPath(it) == null } -> TEXT_INVALID_PATH
         useAppScope && appPackages.isEmpty() -> TEXT_NO_APP
+        useAppScope && appPackages.any { normalizeAppEntry(it) == null } -> TEXT_INVALID_APP
         else -> null
     }
 }
@@ -917,7 +1148,7 @@ private fun EditableList(
             ) {
                 Text(
                     modifier = Modifier.weight(1f),
-                    text = item,
+                    text = displayConfigItem(item, emptyKind),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1122,15 +1353,15 @@ private fun HelpLine(
 
 @Composable
 private fun HiddenPathAppPickerDialog(
-    selectedPackages: List<String>,
+    selectedEntries: List<String>,
     onDismissRequest: () -> Unit,
-    onSelectPackage: (String) -> Unit,
+    onSelectUid: (Int) -> Unit,
 ) {
     val context = LocalContext.current
     var loading by remember { mutableStateOf(true) }
     var apps by remember { mutableStateOf<List<HiddenPathAppCandidate>>(emptyList()) }
     var query by rememberSaveable { mutableStateOf("") }
-    val selectedSet = remember(selectedPackages) { selectedPackages.toSet() }
+    val selectedSet = remember(selectedEntries) { selectedEntries.toSet() }
     val filteredApps by remember(apps, query) {
         derivedStateOf {
             val keyword = query.trim()
@@ -1222,13 +1453,13 @@ private fun HiddenPathAppPickerDialog(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             items(filteredApps, key = { it.packageName }) { app ->
-                                val selected = app.packageName in selectedSet || app.uid.toString() in selectedSet
+                                val selected = app.uid.toString() in selectedSet || app.packageName in selectedSet
                                 HiddenPathAppPickerRow(
                                     app = app,
                                     selected = selected,
                                     onClick = {
                                         if (!selected) {
-                                            onSelectPackage(app.packageName)
+                                            onSelectUid(app.uid)
                                         }
                                     },
                                 )
@@ -1343,4 +1574,86 @@ private fun copyTextToClipboard(context: Context, label: String, text: String) {
 
 private fun displayLogText(logs: String): String {
     return logs.ifBlank { "\u6682\u65e0\u9690\u85cf\u8def\u5f84\u65e5\u5fd7" }
+}
+
+private fun displayConfigItem(item: String, kind: EmptyListKind): String {
+    return if (kind == EmptyListKind.App && item.all(Char::isDigit)) {
+        "UID $item"
+    } else {
+        item
+    }
+}
+
+private fun sanitizeHiddenPathConfig(config: HiddenPathConfigState): HiddenPathConfigState {
+    return config.copy(
+        targetPaths = config.targetPaths.mapNotNull(::normalizeHiddenPath).distinct(),
+        appPackages = config.appPackages.mapNotNull(::normalizeAppEntry).distinct(),
+    )
+}
+
+private fun normalizeHiddenPath(rawPath: String): String? {
+    val path = rawPath.trim()
+    if (
+        path.startsWith("/") &&
+        !path.contains(",") &&
+        !path.contains('\u0000') &&
+        !path.any(Char::isWhitespace)
+    ) {
+        return path
+    }
+    return null
+}
+
+private fun normalizeAppEntry(rawEntry: String): String? {
+    val entry = rawEntry.trim()
+    if (entry.isBlank()) {
+        return null
+    }
+    if (entry.all(Char::isDigit)) {
+        return entry.takeIf { it.toLongOrNull() != null }
+    }
+    return entry.takeIf { value ->
+        value.all { char ->
+            char in 'a'..'z' ||
+                char in 'A'..'Z' ||
+                char in '0'..'9' ||
+                char == '.' ||
+                char == '_' ||
+                char == '-' ||
+                char == ':'
+        }
+    }
+}
+
+private fun loadHiddenPathTemplates(context: Context): List<HiddenPathTemplate> {
+    val prefs = context.getSharedPreferences(PREF_HIDDEN_PATH_TEMPLATES, Context.MODE_PRIVATE)
+    val text = prefs.getString(PREF_KEY_TEMPLATES, null) ?: return emptyList()
+    return runCatching {
+        val array = JSONArray(text)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val name = item.optString("name").trim().takeIf(String::isNotEmpty) ?: continue
+                val configObject = item.optJSONObject("config") ?: continue
+                val config = sanitizeHiddenPathConfig(parseHiddenPathConfigJson(configObject.toString()))
+                add(HiddenPathTemplate(name, config))
+            }
+        }.sortedBy { it.name.lowercase() }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveHiddenPathTemplates(context: Context, templates: List<HiddenPathTemplate>): Boolean {
+    val array = JSONArray()
+    templates.forEach { template ->
+        array.put(
+            JSONObject()
+                .put("name", template.name)
+                .put("config", JSONObject(sanitizeHiddenPathConfig(template.config).toConfigJson()))
+        )
+    }
+    return context
+        .getSharedPreferences(PREF_HIDDEN_PATH_TEMPLATES, Context.MODE_PRIVATE)
+        .edit()
+        .putString(PREF_KEY_TEMPLATES, array.toString())
+        .commit()
 }
