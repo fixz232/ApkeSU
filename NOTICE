@@ -1,0 +1,33 @@
+ApkeSU copyright and licensing notice
+=====================================
+
+ApkeSU is a derivative work based on the upstream KernelSU project.
+
+Upstream project:
+  KernelSU
+  https://github.com/tiann/KernelSU
+
+Upstream copyright:
+  Copyright belongs to the respective KernelSU authors and contributors.
+  KernelSU upstream history, notices, author attribution, and license terms
+  remain preserved in this repository.
+
+ApkeSU modifications:
+  Copyright belongs to the respective ApkeSU contributors.
+  Unless a file states otherwise, ApkeSU modifications outside the kernel
+  tree are distributed under GPL-3.0-or-later.
+
+Kernel tree:
+  Files under kernel/ follow the upstream KernelSU/Linux-kernel licensing
+  model and are distributed under GPL-2.0-only unless the individual file
+  states a different compatible license.
+
+Non-kernel source:
+  Manager, userspace, scripts, documentation, and other non-kernel changes
+  derived from KernelSU are distributed under GPL-3.0-or-later unless the
+  individual file states otherwise.
+
+Third-party components:
+  Third-party dependencies remain under their own licenses. When a dependency
+  is required at build time, this repository uses source-available/public
+  package coordinates whenever possible instead of checked-in opaque binaries.
