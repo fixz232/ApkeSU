@@ -53,6 +53,7 @@ fun InstallScreen() {
     var lkmSelection by rememberSaveable { mutableStateOf<LkmSelection>(LkmSelection.KmiNone) }
     var partitionSelectionIndex by rememberSaveable { mutableIntStateOf(0) }
     var hasCustomSelected by rememberSaveable { mutableStateOf(false) }
+    var selectedBootImageFileName by rememberSaveable { mutableStateOf("") }
     var hiddenPathImagePickerPending by rememberSaveable { mutableStateOf(false) }
     val showChooseKmiDialog = rememberSaveable { mutableStateOf(false) }
     var installAfterKmiSelection by rememberSaveable { mutableStateOf(false) }
@@ -109,10 +110,13 @@ fun InstallScreen() {
         partitions.indexOf(defaultPartition).coerceAtLeast(0)
     }
 
-    LaunchedEffect(partitions, defaultIndex, hasCustomSelected) {
+    LaunchedEffect(partitions, defaultIndex, hasCustomSelected, selectedBootImageFileName) {
         if (partitions.isEmpty()) return@LaunchedEffect
         if (!hasCustomSelected) {
-            partitionSelectionIndex = defaultIndex.coerceIn(0, partitions.lastIndex)
+            val inferredIndex = inferPartitionFromImageName(selectedBootImageFileName)
+                ?.let(partitions::indexOf)
+                ?.takeIf { it >= 0 }
+            partitionSelectionIndex = (inferredIndex ?: defaultIndex).coerceIn(0, partitions.lastIndex)
         } else if (partitionSelectionIndex > partitions.lastIndex) {
             partitionSelectionIndex = partitions.lastIndex
         }
@@ -120,6 +124,15 @@ fun InstallScreen() {
 
     val displayPartitions = remember(partitions, defaultPartition) {
         partitions.map { name -> if (defaultPartition == name) "$name (default)" else name }
+    }
+
+    fun selectPartitionForFileName(fileName: String) {
+        if (hasCustomSelected || partitions.isEmpty()) return
+        val inferred = inferPartitionFromImageName(fileName) ?: return
+        val index = partitions.indexOf(inferred)
+        if (index >= 0) {
+            partitionSelectionIndex = index
+        }
     }
 
     fun showMessage(message: String) {
@@ -152,10 +165,13 @@ fun InstallScreen() {
             } else {
                 selectedLkm
             }
-            val selectedPartition = if (method is InstallMethod.SelectFile || method is InstallMethod.HiddenPathLkmPatch) {
-                null
-            } else {
-                partitions.getOrNull(partitionSelectionIndex)
+            val selectedPartition = when (method) {
+                is InstallMethod.SelectFile,
+                is InstallMethod.HiddenPathLkmPatch,
+                is InstallMethod.DirectInstall,
+                is InstallMethod.DirectInstallToInactiveSlot -> partitions.getOrNull(partitionSelectionIndex)
+
+                else -> null
             }
             val bootUri = when (method) {
                 is InstallMethod.SelectFile -> method.uri
@@ -221,6 +237,8 @@ fun InstallScreen() {
                 val fileName = uri.getFileName(context)?.takeUnless { name -> name.isBlank() }
                     ?: uri.lastPathSegment
                     ?: if (isGkiDevice) selectFileTip else selectFileTipNoGki
+                selectedBootImageFileName = fileName
+                selectPartitionForFileName(fileName)
                 installMethod = if (hiddenPathImagePickerPending) {
                     lkmSelection = LkmSelection.KmiNone
                     InstallMethod.HiddenPathLkmPatch(uri, summary = fileName)
@@ -263,7 +281,9 @@ fun InstallScreen() {
         slotSuffix = slotSuffix,
         installMethodOptions = installMethodOptions,
         canSelectPartition = displayPartitions.isNotEmpty() &&
-                (installMethod is InstallMethod.DirectInstall ||
+                (installMethod is InstallMethod.SelectFile ||
+                        installMethod is InstallMethod.HiddenPathLkmPatch ||
+                        installMethod is InstallMethod.DirectInstall ||
                         installMethod is InstallMethod.DirectInstallToInactiveSlot),
         canInstall = canInstall,
         advancedOptionsShown = advancedOptionsShown,
@@ -274,6 +294,9 @@ fun InstallScreen() {
         onBack = dropUnlessResumed { navigator.pop() },
         onSelectMethod = { method ->
             installMethod = method
+            if (method !is InstallMethod.SelectFile && method !is InstallMethod.HiddenPathLkmPatch) {
+                selectedBootImageFileName = ""
+            }
             if (method !is InstallMethod.HiddenPathLkmPatch && lkmSelection is LkmSelection.PathMaskKmiString) {
                 lkmSelection = LkmSelection.KmiNone
             }
@@ -350,5 +373,24 @@ private suspend fun <T> loadInstallState(defaultValue: T, block: suspend () -> T
         block()
     } catch (_: Throwable) {
         defaultValue
+    }
+}
+
+private fun inferPartitionFromImageName(fileName: String): String? {
+    val normalized = fileName
+        .substringAfterLast('/')
+        .substringAfterLast('\\')
+        .lowercase()
+        .replace('-', '_')
+
+    return when {
+        "vendor_boot" in normalized || "vendorboot" in normalized || "verboot" in normalized -> "vendor_boot"
+        "init_boot" in normalized || "initboot" in normalized || "intboot" in normalized -> "init_boot"
+        normalized == "boot.img" ||
+                normalized.startsWith("boot.") ||
+                normalized.startsWith("boot_") ||
+                normalized.contains("_boot.") ||
+                normalized.contains("_boot_") -> "boot"
+        else -> null
     }
 }

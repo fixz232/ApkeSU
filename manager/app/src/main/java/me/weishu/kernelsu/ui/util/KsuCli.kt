@@ -1193,6 +1193,15 @@ fun flashAnyKernelZip(
     """.trimIndent().replace(Regex("\\s+\\\\\\s*"), " ")
 
     val result = flashWithIoAk3(cmd, onStdout, onStderr)
+    if (result.isSuccess) {
+        runCatching {
+            if (!execKsud("rescue mark-pending ${shellQuote("AnyKernel install")}", true)) {
+                onStderr("Rescue protection: failed to mark next boot pending")
+            }
+        }.onFailure {
+            Log.w(TAG, "failed to mark rescue pending after AnyKernel install", it)
+        }
+    }
     try {
         return FlashResult(result, result.isSuccess)
     } finally {

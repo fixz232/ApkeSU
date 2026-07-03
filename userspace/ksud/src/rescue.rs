@@ -2,15 +2,17 @@ use anyhow::{Context, Result, bail};
 use chrono::Local;
 use const_format::concatcp;
 use serde_json::{Value, json};
+#[cfg(target_os = "android")]
+use std::os::fd::AsRawFd;
 use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
-    io::Write,
+    io::{self, Write},
     path::{Path, PathBuf},
     process::Command,
 };
 
-use crate::{boot_patch, defs, utils};
+use crate::{boot_patch, defs, module, utils};
 
 const RESCUE_DIR: &str = concatcp!(defs::WORKING_DIR, "rescue/");
 const CONFIG_PATH: &str = concatcp!(RESCUE_DIR, "config.json");
@@ -23,7 +25,16 @@ const PENDING_BOOT_PATH: &str = concatcp!(RESCUE_DIR, "pending_boot");
 const RESTORE_LOCK_PATH: &str = concatcp!(RESCUE_DIR, "restore_done.lock");
 const AUTO_RESTORE_ATTEMPTS_PATH: &str = concatcp!(RESCUE_DIR, "auto_restore_attempts");
 const RECOVERY_CHECK_GUARD_PATH: &str = "/dev/ksu_rescue_recovery_checked";
+const SKIP_MODULES_ONCE_PATH: &str = concatcp!(RESCUE_DIR, "skip_modules_once");
+const CACHE_SKIP_MODULES_ONCE_PATH: &str = "/cache/ksu_rescue_skip_modules_once";
+const SKIP_MODULES_THIS_BOOT_PATH: &str = "/dev/ksu_rescue_skip_modules_this_boot";
+const LEGACY_FIX_DONE_LOCK_PATH: &str = "/cache/mochen_fix_done.lock";
+const LEGACY_LOOP_FLAG_PATH: &str = "/cache/mochen_boot_loop_flag";
+const LEGACY_PANIC_FLAG_PATH: &str = "/cache/mochen_kernel_panic";
+const LEGACY_TMP_MODULE_DISABLE_PATH: &str = "/cache/tmp_modules_disable";
 const MAX_AUTO_RESTORE_ATTEMPTS: u32 = 3;
+const BOOT_FAILURE_TRIGGER_COUNT: u32 = 3;
+const PENDING_BOOT_FAILURE_TRIGGER_COUNT: u32 = 2;
 
 #[derive(Clone, Debug, Default)]
 struct RescueConfig {
@@ -79,6 +90,8 @@ pub fn print_status() {
         "bootMode": boot_mode(),
         "device": device_summary(),
         "lastRestoreDone": Path::new(RESTORE_LOCK_PATH).exists(),
+        "skipModulesOnce": skip_modules_once_exists(),
+        "skipModulesThisBoot": should_skip_modules_this_boot(),
         "manifest": manifest,
         "ready": ready,
         "readyReason": ready_reason,
@@ -150,7 +163,8 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
     }
 
     utils::ensure_dir_exists(RESCUE_DIR)?;
-    preserve_file(&spec.image_path)?;
+    let protected_files = vec![spec.image_path.clone(), MANIFEST_PATH.to_string()];
+    preserve_files(&protected_files)?;
     let import_result = (|| -> Result<()> {
         fs::copy(source, &spec.image_path).with_context(|| {
             format!(
@@ -159,19 +173,20 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
                 source.display()
             )
         })?;
-        validate_image_size_against_partition(&spec, &device)
+        validate_image_size_against_partition(&spec, &device)?;
+        write_manifest(&specs)
     })();
     if let Err(err) = import_result {
-        restore_preserved_file(&spec.image_path);
+        restore_preserved_files(&protected_files);
         return Err(err);
     }
+    cleanup_preserved_files(&protected_files);
     append_log(format!(
         "imported {} backup from {}, sha256={}",
         spec.name,
         source.display(),
         sha256_of(&spec.image_path)
     ));
-    write_manifest(&specs)?;
     Ok(())
 }
 
@@ -183,17 +198,31 @@ pub fn backup(force: bool) -> Result<()> {
         bail!("backup already exists; pass --force to overwrite it");
     }
     append_log("backup requested by manager");
-    for spec in &specs {
-        let Some(device) = find_partition(spec)? else {
-            if spec.required {
-                bail!("{} partition is missing", spec.name);
-            }
-            append_log(format!("skip backup: {} partition not found", spec.name));
-            continue;
-        };
-        backup_partition(spec, &device)?;
+    let protected_files = rescue_file_paths(&specs);
+    preserve_files(&protected_files)?;
+    let backup_result = (|| -> Result<()> {
+        for spec in &specs {
+            let Some(device) = find_partition(spec)? else {
+                if spec.required {
+                    bail!("{} partition is missing", spec.name);
+                }
+                append_log(format!("skip backup: {} partition not found", spec.name));
+                continue;
+            };
+            backup_partition(spec, &device)?;
+        }
+        write_manifest(&specs)
+    })();
+
+    if let Err(err) = backup_result {
+        restore_preserved_files(&protected_files);
+        append_log(format!(
+            "backup failed; restored previous rescue backups: {err:#}"
+        ));
+        return Err(err);
     }
-    write_manifest(&specs)?;
+
+    cleanup_preserved_files(&protected_files);
     Ok(())
 }
 
@@ -265,6 +294,32 @@ pub fn clear_logs() -> Result<()> {
     Ok(())
 }
 
+pub fn take_skip_modules_once() -> bool {
+    if Path::new(SKIP_MODULES_THIS_BOOT_PATH).exists() {
+        return true;
+    }
+    let skip_once = skip_modules_once_exists();
+    let legacy_skip_once = Path::new(LEGACY_TMP_MODULE_DISABLE_PATH).exists();
+    if !skip_once && !legacy_skip_once {
+        return false;
+    }
+
+    let _ = fs::remove_file(SKIP_MODULES_ONCE_PATH);
+    let _ = fs::remove_file(CACHE_SKIP_MODULES_ONCE_PATH);
+    let _ = fs::remove_file(LEGACY_TMP_MODULE_DISABLE_PATH);
+    if let Err(err) = fs::write(SKIP_MODULES_THIS_BOOT_PATH, b"1") {
+        append_log(format!("failed to mark module skip guard: {err:#}"));
+    }
+    append_log(format!(
+        "rescue requested temporary module skip for this boot: skip_once={skip_once}, legacy_skip_once={legacy_skip_once}"
+    ));
+    true
+}
+
+pub fn should_skip_modules_this_boot() -> bool {
+    Path::new(SKIP_MODULES_THIS_BOOT_PATH).exists()
+}
+
 pub fn check_on_post_fs_data() {
     if !is_enabled() {
         return;
@@ -279,6 +334,7 @@ pub fn check_on_post_fs_data() {
         append_log("restore lock exists; reset boot counter and skip auto restore");
         let _ = fs::write(BOOT_COUNT_PATH, b"0");
         let _ = fs::remove_file(BOOT_OK_PATH);
+        let _ = fs::remove_file(PENDING_BOOT_PATH);
         let _ = fs::remove_file(RESTORE_LOCK_PATH);
         return;
     }
@@ -299,12 +355,20 @@ pub fn check_on_post_fs_data() {
         "post-fs-data rescue check: previous_boot_ok={previous_boot_ok}, pending_boot={pending_boot}, boot_count={next_count}"
     ));
 
-    if (has_boot_failure_hint() || next_count >= 2)
+    let failure_hint = has_boot_failure_hint();
+    let pending_boot_failed =
+        pending_boot && next_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT && !previous_boot_ok;
+    let boot_count_failed = next_count >= BOOT_FAILURE_TRIGGER_COUNT;
+    if failure_hint || pending_boot_failed || boot_count_failed {
+        append_log(format!(
+            "auto restore triggered on post-fs-data: failure_hint={failure_hint}, pending_boot_failed={pending_boot_failed}, boot_count_failed={boot_count_failed}"
+        ));
+    }
+
+    if (failure_hint || pending_boot_failed || boot_count_failed)
         && let Err(err) = auto_restore_backups()
     {
         append_log(format!("auto restore failed: {err:#}"));
-        let _ = fs::remove_file(ENABLED_PATH);
-        append_log("rescue protection disabled after auto restore failure");
     }
 }
 
@@ -322,7 +386,11 @@ pub fn check_on_recovery_boot() {
     }
 
     if Path::new(RESTORE_LOCK_PATH).exists() {
-        append_log("restore lock exists in recovery; skip auto restore");
+        append_log("restore lock exists in recovery; reset rescue markers and skip auto restore");
+        let _ = fs::write(BOOT_COUNT_PATH, b"0");
+        let _ = fs::remove_file(BOOT_OK_PATH);
+        let _ = fs::remove_file(PENDING_BOOT_PATH);
+        let _ = fs::remove_file(RESTORE_LOCK_PATH);
         return;
     }
 
@@ -342,12 +410,10 @@ pub fn check_on_recovery_boot() {
         boot_mode()
     ));
 
-    if (pending_boot || failure_hint || next_count >= 2)
+    if (pending_boot || failure_hint || next_count >= BOOT_FAILURE_TRIGGER_COUNT)
         && let Err(err) = auto_restore_backups()
     {
         append_log(format!("auto restore failed in recovery: {err:#}"));
-        let _ = fs::remove_file(ENABLED_PATH);
-        append_log("rescue protection disabled after recovery auto restore failure");
     }
 }
 
@@ -367,6 +433,10 @@ pub fn mark_boot_completed() {
     let _ = fs::write(BOOT_COUNT_PATH, b"0");
     let _ = fs::write(AUTO_RESTORE_ATTEMPTS_PATH, b"0");
     let _ = fs::remove_file(PENDING_BOOT_PATH);
+    let _ = fs::remove_file(SKIP_MODULES_ONCE_PATH);
+    let _ = fs::remove_file(CACHE_SKIP_MODULES_ONCE_PATH);
+    let _ = fs::remove_file(LEGACY_TMP_MODULE_DISABLE_PATH);
+    cleanup_legacy_rescue_flags();
     append_log("boot completed; rescue counter reset");
 }
 
@@ -459,6 +529,69 @@ fn validate_backups(specs: &[PartitionSpec]) -> Result<()> {
     Ok(())
 }
 
+fn validate_restore_backups(
+    specs: &[PartitionSpec],
+    config: &RescueConfig,
+    automatic: bool,
+) -> Result<()> {
+    validate_manifest_context()?;
+    let mut available_count = 0usize;
+    for spec in specs {
+        if !should_restore_spec(spec, config, automatic) {
+            continue;
+        }
+
+        let Some(device) = find_partition(spec)? else {
+            if spec.required {
+                bail!("{} partition is missing", spec.name);
+            }
+            append_log(format!(
+                "skip restore validation: {} partition not found",
+                spec.name
+            ));
+            continue;
+        };
+
+        let image = Path::new(&spec.image_path);
+        if !image.is_file() {
+            if spec.required {
+                bail!("{} backup is missing", spec.name);
+            }
+            append_log(format!(
+                "skip restore validation: {} backup not found",
+                spec.name
+            ));
+            continue;
+        }
+
+        validate_image_against_partition(spec, &device)?;
+        available_count += 1;
+    }
+
+    if available_count == 0 {
+        bail!("no rescue backup is available to restore");
+    }
+
+    Ok(())
+}
+
+fn should_restore_spec(spec: &PartitionSpec, config: &RescueConfig, automatic: bool) -> bool {
+    if !spec.restore {
+        return false;
+    }
+    if automatic
+        && is_dangerous_partition(&spec.name)
+        && !config.dangerous_auto_restore.is_allowed()
+    {
+        append_log(format!(
+            "skip auto restore: {} is a dangerous partition",
+            spec.name
+        ));
+        return false;
+    }
+    true
+}
+
 fn validate_image_against_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
     let image_size = fs::metadata(&spec.image_path)
         .with_context(|| format!("failed to read {} backup metadata", spec.name))?
@@ -512,7 +645,8 @@ fn auto_restore_backups() -> Result<()> {
     let attempts = read_auto_restore_attempts();
     if attempts >= MAX_AUTO_RESTORE_ATTEMPTS {
         let _ = fs::remove_file(ENABLED_PATH);
-        bail!("auto restore attempt limit reached; rescue protection disabled");
+        append_log("auto restore attempt limit reached; rescue protection disabled");
+        bail!("auto restore attempt limit reached");
     }
     write_auto_restore_attempts(attempts.saturating_add(1));
     restore_backups("auto data-preserving rollback after failed boot", true)
@@ -521,24 +655,13 @@ fn auto_restore_backups() -> Result<()> {
 fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     let config = read_config().unwrap_or_default();
     let specs = partition_specs(&config);
-    validate_backups(&specs)?;
+    validate_restore_backups(&specs, &config, automatic)?;
     append_log(format!("restore started: {reason}"));
     append_log("restore mode: keep /data untouched; only configured boot images are restored");
+    let mut restored_count = 0usize;
     for spec in &specs {
-        if !spec.restore {
-            continue;
-        }
-        if !Path::new(&spec.image_path).is_file() {
-            continue;
-        }
-        if automatic
-            && is_dangerous_partition(&spec.name)
-            && !config.dangerous_auto_restore.is_allowed()
+        if !should_restore_spec(spec, &config, automatic) || !Path::new(&spec.image_path).is_file()
         {
-            append_log(format!(
-                "skip auto restore: {} is a dangerous partition",
-                spec.name
-            ));
             continue;
         }
         let Some(device) = find_partition(spec)? else {
@@ -546,12 +669,23 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
             continue;
         };
         restore_partition(spec, &device)?;
+        restored_count += 1;
     }
+    if restored_count == 0 {
+        bail!("no rescue backup was restored");
+    }
+    cleanup_after_restore();
+    mark_skip_modules_once();
+    mark_legacy_tmp_module_disable();
+    disable_all_modules_after_restore();
+    mark_legacy_fix_done_lock();
+    cleanup_legacy_rescue_flags();
     fs::write(RESTORE_LOCK_PATH, b"1").context("failed to write restore lock")?;
     fs::write(BOOT_COUNT_PATH, b"0").context("failed to reset boot counter")?;
+    let _ = fs::remove_file(PENDING_BOOT_PATH);
     append_log("restore finished; rebooting");
     let _ = Command::new("sync").status();
-    let _ = Command::new("reboot").status();
+    request_reboot();
     Ok(())
 }
 
@@ -560,7 +694,6 @@ fn backup_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
         "backup {}: {} -> {}",
         spec.name, device, spec.image_path
     ));
-    preserve_file(&spec.image_path)?;
     let backup_result = (|| -> Result<()> {
         run_dd(device, &spec.image_path)
             .with_context(|| format!("failed to backup {}", spec.name))?;
@@ -592,20 +725,181 @@ fn restore_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
 }
 
 fn run_dd(input: &str, output: &str) -> Result<()> {
-    let result = Command::new("dd")
-        .arg(format!("if={input}"))
-        .arg(format!("of={output}"))
-        .arg("bs=4096")
-        .output()
-        .context("failed to execute dd")?;
-    if !result.status.success() {
-        bail!(
-            "dd failed: {}",
-            String::from_utf8_lossy(&result.stderr).trim()
-        );
+    let mut input_file = OpenOptions::new()
+        .read(true)
+        .open(input)
+        .with_context(|| format!("open input {input}"))?;
+
+    let output_is_block = output.starts_with("/dev/block/");
+    let mut output_options = OpenOptions::new();
+    output_options.write(true);
+    if !output_is_block {
+        output_options.create(true).truncate(true);
     }
+    let mut output_file = output_options
+        .open(output)
+        .with_context(|| format!("open output {output}"))?;
+
+    set_block_writable(&output_file, output)?;
+    io::copy(&mut input_file, &mut output_file)
+        .with_context(|| format!("copy {input} to {output}"))?;
+    output_file
+        .sync_all()
+        .with_context(|| format!("sync output {output}"))?;
     let _ = Command::new("sync").status();
     Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn set_block_writable(file: &fs::File, path: &str) -> Result<()> {
+    if !path.starts_with("/dev/block/") {
+        return Ok(());
+    }
+    unsafe {
+        const BLKROSET: i32 = libc::_IO(0x12, 93);
+        let mut val: libc::c_int = 0;
+        if libc::ioctl(file.as_raw_fd(), BLKROSET, &raw mut val) != 0 {
+            bail!("Failed to set rw for {path}: {}", *libc::__errno());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+fn set_block_writable(_file: &fs::File, _path: &str) -> Result<()> {
+    Ok(())
+}
+
+fn request_reboot() {
+    let commands: [(&str, &[&str]); 4] = [
+        ("/system/bin/reboot", &[]),
+        ("reboot", &[]),
+        ("svc", &["power", "reboot"]),
+        ("setprop", &["sys.powerctl", "reboot"]),
+    ];
+
+    for (program, args) in commands {
+        match Command::new(program).args(args).status() {
+            Ok(status) if status.success() => {
+                append_log(format!("requested reboot via {program}"));
+                return;
+            }
+            Ok(status) => {
+                append_log(format!("reboot command {program} exited with {status}"));
+            }
+            Err(err) => {
+                append_log(format!("reboot command {program} failed: {err:#}"));
+            }
+        }
+    }
+}
+
+fn cleanup_after_restore() {
+    const CLEANUP_DIRS: &[&str] = &[
+        "/data/dalvik-cache",
+        "/data/resource-cache",
+        "/data/log",
+        "/cache",
+        "/cache/dalvik-cache",
+        "/cache/recovery",
+        "/data/ota",
+    ];
+
+    for dir in CLEANUP_DIRS {
+        cleanup_dir_contents(dir);
+    }
+}
+
+fn cleanup_dir_contents(dir: &str) {
+    let path = Path::new(dir);
+    if !path.is_dir() {
+        return;
+    }
+
+    let Ok(entries) = fs::read_dir(path) else {
+        append_log(format!("skip cleanup: cannot read {dir}"));
+        return;
+    };
+
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let item = entry.path();
+        let result = match fs::symlink_metadata(&item) {
+            Ok(metadata) if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() => {
+                fs::remove_dir_all(&item)
+            }
+            Ok(_) => fs::remove_file(&item),
+            Err(err) => Err(err),
+        };
+        match result {
+            Ok(()) => removed += 1,
+            Err(err) => append_log(format!("cleanup failed for {}: {err:#}", item.display())),
+        }
+    }
+    if removed > 0 {
+        append_log(format!(
+            "cleanup after restore: removed {removed} item(s) from {dir}"
+        ));
+    }
+}
+
+fn mark_skip_modules_once() {
+    if let Err(err) = utils::ensure_dir_exists(RESCUE_DIR) {
+        append_log(format!(
+            "failed to create rescue dir for module skip: {err:#}"
+        ));
+        return;
+    }
+
+    let primary = fs::write(SKIP_MODULES_ONCE_PATH, b"1");
+    let cache_compat = fs::write(CACHE_SKIP_MODULES_ONCE_PATH, b"1");
+    if primary.is_ok() || cache_compat.is_ok() {
+        append_log("temporary module skip will be applied on next boot");
+    } else {
+        if let Err(err) = primary {
+            append_log(format!("failed to mark temporary module skip: {err:#}"));
+        }
+        if let Err(err) = cache_compat {
+            append_log(format!(
+                "failed to mark cache temporary module skip: {err:#}"
+            ));
+        }
+    }
+}
+
+fn skip_modules_once_exists() -> bool {
+    Path::new(SKIP_MODULES_ONCE_PATH).exists() || Path::new(CACHE_SKIP_MODULES_ONCE_PATH).exists()
+}
+
+fn mark_legacy_tmp_module_disable() {
+    if let Err(err) = fs::write(LEGACY_TMP_MODULE_DISABLE_PATH, b"1") {
+        append_log(format!(
+            "failed to mark legacy temporary module disable: {err:#}"
+        ));
+    } else {
+        append_log("legacy temporary module disable marker will be applied on next boot");
+    }
+}
+
+fn disable_all_modules_after_restore() {
+    match module::disable_all_modules() {
+        Ok(()) => append_log("all modules disabled after rescue restore"),
+        Err(err) => append_log(format!(
+            "failed to disable all modules after rescue restore: {err:#}"
+        )),
+    }
+}
+
+fn mark_legacy_fix_done_lock() {
+    if let Err(err) = fs::write(LEGACY_FIX_DONE_LOCK_PATH, b"1") {
+        append_log(format!("failed to mark legacy rescue lock: {err:#}"));
+    }
+}
+
+fn cleanup_legacy_rescue_flags() {
+    for path in [LEGACY_LOOP_FLAG_PATH, LEGACY_PANIC_FLAG_PATH] {
+        let _ = fs::remove_file(path);
+    }
 }
 
 fn find_partition(spec: &PartitionSpec) -> Result<Option<String>> {
@@ -662,7 +956,6 @@ fn write_manifest(specs: &[PartitionSpec]) -> Result<()> {
         "config": config_json(&read_config().unwrap_or_default()),
         "images": images,
     });
-    preserve_file(MANIFEST_PATH)?;
     fs::write(MANIFEST_PATH, manifest.to_string()).context("failed to write rescue manifest")
 }
 
@@ -854,6 +1147,35 @@ fn restore_preserved_file(path: &str) {
     }
 }
 
+fn rescue_file_paths(specs: &[PartitionSpec]) -> Vec<String> {
+    let mut paths = Vec::with_capacity(specs.len() + 1);
+    paths.push(MANIFEST_PATH.to_string());
+    paths.extend(specs.iter().map(|spec| spec.image_path.clone()));
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+fn preserve_files(paths: &[String]) -> Result<()> {
+    for path in paths {
+        preserve_file(path)?;
+    }
+    Ok(())
+}
+
+fn restore_preserved_files(paths: &[String]) {
+    for path in paths {
+        restore_preserved_file(path);
+    }
+    cleanup_preserved_files(paths);
+}
+
+fn cleanup_preserved_files(paths: &[String]) {
+    for path in paths {
+        let _ = fs::remove_file(backup_path(Path::new(path)));
+    }
+}
+
 fn backup_path(path: &Path) -> PathBuf {
     let file_name = path
         .file_name()
@@ -872,6 +1194,7 @@ fn boot_mode() -> String {
         "ro.boot.bootmode",
         "vendor.boot.bootmode",
         "ro.boot.mode",
+        "ro.boot.recovery",
     ]
     .into_iter()
     .filter_map(utils::getprop)
@@ -882,7 +1205,10 @@ fn boot_mode() -> String {
 
 fn is_recovery_boot() -> bool {
     let mode = boot_mode();
-    mode == "recovery" || mode == "rec" || mode.contains("recovery")
+    if mode == "1" || mode == "recovery" || mode == "rec" || mode.contains("recovery") {
+        return true;
+    }
+    mode.is_empty() && boot_reason_text().contains("recovery")
 }
 
 fn device_summary() -> Value {
@@ -926,7 +1252,21 @@ fn write_boot_count(value: u32) {
 }
 
 fn has_boot_failure_hint() -> bool {
-    has_kernel_panic_hint() || has_boot_reason_failure_hint() || has_pstore_failure_hint()
+    has_legacy_failure_hint()
+        || has_kernel_panic_hint()
+        || has_boot_reason_failure_hint()
+        || has_pstore_failure_hint()
+}
+
+fn has_legacy_failure_hint() -> bool {
+    let mut found = false;
+    for path in [LEGACY_LOOP_FLAG_PATH, LEGACY_PANIC_FLAG_PATH] {
+        if Path::new(path).exists() {
+            append_log(format!("legacy rescue failure hint found: {path}"));
+            found = true;
+        }
+    }
+    found
 }
 
 fn has_kernel_panic_hint() -> bool {
@@ -941,7 +1281,16 @@ fn has_kernel_panic_hint() -> bool {
 }
 
 fn has_boot_reason_failure_hint() -> bool {
-    let text = [
+    let text = boot_reason_text();
+    let found = has_failure_text(&text);
+    if found {
+        append_log(format!("boot failure hint found in boot reason: {text}"));
+    }
+    found
+}
+
+fn boot_reason_text() -> String {
+    [
         "sys.boot.reason",
         "ro.boot.bootreason",
         "ro.boot.boot_reason",
@@ -949,13 +1298,9 @@ fn has_boot_reason_failure_hint() -> bool {
     ]
     .into_iter()
     .filter_map(utils::getprop)
+    .map(|value| value.trim().to_ascii_lowercase())
     .collect::<Vec<_>>()
-    .join("\n");
-    let found = has_failure_text(&text);
-    if found {
-        append_log(format!("boot failure hint found in boot reason: {text}"));
-    }
-    found
+    .join("\n")
 }
 
 fn has_pstore_failure_hint() -> bool {
@@ -992,9 +1337,17 @@ fn has_failure_text(text: &str) -> bool {
             || line.contains("dm-verity")
             || line.contains("boot verification")
             || line.contains("dtb load fail")
+            || line.contains("dtbo")
+            || line.contains("avb")
+            || line.contains("vbmeta")
+            || line.contains("init_boot")
+            || line.contains("vendor_boot")
             || line.contains("vendor_boot mismatch")
             || line.contains("gki kmi")
             || line.contains("kmi mismatch")
+            || line.contains("verification failed")
+            || line.contains("invalid magic")
+            || line.contains("bad magic")
     })
 }
 

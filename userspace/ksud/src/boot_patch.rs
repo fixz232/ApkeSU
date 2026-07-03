@@ -609,6 +609,22 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                 if kmod.is_some() {
                     return Ok(String::new());
                 }
+
+                if let Some(image_path) = &image {
+                    println!(
+                        "- Trying to auto detect KMI version for {}",
+                        image_path.display()
+                    );
+                    match parse_kmi_from_boot(image_path) {
+                        Ok(value) => {
+                            return Ok(value);
+                        }
+                        Err(e) => {
+                            println!("- Failed to auto detect KMI from selected image: {e}");
+                        }
+                    }
+                }
+
                 #[cfg(target_os = "android")]
                 match get_current_kmi() {
                     Ok(value) => {
@@ -618,13 +634,8 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                         println!("- {e}");
                     }
                 }
-                Ok(if let Some(image_path) = &image {
-                    println!(
-                        "- Trying to auto detect KMI version for {}",
-                        image_path.display()
-                    );
-                    parse_kmi_from_boot(image_path)?
-                } else if let Some(kernel_path) = &kernel {
+
+                Ok(if let Some(kernel_path) = &kernel {
                     println!(
                         "- Trying to auto detect KMI version for {}",
                         kernel_path.display()

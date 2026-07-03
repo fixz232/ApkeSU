@@ -26,6 +26,7 @@ pub fn on_post_data_fs() -> Result<()> {
     utils::umask(0);
 
     crate::rescue::check_on_post_fs_data();
+    let rescue_skip_modules = crate::rescue::take_skip_modules_once();
 
     // Clear all temporary module configs early
     if let Err(e) = crate::module_config::clear_all_temp_configs() {
@@ -36,6 +37,14 @@ pub fn on_post_data_fs() -> Result<()> {
     let _ = catch_bootlog("logcat", &["logcat", "-b", "all"]);
     #[cfg(unix)]
     let _ = catch_bootlog("dmesg", &["dmesg", "-w", "-r"]);
+
+    if rescue_skip_modules {
+        warn!("rescue requested temporary module skip; skip post-fs-data module stages");
+        if let Err(e) = assets::ensure_binaries(true) {
+            warn!("failed to extract bin assets during rescue module skip: {e}");
+        }
+        return Ok(());
+    }
 
     if utils::has_magisk() {
         warn!("Magisk detected, skip post-fs-data!");
@@ -142,6 +151,11 @@ pub fn on_post_data_fs() -> Result<()> {
 
 pub fn run_stage(stage: &str, block: bool) {
     utils::umask(0);
+
+    if crate::rescue::should_skip_modules_this_boot() {
+        warn!("rescue requested temporary module skip; skip {stage} scripts");
+        return;
+    }
 
     if utils::has_magisk() {
         warn!("Magisk detected, skip {stage}");

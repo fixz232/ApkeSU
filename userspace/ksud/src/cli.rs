@@ -251,6 +251,13 @@ enum Rescue {
     /// Restore boot images without touching user data
     RestoreKeepData,
 
+    /// Mark the next boot as pending after an external boot image change
+    #[command(hide = true)]
+    MarkPending {
+        #[arg(default_value = "external boot image change")]
+        reason: String,
+    },
+
     /// Check rescue protection during recovery boot
     #[command(hide = true)]
     RecoveryCheck,
@@ -869,6 +876,10 @@ pub fn run() -> Result<()> {
                 Rescue::Disable => rescue::disable(),
                 Rescue::Restore => rescue::restore_now(),
                 Rescue::RestoreKeepData => rescue::restore_keep_data_now(),
+                Rescue::MarkPending { reason } => {
+                    rescue::mark_next_boot_pending(&reason);
+                    Ok(())
+                }
                 Rescue::RecoveryCheck => {
                     rescue::check_on_recovery_boot();
                     Ok(())
