@@ -40,6 +40,9 @@ runs:
       run: |
         set -euo pipefail
 
+        export KSU_VERSION_OVERRIDE="${KSU_VERSION_OVERRIDE:-32560}"
+        echo "Using KSU_VERSION_OVERRIDE=$KSU_VERSION_OVERRIDE"
+
         rm -rf /home/runner/out
         mkdir -p /home/runner/out
 
@@ -72,6 +75,7 @@ runs:
             tools/bazel run \
               --config=fast \
               --config=stamp \
+              --action_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
               --disk_cache=/home/runner/.cache/bazel \
               //common:kernel_aarch64_dist \
               -- --destdir=/home/runner/out
@@ -79,6 +83,7 @@ runs:
             tools/bazel run \
               --config=fast \
               --config=stamp \
+              --action_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
               --disk_cache=/home/runner/.cache/bazel \
               //common:kernel_aarch64_dist \
               -- --dist_dir=/home/runner/out
