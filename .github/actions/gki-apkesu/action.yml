@@ -39,9 +39,15 @@ runs:
         DRIVER_MAKEFILE="$DRIVER_DIR/Makefile"
         DRIVER_KCONFIG="$DRIVER_DIR/Kconfig"
         KSU_DRIVER_DIR="$DRIVER_DIR/kernelsu"
+        APKESU_GKI_VERSION="${{ inputs.gki_version }}"
+        if [ -z "$APKESU_GKI_VERSION" ]; then
+          APKESU_GKI_VERSION="32560"
+        fi
 
         ln -sfn "$(realpath --relative-to="$DRIVER_DIR" "$APKESU_ROOT/kernel")" "$KSU_DRIVER_DIR"
         ln -sfn "$(realpath --relative-to="$KSU_DRIVER_DIR" "$APKESU_ROOT/uapi")" "$KSU_DRIVER_DIR/uapi"
+        printf 'versionCode=%s\n' "$APKESU_GKI_VERSION" > "$DRIVER_DIR/version.properties"
+        echo "Pinned ApkeSU GKI versionCode=$APKESU_GKI_VERSION at $DRIVER_DIR/version.properties"
         grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$DRIVER_MAKEFILE" || \
           printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$DRIVER_MAKEFILE"
         grep -q 'source "drivers/kernelsu/Kconfig"' "$DRIVER_KCONFIG" || \

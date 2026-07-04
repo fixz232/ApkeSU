@@ -76,6 +76,7 @@ runs:
               --config=fast \
               --config=stamp \
               --action_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
+              --repo_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
               --disk_cache=/home/runner/.cache/bazel \
               //common:kernel_aarch64_dist \
               -- --destdir=/home/runner/out
@@ -84,6 +85,7 @@ runs:
               --config=fast \
               --config=stamp \
               --action_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
+              --repo_env=KSU_VERSION_OVERRIDE="$KSU_VERSION_OVERRIDE" \
               --disk_cache=/home/runner/.cache/bazel \
               //common:kernel_aarch64_dist \
               -- --dist_dir=/home/runner/out
