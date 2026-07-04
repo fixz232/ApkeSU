@@ -116,6 +116,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean(SHOW_VERSION_MISMATCH_WARNING_KEY, true)
         set(value) = prefs.edit { putBoolean(SHOW_VERSION_MISMATCH_WARNING_KEY, value) }
 
+    override var showGkiWarning: Boolean
+        get() = prefs.getBoolean(SHOW_GKI_WARNING_KEY, true)
+        set(value) = prefs.edit { putBoolean(SHOW_GKI_WARNING_KEY, value) }
+
     override var showHomeSupportCard: Boolean
         get() = prefs.getBoolean(SHOW_HOME_SUPPORT_CARD_KEY, true)
         set(value) = prefs.edit { putBoolean(SHOW_HOME_SUPPORT_CARD_KEY, value) }

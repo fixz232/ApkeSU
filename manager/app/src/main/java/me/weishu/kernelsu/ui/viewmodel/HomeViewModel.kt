@@ -19,6 +19,7 @@ import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
+import me.weishu.kernelsu.data.repository.SHOW_GKI_WARNING_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_LEARN_CARD_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_SUPPORT_CARD_KEY
 import me.weishu.kernelsu.data.repository.SHOW_VERSION_MISMATCH_WARNING_KEY
@@ -41,12 +42,14 @@ class HomeViewModel(
     private val prefs = ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == SHOW_VERSION_MISMATCH_WARNING_KEY ||
+            key == SHOW_GKI_WARNING_KEY ||
             key == SHOW_HOME_SUPPORT_CARD_KEY ||
             key == SHOW_HOME_LEARN_CARD_KEY
         ) {
             _uiState.update {
                 it.copy(
                     showVersionMismatchWarningSetting = repo.showVersionMismatchWarning,
+                    showGkiWarningSetting = repo.showGkiWarning,
                     showHomeSupportCard = repo.showHomeSupportCard,
                     showHomeLearnCard = repo.showHomeLearnCard,
                 )
@@ -115,6 +118,7 @@ class HomeViewModel(
             isLateLoadMode = runCatching { Natives.isLateLoadMode }.getOrDefault(false),
             currentManagerVersionCode = managerVersion.versionCode,
             showVersionMismatchWarningSetting = repo.showVersionMismatchWarning,
+            showGkiWarningSetting = repo.showGkiWarning,
             showHomeSupportCard = repo.showHomeSupportCard,
             showHomeLearnCard = repo.showHomeLearnCard,
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0),
@@ -153,6 +157,7 @@ class HomeViewModel(
             showVersionMismatchWarningSetting = runCatching {
                 repo.showVersionMismatchWarning
             }.getOrDefault(true),
+            showGkiWarningSetting = runCatching { repo.showGkiWarning }.getOrDefault(true),
             showHomeSupportCard = runCatching { repo.showHomeSupportCard }.getOrDefault(true),
             showHomeLearnCard = runCatching { repo.showHomeLearnCard }.getOrDefault(true),
             superuserCount = 0,

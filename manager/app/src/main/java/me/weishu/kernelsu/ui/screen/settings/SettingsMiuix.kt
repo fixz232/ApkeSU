@@ -204,6 +204,20 @@ fun SettingPagerMiuix(
                                 checked = uiState.showVersionMismatchWarning,
                                 onCheckedChange = actions.onSetShowVersionMismatchWarning
                             )
+                            SwitchPreference(
+                                title = stringResource(id = R.string.settings_gki_warning),
+                                summary = stringResource(id = R.string.settings_gki_warning_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.BugReport,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_gki_warning),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                checked = uiState.showGkiWarning,
+                                onCheckedChange = actions.onSetShowGkiWarning
+                            )
                         }
                     }
 
@@ -995,7 +1009,7 @@ private fun CollapsibleMiuixSection(
     }
 }
 
-private const val UPDATES_ITEM_COUNT = 2
+private const val UPDATES_ITEM_COUNT = 3
 private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 10
 

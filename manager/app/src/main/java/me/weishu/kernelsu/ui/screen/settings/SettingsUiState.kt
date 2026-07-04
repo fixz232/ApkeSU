@@ -32,6 +32,7 @@ data class SettingsUiState(
     val uiMode: String = UiMode.DEFAULT_VALUE,
     val checkModuleUpdate: Boolean = true,
     val showVersionMismatchWarning: Boolean = true,
+    val showGkiWarning: Boolean = true,
     val showHomeSupportCard: Boolean = true,
     val showHomeLearnCard: Boolean = true,
     val themeMode: Int = 0,
@@ -137,6 +138,7 @@ data class SettingsUiState(
 data class SettingsScreenActions(
     val onSetCheckModuleUpdate: (Boolean) -> Unit,
     val onSetShowVersionMismatchWarning: (Boolean) -> Unit,
+    val onSetShowGkiWarning: (Boolean) -> Unit,
     val onSetShowHomeSupportCard: (Boolean) -> Unit,
     val onSetShowHomeLearnCard: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,

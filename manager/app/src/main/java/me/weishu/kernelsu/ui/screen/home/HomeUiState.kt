@@ -25,6 +25,7 @@ data class HomeUiState(
     val isLateLoadMode: Boolean,
     val currentManagerVersionCode: Long,
     val showVersionMismatchWarningSetting: Boolean,
+    val showGkiWarningSetting: Boolean = true,
     val showHomeSupportCard: Boolean = true,
     val showHomeLearnCard: Boolean = true,
     val superuserCount: Int,
@@ -38,7 +39,7 @@ data class HomeUiState(
         get() = isManager && !requiresNewKernel && isRootAvailable
 
     val showGkiWarning: Boolean
-        get() = ksuVersion != null && lkmMode == false
+        get() = showGkiWarningSetting && ksuVersion != null && lkmMode == false
 
     val lkmModeLabel: String
         get() = if (hiddenPathLkmMode) HIDDEN_PATH_LKM_MODE_LABEL else LKM_MODE_LABEL

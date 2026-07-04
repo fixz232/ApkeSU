@@ -57,6 +57,7 @@ class SettingsViewModel(
         viewModelScope.launch(refreshExceptionHandler) {
             val checkModuleUpdate = repo.checkModuleUpdate
             val showVersionMismatchWarning = repo.showVersionMismatchWarning
+            val showGkiWarning = repo.showGkiWarning
             val showHomeSupportCard = repo.showHomeSupportCard
             val showHomeLearnCard = repo.showHomeLearnCard
             val themeMode = repo.themeMode
@@ -150,6 +151,7 @@ class SettingsViewModel(
                     uiMode = uiMode,
                     checkModuleUpdate = checkModuleUpdate,
                     showVersionMismatchWarning = showVersionMismatchWarning,
+                    showGkiWarning = showGkiWarning,
                     showHomeSupportCard = showHomeSupportCard,
                     showHomeLearnCard = showHomeLearnCard,
                     themeMode = themeMode,
@@ -322,6 +324,11 @@ class SettingsViewModel(
     fun setShowVersionMismatchWarning(enabled: Boolean) {
         repo.showVersionMismatchWarning = enabled
         _uiState.update { it.copy(showVersionMismatchWarning = enabled) }
+    }
+
+    fun setShowGkiWarning(enabled: Boolean) {
+        repo.showGkiWarning = enabled
+        _uiState.update { it.copy(showGkiWarning = enabled) }
     }
 
     fun setShowHomeSupportCard(enabled: Boolean) {

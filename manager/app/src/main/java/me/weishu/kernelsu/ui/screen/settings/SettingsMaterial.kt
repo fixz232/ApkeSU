@@ -197,6 +197,15 @@ private fun SettingsMaterialContent(
                         onCheckedChange = actions.onSetShowVersionMismatchWarning
                     )
                 },
+                {
+                    SegmentedSwitchItem(
+                        icon = Icons.Filled.BugReport,
+                        title = stringResource(id = R.string.settings_gki_warning),
+                        summary = stringResource(id = R.string.settings_gki_warning_summary),
+                        checked = uiState.showGkiWarning,
+                        onCheckedChange = actions.onSetShowGkiWarning
+                    )
+                },
             )
         )
     }

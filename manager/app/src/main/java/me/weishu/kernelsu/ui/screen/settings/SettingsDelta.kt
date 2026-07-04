@@ -215,6 +215,12 @@ fun SettingPagerDelta(
                     checked = uiState.showVersionMismatchWarning,
                     onCheckedChange = actions.onSetShowVersionMismatchWarning,
                 )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
+                )
             }
 
             DeltaSettingsSection(

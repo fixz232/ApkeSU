@@ -13,6 +13,7 @@ import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.KPatchNextStatus
 
 const val SHOW_VERSION_MISMATCH_WARNING_KEY = "show_version_mismatch_warning"
+const val SHOW_GKI_WARNING_KEY = "show_gki_warning"
 const val SHOW_HOME_SUPPORT_CARD_KEY = "show_home_support_card"
 const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
 
@@ -20,6 +21,7 @@ interface SettingsRepository {
     var uiMode: String
     var checkModuleUpdate: Boolean
     var showVersionMismatchWarning: Boolean
+    var showGkiWarning: Boolean
     var showHomeSupportCard: Boolean
     var showHomeLearnCard: Boolean
     var themeMode: Int

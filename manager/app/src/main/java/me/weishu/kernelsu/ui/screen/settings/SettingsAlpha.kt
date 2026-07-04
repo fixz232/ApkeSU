@@ -208,6 +208,12 @@ fun SettingPagerAlpha(
                     checked = uiState.showVersionMismatchWarning,
                     onCheckedChange = actions.onSetShowVersionMismatchWarning,
                 )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
+                )
             }
 
             AlphaSection(

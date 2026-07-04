@@ -201,8 +201,15 @@ fun SettingPagerSkrootpro(
                 )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_version_mismatch_warning),
+                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
                     checked = uiState.showVersionMismatchWarning,
                     onCheckedChange = actions.onSetShowVersionMismatchWarning,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
                 )
             }
 

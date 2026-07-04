@@ -266,6 +266,8 @@
     <string name="settings_module_check_update_summary">Automatically check installed modules for available updates.</string>
     <string name="settings_version_mismatch_warning">Version mismatch warning</string>
     <string name="settings_version_mismatch_warning_summary">Show a warning when the Manager and ApkeSU driver versions do not match.</string>
+    <string name="settings_gki_warning">Show GKI testing warning</string>
+    <string name="settings_gki_warning_summary">Show the home warning that GKI work mode is recommended for testing only.</string>
     <string name="grant_root_failed">Failed to grant root!</string>
     <string name="home_pr_build_warning">This is a PR debug build. Do NOT use it in production!</string>
     <string name="home_pr_kernel_warning">The kernel was built with PR signature support. This is not a production kernel!</string>
