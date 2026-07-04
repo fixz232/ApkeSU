@@ -1,9 +1,9 @@
-name: Setup EpkeSU
-description: Link this repository's EpkeSU kernel source into the downloaded GKI tree
+name: Setup ApkeSU
+description: Link this repository's ApkeSU kernel source into the downloaded GKI tree
 
 inputs:
   enable_susfs:
-    description: "Whether the SUSFS bridge patch will handle EpkeSU kernel compatibility fixes"
+    description: "Whether the SUSFS bridge patch will handle ApkeSU kernel compatibility fixes"
     required: false
     default: "false"
   gki_version:
@@ -14,16 +14,16 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Link EpkeSU into GKI drivers
+    - name: Link ApkeSU into GKI drivers
       shell: bash
       run: |
         set -euo pipefail
 
-        EPKESU_ROOT="${{ github.workspace }}"
+        APKESU_ROOT="${{ github.workspace }}"
         GKI_KERNEL="${{ github.workspace }}/.gki/kernel"
 
-        if [ ! -d "$EPKESU_ROOT/kernel" ]; then
-          echo "EpkeSU kernel source not found at $EPKESU_ROOT/kernel" >&2
+        if [ ! -d "$APKESU_ROOT/kernel" ]; then
+          echo "ApkeSU kernel source not found at $APKESU_ROOT/kernel" >&2
           exit 1
         fi
 
@@ -40,14 +40,14 @@ runs:
         DRIVER_KCONFIG="$DRIVER_DIR/Kconfig"
         KSU_DRIVER_DIR="$DRIVER_DIR/kernelsu"
 
-        ln -sfn "$(realpath --relative-to="$DRIVER_DIR" "$EPKESU_ROOT/kernel")" "$KSU_DRIVER_DIR"
-        ln -sfn "$(realpath --relative-to="$KSU_DRIVER_DIR" "$EPKESU_ROOT/uapi")" "$KSU_DRIVER_DIR/uapi"
+        ln -sfn "$(realpath --relative-to="$DRIVER_DIR" "$APKESU_ROOT/kernel")" "$KSU_DRIVER_DIR"
+        ln -sfn "$(realpath --relative-to="$KSU_DRIVER_DIR" "$APKESU_ROOT/uapi")" "$KSU_DRIVER_DIR/uapi"
         grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$DRIVER_MAKEFILE" || \
           printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$DRIVER_MAKEFILE"
         grep -q 'source "drivers/kernelsu/Kconfig"' "$DRIVER_KCONFIG" || \
           sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' "$DRIVER_KCONFIG"
 
-    - name: Apply EpkeSU GKI compatibility fixes
+    - name: Apply ApkeSU GKI compatibility fixes
       if: ${{ inputs.enable_susfs != 'true' }}
       shell: bash
       run: |
@@ -62,27 +62,27 @@ runs:
           sed -i 's/if (context_struct_compute_av_fn) {/if (context_struct_compute_av_fn != NULL) {/' "$SELINUX_HIDE"
         fi
 
-    - name: Enable EpkeSU kernel config
+    - name: Enable ApkeSU kernel config
       uses: ./.github/actions/gki-set-kernel-config
       with:
         config_list: |
           CONFIG_KSU=y
 
-    - name: Export EpkeSU version info
+    - name: Export ApkeSU version info
       shell: bash
       run: |
         set -euo pipefail
 
-        EPKESU_COMMIT="$(git -C "${{ github.workspace }}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-        EPKESU_VERSION="$(sed -n 's/^versionCode=//p' "${{ github.workspace }}/version.properties" 2>/dev/null | head -n 1)"
-        EPKESU_VERSION_NAME="$(sed -n 's/^versionName=//p' "${{ github.workspace }}/version.properties" 2>/dev/null | head -n 1)"
-        EPKESU_GKI_VERSION="${{ inputs.gki_version }}"
-        if [ -z "$EPKESU_GKI_VERSION" ]; then
-          EPKESU_GKI_VERSION="32560"
+        APKESU_COMMIT="$(git -C "${{ github.workspace }}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+        APKESU_VERSION="$(sed -n 's/^versionCode=//p' "${{ github.workspace }}/version.properties" 2>/dev/null | head -n 1)"
+        APKESU_VERSION_NAME="$(sed -n 's/^versionName=//p' "${{ github.workspace }}/version.properties" 2>/dev/null | head -n 1)"
+        APKESU_GKI_VERSION="${{ inputs.gki_version }}"
+        if [ -z "$APKESU_GKI_VERSION" ]; then
+          APKESU_GKI_VERSION="32560"
         fi
 
-        echo "EPKESU_COMMIT=$EPKESU_COMMIT" >> "$GITHUB_ENV"
-        echo "EPKESU_VERSION=$EPKESU_VERSION" >> "$GITHUB_ENV"
-        echo "EPKESU_VERSION_NAME=$EPKESU_VERSION_NAME" >> "$GITHUB_ENV"
-        echo "EPKESU_GKI_VERSION=$EPKESU_GKI_VERSION" >> "$GITHUB_ENV"
-        echo "KSU_VERSION_OVERRIDE=$EPKESU_GKI_VERSION" >> "$GITHUB_ENV"
+        echo "APKESU_COMMIT=$APKESU_COMMIT" >> "$GITHUB_ENV"
+        echo "APKESU_VERSION=$APKESU_VERSION" >> "$GITHUB_ENV"
+        echo "APKESU_VERSION_NAME=$APKESU_VERSION_NAME" >> "$GITHUB_ENV"
+        echo "APKESU_GKI_VERSION=$APKESU_GKI_VERSION" >> "$GITHUB_ENV"
+        echo "KSU_VERSION_OVERRIDE=$APKESU_GKI_VERSION" >> "$GITHUB_ENV"

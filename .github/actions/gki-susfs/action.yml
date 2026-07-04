@@ -44,21 +44,21 @@ runs:
           git checkout "$SUSFS_COMMIT"
         fi
 
-    - name: Apply EpkeSU SUSFS bridge patch
+    - name: Apply ApkeSU SUSFS bridge patch
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
 
-        PATCH="${{ github.action_path }}/patches/epkesu-susfs-bridge.patch"
+        PATCH="${{ github.action_path }}/patches/apkesu-susfs-bridge.patch"
         if [ ! -f "$PATCH" ]; then
-          echo "EpkeSU SUSFS bridge patch not found: $PATCH" >&2
+          echo "ApkeSU SUSFS bridge patch not found: $PATCH" >&2
           exit 1
         fi
 
         if ! git apply --check "$PATCH"; then
-          echo "::error::EpkeSU SUSFS bridge patch does not apply cleanly to the current kernel source."
-          echo "::error::Rebase .github/actions/gki-susfs/patches/epkesu-susfs-bridge.patch against the current EpkeSU kernel code."
+          echo "::error::ApkeSU SUSFS bridge patch does not apply cleanly to the current kernel source."
+          echo "::error::Rebase .github/actions/gki-susfs/patches/apkesu-susfs-bridge.patch against the current ApkeSU kernel code."
           git apply --reject --whitespace=nowarn "$PATCH" || true
           find kernel -type f -name '*.rej' -print
           exit 1

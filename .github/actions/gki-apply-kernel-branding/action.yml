@@ -1,5 +1,5 @@
 name: "Apply Kernel Branding"
-description: "Apply EpkeSU branding to kernel version string"
+description: "Apply ApkeSU branding to kernel version string"
 inputs:
   variant:
     description: "Variant of kernel to apply branding to"
@@ -30,8 +30,8 @@ runs:
 
         if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
           KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-EpkeSU\"" >> scripts/setlocalversion
+          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING-ApkeSU\"" >> scripts/setlocalversion
         else
-          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-EpkeSU\"" >> scripts/setlocalversion
+          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-ApkeSU\"" >> scripts/setlocalversion
         fi
         chmod +x scripts/setlocalversion

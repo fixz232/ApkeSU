@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout EpkeSU
+      - name: Checkout ApkeSU
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -130,8 +130,8 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           os_patch_level: ${{ inputs.os_patch_level }}
 
-      - name: Setup EpkeSU
-        uses: ./.github/actions/gki-epkesu
+      - name: Setup ApkeSU
+        uses: ./.github/actions/gki-apkesu
         with:
           enable_susfs: ${{ contains(inputs.feature_set, 'SUSFS') }}
 
@@ -146,8 +146,8 @@ jobs:
           os_patch_level: ${{ inputs.os_patch_level }}
           sublevel: ${{ steps.extract.outputs.sublevel }}
 
-      - name: Apply EpkeSU post patch fixes
-        uses: ./.github/actions/gki-epkesu-post-fixes
+      - name: Apply ApkeSU post patch fixes
+        uses: ./.github/actions/gki-apkesu-post-fixes
 
       - name: Setup misc configs
         uses: ./.github/actions/gki-misc
@@ -174,7 +174,7 @@ jobs:
           version: ${{ inputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
 
-      - name: Apply EpkeSU branding
+      - name: Apply ApkeSU branding
         uses: ./.github/actions/gki-apply-kernel-branding
         with:
           variant: ${{ inputs.variant }}

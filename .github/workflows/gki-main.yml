@@ -24,9 +24,9 @@ on:
         description: "Feature set"
         type: choice
         options:
-          - EpkeSU
-          - EpkeSU+SUSFS
-        default: EpkeSU
+          - ApkeSU
+          - ApkeSU+SUSFS
+        default: ApkeSU
       os_patch_level:
         description: "Patch level: latest, all, or YYYY-MM"
         type: string

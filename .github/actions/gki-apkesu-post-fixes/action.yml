@@ -1,10 +1,10 @@
-name: Apply EpkeSU post patch fixes
-description: Apply EpkeSU GKI fixes that must run after optional SUSFS patches
+name: Apply ApkeSU post patch fixes
+description: Apply ApkeSU GKI fixes that must run after optional SUSFS patches
 
 runs:
   using: composite
   steps:
-    - name: Fix EpkeSU GKI warnings
+    - name: Fix ApkeSU GKI warnings
       shell: bash
       run: |
         set -euo pipefail
@@ -61,7 +61,7 @@ runs:
             text = "".join(fixed)
             print(f"Removed SUSFS extern function checks: dump={dump_count}, compute={compute_count}")
             if dump_count != 1 or compute_count != 1:
-                raise SystemExit("EpkeSU post patch fixes did not update the expected SUSFS function checks")
+                raise SystemExit("ApkeSU post patch fixes did not update the expected SUSFS function checks")
 
         path.write_text(text)
         PY
