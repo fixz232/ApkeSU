@@ -21,6 +21,14 @@ on:
       build_bypass:
         required: true
         type: boolean
+      oplus_patch_mode:
+        required: false
+        type: string
+        default: "off"
+      oplus_reference_ref:
+        required: false
+        type: string
+        default: "main"
 
 jobs:
   generate-matrix:
@@ -99,4 +107,6 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit

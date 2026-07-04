@@ -1,0 +1,165 @@
+name: "Setup OPlus SM8750/MT6991 6.6 GKI Profile"
+description: "Apply ApkeSU GKI compatibility settings based on cctv18/oppo_oplus_realme_sm8750"
+
+inputs:
+  version:
+    description: "Combined kernel version, for example android15-6.6"
+    required: true
+  variant:
+    description: "Build variant"
+    required: true
+  sublevel:
+    description: "Kernel sublevel"
+    required: true
+  os_patch_level:
+    description: "OS patch level"
+    required: true
+  patch_mode:
+    description: "off, compat, or zram"
+    required: false
+    default: "off"
+  reference_ref:
+    description: "Reference repository ref"
+    required: false
+    default: "main"
+
+runs:
+  using: composite
+  steps:
+    - name: Apply OPlus 6.6 profile
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        VERSION="${{ inputs.version }}"
+        VARIANT="${{ inputs.variant }}"
+        PATCH_MODE="${{ inputs.patch_mode }}"
+        REF="${{ inputs.reference_ref }}"
+        COMMON="${{ github.workspace }}/.gki/kernel/common"
+        DEFCONFIG="$COMMON/arch/arm64/configs/gki_defconfig"
+        REF_DIR="${{ github.workspace }}/.gki/oplus_sm8750_ref"
+
+        if [ "$VERSION" != "android15-6.6" ]; then
+          echo "OPlus profile skipped: version=$VERSION"
+          exit 0
+        fi
+
+        case "$VARIANT" in
+          OnePlus-Realme-SM8750|OnePlus-Realme-MT6991)
+            ;;
+          *)
+            echo "OPlus profile skipped: variant=$VARIANT"
+            exit 0
+            ;;
+        esac
+
+        if [ "$PATCH_MODE" = "off" ]; then
+          echo "OPlus profile disabled by patch_mode=off"
+          exit 0
+        fi
+
+        case "$PATCH_MODE" in
+          compat|zram)
+            ;;
+          *)
+            echo "Unsupported OPlus patch_mode: $PATCH_MODE" >&2
+            exit 1
+            ;;
+        esac
+
+        if [ ! -f "$DEFCONFIG" ]; then
+          echo "gki_defconfig not found: $DEFCONFIG" >&2
+          exit 1
+        fi
+
+        rm -rf "$REF_DIR"
+        if ! git clone --depth=1 --branch "$REF" \
+          https://github.com/cctv18/oppo_oplus_realme_sm8750.git "$REF_DIR"; then
+          rm -rf "$REF_DIR"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/cctv18/oppo_oplus_realme_sm8750.git "$REF_DIR"
+          git -C "$REF_DIR" fetch --depth=1 origin "$REF"
+          git -C "$REF_DIR" checkout --detach FETCH_HEAD
+        fi
+
+        REF_COMMIT="$(git -C "$REF_DIR" rev-parse --short HEAD)"
+        echo "OPlus reference commit: $REF_COMMIT"
+        {
+          echo "## OPlus SM8750/MT6991 6.6 profile"
+          echo ""
+          echo "- Variant: $VARIANT"
+          echo "- Kernel: $VERSION.${{ inputs.sublevel }} (${{ inputs.os_patch_level }})"
+          echo "- Reference: cctv18/oppo_oplus_realme_sm8750@$REF_COMMIT"
+          echo "- Patch mode: $PATCH_MODE"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        append_config() {
+          local line="$1"
+          if ! grep -qxF "$line" "$DEFCONFIG"; then
+            echo "$line" >> "$DEFCONFIG"
+          fi
+        }
+
+        append_config "CONFIG_TMPFS_XATTR=y"
+        append_config "CONFIG_TMPFS_POSIX_ACL=y"
+        append_config "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
+        append_config "CONFIG_HEADERS_INSTALL=n"
+
+        if [ "$PATCH_MODE" != "zram" ]; then
+          echo "OPlus zram patches skipped for patch_mode=$PATCH_MODE"
+          exit 0
+        fi
+
+        apply_best_effort() {
+          local patch_file="$1"
+          local label="$2"
+          local check_cmd="$3"
+          local apply_cmd="$4"
+
+          if [ ! -f "$patch_file" ]; then
+            echo "::warning::$label not found at $patch_file"
+            echo "- $label: missing" >> "$GITHUB_STEP_SUMMARY"
+            return 0
+          fi
+
+          cd "$COMMON"
+          if eval "$check_cmd < '$patch_file'" >/tmp/oplus-patch-check.log 2>&1; then
+            eval "$apply_cmd < '$patch_file'"
+            echo "$label applied"
+            echo "- $label: applied" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::$label did not apply cleanly; keeping base GKI source"
+            cat /tmp/oplus-patch-check.log || true
+            echo "- $label: skipped, patch did not apply cleanly" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cd "${{ github.workspace }}"
+        }
+
+        if [ -f "$REF_DIR/zram_patch/lz4armv8.S" ] && [ -d "$COMMON/lib" ]; then
+          cp "$REF_DIR/zram_patch/lz4armv8.S" "$COMMON/lib/lz4armv8.S"
+          echo "- lz4armv8.S: copied" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        apply_best_effort \
+          "$REF_DIR/zram_patch/001-lz4.patch" \
+          "LZ4 1.10.0 patch" \
+          "git apply --check -p1" \
+          "git apply -p1"
+
+        if [ "$VARIANT" = "OnePlus-Realme-MT6991" ]; then
+          apply_best_effort \
+            "$REF_DIR/zram_patch/001-lz4-clearMake.patch" \
+            "MT6991 LZ4 Makefile cleanup" \
+            "git apply --check -p1" \
+            "git apply -p1"
+        fi
+
+        apply_best_effort \
+          "$REF_DIR/zram_patch/002-zstd.patch" \
+          "ZSTD 1.5.7 patch" \
+          "patch --dry-run -p1" \
+          "patch -p1"
+
+        append_config "CONFIG_ZSMALLOC=y"
+        append_config "CONFIG_CRYPTO_LZ4HC=y"

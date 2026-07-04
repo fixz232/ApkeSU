@@ -144,11 +144,13 @@ Direct external build inputs:
 | WildKernels/kernel_patches | default branch at workflow runtime | External GKI patch helper repository cloned during workflow. |
 | WildKernels/AnyKernel3 | branch `gki-2.0` | AnyKernel3 packaging tree cloned during workflow. |
 | simonpunk/susfs4ksu | branch `gki-${version}`, optionally pinned by .github/config/gki-commits.json | SUSFS source and patches cloned during workflow. Preserve its upstream license/notices with SUSFS-enabled kernel artifacts. |
+| cctv18/oppo_oplus_realme_sm8750 | user-selected ref, default `main` | Optional OPlus SM8750/MT6991 6.6 reference patch source for the dedicated GKI profile. Preserve its upstream notices when publishing artifacts that include patches from it. |
 | GitHub Actions official actions | checkout, upload-artifact | Build-service actions used at CI time; not vendored into release artifacts. |
 
 The repository does not vendor the full Android GKI kernel tree, DDK container,
-AnyKernel3 tree, kernel_patches tree, or SUSFS repository. They are fetched by
-CI at build time and remain governed by their own upstream licenses.
+AnyKernel3 tree, kernel_patches tree, SUSFS repository, or OPlus reference
+patch repository. They are fetched by CI at build time and remain governed by
+their own upstream licenses.
 
 When publishing a KO, boot image, or AnyKernel3 package, include:
 

@@ -42,6 +42,18 @@ on:
         description: "Also build Bypass-Image"
         type: boolean
         default: false
+      oplus_patch_mode:
+        description: "OPlus 6.6 reference patches"
+        type: choice
+        options:
+          - zram
+          - compat
+          - off
+        default: "zram"
+      oplus_reference_ref:
+        description: "cctv18/oppo_oplus_realme_sm8750 ref"
+        type: string
+        default: "main"
 
 jobs:
   build-sm8650:
@@ -55,10 +67,12 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit
 
   build-sm8750:
-    name: SM8750 android15-6.6.89
+    name: SM8750 android15-6.6 series
     if: ${{ inputs.target_chip == 'All' || inputs.target_chip == 'sm8750' }}
     uses: ./.github/workflows/gki-prepare.yml
     with:
@@ -68,6 +82,8 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit
 
   build-sm8850:
@@ -81,6 +97,8 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit
 
   build-mt6989-mt6897:
@@ -94,10 +112,12 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit
 
   build-mt6991:
-    name: MT6991 android15-6.6.89
+    name: MT6991 android15-6.6 series
     if: ${{ inputs.target_chip == 'All' || inputs.target_chip == 'mt6991' }}
     uses: ./.github/workflows/gki-prepare.yml
     with:
@@ -107,6 +127,8 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit
 
   build-mt6993:
@@ -120,4 +142,6 @@ jobs:
       use_repo: ${{ inputs.use_repo }}
       use_latest_susfs: ${{ inputs.use_latest_susfs }}
       build_bypass: ${{ inputs.build_bypass }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
     secrets: inherit

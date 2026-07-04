@@ -37,6 +37,14 @@ on:
       build_bypass:
         required: true
         type: boolean
+      oplus_patch_mode:
+        required: false
+        type: string
+        default: "off"
+      oplus_reference_ref:
+        required: false
+        type: string
+        default: "main"
 
 jobs:
   build-gki:
@@ -149,6 +157,16 @@ jobs:
           android_version: ${{ inputs.android_version }}
           sublevel: ${{ steps.extract.outputs.sublevel }}
           variant: ${{ inputs.variant }}
+
+      - name: Setup OPlus SM8750/MT6991 6.6 GKI profile
+        uses: ./.github/actions/gki-oplus-sm8750-6-6
+        with:
+          version: ${{ inputs.version }}
+          variant: ${{ inputs.variant }}
+          sublevel: ${{ steps.extract.outputs.sublevel }}
+          os_patch_level: ${{ inputs.os_patch_level }}
+          patch_mode: ${{ inputs.oplus_patch_mode }}
+          reference_ref: ${{ inputs.oplus_reference_ref }}
 
       - name: Apply device patches
         uses: ./.github/actions/gki-apply-device-patches
