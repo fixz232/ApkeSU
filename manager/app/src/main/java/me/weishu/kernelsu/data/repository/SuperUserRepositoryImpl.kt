@@ -3,6 +3,7 @@ package me.weishu.kernelsu.data.repository
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Handler
@@ -147,7 +148,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
     private fun parseAppInfo(packageInfo: PackageInfo, allowedUids: Set<Int>): AppInfo? {
         return runCatching {
             val appInfo = packageInfo.applicationInfo ?: return null
-            if (appInfo.isResourceOverlay) return null
+            if ((appInfo.flags and ApplicationInfo.FLAG_HAS_CODE) == 0) return null
 
             val pm = ksuApp.packageManager
             val uid = appInfo.uid
