@@ -128,9 +128,11 @@ private fun DeltaStatusCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = state.ksuVersion?.let {
-                        "v${it}-${state.kernelUAPIVersion ?: 0}"
-                    } ?: stringResource(R.string.home_not_installed),
+                    text = if (state.isKernelActive) {
+                        "v${state.ksuVersionLabel}"
+                    } else {
+                        stringResource(R.string.home_not_installed)
+                    },
                     color = DeltaColors.Muted,
                     fontSize = deltaSp(17f, maxScale = 1.0f),
                     lineHeight = deltaSp(21f, maxScale = 1.0f),
@@ -141,7 +143,7 @@ private fun DeltaStatusCard(
                 Spacer(modifier = Modifier.height(14.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeltaPillButton(
-                        text = if (state.ksuVersion == null) {
+                        text = if (!state.isKernelActive) {
                             stringResource(R.string.module_install)
                         } else {
                             stringResource(R.string.alpha_current)
@@ -150,7 +152,7 @@ private fun DeltaStatusCard(
                         onClick = actions.onInstallClick,
                         background = DeltaColors.AccentSoft,
                     )
-                    if (state.ksuVersion == null) {
+                    if (!state.isKernelActive) {
                         DeltaPillButton(
                             text = stringResource(R.string.home_jailbreak),
                             icon = Icons.Rounded.WarningAmber,

@@ -72,8 +72,9 @@ KSU_KERNEL_DIR := $(srctree)/$(src)
 else
 KSU_KERNEL_DIR := $(src)
 endif
+KSU_ROOT_DIR := $(abspath $(KSU_KERNEL_DIR)/..)
 
-ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include
+ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_ROOT_DIR)
 
 obj-$(CONFIG_KSU) += kernelsu.o
 
@@ -135,7 +136,7 @@ $(info -- KernelSU Manager identity: $(KSU_MANAGER_IDENTITY))
 endif
 
 ifndef KSU_MANAGER_PACKAGE
-KSU_MANAGER_PACKAGE := io.github.fixz.epkesu
+KSU_MANAGER_PACKAGE := io.github.fixz.apkesu
 endif
 
 ifndef KSU_EXPECTED_SIZE

@@ -34,6 +34,7 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_OVERLAY
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_LITE
 import me.weishu.kernelsu.ui.util.LauncherIconOption
 
 class SettingsViewModel(
@@ -214,6 +215,7 @@ class SettingsViewModel(
                     isDefaultUmountModules = isDefaultUmountModules,
                     isBuiltinMountEnabled = builtinMountStatus.enabled,
                     builtinMountDefaultMode = builtinMountStatus.defaultMode,
+                    builtinMountVariant = builtinMountStatus.variant,
                     isBuiltinMountWebUiAvailable = builtinMountStatus.webUi,
                     builtinMountConflict = builtinMountStatus.conflict,
                     isKPatchNextInstalled = kPatchNextStatus.installed,
@@ -879,6 +881,25 @@ class SettingsViewModel(
         }
     }
 
+    fun setBuiltinMountVariant(@Suppress("UNUSED_PARAMETER") index: Int) {
+        val variant = BUILTIN_MOUNT_VARIANT_LITE
+        viewModelScope.launch(Dispatchers.IO) {
+            if (repo.setBuiltinMountVariant(variant)) {
+                refreshBuiltinMountStatus()
+                if (_uiState.value.isBuiltinMountEnabled) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(ksuApp, R.string.settings_builtin_mount_reboot_required, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } else {
+                refreshBuiltinMountStatus()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(ksuApp, R.string.settings_builtin_mount_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     fun setKPatchNextEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setKPatchNextEnabled(enabled)) {
@@ -913,6 +934,7 @@ class SettingsViewModel(
             it.copy(
                 isBuiltinMountEnabled = status.enabled,
                 builtinMountDefaultMode = status.defaultMode,
+                builtinMountVariant = status.variant,
                 isBuiltinMountWebUiAvailable = status.webUi,
                 builtinMountConflict = status.conflict,
             )

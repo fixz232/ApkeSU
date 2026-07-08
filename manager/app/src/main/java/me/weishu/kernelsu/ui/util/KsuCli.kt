@@ -40,6 +40,7 @@ const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
 const val KPATCH_NEXT_MODULE_ID = "KPatch-Next"
 const val BUILTIN_MOUNT_MODE_OVERLAY = "overlay"
 const val BUILTIN_MOUNT_MODE_MAGIC = "magic"
+const val BUILTIN_MOUNT_VARIANT_LITE = "lite"
 const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
 const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
 
@@ -62,6 +63,7 @@ data class BuiltinMountStatus(
     val enabled: Boolean = false,
     val conflict: String? = null,
     val defaultMode: String = BUILTIN_MOUNT_MODE_OVERLAY,
+    val variant: String = BUILTIN_MOUNT_VARIANT_LITE,
     val webUi: Boolean = false,
 )
 
@@ -347,6 +349,9 @@ suspend fun getBuiltinMountStatus(): BuiltinMountStatus = withContext(Dispatcher
         val mode = obj.optString("defaultMode", BUILTIN_MOUNT_MODE_OVERLAY)
             .takeIf { it == BUILTIN_MOUNT_MODE_OVERLAY || it == BUILTIN_MOUNT_MODE_MAGIC }
             ?: BUILTIN_MOUNT_MODE_OVERLAY
+        val variant = obj.optString("variant", BUILTIN_MOUNT_VARIANT_LITE)
+            .takeIf { it == BUILTIN_MOUNT_VARIANT_LITE }
+            ?: BUILTIN_MOUNT_VARIANT_LITE
         BuiltinMountStatus(
             moduleId = obj.optString("moduleId", HYBRID_MOUNT_MODULE_ID),
             moduleName = obj.optString("moduleName", "Hybrid Mount Lite"),
@@ -357,6 +362,7 @@ suspend fun getBuiltinMountStatus(): BuiltinMountStatus = withContext(Dispatcher
             enabled = obj.optBoolean("enabled", false),
             conflict = obj.optString("conflict").takeIf { it.isNotBlank() && it != "null" },
             defaultMode = mode,
+            variant = variant,
             webUi = obj.optBoolean("webui", false),
         )
     }.getOrElse {
@@ -378,6 +384,10 @@ fun setBuiltinMountDefaultMode(mode: String): Boolean {
         BUILTIN_MOUNT_MODE_OVERLAY
     }
     return execKsud("builtin-mount set-default-mode $normalized", true)
+}
+
+fun setBuiltinMountVariant(@Suppress("UNUSED_PARAMETER") variant: String): Boolean {
+    return execKsud("builtin-mount set-variant $BUILTIN_MOUNT_VARIANT_LITE", true)
 }
 
 suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO) {
@@ -1220,6 +1230,96 @@ fun rootAvailable(): Boolean {
             KsuCli.reset()
         }
         available
+    }.getOrDefault(false)
+}
+
+fun ksuRootAvailable(): Boolean {
+    return runCatching {
+        val shell = Shell.Builder.create().build(getKsuDaemonPath(), "debug", "su")
+        try {
+            shell.isRoot
+        } finally {
+            shell.closeQuietly()
+        }
+    }.getOrDefault(false)
+}
+
+fun apkeSuRootAvailable(): Boolean {
+    if (ksuRootAvailable()) {
+        return true
+    }
+
+    return runCatching {
+        withNewRootShell {
+            if (!isRoot) {
+                return@withNewRootShell false
+            }
+
+            val versionOutput = ArrayList<String>()
+            newJob()
+                .add("su -v 2>/dev/null || /system/bin/su -v 2>/dev/null || true")
+                .to(versionOutput, null)
+                .exec()
+            val suVersion = versionOutput.joinToString("\n")
+            if (suVersion.contains("KernelSU", ignoreCase = true) ||
+                suVersion.contains("ApkeSU", ignoreCase = true)
+            ) {
+                return@withNewRootShell true
+            }
+
+            val marker = ShellUtils.fastCmd(
+                this,
+                "if [ -d /sys/module/kernelsu ] || " +
+                    "grep -q '^kernelsu ' /proc/modules 2>/dev/null || " +
+                    "{ [ -d /data/adb/ksu ] && " +
+                    "{ [ -x /data/adb/ksud ] || [ -x /data/adb/ksu/bin/ksud ] || " +
+                    "[ -f /data/adb/ksu/.allowlist ]; }; }; then echo 1; else echo 0; fi"
+            ).trim()
+            marker == "1"
+        }
+    }.getOrDefault(false)
+}
+
+fun ensureManagerRegistered(): Boolean {
+    if (runCatching { Natives.refreshInfo(); Natives.isManager }.getOrDefault(false)) {
+        return true
+    }
+    if (!apkeSuRootAvailable()) {
+        return false
+    }
+
+    val managerUid = Os.getuid()
+    val managerAppId = managerUid % 100_000
+    val result = runCatching {
+        val ksud = shellQuote(getKsuDaemonPath())
+        val packageName = shellQuote(BuildConfig.APPLICATION_ID)
+        val command = """
+            KSU_MANAGER_APPID=$managerAppId
+            KSU_MANAGER_PARAM=/sys/module/kernelsu/parameters/ksu_debug_manager_appid
+            if [ -w "${'$'}KSU_MANAGER_PARAM" ]; then
+                echo "${'$'}KSU_MANAGER_APPID" > "${'$'}KSU_MANAGER_PARAM" 2>/dev/null || true
+            fi
+            $ksud late-load --package-name $packageName --manager-uid $managerUid || true
+            if [ -w "${'$'}KSU_MANAGER_PARAM" ]; then
+                echo "${'$'}KSU_MANAGER_APPID" > "${'$'}KSU_MANAGER_PARAM" 2>/dev/null || true
+            fi
+        """.trimIndent()
+        withNewRootShell {
+            newJob().add(command).exec()
+        }
+    }.onFailure {
+        Log.w(TAG, "register manager appid failed", it)
+    }.getOrNull()
+
+    if (result?.isSuccess != true) {
+        Log.w(TAG, "register manager appid failed: ${result?.err?.joinToString("\n")}")
+        return false
+    }
+
+    KsuCli.reset()
+    return runCatching {
+        Natives.refreshInfo()
+        Natives.isManager
     }.getOrDefault(false)
 }
 

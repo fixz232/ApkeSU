@@ -456,7 +456,7 @@ fn enforce_bootimage_version(boot: &BootImage<'_>) -> Result<()> {
     Ok(())
 }
 
-fn enforce_epkesu_lkm_identity(kernelsu_ko: &[u8], source: &str) -> Result<()> {
+fn enforce_apkesu_lkm_identity(kernelsu_ko: &[u8], source: &str) -> Result<()> {
     ensure!(
         kernelsu_ko
             .windows(MANAGER_CERT_HASH.len())
@@ -692,14 +692,14 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             Box::new(Vec::<u8>::new())
         } else if let Some(kmod_path) = kmod {
             let module_data = map_file(&kmod_path)?;
-            enforce_epkesu_lkm_identity(module_data.as_ref(), &kmod_path.display().to_string())?;
+            enforce_apkesu_lkm_identity(module_data.as_ref(), &kmod_path.display().to_string())?;
             Box::new(module_data)
         } else {
             println!("- KMI: {kmi}");
             let name = format!("{kmi}_kernelsu.ko");
             let module_data =
                 assets::get_asset_data(&name).with_context(|| format!("Failed to load {name}"))?;
-            enforce_epkesu_lkm_identity(module_data.as_ref(), &name)?;
+            enforce_apkesu_lkm_identity(module_data.as_ref(), &name)?;
             Box::new(module_data)
         };
 
@@ -848,7 +848,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             let output_dir = out.unwrap_or(std::env::current_dir()?);
             let name = out_name.unwrap_or_else(|| {
                 let now = chrono::Utc::now();
-                format!("epkesu_patched_{}.img", now.format("%Y%m%d_%H%M%S"))
+                format!("apkesu_patched_{}.img", now.format("%Y%m%d_%H%M%S"))
             });
             let output_image = output_dir.join(name);
             std::fs::write(&output_image, &new_boot_bytes).context("write out new boot failed")?;
@@ -1018,7 +1018,7 @@ pub fn restore(args: BootRestoreArgs) -> Result<()> {
         let output_dir = out.unwrap_or(std::env::current_dir()?);
         let name = out_name.unwrap_or_else(|| {
             let now = chrono::Utc::now();
-            format!("epkesu_restore_{}.img", now.format("%Y%m%d_%H%M%S"))
+            format!("apkesu_restore_{}.img", now.format("%Y%m%d_%H%M%S"))
         });
         let output_image = output_dir.join(name);
         std::fs::write(&output_image, &new_boot_bytes).context("copy out new boot failed")?;

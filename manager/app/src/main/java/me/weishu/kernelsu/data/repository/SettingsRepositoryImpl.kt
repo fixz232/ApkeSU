@@ -91,6 +91,7 @@ import me.weishu.kernelsu.ui.util.setCustomPageBackgroundVideoDurationSeconds as
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundWallpaper as writeCustomPageBackgroundWallpaper
 import me.weishu.kernelsu.ui.util.setBuiltinMountDefaultMode as writeBuiltinMountDefaultMode
 import me.weishu.kernelsu.ui.util.setBuiltinMountEnabled as writeBuiltinMountEnabled
+import me.weishu.kernelsu.ui.util.setBuiltinMountVariant as writeBuiltinMountVariant
 import me.weishu.kernelsu.ui.util.setKPatchNextEnabled as writeKPatchNextEnabled
 import me.weishu.kernelsu.ui.util.getEpkesuHideStatus as readEpkesuHideStatus
 import me.weishu.kernelsu.ui.util.setEpkesuHideEnabled as writeEpkesuHideEnabled
@@ -651,6 +652,8 @@ class SettingsRepositoryImpl : SettingsRepository {
     override fun setBuiltinMountEnabled(enabled: Boolean): Boolean = writeBuiltinMountEnabled(enabled)
 
     override fun setBuiltinMountDefaultMode(mode: String): Boolean = writeBuiltinMountDefaultMode(mode)
+
+    override fun setBuiltinMountVariant(variant: String): Boolean = writeBuiltinMountVariant(variant)
 
     override suspend fun getKPatchNextStatus() = readKPatchNextStatus()
 

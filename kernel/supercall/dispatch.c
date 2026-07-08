@@ -339,9 +339,8 @@ static int do_set_manager_appid(void __user *arg)
             return 0;
         }
 
-        pr_warn("set_manager_appid: refusing to replace manager appid %u with %u\n",
+        pr_warn("set_manager_appid: replacing manager appid %u with %u\n",
                 ksu_get_manager_appid(), cmd.appid);
-        return -EPERM;
     }
 
     ksu_set_manager_appid(cmd.appid);

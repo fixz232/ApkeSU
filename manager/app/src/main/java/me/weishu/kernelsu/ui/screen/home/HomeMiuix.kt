@@ -235,7 +235,7 @@ private fun StatusCard(
     installFeedbackActive: Boolean = false,
 ) {
     when {
-        state.ksuVersion != null -> ActivatedStatusCard(state = state, actions = actions)
+        state.isKernelActive -> ActivatedStatusCard(state = state, actions = actions)
         state.kernelVersion.isGKI() -> InstallStatusCard(
             state = state,
             actions = actions,
@@ -378,7 +378,7 @@ private fun ActivatedStatusCard(
                         modifier = Modifier.fillMaxWidth(),
                         text = stringResource(
                             R.string.home_working_version,
-                            "${state.ksuVersion}-${state.kernelUAPIVersion}"
+                            state.ksuVersionLabel
                         ),
                         fontSize = 14.sp,
                         lineHeight = 18.sp,

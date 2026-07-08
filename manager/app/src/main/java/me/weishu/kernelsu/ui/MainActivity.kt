@@ -143,8 +143,10 @@ import me.weishu.kernelsu.ui.util.LocalScrollAnimation
 import me.weishu.kernelsu.ui.util.LocalScrollAnimationEffect
 import me.weishu.kernelsu.ui.util.ManagerUpdateChecker
 import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
+import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getFileName
 import me.weishu.kernelsu.ui.util.install
+import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import me.weishu.kernelsu.ui.util.rememberContentReady
 import me.weishu.kernelsu.ui.util.rootAvailable
@@ -171,11 +173,19 @@ class MainActivity : ComponentActivity() {
         runCatching { Natives.refreshInfo() }
             .onFailure { Log.e(TAG, "refresh native info failed", it) }
         val isManager = runCatching { Natives.isManager }.getOrDefault(false)
+        val ksuVersion = runCatching { Natives.version }.getOrDefault(0)
         val requiresNewKernel = runCatching { Natives.requireNewKernel() }.getOrDefault(true)
-        if (isManager && !requiresNewKernel) {
+        if ((isManager && !requiresNewKernel) || ksuVersion > 0) {
             lifecycleScope.launch(Dispatchers.IO) {
                 runCatching { install() }
                     .onFailure { Log.e(TAG, "install ksud failed", it) }
+            }
+        } else {
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (ensureManagerRegistered()) {
+                    runCatching { install() }
+                        .onFailure { Log.e(TAG, "install ksud failed", it) }
+                }
             }
         }
 
@@ -632,8 +642,12 @@ fun MainScreen(
     val isFullFeatured by produceState(initialValue = false, refreshTick) {
         val fullFeatured = kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching { Natives.refreshInfo() }
+            if (runCatching { ensureManagerRegistered() }.getOrDefault(false)) {
+                return@withContext true
+            }
             runCatching {
-                Natives.isManager && !Natives.requireNewKernel() && rootAvailable()
+                ((Natives.isManager && !Natives.requireNewKernel()) || Natives.version > 0) &&
+                    rootAvailable()
             }.getOrDefault(false)
         }
         value = fullFeatured

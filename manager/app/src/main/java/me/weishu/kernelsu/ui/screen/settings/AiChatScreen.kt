@@ -81,6 +81,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.Module
 import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
 import me.weishu.kernelsu.ksuApp
+import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.getFileName
 import okhttp3.Call
@@ -289,8 +290,10 @@ fun AiChatScreen() {
         }
     }
 
+    val pageContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
+    val barContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = pageContainerColor,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
@@ -304,7 +307,10 @@ fun AiChatScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    containerColor = barContainerColor,
+                    scrolledContainerColor = barContainerColor,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
         },
@@ -486,7 +492,10 @@ private fun AiApiConfigCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            TextButton(onClick = { onExpandedChange(!expanded) }) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
                     stringResource(
                         id = if (expanded) {
@@ -494,7 +503,14 @@ private fun AiApiConfigCard(
                         } else {
                             R.string.ai_chat_edit_config
                         }
-                    )
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ExpressiveSwitch(
+                    checked = expanded,
+                    onCheckedChange = onExpandedChange,
+                    showThumbIcon = false,
                 )
             }
         }
@@ -636,7 +652,7 @@ private fun AiChatInputBar(
     var toolsExpanded by rememberSaveable { mutableStateOf(false) }
     Surface(
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.98f),
     ) {
         Column(
             modifier = Modifier

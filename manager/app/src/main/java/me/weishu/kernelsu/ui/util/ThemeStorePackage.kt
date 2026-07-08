@@ -16,7 +16,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-private const val THEME_STORE_SCHEMA = "io.github.fixz.epkesu.theme"
+private const val THEME_STORE_SCHEMA = "io.github.fixz.apkesu.theme"
 private const val THEME_STORE_VERSION = 2
 private const val MAX_THEME_STORE_ENTRY_COUNT = 64
 private const val MAX_THEME_STORE_JSON_BYTES = 256L * 1024L

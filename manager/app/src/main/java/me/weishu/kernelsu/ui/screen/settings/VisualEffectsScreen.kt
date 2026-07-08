@@ -65,6 +65,7 @@ import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
@@ -447,9 +448,10 @@ private fun VisualSwitchRow(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        Switch(
+        ExpressiveSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            showThumbIcon = false,
         )
     }
 }

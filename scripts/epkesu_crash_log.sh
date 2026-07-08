@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # Collect ApkeSU startup crash logs from Android/Termux or from a PC with adb.
 
-PKG="io.github.fixz.epkesu"
+PKG="io.github.fixz.apkesu"
 WAIT_SECONDS=8
 MODE="collect"
 LAUNCH_APP=1
@@ -54,7 +54,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-FILTER='AndroidRuntime|FATAL EXCEPTION|Fatal signal|DEBUG|crash_dump|tombstone|SIGSYS|SIGSEGV|SIGABRT|libkernelsu|libc\.so|io\.github\.fixz\.epkesu|KernelSUApplication|MainActivity|MainActivityViewModel|HomeViewModel|SettingsViewModel|KsuCli|Build fingerprint|pid:|backtrace'
+FILTER='AndroidRuntime|FATAL EXCEPTION|Fatal signal|DEBUG|crash_dump|tombstone|SIGSYS|SIGSEGV|SIGABRT|libkernelsu|libc\.so|io\.github\.fixz\.apkesu|KernelSUApplication|MainActivity|MainActivityViewModel|HomeViewModel|SettingsViewModel|KsuCli|Build fingerprint|pid:|backtrace'
 
 has_cmd() {
     command -v "$1" >/dev/null 2>&1

@@ -478,6 +478,12 @@ enum BuiltinMount {
         /// overlay or magic
         mode: String,
     },
+
+    /// Set the built-in mount package variant: lite or full
+    SetVariant {
+        /// lite or full
+        variant: String,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -804,6 +810,10 @@ pub fn run() -> Result<()> {
                 BuiltinMount::SetDefaultMode { mode } => {
                     let mode = builtin_mount::MountMode::parse(&mode)?;
                     builtin_mount::set_default_mode(mode)
+                }
+                BuiltinMount::SetVariant { variant } => {
+                    let variant = builtin_mount::BuiltinMountVariant::parse(&variant)?;
+                    builtin_mount::set_variant(variant)
                 }
             }
         }

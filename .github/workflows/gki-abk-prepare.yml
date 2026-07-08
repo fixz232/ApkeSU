@@ -1,0 +1,187 @@
+name: Prepare ABK Style ApkeSU GKI Matrix
+
+on:
+  workflow_call:
+    inputs:
+      config_file:
+        required: true
+        type: string
+      feature_set:
+        required: true
+        type: string
+      os_patch_level:
+        required: true
+        type: string
+      use_repo:
+        required: true
+        type: boolean
+      use_latest_susfs:
+        required: true
+        type: boolean
+      build_bypass:
+        required: true
+        type: boolean
+      build_time:
+        required: false
+        type: string
+        default: "Sun Dec 01 08:10:00 UTC 2024"
+      use_zram:
+        required: false
+        type: boolean
+        default: false
+      zram_full_algo:
+        required: false
+        type: boolean
+        default: false
+      zram_extra_algos:
+        required: false
+        type: string
+        default: ""
+      use_ntsync:
+        required: false
+        type: boolean
+        default: false
+      use_networking:
+        required: false
+        type: boolean
+        default: false
+      virtualization_support:
+        required: false
+        type: string
+        default: "off"
+      use_bbg:
+        required: false
+        type: boolean
+        default: false
+      use_ddk:
+        required: false
+        type: boolean
+        default: false
+      use_kpm:
+        required: false
+        type: boolean
+        default: false
+      use_rekernel:
+        required: false
+        type: boolean
+        default: false
+      supp_op:
+        required: false
+        type: boolean
+        default: false
+      use_custom_external_modules:
+        required: false
+        type: boolean
+        default: false
+      custom_external_modules:
+        required: false
+        type: string
+        default: ""
+      upload_aux_artifacts:
+        required: false
+        type: boolean
+        default: true
+      oplus_patch_mode:
+        required: false
+        type: string
+        default: "off"
+      oplus_reference_ref:
+        required: false
+        type: string
+        default: "main"
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.final.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read config
+        id: final
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          PATCH_LEVEL: ${{ inputs.os_patch_level }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const cfg = JSON.parse(fs.readFileSync(process.env.CONFIG_FILE, "utf8"));
+          const patch = process.env.PATCH_LEVEL.toLowerCase();
+          const [androidVersion, kernelVersion] = cfg.version.split("-");
+
+          let items;
+          if (patch === "all") {
+            items = cfg.include;
+          } else if (patch === "latest") {
+            items = [cfg.include.filter((item) => item.date !== "lts").at(-1)];
+          } else {
+            items = cfg.include.filter((item) => item.date === patch);
+          }
+
+          items = items.filter(Boolean);
+          if (items.length === 0) {
+            throw new Error(`No GKI config entries matched patch level ${patch}`);
+          }
+
+          const seen = new Set();
+          const include = [];
+          for (const item of items) {
+            const entry = {
+              version: cfg.version,
+              android_version: androidVersion,
+              kernel_version: kernelVersion,
+              sublevel: item.sublevel,
+              os_patch_level: item.date,
+              variant: item.variant || cfg.variant || "Normal",
+            };
+            const key = JSON.stringify(entry);
+            if (!seen.has(key)) {
+              seen.add(key);
+              include.push(entry);
+            }
+          }
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify({ include })}\n`);
+          NODE
+
+  build:
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    uses: ./.github/workflows/gki-abk-build.yml
+    with:
+      version: ${{ matrix.version }}
+      android_version: ${{ matrix.android_version }}
+      kernel_version: ${{ matrix.kernel_version }}
+      sublevel: ${{ matrix.sublevel }}
+      os_patch_level: ${{ matrix.os_patch_level }}
+      variant: ${{ matrix.variant }}
+      feature_set: ${{ inputs.feature_set }}
+      use_repo: ${{ inputs.use_repo }}
+      use_latest_susfs: ${{ inputs.use_latest_susfs }}
+      build_bypass: ${{ inputs.build_bypass }}
+      build_time: ${{ inputs.build_time }}
+      use_zram: ${{ inputs.use_zram }}
+      zram_full_algo: ${{ inputs.zram_full_algo }}
+      zram_extra_algos: ${{ inputs.zram_extra_algos }}
+      use_ntsync: ${{ inputs.use_ntsync }}
+      use_networking: ${{ inputs.use_networking }}
+      virtualization_support: ${{ inputs.virtualization_support }}
+      use_bbg: ${{ inputs.use_bbg }}
+      use_ddk: ${{ inputs.use_ddk }}
+      use_kpm: ${{ inputs.use_kpm }}
+      use_rekernel: ${{ inputs.use_rekernel }}
+      supp_op: ${{ inputs.supp_op }}
+      use_custom_external_modules: ${{ inputs.use_custom_external_modules }}
+      custom_external_modules: ${{ inputs.custom_external_modules }}
+      upload_aux_artifacts: ${{ inputs.upload_aux_artifacts }}
+      oplus_patch_mode: ${{ inputs.oplus_patch_mode }}
+      oplus_reference_ref: ${{ inputs.oplus_reference_ref }}
+    secrets: inherit

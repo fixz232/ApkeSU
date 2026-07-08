@@ -28,6 +28,8 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.screen.home.HomeUiState
 import me.weishu.kernelsu.ui.screen.home.SystemInfo
 import me.weishu.kernelsu.ui.screen.home.getManagerVersion
+import me.weishu.kernelsu.ui.util.apkeSuRootAvailable
+import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getModuleCount
 import me.weishu.kernelsu.ui.util.getSELinuxStatusRaw
 import me.weishu.kernelsu.ui.util.getSuperuserCount
@@ -88,14 +90,19 @@ class HomeViewModel(
 
     private fun buildState(): HomeUiState {
         val kernelVersion = getKernelVersion()
-        val isManager = runCatching { Natives.isManager }.getOrDefault(false)
+        var isManager = runCatching { Natives.isManager }.getOrDefault(false)
         val ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
+        val isKsuRootAvailable = ksuVersion != null ||
+                runCatching { apkeSuRootAvailable() }.getOrDefault(false)
+        if (!isManager && isKsuRootAvailable) {
+            isManager = runCatching { ensureManagerRegistered() }.getOrDefault(false)
+        }
         val kernelUAPIVersion = ksuVersion?.let { runCatching { Natives.kernelUAPIVersion }.getOrNull() }
         val managerUAPIVersion = runCatching { Natives.managerUAPIVersion }.getOrDefault(0)
         val lkmMode = ksuVersion?.let {
             if (kernelVersion.isGKI()) runCatching { Natives.isLkmMode }.getOrNull() else null
         }
-        val isRootAvailable = runCatching { rootAvailable() }.getOrDefault(false)
+        val isRootAvailable = isKsuRootAvailable || runCatching { rootAvailable() }.getOrDefault(false)
         val hiddenPathLkmMode = lkmMode == true &&
             isRootAvailable &&
             runCatching { isHiddenPathLkmMode() }.getOrDefault(false)
@@ -104,6 +111,7 @@ class HomeViewModel(
         return HomeUiState(
             kernelVersion = kernelVersion,
             ksuVersion = ksuVersion,
+            isKernelActive = ksuVersion != null || isKsuRootAvailable,
             lkmMode = lkmMode,
             hiddenPathLkmMode = hiddenPathLkmMode,
             isManager = isManager,

@@ -69,20 +69,20 @@ fun HomePager(
         }
     }
 
-    LaunchedEffect(uiState.ksuVersion) {
-        if (uiState.ksuVersion != null) {
+    LaunchedEffect(uiState.isKernelActive) {
+        if (uiState.isKernelActive) {
             installFeedbackActive = false
         }
     }
 
-    LaunchedEffect(uiState.isLateLoadMode, uiState.ksuVersion) {
-        if (jailbreakInProgress && (uiState.isLateLoadMode || uiState.ksuVersion != null)) {
+    LaunchedEffect(uiState.isLateLoadMode, uiState.isKernelActive) {
+        if (jailbreakInProgress && (uiState.isLateLoadMode || uiState.isKernelActive)) {
             jailbreakInProgress = false
             loadingDialog.hide()
         }
     }
 
-    val showInlineInstallFeedback = uiState.ksuVersion == null && uiState.kernelVersion.isGKI()
+    val showInlineInstallFeedback = !uiState.isKernelActive && uiState.kernelVersion.isGKI()
     val actions = HomeActions(
         onInstallClick = {
             if (showInlineInstallFeedback) {

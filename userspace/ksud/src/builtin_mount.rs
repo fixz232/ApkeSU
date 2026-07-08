@@ -3,7 +3,7 @@ use serde_json::json;
 use std::{
     collections::HashMap,
     fs,
-    io::Cursor,
+    io::{Cursor, Read},
     path::{Path, PathBuf},
 };
 
@@ -12,12 +12,39 @@ use crate::{defs, metamodule, module, utils};
 pub const HYBRID_MOUNT_MODULE_ID: &str = "hybrid_mount";
 
 const CONFIG_PATH: &str = "/data/adb/hybrid-mount/config.toml";
-const BUILTIN_ZIP: &[u8] = include_bytes!("../builtin/hybrid-mount-lite.zip");
+const BUILTIN_VARIANT_PATH: &str = "/data/adb/hybrid-mount/builtin_variant";
+const BUILTIN_LITE_ZIP: &[u8] = include_bytes!("../builtin/hybrid-mount-lite.zip");
 const MODULE_NAME_FALLBACK: &str = "Hybrid Mount Lite";
 const MODULE_VERSION_FALLBACK: &str = "4.1.0-1719";
 const MODULE_VERSION_CODE_FALLBACK: &str = "401000";
 const HYBRID_MOUNT_BINARY: &str = "hybrid-mount";
 const COMPAT_MARKER_FILE: &str = ".ksu_builtin_mount_compat";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BuiltinMountVariant {
+    Lite,
+}
+
+impl BuiltinMountVariant {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "lite" | "full" | "kasumi" | "experimental" => Ok(Self::Lite),
+            _ => bail!("unsupported builtin mount variant: {value}"),
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lite => "lite",
+        }
+    }
+
+    pub const fn archive(self) -> &'static [u8] {
+        match self {
+            Self::Lite => BUILTIN_LITE_ZIP,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MountMode {
@@ -49,7 +76,12 @@ pub fn print_status() {
     let conflict = conflicting_metamodule_id();
     let webui = module_dir.join(defs::MODULE_WEB_DIR).exists();
     let default_mode = read_default_mode().as_str();
-    let module_prop = read_builtin_module_prop();
+    let variant = read_variant();
+    let module_prop = if installed {
+        read_installed_module_prop()
+    } else {
+        read_archive_module_prop(variant)
+    };
     let module_path = module_dir.display().to_string();
     let name = module_prop
         .get("name")
@@ -73,6 +105,7 @@ pub fn print_status() {
             "enabled": enabled,
             "conflict": conflict,
             "defaultMode": default_mode,
+            "variant": variant.as_str(),
             "webui": webui,
         })
     );
@@ -87,9 +120,10 @@ pub fn enable() -> Result<()> {
 
     let module_dir = module_dir();
     let mode = read_default_mode();
+    let variant = read_variant();
     write_default_mode(mode)?;
     remove_builtin_symlink_if_active()?;
-    install_or_update_builtin_module(&module_dir)?;
+    install_or_update_builtin_module(&module_dir, variant)?;
     cleanup_legacy_module_dirs()?;
     remove_disable_marker(&module_dir)?;
     ensure_compat_module_entry(&module_dir)?;
@@ -121,6 +155,28 @@ pub fn disable() -> Result<()> {
 
 pub fn set_default_mode(mode: MountMode) -> Result<()> {
     write_default_mode(mode)
+}
+
+pub fn set_variant(variant: BuiltinMountVariant) -> Result<()> {
+    let module_dir = module_dir();
+    let enabled = is_enabled_at(&module_dir);
+
+    if enabled {
+        ensure_no_conflicting_metamodule()?;
+        let mode = read_default_mode();
+        write_default_mode(mode)?;
+        remove_builtin_symlink_if_active()?;
+        install_or_update_builtin_module(&module_dir, variant)?;
+        cleanup_legacy_module_dirs()?;
+        remove_disable_marker(&module_dir)?;
+        ensure_compat_module_entry(&module_dir)?;
+        metamodule::ensure_symlink(&module_dir)?;
+        if let Err(e) = module::regenerate_preinit_rc() {
+            log::warn!("regenerate preinit rc failed: {e}");
+        }
+    }
+
+    write_variant(variant)
 }
 
 pub fn ensure_active_compat_entry() -> Result<()> {
@@ -189,7 +245,7 @@ fn conflicting_metamodule_id() -> Option<String> {
     (id != HYBRID_MOUNT_MODULE_ID).then_some(id)
 }
 
-fn install_or_update_builtin_module(module_dir: &Path) -> Result<()> {
+fn install_or_update_builtin_module(module_dir: &Path, variant: BuiltinMountVariant) -> Result<()> {
     let parent = module_dir
         .parent()
         .with_context(|| format!("{} has no parent", module_dir.display()))?;
@@ -198,7 +254,7 @@ fn install_or_update_builtin_module(module_dir: &Path) -> Result<()> {
     let tmp_dir = parent.join(format!("{HYBRID_MOUNT_MODULE_ID}.tmp"));
     utils::ensure_clean_dir(&tmp_dir)?;
 
-    let mut archive = zip::ZipArchive::new(Cursor::new(BUILTIN_ZIP))
+    let mut archive = zip::ZipArchive::new(Cursor::new(variant.archive()))
         .with_context(|| "failed to open builtin mount archive")?;
     archive
         .extract(&tmp_dir)
@@ -324,12 +380,6 @@ fn ensure_compat_module_entry(module_dir: &Path) -> Result<()> {
             .with_context(|| format!("failed to chmod {}", compat_dir.display()))?;
         fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755))
             .with_context(|| format!("failed to chmod {}", wrapper.display()))?;
-
-        let kasumi_lkm = module_dir.join("kasumi_lkm");
-        if kasumi_lkm.exists() {
-            std::os::unix::fs::symlink(&kasumi_lkm, compat_dir.join("kasumi_lkm"))
-                .with_context(|| "failed to create builtin mount kasumi_lkm compat symlink")?;
-        }
     }
 
     Ok(())
@@ -394,8 +444,56 @@ fn is_same_path(left: &Path, right: &Path) -> bool {
     }
 }
 
-fn read_builtin_module_prop() -> HashMap<String, String> {
+fn read_installed_module_prop() -> HashMap<String, String> {
     module::read_module_prop(&module_dir()).unwrap_or_default()
+}
+
+fn read_archive_module_prop(variant: BuiltinMountVariant) -> HashMap<String, String> {
+    let Ok(mut archive) = zip::ZipArchive::new(Cursor::new(variant.archive())) else {
+        return HashMap::new();
+    };
+    let Ok(mut file) = archive.by_name("module.prop") else {
+        return HashMap::new();
+    };
+    let mut content = String::new();
+    if file.read_to_string(&mut content).is_err() {
+        return HashMap::new();
+    }
+    parse_prop_content(&content)
+}
+
+fn parse_prop_content(content: &str) -> HashMap<String, String> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                return None;
+            }
+            let (key, value) = trimmed.split_once('=')?;
+            Some((key.trim().to_string(), value.trim().to_string()))
+        })
+        .collect()
+}
+
+fn read_variant() -> BuiltinMountVariant {
+    if let Ok(content) = fs::read_to_string(BUILTIN_VARIANT_PATH)
+        && let Ok(variant) = BuiltinMountVariant::parse(&content)
+    {
+        return variant;
+    }
+
+    BuiltinMountVariant::Lite
+}
+
+fn write_variant(variant: BuiltinMountVariant) -> Result<()> {
+    let path = Path::new(BUILTIN_VARIANT_PATH);
+    let parent = path
+        .parent()
+        .with_context(|| format!("{} has no parent", path.display()))?;
+    utils::ensure_dir_exists(parent)?;
+    fs::write(path, format!("{}\n", variant.as_str()))
+        .with_context(|| format!("failed to write {}", path.display()))
 }
 
 fn read_default_mode() -> MountMode {
@@ -429,7 +527,8 @@ fn write_default_mode(mode: MountMode) -> Result<()> {
         .with_context(|| format!("{} has no parent", config.display()))?;
     utils::ensure_dir_exists(parent)?;
 
-    let content = fs::read_to_string(config).unwrap_or_else(|_| default_config(mode));
+    let content =
+        fs::read_to_string(config).unwrap_or_else(|_| default_config(mode, read_variant()));
     let mut found = false;
     let mut output = String::new();
     for line in content.lines() {
@@ -466,7 +565,7 @@ fn write_default_mode(mode: MountMode) -> Result<()> {
     Ok(())
 }
 
-fn default_config(mode: MountMode) -> String {
+fn default_config(mode: MountMode, _variant: BuiltinMountVariant) -> String {
     format!(
         "default_mode = \"{}\"\n\
          disable_umount = false\n\

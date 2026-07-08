@@ -110,6 +110,7 @@ interface SettingsRepository {
     suspend fun getBuiltinMountStatus(): BuiltinMountStatus
     fun setBuiltinMountEnabled(enabled: Boolean): Boolean
     fun setBuiltinMountDefaultMode(mode: String): Boolean
+    fun setBuiltinMountVariant(variant: String): Boolean
 
     suspend fun getKPatchNextStatus(): KPatchNextStatus
     fun setKPatchNextEnabled(enabled: Boolean): Boolean

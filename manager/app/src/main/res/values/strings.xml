@@ -183,7 +183,7 @@
     <string name="home_gki_warning">Starting from v3.0.0, the GKI work mode will be used only in testing environments. We do not recommend it for daily use, and image files will no longer be provided.</string>
     <string name="home_manager_identity_warning">ApkeSU is active, but this app is not recognized as the manager by the kernel. Reinstall the matching Manager APK or rebuild the kernel with this app signature.</string>
     <string name="about_join_qq_group">加入我的QQ群（莫晨又菜又爱玩①群）</string>
-    <string name="profile" translatable="false">App Profile</string>
+    <string name="profile">App Profile</string>
     <string name="profile_default">Default</string>
     <string name="profile_template">Template</string>
     <string name="profile_custom">Custom</string>

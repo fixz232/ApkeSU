@@ -152,6 +152,7 @@ fun SettingPager(
         onSetDefaultUmountModules = viewModel::setDefaultUmountModules,
         onSetBuiltinMountEnabled = viewModel::setBuiltinMountEnabled,
         onSetBuiltinMountDefaultMode = viewModel::setBuiltinMountDefaultMode,
+        onSetBuiltinMountVariant = viewModel::setBuiltinMountVariant,
         onOpenBuiltinMountWebUi = {
             context.startActivity(
                 Intent(context, WebUIActivity::class.java)

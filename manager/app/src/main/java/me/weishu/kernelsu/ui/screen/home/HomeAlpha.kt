@@ -114,7 +114,7 @@ private fun AlphaStatusCard(
                         .padding(horizontal = 12.dp),
                 )
                 AlphaInstallAction(
-                    installed = state.ksuVersion != null,
+                    installed = state.isKernelActive,
                     onInstallClick = actions.onInstallClick,
                     onJailbreakClick = actions.onJailbreakClick,
                 )
@@ -123,9 +123,11 @@ private fun AlphaStatusCard(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 AlphaInfoLine(
                     label = stringResource(R.string.alpha_current),
-                    value = state.ksuVersion?.let {
-                        "${it}-${state.kernelUAPIVersion ?: 0}"
-                    } ?: stringResource(R.string.home_not_installed),
+                    value = if (state.isKernelActive) {
+                        state.ksuVersionLabel
+                    } else {
+                        stringResource(R.string.home_not_installed)
+                    },
                     strong = true,
                 )
                 AlphaInfoLine(

@@ -50,8 +50,8 @@ fun HomePagerSkrootpro(
 ) {
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    var outputCleared by remember(state.ksuVersion) { mutableStateOf(false) }
-    val outputText = if (state.ksuVersion == null) {
+    var outputCleared by remember(state.isKernelActive) { mutableStateOf(false) }
+    val outputText = if (!state.isKernelActive) {
         stringResource(R.string.skrootpro_env_not_installed)
     } else {
         stringResource(R.string.skrootpro_env_active)

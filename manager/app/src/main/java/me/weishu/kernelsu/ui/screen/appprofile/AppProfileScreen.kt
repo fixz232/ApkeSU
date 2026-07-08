@@ -15,13 +15,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.forceStopApp
 import me.weishu.kernelsu.ui.util.getSepolicy
 import me.weishu.kernelsu.ui.util.launchApp
@@ -120,7 +123,14 @@ fun AppProfileScreen(uid: Int) {
                         return@launch
                     }
                 }
-                if (!Natives.setAppProfile(updatedProfile)) {
+                val updated = withContext(Dispatchers.IO) {
+                    if (Natives.setAppProfile(updatedProfile)) {
+                        true
+                    } else {
+                        ensureManagerRegistered() && Natives.setAppProfile(updatedProfile)
+                    }
+                }
+                if (!updated) {
                     showMessage(failToUpdateAppProfile)
                 } else {
                     profile = updatedProfile

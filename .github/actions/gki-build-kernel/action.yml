@@ -40,7 +40,14 @@ runs:
       run: |
         set -euo pipefail
 
-        export KSU_VERSION_OVERRIDE="${KSU_VERSION_OVERRIDE:-32560}"
+        if [ -z "${KSU_VERSION_OVERRIDE:-}" ]; then
+          KSU_VERSION_OVERRIDE="$(sed -n 's/^versionCode=//p' "$GITHUB_WORKSPACE/version.properties" 2>/dev/null | head -n 1)"
+        fi
+        if [ -z "$KSU_VERSION_OVERRIDE" ]; then
+          echo "Unable to determine KSU_VERSION_OVERRIDE" >&2
+          exit 1
+        fi
+        export KSU_VERSION_OVERRIDE
         echo "Using KSU_VERSION_OVERRIDE=$KSU_VERSION_OVERRIDE"
 
         rm -rf /home/runner/out

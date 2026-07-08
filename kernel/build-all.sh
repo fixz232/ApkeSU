@@ -7,6 +7,14 @@ else
     KMIS=$1
 fi
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ASSET_DIR="$ROOT_DIR/userspace/ksud/bin/aarch64"
+if [ -z "${KSU_VERSION_OVERRIDE:-}" ] && [ -f "$ROOT_DIR/version.properties" ]; then
+    KSU_VERSION_OVERRIDE="$(sed -n 's/^versionCode=//p' "$ROOT_DIR/version.properties" | head -n 1)"
+fi
+export KSU_VERSION_OVERRIDE
+echo "Using KSU_VERSION_OVERRIDE=${KSU_VERSION_OVERRIDE:-unset}"
+
 # Some patch is required to use separate build dir when building for android16-6.12, see:
 # https://github.com/5ec1cff/ddk#local-%E6%A8%A1%E5%BC%8F%E6%9E%84%E5%BB%BA%E9%80%82%E7%94%A8%E4%BA%8E%E5%A4%9A%E4%B8%AA-target-%E7%89%88%E6%9C%AC%E7%9A%84%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97
 
@@ -19,6 +27,8 @@ for kmi in $KMIS; do
         if [ -f "$ODIR/kernelsu.ko" ]; then
             cp "$ODIR/kernelsu.ko" "kernelsu-${kmi}.ko"
             llvm-strip -d "kernelsu-${kmi}.ko"
+            mkdir -p "$ASSET_DIR"
+            cp "kernelsu-${kmi}.ko" "$ASSET_DIR/${kmi}_kernelsu.ko"
             echo "✓ Built kernelsu-${kmi}.ko"
         fi
     else

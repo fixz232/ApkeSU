@@ -247,7 +247,7 @@ private fun HomeOverviewSection(
             SummaryStatusTile(
                 icon = Icons.Rounded.Android,
                 title = stringResource(R.string.home_system_patch),
-                value = stringResource(if (state.ksuVersion != null) R.string.home_active else R.string.home_inactive),
+                value = stringResource(if (state.isKernelActive) R.string.home_active else R.string.home_inactive),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -268,7 +268,7 @@ private fun PrimaryStatusTile(
         target = wallpaperTarget,
         onWallpaperSelected = {}
     )
-    val installed = state.ksuVersion != null
+    val installed = state.isKernelActive
     val installable = state.kernelVersion.isGKI()
     val showLkmWallpaperActions = state.lkmMode == true
     val wallpaperBitmap = rememberHomeMetricCardWallpaperBitmap(
@@ -283,11 +283,8 @@ private fun PrimaryStatusTile(
         installable -> stringResource(R.string.home_not_installed)
         else -> stringResource(R.string.home_unsupported)
     }
-    val version = state.ksuVersion?.let { ksu ->
-        ksu.toString()
-    }
     val statusSubtitle = when {
-        installed -> stringResource(R.string.home_working_version, version ?: "")
+        installed -> stringResource(R.string.home_working_version, state.ksuVersionLabel)
         installable -> stringResource(R.string.home_click_to_install)
         else -> stringResource(R.string.home_unsupported_reason)
     }
@@ -492,7 +489,7 @@ private fun StatusCard(
     installFeedbackActive: Boolean = false,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        val isInstalled = state.ksuVersion != null
+        val isInstalled = state.isKernelActive
         val isInstallable = state.kernelVersion.isGKI()
         val containerColor = when {
             isInstalled -> MaterialTheme.colorScheme.secondaryContainer
@@ -533,7 +530,7 @@ private fun StatusCard(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     when {
-                        state.ksuVersion != null -> {
+                        state.isKernelActive -> {
                             val workingMode = state.workingModeLabel.orEmpty()
 
                             StatusHeader(
@@ -542,7 +539,7 @@ private fun StatusCard(
                                 title = stringResource(id = R.string.home_working),
                                 subtitle = stringResource(
                                     R.string.home_working_version,
-                                    "${state.ksuVersion}-${state.kernelUAPIVersion}"
+                                    state.ksuVersionLabel
                                 ),
                                 accentColor = accentColor,
                                 contentColor = contentColor

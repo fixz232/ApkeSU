@@ -11,6 +11,7 @@ private const val GKI_MODE_LABEL = "GKI"
 data class HomeUiState(
     val kernelVersion: KernelVersion,
     val ksuVersion: Int?,
+    val isKernelActive: Boolean = ksuVersion != null,
     val managerUAPIVersion: Int,
     val kernelUAPIVersion: Int?,
     val lkmMode: Boolean?,
@@ -36,10 +37,10 @@ data class HomeUiState(
         get() = systemInfo.selinuxStatus == "Permissive"
 
     val isFullFeatured: Boolean
-        get() = isManager && !requiresNewKernel && isRootAvailable
+        get() = isKernelActive && isManager && !requiresNewKernel && isRootAvailable
 
     val showGkiWarning: Boolean
-        get() = showGkiWarningSetting && ksuVersion != null && lkmMode == false
+        get() = showGkiWarningSetting && isKernelActive && lkmMode == false
 
     val lkmModeLabel: String
         get() = if (hiddenPathLkmMode) HIDDEN_PATH_LKM_MODE_LABEL else LKM_MODE_LABEL
@@ -58,10 +59,10 @@ data class HomeUiState(
         get() = isManager && showRequireKernelWarning && uapiMismatch
 
     val showRootWarning: Boolean
-        get() = ksuVersion != null && !isRootAvailable
+        get() = isKernelActive && !isRootAvailable
 
     val showManagerWarning: Boolean
-        get() = ksuVersion != null && !isManager
+        get() = isKernelActive && !isManager
 
     val showManagerPrBuildWarning: Boolean
         get() = isManager && isManagerPrBuild
@@ -73,6 +74,11 @@ data class HomeUiState(
         get() = showVersionMismatchWarningSetting &&
                 ksuVersion != null &&
                 currentManagerVersionCode < ksuVersion.toLong()
+
+    val ksuVersionLabel: String
+        get() = ksuVersion?.let { version ->
+            kernelUAPIVersion?.let { "$version-$it" } ?: version.toString()
+        } ?: "--"
 }
 
 @Immutable

@@ -69,11 +69,17 @@ struct PartitionSpec {
     restore: bool,
 }
 
+struct RestorePlan {
+    description: String,
+    specs: Vec<PartitionSpec>,
+    activate_slot: Option<String>,
+}
+
 pub fn print_status() {
     let config = read_config().unwrap_or_default();
     let specs = partition_specs(&config);
     let manifest = read_manifest().unwrap_or_else(|_| json!({}));
-    let validation = validate_backups(&specs);
+    let validation = validate_backups(&config);
     let ready = validation.is_ok();
     let ready_reason = validation
         .err()
@@ -104,7 +110,7 @@ pub fn print_test_report() {
     let config = read_config().unwrap_or_default();
     let specs = partition_specs(&config);
     let environment = validate_environment(&specs);
-    let backup_validation = validate_backups(&specs);
+    let backup_validation = validate_backups(&config);
     let ok = environment.is_ok();
     let reason = environment
         .err()
@@ -228,13 +234,13 @@ pub fn backup(force: bool) -> Result<()> {
 
 pub fn enable() -> Result<()> {
     let config = read_config().unwrap_or_default();
-    let specs = partition_specs(&config);
-    validate_backups(&specs)?;
+    validate_backups(&config)?;
     utils::ensure_dir_exists(RESCUE_DIR)?;
+    clear_runtime_markers();
     fs::write(ENABLED_PATH, b"1").context("failed to enable rescue protection")?;
     fs::write(BOOT_OK_PATH, b"1").context("failed to mark current boot as healthy")?;
-    let _ = fs::remove_file(PENDING_BOOT_PATH);
     write_boot_count(0);
+    write_auto_restore_attempts(0);
     append_log("rescue protection enabled");
     Ok(())
 }
@@ -245,7 +251,7 @@ pub fn disable() -> Result<()> {
     let _ = fs::remove_file(BOOT_COUNT_PATH);
     let _ = fs::remove_file(AUTO_RESTORE_ATTEMPTS_PATH);
     let _ = fs::remove_file(BOOT_OK_PATH);
-    let _ = fs::remove_file(PENDING_BOOT_PATH);
+    clear_runtime_markers();
     append_log("rescue protection disabled");
     Ok(())
 }
@@ -331,11 +337,11 @@ pub fn check_on_post_fs_data() {
     }
 
     if Path::new(RESTORE_LOCK_PATH).exists() {
-        append_log("restore lock exists; reset boot counter and skip auto restore");
-        let _ = fs::write(BOOT_COUNT_PATH, b"0");
-        let _ = fs::remove_file(BOOT_OK_PATH);
-        let _ = fs::remove_file(PENDING_BOOT_PATH);
-        let _ = fs::remove_file(RESTORE_LOCK_PATH);
+        append_log("restore lock exists; mark boot healthy and skip auto restore");
+        clear_runtime_markers();
+        let _ = fs::write(BOOT_OK_PATH, b"1");
+        write_boot_count(0);
+        write_auto_restore_attempts(0);
         return;
     }
 
@@ -355,14 +361,16 @@ pub fn check_on_post_fs_data() {
         "post-fs-data rescue check: previous_boot_ok={previous_boot_ok}, pending_boot={pending_boot}, boot_count={next_count}"
     ));
 
-    let failure_hint = has_boot_failure_hint();
+    let failure_hint = pending_boot && has_boot_failure_hint();
     let pending_boot_failed =
         pending_boot && next_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT && !previous_boot_ok;
-    let boot_count_failed = next_count >= BOOT_FAILURE_TRIGGER_COUNT;
+    let boot_count_failed = pending_boot && next_count >= BOOT_FAILURE_TRIGGER_COUNT;
     if failure_hint || pending_boot_failed || boot_count_failed {
         append_log(format!(
             "auto restore triggered on post-fs-data: failure_hint={failure_hint}, pending_boot_failed={pending_boot_failed}, boot_count_failed={boot_count_failed}"
         ));
+    } else if !pending_boot {
+        append_log("no pending flashed boot; normal boot counter will not trigger auto restore");
     }
 
     if (failure_hint || pending_boot_failed || boot_count_failed)
@@ -386,11 +394,11 @@ pub fn check_on_recovery_boot() {
     }
 
     if Path::new(RESTORE_LOCK_PATH).exists() {
-        append_log("restore lock exists in recovery; reset rescue markers and skip auto restore");
-        let _ = fs::write(BOOT_COUNT_PATH, b"0");
-        let _ = fs::remove_file(BOOT_OK_PATH);
-        let _ = fs::remove_file(PENDING_BOOT_PATH);
-        let _ = fs::remove_file(RESTORE_LOCK_PATH);
+        append_log("restore lock exists in recovery; mark boot healthy and skip auto restore");
+        clear_runtime_markers();
+        let _ = fs::write(BOOT_OK_PATH, b"1");
+        write_boot_count(0);
+        write_auto_restore_attempts(0);
         return;
     }
 
@@ -404,13 +412,13 @@ pub fn check_on_recovery_boot() {
     let _ = fs::remove_file(BOOT_OK_PATH);
     write_boot_count(next_count);
 
-    let failure_hint = has_boot_failure_hint();
+    let failure_hint = pending_boot && has_boot_failure_hint();
     append_log(format!(
         "recovery rescue check: boot_mode={}, previous_boot_ok={previous_boot_ok}, pending_boot={pending_boot}, boot_count={next_count}, failure_hint={failure_hint}",
         boot_mode()
     ));
 
-    if (pending_boot || failure_hint || next_count >= BOOT_FAILURE_TRIGGER_COUNT)
+    if (pending_boot || failure_hint)
         && let Err(err) = auto_restore_backups()
     {
         append_log(format!("auto restore failed in recovery: {err:#}"));
@@ -432,15 +440,20 @@ pub fn mark_boot_completed() {
     let _ = fs::write(BOOT_OK_PATH, b"1");
     let _ = fs::write(BOOT_COUNT_PATH, b"0");
     let _ = fs::write(AUTO_RESTORE_ATTEMPTS_PATH, b"0");
-    let _ = fs::remove_file(PENDING_BOOT_PATH);
-    let _ = fs::remove_file(SKIP_MODULES_ONCE_PATH);
-    let _ = fs::remove_file(CACHE_SKIP_MODULES_ONCE_PATH);
-    let _ = fs::remove_file(LEGACY_TMP_MODULE_DISABLE_PATH);
+    clear_runtime_markers();
     cleanup_legacy_rescue_flags();
     append_log("boot completed; rescue counter reset");
 }
 
 fn partition_specs(config: &RescueConfig) -> Vec<PartitionSpec> {
+    base_partition_names(config)
+        .into_iter()
+        .map(|(name, required)| current_slot_spec(name, required, config))
+        .chain(other_slot_specs(config))
+        .collect()
+}
+
+fn base_partition_names(config: &RescueConfig) -> Vec<(&'static str, bool)> {
     let mut names = vec![("boot", true), ("vendor_boot", false), ("init_boot", false)];
     if config.include_dtbo {
         names.push(("dtbo", false));
@@ -448,12 +461,7 @@ fn partition_specs(config: &RescueConfig) -> Vec<PartitionSpec> {
     if config.include_vbmeta {
         names.push(("vbmeta", false));
     }
-
     names
-        .into_iter()
-        .map(|(name, required)| current_slot_spec(name, required, config))
-        .chain(other_slot_specs(config))
-        .collect()
 }
 
 fn current_slot_spec(name: &str, required: bool, config: &RescueConfig) -> PartitionSpec {
@@ -474,15 +482,7 @@ fn other_slot_specs(config: &RescueConfig) -> Vec<PartitionSpec> {
         return Vec::new();
     }
 
-    let mut names = vec![("boot", true), ("vendor_boot", false), ("init_boot", false)];
-    if config.include_dtbo {
-        names.push(("dtbo", false));
-    }
-    if config.include_vbmeta {
-        names.push(("vbmeta", false));
-    }
-
-    names
+    base_partition_names(config)
         .into_iter()
         .filter(|(name, _)| !config.custom_partitions.contains_key(*name))
         .map(|(name, _required)| PartitionSpec {
@@ -507,26 +507,19 @@ fn validate_environment(specs: &[PartitionSpec]) -> Result<()> {
     Ok(())
 }
 
-fn validate_backups(specs: &[PartitionSpec]) -> Result<()> {
-    validate_manifest_context()?;
-    for spec in specs {
-        let Some(device) = find_partition(spec)? else {
-            if spec.required {
-                bail!("{} partition is missing", spec.name);
-            }
-            continue;
-        };
-
-        let image = Path::new(&spec.image_path);
-        if !image.is_file() {
-            if spec.required {
-                bail!("{} backup is missing", spec.name);
-            }
-            bail!("{} partition exists but backup is missing", spec.name);
+fn validate_backups(config: &RescueConfig) -> Result<()> {
+    let plans = restore_plans(config)?;
+    let mut last_error = None;
+    for plan in plans {
+        match validate_restore_backups(&plan.specs, config, false) {
+            Ok(()) => return Ok(()),
+            Err(err) => last_error = Some(err),
         }
-        validate_image_against_partition(spec, &device)?;
     }
-    Ok(())
+    if let Some(err) = last_error {
+        return Err(err).context("no usable rescue backup set");
+    }
+    bail!("no usable rescue backup set");
 }
 
 fn validate_restore_backups(
@@ -534,7 +527,6 @@ fn validate_restore_backups(
     config: &RescueConfig,
     automatic: bool,
 ) -> Result<()> {
-    validate_manifest_context()?;
     let mut available_count = 0usize;
     for spec in specs {
         if !should_restore_spec(spec, config, automatic) {
@@ -641,6 +633,76 @@ fn validate_image_size_against_partition(spec: &PartitionSpec, device: &str) -> 
     Ok(())
 }
 
+fn restore_plans(config: &RescueConfig) -> Result<Vec<RestorePlan>> {
+    let manifest = validate_manifest_context_for_restore()?;
+    let saved_slot = manifest_slot(&manifest);
+    let now_slot = current_slot();
+    if saved_slot.is_empty() || now_slot.is_empty() || saved_slot == now_slot {
+        return Ok(vec![RestorePlan {
+            description: "restore backups for current slot".to_string(),
+            specs: partition_specs(config),
+            activate_slot: None,
+        }]);
+    }
+
+    let mut plans = Vec::new();
+    if config.backup_other_slot {
+        let current_slot_specs = current_slot_specs_from_other_backups(config);
+        if current_slot_specs.iter().any(|spec| spec.required) {
+            plans.push(RestorePlan {
+                description: format!(
+                    "slot changed from {saved_slot} to {now_slot}; use other-slot backups for current slot"
+                ),
+                specs: current_slot_specs,
+                activate_slot: None,
+            });
+        }
+    }
+
+    plans.push(RestorePlan {
+        description: format!(
+            "slot changed from {saved_slot} to {now_slot}; restore backup slot and switch active slot back to {saved_slot}"
+        ),
+        specs: saved_slot_specs(config),
+        activate_slot: Some(saved_slot),
+    });
+    Ok(plans)
+}
+
+fn current_slot_specs_from_other_backups(config: &RescueConfig) -> Vec<PartitionSpec> {
+    base_partition_names(config)
+        .into_iter()
+        .filter(|(name, _)| !config.custom_partitions.contains_key(*name))
+        .map(|(name, required)| PartitionSpec {
+            name: name.to_string(),
+            label: format!("{name}_other"),
+            image_path: format!("{RESCUE_DIR}{name}_other.img"),
+            required,
+            custom_path: None,
+            ota: false,
+            restore: true,
+        })
+        .collect()
+}
+
+fn saved_slot_specs(config: &RescueConfig) -> Vec<PartitionSpec> {
+    base_partition_names(config)
+        .into_iter()
+        .map(|(name, required)| {
+            let custom_path = config.custom_partitions.get(name).cloned();
+            PartitionSpec {
+                name: name.to_string(),
+                label: name.to_string(),
+                image_path: format!("{RESCUE_DIR}{name}.img"),
+                required,
+                ota: custom_path.is_none(),
+                custom_path,
+                restore: true,
+            }
+        })
+        .collect()
+}
+
 fn auto_restore_backups() -> Result<()> {
     let attempts = read_auto_restore_attempts();
     if attempts >= MAX_AUTO_RESTORE_ATTEMPTS {
@@ -654,12 +716,37 @@ fn auto_restore_backups() -> Result<()> {
 
 fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     let config = read_config().unwrap_or_default();
-    let specs = partition_specs(&config);
-    validate_restore_backups(&specs, &config, automatic)?;
+    let plans = restore_plans(&config)?;
+    let mut selected_plan = None;
+    let mut last_error = None;
+    for plan in plans {
+        match validate_restore_backups(&plan.specs, &config, automatic) {
+            Ok(()) => {
+                selected_plan = Some(plan);
+                break;
+            }
+            Err(err) => {
+                append_log(format!("skip restore plan '{}': {err:#}", plan.description));
+                last_error = Some(err);
+            }
+        }
+    }
+    let Some(plan) = selected_plan else {
+        if let Some(err) = last_error {
+            return Err(err).context("no usable rescue restore plan");
+        }
+        bail!("no usable rescue restore plan");
+    };
+
+    if let Some(slot) = plan.activate_slot.as_deref() {
+        validate_active_slot_switch(slot)?;
+    }
+
     append_log(format!("restore started: {reason}"));
+    append_log(format!("restore plan: {}", plan.description));
     append_log("restore mode: keep /data untouched; only configured boot images are restored");
     let mut restored_count = 0usize;
-    for spec in &specs {
+    for spec in &plan.specs {
         if !should_restore_spec(spec, &config, automatic) || !Path::new(&spec.image_path).is_file()
         {
             continue;
@@ -673,6 +760,9 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     }
     if restored_count == 0 {
         bail!("no rescue backup was restored");
+    }
+    if let Some(slot) = plan.activate_slot.as_deref() {
+        set_active_slot(slot)?;
     }
     cleanup_after_restore();
     mark_skip_modules_once();
@@ -794,6 +884,81 @@ fn request_reboot() {
     }
 }
 
+fn set_active_slot(slot: &str) -> Result<()> {
+    let slot_number = bootctl_slot_number(slot)?;
+    let mut errors = Vec::new();
+    prepare_bootctl_for_slot_switch();
+    for program in bootctl_commands() {
+        match Command::new(program)
+            .arg("set-active-boot-slot")
+            .arg(slot_number)
+            .status()
+        {
+            Ok(status) if status.success() => {
+                append_log(format!("set active slot to {slot} via {program}"));
+                return Ok(());
+            }
+            Ok(status) => {
+                errors.push(format!("{program} exited with {status}"));
+            }
+            Err(err) => {
+                errors.push(format!("{program} failed: {err:#}"));
+            }
+        }
+    }
+    bail!("failed to set active slot to {slot}: {}", errors.join("; "))
+}
+
+fn validate_active_slot_switch(slot: &str) -> Result<()> {
+    let _ = bootctl_slot_number(slot)?;
+    let mut errors = Vec::new();
+    prepare_bootctl_for_slot_switch();
+    for program in bootctl_commands() {
+        match Command::new(program).arg("hal-info").status() {
+            Ok(status) if status.success() => {
+                append_log(format!(
+                    "validated active slot switch support via {program}"
+                ));
+                return Ok(());
+            }
+            Ok(status) => {
+                errors.push(format!("{program} hal-info exited with {status}"));
+            }
+            Err(err) => {
+                errors.push(format!("{program} hal-info failed: {err:#}"));
+            }
+        }
+    }
+    bail!(
+        "cannot switch active slot to {slot}; bootctl is unavailable: {}",
+        errors.join("; ")
+    )
+}
+
+fn prepare_bootctl_for_slot_switch() {
+    if let Err(err) = crate::assets::ensure_binaries(true) {
+        append_log(format!(
+            "failed to extract bootctl before slot switch: {err:#}"
+        ));
+    }
+}
+
+const fn bootctl_commands() -> [&'static str; 3] {
+    [
+        crate::assets::BOOTCTL_PATH,
+        "/system/bin/bootctl",
+        "bootctl",
+    ]
+}
+
+fn bootctl_slot_number(slot: &str) -> Result<&'static str> {
+    match slot.trim() {
+        "_a" | "a" | "0" => Ok("0"),
+        "_b" | "b" | "1" => Ok("1"),
+        value => bail!("unsupported slot suffix for rescue restore: {value}"),
+    }
+}
+
 fn cleanup_after_restore() {
     const CLEANUP_DIRS: &[&str] = &[
         "/data/dalvik-cache",
@@ -869,6 +1034,19 @@ fn mark_skip_modules_once() {
 
 fn skip_modules_once_exists() -> bool {
     Path::new(SKIP_MODULES_ONCE_PATH).exists() || Path::new(CACHE_SKIP_MODULES_ONCE_PATH).exists()
+}
+
+fn clear_runtime_markers() {
+    for path in [
+        PENDING_BOOT_PATH,
+        RESTORE_LOCK_PATH,
+        SKIP_MODULES_ONCE_PATH,
+        CACHE_SKIP_MODULES_ONCE_PATH,
+        SKIP_MODULES_THIS_BOOT_PATH,
+        LEGACY_TMP_MODULE_DISABLE_PATH,
+    ] {
+        let _ = fs::remove_file(path);
+    }
 }
 
 fn mark_legacy_tmp_module_disable() {
@@ -967,19 +1145,10 @@ fn read_manifest() -> Result<Value> {
     serde_json::from_str(&content).context("invalid rescue manifest")
 }
 
-fn validate_manifest_context() -> Result<()> {
+fn validate_manifest_context_for_restore() -> Result<Value> {
     let manifest = read_manifest()?;
     if manifest.as_object().is_none_or(serde_json::Map::is_empty) {
         bail!("rescue manifest is missing; please backup first");
-    }
-
-    let saved_slot = manifest
-        .get("slot")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let now_slot = current_slot();
-    if !saved_slot.is_empty() && saved_slot != now_slot {
-        bail!("slot mismatch: backup={saved_slot}, current={now_slot}");
     }
 
     let saved_fingerprint = manifest
@@ -1001,7 +1170,15 @@ fn validate_manifest_context() -> Result<()> {
         bail!("rescue config changed after backup; please create a fresh backup");
     }
 
-    Ok(())
+    Ok(manifest)
+}
+
+fn manifest_slot(manifest: &Value) -> String {
+    manifest
+        .get("slot")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn manifest_sha256(name: &str) -> Option<String> {

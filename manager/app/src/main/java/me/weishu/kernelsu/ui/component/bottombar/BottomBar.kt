@@ -25,6 +25,7 @@ import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.alpha.AlphaBottomBar
 import me.weishu.kernelsu.ui.component.delta.DeltaBottomBar
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproBottomBar
+import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rootAvailable
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
@@ -35,7 +36,8 @@ internal fun hasFullFeaturedManager(): Boolean {
     if (!isManager) return false
     val requiresNewKernel = runCatching { Natives.requireNewKernel() }.getOrDefault(true)
     if (requiresNewKernel) return false
-    return runCatching { rootAvailable() }.getOrDefault(false)
+    return runCatching { rootAvailable() }.getOrDefault(false) ||
+        runCatching { ksuRootAvailable() }.getOrDefault(false)
 }
 
 class MainPagerState(

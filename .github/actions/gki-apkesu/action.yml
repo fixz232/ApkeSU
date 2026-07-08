@@ -9,7 +9,7 @@ inputs:
   gki_version:
     description: "Fixed KSU_VERSION used by GKI builds"
     required: false
-    default: "32560"
+    default: ""
 
 runs:
   using: composite
@@ -41,7 +41,11 @@ runs:
         KSU_DRIVER_DIR="$DRIVER_DIR/kernelsu"
         APKESU_GKI_VERSION="${{ inputs.gki_version }}"
         if [ -z "$APKESU_GKI_VERSION" ]; then
-          APKESU_GKI_VERSION="32560"
+          APKESU_GKI_VERSION="$(sed -n 's/^versionCode=//p' "$APKESU_ROOT/version.properties" 2>/dev/null | head -n 1)"
+        fi
+        if [ -z "$APKESU_GKI_VERSION" ]; then
+          echo "Unable to determine ApkeSU GKI version" >&2
+          exit 1
         fi
 
         ln -sfn "$(realpath --relative-to="$DRIVER_DIR" "$APKESU_ROOT/kernel")" "$KSU_DRIVER_DIR"
@@ -84,7 +88,11 @@ runs:
         APKESU_VERSION_NAME="$(sed -n 's/^versionName=//p' "${{ github.workspace }}/version.properties" 2>/dev/null | head -n 1)"
         APKESU_GKI_VERSION="${{ inputs.gki_version }}"
         if [ -z "$APKESU_GKI_VERSION" ]; then
-          APKESU_GKI_VERSION="32560"
+          APKESU_GKI_VERSION="$APKESU_VERSION"
+        fi
+        if [ -z "$APKESU_GKI_VERSION" ]; then
+          echo "Unable to determine ApkeSU GKI version" >&2
+          exit 1
         fi
 
         echo "APKESU_COMMIT=$APKESU_COMMIT" >> "$GITHUB_ENV"

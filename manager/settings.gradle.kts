@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KernelSU"
 include(":app")
+include(":gki-builder")

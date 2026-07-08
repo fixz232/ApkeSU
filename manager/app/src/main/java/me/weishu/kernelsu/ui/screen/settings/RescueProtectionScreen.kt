@@ -40,9 +40,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -53,10 +54,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.RescueConfigState
 import me.weishu.kernelsu.ui.util.RescueImageState
@@ -79,11 +81,14 @@ import java.io.File
 
 private const val TITLE = "救砖保护"
 
+private val RESCUE_TABS = listOf("主页", "配置", "使用说明")
+
 @Composable
 fun RescueProtectionScreen() {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
     var status by remember { mutableStateOf(RescueStatus()) }
     var logs by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
@@ -118,7 +123,11 @@ fun RescueProtectionScreen() {
             status = getRescueStatus()
             logs = getRescueLogs()
             busy = false
-            Toast.makeText(context, if (ok) "镜像已导入" else "镜像导入失败，请查看日志", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                if (ok) "镜像已导入" else "镜像导入失败，请查看日志",
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 
@@ -208,8 +217,10 @@ fun RescueProtectionScreen() {
         refresh(syncConfig = true)
     }
 
+    val pageContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
+    val barContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = pageContainerColor,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
@@ -220,8 +231,10 @@ fun RescueProtectionScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
+                    containerColor = barContainerColor,
+                    scrolledContainerColor = barContainerColor,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
         },
@@ -229,75 +242,92 @@ fun RescueProtectionScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(innerPadding),
         ) {
-            if (loading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            PrimaryTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = barContainerColor,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                RESCUE_TABS.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(title) },
+                    )
+                }
             }
 
-            RescueStatusCard(status = status)
-            RescueImagesCard(
-                status = status,
-                onImport = { image ->
-                    if (image.exists) {
-                        showImportConfirmFor = image
-                    } else {
-                        launchImageImport(image.name, force = false)
-                    }
-                },
-            )
-            RescueConfigCard(
-                busy = busy,
-                includeDtbo = includeDtbo,
-                includeVbmeta = includeVbmeta,
-                backupOtherSlot = backupOtherSlot,
-                allowDangerousAutoRestore = allowDangerousAutoRestore,
-                bootPath = bootPath,
-                vendorBootPath = vendorBootPath,
-                initBootPath = initBootPath,
-                dtboPath = dtboPath,
-                vbmetaPath = vbmetaPath,
-                onIncludeDtboChange = { includeDtbo = it },
-                onIncludeVbmetaChange = { includeVbmeta = it },
-                onBackupOtherSlotChange = { backupOtherSlot = it },
-                onAllowDangerousAutoRestoreChange = { allowDangerousAutoRestore = it },
-                onBootPathChange = { bootPath = it },
-                onVendorBootPathChange = { vendorBootPath = it },
-                onInitBootPathChange = { initBootPath = it },
-                onDtboPathChange = { dtboPath = it },
-                onVbmetaPathChange = { vbmetaPath = it },
-                onSave = ::saveConfig,
-            )
-            RescueActionCard(
-                status = status,
-                busy = busy,
-                onBackup = {
-                    if (status.manifestCreatedAt.isBlank()) {
-                        runAction("backup", "备份完成", "备份失败，请查看日志", timeoutMultiplier = 30)
-                    } else {
-                        showBackupConfirm = true
-                    }
-                },
-                onTest = ::testEnvironment,
-                onToggle = { enabled ->
-                    runAction(
-                        if (enabled) "enable" else "disable",
-                        if (enabled) "救砖保护已启用" else "救砖保护已关闭",
-                        "操作失败，请先检测环境和确认备份完整",
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
+
+                when (selectedTab) {
+                    0 -> RescueHomePage(
+                        status = status,
+                        logs = logs,
+                        busy = busy,
+                        testReport = testReport,
+                        onImport = { image ->
+                            if (image.exists) {
+                                showImportConfirmFor = image
+                            } else {
+                                launchImageImport(image.name, force = false)
+                            }
+                        },
+                        onBackup = {
+                            if (status.manifestCreatedAt.isBlank()) {
+                                runAction("backup", "备份完成", "备份失败，请查看日志", timeoutMultiplier = 30)
+                            } else {
+                                showBackupConfirm = true
+                            }
+                        },
+                        onTest = ::testEnvironment,
+                        onToggle = { enabled ->
+                            runAction(
+                                if (enabled) "enable" else "disable",
+                                if (enabled) "救砖保护已启用" else "救砖保护已关闭",
+                                "操作失败，请先检测环境并确认备份完整",
+                            )
+                        },
+                        onRestore = { showRestoreConfirm = true },
+                        onRefresh = { refresh(syncConfig = true) },
+                        onClearLogs = { runAction("clear-logs", "日志已清空", "清空日志失败") },
                     )
-                },
-                onRestore = { showRestoreConfirm = true },
-                onRefresh = { refresh(syncConfig = true) },
-                onClearLogs = { runAction("clear-logs", "日志已清空", "清空日志失败") },
-            )
-            RescueHelpCard()
-            if (testReport.isNotBlank()) {
-                RescueTextCard("检测报告", testReport)
+
+                    1 -> RescueConfigCard(
+                        busy = busy,
+                        includeDtbo = includeDtbo,
+                        includeVbmeta = includeVbmeta,
+                        backupOtherSlot = backupOtherSlot,
+                        allowDangerousAutoRestore = allowDangerousAutoRestore,
+                        bootPath = bootPath,
+                        vendorBootPath = vendorBootPath,
+                        initBootPath = initBootPath,
+                        dtboPath = dtboPath,
+                        vbmetaPath = vbmetaPath,
+                        onIncludeDtboChange = { includeDtbo = it },
+                        onIncludeVbmetaChange = { includeVbmeta = it },
+                        onBackupOtherSlotChange = { backupOtherSlot = it },
+                        onAllowDangerousAutoRestoreChange = { allowDangerousAutoRestore = it },
+                        onBootPathChange = { bootPath = it },
+                        onVendorBootPathChange = { vendorBootPath = it },
+                        onInitBootPathChange = { initBootPath = it },
+                        onDtboPathChange = { dtboPath = it },
+                        onVbmetaPathChange = { vbmetaPath = it },
+                        onSave = ::saveConfig,
+                    )
+
+                    else -> RescueHelpCard()
+                }
             }
-            RescueTextCard("日志", logs.ifBlank { status.log }.ifBlank { "暂无救砖日志" })
         }
     }
 
@@ -306,12 +336,21 @@ fun RescueProtectionScreen() {
             onDismissRequest = { showRestoreConfirm = false },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
             title = { Text("确认保留数据回滚？") },
-            text = { Text("这会立即写回已备份的 boot/init_boot/vendor_boot 等启动镜像，并尝试重启；不会清空 /data，也不会删除救砖备份和配置。") },
+            text = {
+                Text(
+                    "这会立即写回已备份的 boot/init_boot/vendor_boot 等启动镜像，并尝试重启；不会清空 /data，也不会删除救砖备份和配置。"
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         showRestoreConfirm = false
-                        runAction("restore", "已开始保留数据回滚", "保留数据回滚失败，请查看日志", timeoutMultiplier = 20)
+                        runAction(
+                            "restore",
+                            "已开始保留数据回滚",
+                            "保留数据回滚失败，请查看日志",
+                            timeoutMultiplier = 20,
+                        )
                     },
                 ) {
                     Text("确认回滚")
@@ -354,7 +393,11 @@ fun RescueProtectionScreen() {
             onDismissRequest = { showImportConfirmFor = null },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
             title = { Text("覆盖 ${image.name} 备份？") },
-            text = { Text("导入本地镜像会覆盖当前 ${image.name} 救砖备份。请确认选择的是当前设备、当前槽位对应的镜像。") },
+            text = {
+                Text(
+                    "导入本地镜像会覆盖当前 ${image.name} 救砖备份。请确认选择的是当前设备、当前槽位对应的镜像。"
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -372,6 +415,38 @@ fun RescueProtectionScreen() {
             },
         )
     }
+}
+
+@Composable
+private fun RescueHomePage(
+    status: RescueStatus,
+    logs: String,
+    busy: Boolean,
+    testReport: String,
+    onImport: (RescueImageState) -> Unit,
+    onBackup: () -> Unit,
+    onTest: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onRestore: () -> Unit,
+    onRefresh: () -> Unit,
+    onClearLogs: () -> Unit,
+) {
+    RescueStatusCard(status = status)
+    RescueImagesCard(status = status, onImport = onImport)
+    RescueActionCard(
+        status = status,
+        busy = busy,
+        onBackup = onBackup,
+        onTest = onTest,
+        onToggle = onToggle,
+        onRestore = onRestore,
+        onRefresh = onRefresh,
+        onClearLogs = onClearLogs,
+    )
+    if (testReport.isNotBlank()) {
+        RescueTextCard("检测报告", testReport)
+    }
+    RescueTextCard("日志", logs.ifBlank { status.log }.ifBlank { "暂无救砖日志" })
 }
 
 @Composable
@@ -441,10 +516,10 @@ private fun RescueImageRow(
                     !image.sha256Ok -> "校验失败"
                     else -> "异常"
                 },
-                color = if (ok || image.partition.isBlank()) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
+                color = when {
+                    ok -> MaterialTheme.colorScheme.primary
+                    image.partition.isBlank() -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.error
                 },
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -497,10 +572,25 @@ private fun RescueConfigCard(
     onVbmetaPathChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
-    RescueCard(title = "高级配置") {
-        SwitchLine("双槽备份", "中风险：会额外备份另一槽 boot/vendor_boot/init_boot；手动分区路径不会自动推断另一槽。", backupOtherSlot, onBackupOtherSlotChange)
-        SwitchLine("同时备份 dtbo", "中高风险：适合刷内核/DTBO 风险较高的设备。", includeDtbo, onIncludeDtboChange)
-        SwitchLine("同时备份 vbmeta", "高风险：只建议高级用户开启，不确定时保持关闭。", includeVbmeta, onIncludeVbmetaChange)
+    RescueCard(title = "配置") {
+        SwitchLine(
+            "双槽备份",
+            "中风险：额外备份另一槽 boot/vendor_boot/init_boot；手动分区路径不会自动推断另一槽。",
+            backupOtherSlot,
+            onBackupOtherSlotChange,
+        )
+        SwitchLine(
+            "同时备份 dtbo",
+            "中高风险：适合刷内核时 DTBO 风险较高的设备；不确定时保持关闭。",
+            includeDtbo,
+            onIncludeDtboChange,
+        )
+        SwitchLine(
+            "同时备份 vbmeta",
+            "高风险：只建议高级用户开启；不确定时保持关闭。",
+            includeVbmeta,
+            onIncludeVbmetaChange,
+        )
         if (includeDtbo || includeVbmeta) {
             SwitchLine(
                 "允许自动恢复高危分区",
@@ -551,10 +641,11 @@ private fun RescueActionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(
+            ExpressiveSwitch(
                 checked = status.enabled,
                 enabled = !busy && (status.requiredReady || status.enabled),
                 onCheckedChange = onToggle,
+                showThumbIcon = false,
             )
         }
         FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onTest) {
@@ -593,19 +684,27 @@ private fun RescueActionCard(
 
 @Composable
 private fun RescueHelpCard() {
-    RescueCard(title = "使用说明") {
-        HelpLine("先点“检测环境”，确认 boot 分区可识别，再保存高级配置。")
-        HelpLine("如果自动识别分区失败，可以手动填写 /dev/block/... 分区路径。")
-        HelpLine("没有 init_boot 的设备不会强制要求 init_boot 备份。")
-        HelpLine("dtbo/vbmeta 是可选高风险备份，默认关闭；不确定时不要开启 vbmeta。")
-        HelpLine("备份后会记录大小和 SHA256，恢复前会重新校验，避免坏备份写回分区。")
-        HelpLine("修改高级配置后，旧备份会被判定不匹配，需要重新备份。")
-        HelpLine("已有备份时再次备份会弹出覆盖确认，系统异常时不要覆盖旧备份。")
-        HelpLine("也可以导入自己保存的 boot/init_boot/vendor_boot 镜像作为备份，导入前请确认镜像来自当前设备和当前槽位。")
-        HelpLine("默认回滚模式为保留数据回滚：只恢复启动相关镜像，不会清空 /data。")
-        HelpLine("刷写启动镜像后会标记下一次启动待验证；如果卡到 recovery/rec，检测到失败计数或 panic/watchdog 线索后会自动回滚。")
-        HelpLine("自动恢复最多尝试 3 次；超过限制后会自动关闭保护，避免循环恢复。")
-        HelpLine("极早期连 /data/adb/ksud 都无法启动的硬砖场景，仍需要 fastboot/线刷。")
+    RescueCard(title = "推荐操作步骤") {
+        StepLine(1, "进入配置页", "按设备情况开启双槽备份、dtbo/vbmeta 备份，必要时填写手动分区路径。")
+        StepLine(2, "检测环境", "确认 boot 分区可识别，当前槽位、设备信息和配置可正常读取。")
+        StepLine(3, "保存配置", "保存后如果修改过分区范围或手动路径，请重新备份。")
+        StepLine(4, "备份当前镜像", "生成 boot/vendor_boot/init_boot 等备份，并记录大小与 SHA256。")
+        StepLine(5, "启用救砖保护", "只有备份完整可用时再开启；开启后刷写启动镜像会标记下一次启动待验证。")
+        StepLine(6, "刷入或修补镜像", "刷入后先正常重启一次，成功进入系统后会自动标记本次启动安全。")
+        StepLine(7, "异常时自动处理", "如果启动失败或卡 recovery，救砖保护会按规则尝试保留数据回滚。")
+    }
+
+    RescueCard(title = "什么时候会自动回滚") {
+        HelpLine("刷写 boot/init_boot/vendor_boot 后，下次启动会进入待验证状态。")
+        HelpLine("待验证状态下连续启动失败达到 2 次，会触发自动回滚。")
+        HelpLine("普通启动连续失败达到 3 次，会触发自动回滚。")
+        HelpLine("检测到 pstore 里的 panic、watchdog、oops 等启动失败线索，会触发自动回滚。")
+        HelpLine("如果设备卡到 recovery/rec，且仍能运行 ksud recovery-check，也会尝试自动回滚。")
+        HelpLine("自动恢复最多尝试 3 次；超过限制后会关闭保护，避免循环恢复。")
+        HelpLine("默认是保留数据回滚：只恢复启动相关镜像，不会清空 /data。")
+        HelpLine("双槽设备会优先恢复当前槽匹配的备份；如果只有备份槽可用，会恢复备份槽并尝试切回备份槽。")
+        HelpLine("dtbo/vbmeta 属于高风险分区，只有在配置页允许后才会参与自动恢复。")
+        HelpLine("极早期连 /data/adb/ksud 都无法启动的硬砖场景，仍需要 fastboot 或线刷。")
     }
 }
 
@@ -640,7 +739,11 @@ private fun SwitchLine(
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        ExpressiveSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            showThumbIcon = false,
+        )
     }
 }
 
@@ -710,6 +813,42 @@ private fun HelpLine(text: String) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+@Composable
+private fun StepLine(index: Int, title: String, summary: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Text(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                text = index.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 private fun formatSize(size: Long): String {

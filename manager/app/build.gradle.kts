@@ -116,7 +116,7 @@ android {
     ndkVersion = androidCompileNdkVersion
 
     defaultConfig {
-        applicationId = "io.github.fixz.epkesu"
+        applicationId = "io.github.fixz.apkesu"
         minSdk = androidMinSdkVersion
         targetSdk = androidTargetSdkVersion
         versionCode = managerVersionCode

@@ -19,6 +19,7 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_OVERLAY
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_LITE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_AUDIO_VOLUME
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
@@ -103,6 +104,7 @@ data class SettingsUiState(
     // Built-in Hybrid Mount Lite
     val isBuiltinMountEnabled: Boolean = false,
     val builtinMountDefaultMode: String = BUILTIN_MOUNT_MODE_OVERLAY,
+    val builtinMountVariant: String = BUILTIN_MOUNT_VARIANT_LITE,
     val isBuiltinMountWebUiAvailable: Boolean = false,
     val builtinMountConflict: String? = null,
 
@@ -194,6 +196,7 @@ data class SettingsScreenActions(
     val onSetDefaultUmountModules: (Boolean) -> Unit,
     val onSetBuiltinMountEnabled: (Boolean) -> Unit,
     val onSetBuiltinMountDefaultMode: (Int) -> Unit,
+    val onSetBuiltinMountVariant: (Int) -> Unit,
     val onOpenBuiltinMountWebUi: () -> Unit,
     val onSetKPatchNextEnabled: (Boolean) -> Unit,
     val onOpenKPatchNextWebUi: () -> Unit,

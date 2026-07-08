@@ -136,6 +136,7 @@
     <string name="home_support_content">ApkeSU 将保持免费开源，向开发者捐赠以表示支持</string>
     <string name="home_gki_warning">自 v3.0.0 起 GKI 工作模式将仅用于测试环境，我们不建议用于日常使用，也不再提供镜像文件</string>
     <string name="home_manager_identity_warning">ApkeSU 已激活，但当前应用未被内核识别为管理器。请安装匹配的管理器 APK，或使用当前应用签名重新构建内核。</string>
+    <string name="profile">应用配置</string>
     <string name="profile_default">默认</string>
     <string name="profile_template">模版</string>
     <string name="profile_custom">自定义</string>
@@ -149,7 +150,7 @@
     <string name="profile_capabilities">权能</string>
     <string name="profile_selinux_context">SELinux</string>
     <string name="profile_umount_modules">卸载模块</string>
-    <string name="failed_to_update_app_profile">为 %s 更新 App Profile 失败</string>
+    <string name="failed_to_update_app_profile">为 %s 更新应用配置失败</string>
     <string name="uapi_mismatch">管理器 uapi 版本 (%1$d) 与 ApkeSU 驱动 uapi 版本 (%2$d) 不匹配。</string>
     <string name="require_manager_version">当前 ApkeSU 管理器版本 %1$d 过低，ApkeSU 无法正常工作. 请将 ApkeSU 管理器版本升级至 %2$d 或以上!</string>
     <string name="require_kernel_version">当前 ApkeSU 版本 %1$d 过低，管理器无法正常工作，请将内核 ApkeSU 版本升级至 %2$d 或以上！</string>
