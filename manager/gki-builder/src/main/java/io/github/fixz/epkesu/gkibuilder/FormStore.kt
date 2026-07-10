@@ -27,10 +27,6 @@ private const val KEY_ZRAM_EXTRA_ALGOS = "zram_extra_algos"
 private const val KEY_USE_NTSYNC = "use_ntsync"
 private const val KEY_USE_NETWORKING = "use_networking"
 private const val KEY_VIRTUALIZATION_SUPPORT = "virtualization_support"
-private const val KEY_USE_BBG = "use_bbg"
-private const val KEY_USE_DDK = "use_ddk"
-private const val KEY_USE_KPM = "use_kpm"
-private const val KEY_USE_REKERNEL = "use_rekernel"
 private const val KEY_UPLOAD_AUX_ARTIFACTS = "upload_aux_artifacts"
 private const val KEY_OPLUS_PATCH_MODE = "oplus_patch_mode"
 private const val KEY_OPLUS_REFERENCE_REF = "oplus_reference_ref"
@@ -70,10 +66,6 @@ private fun SharedPreferences.readBuilderForm(): BuilderForm {
         useNetworking = getBoolean(KEY_USE_NETWORKING, defaults.useNetworking),
         virtualizationSupport = getString(KEY_VIRTUALIZATION_SUPPORT, defaults.virtualizationSupport)
             ?: defaults.virtualizationSupport,
-        useBbg = getBoolean(KEY_USE_BBG, defaults.useBbg),
-        useDdk = getBoolean(KEY_USE_DDK, defaults.useDdk),
-        useKpm = getBoolean(KEY_USE_KPM, defaults.useKpm),
-        useRekernel = getBoolean(KEY_USE_REKERNEL, defaults.useRekernel),
         uploadAuxArtifacts = getBoolean(KEY_UPLOAD_AUX_ARTIFACTS, defaults.uploadAuxArtifacts),
         oplusPatchMode = getString(KEY_OPLUS_PATCH_MODE, defaults.oplusPatchMode) ?: defaults.oplusPatchMode,
         oplusReferenceRef = getString(KEY_OPLUS_REFERENCE_REF, defaults.oplusReferenceRef) ?: defaults.oplusReferenceRef,
@@ -114,10 +106,6 @@ private fun SharedPreferences.saveBuilderForm(form: BuilderForm) {
         .putBoolean(KEY_USE_NTSYNC, form.useNtsync)
         .putBoolean(KEY_USE_NETWORKING, form.useNetworking)
         .putString(KEY_VIRTUALIZATION_SUPPORT, form.virtualizationSupport)
-        .putBoolean(KEY_USE_BBG, form.useBbg)
-        .putBoolean(KEY_USE_DDK, form.useDdk)
-        .putBoolean(KEY_USE_KPM, form.useKpm)
-        .putBoolean(KEY_USE_REKERNEL, form.useRekernel)
         .putBoolean(KEY_UPLOAD_AUX_ARTIFACTS, form.uploadAuxArtifacts)
         .putString(KEY_OPLUS_PATCH_MODE, form.oplusPatchMode)
         .putString(KEY_OPLUS_REFERENCE_REF, form.oplusReferenceRef)

@@ -1,7 +1,7 @@
 # ApkeSU release APK
 
-Use `.github/workflows/release-apk.yml` to build an ABK-style release APK for
-this repository.
+Use `.github/workflows/release-apk.yml` to build an ApkeSU release APK for this
+repository.
 
 The workflow builds the release manager APK, injects fresh `ksud` binaries for
 `arm64-v8a` and `x86_64`, zipaligns the APK with 16 KB page alignment, signs it,

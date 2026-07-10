@@ -4,7 +4,7 @@
     <string name="home_title">ApkeSU Kernel</string>
     <string name="home_ready">Ready</string>
     <string name="home_build_label">Build: %1$s / %2$s</string>
-    <string name="chip_abk_flow">ABK flow</string>
+    <string name="chip_gki_flow">GKI flow</string>
     <string name="chip_token_missing">Token missing</string>
     <string name="chip_token_ready">Token ready</string>
     <string name="status_root">Account</string>
@@ -33,7 +33,6 @@
     <string name="update_channel">Update channel</string>
     <string name="use_latest_susfs_summary">Use latest SUSFS source when SUSFS is selected.</string>
     <string name="feature_switches">Feature switches</string>
-    <string name="danger_zone_summary">These ABK switches are shown for compatibility. They stay blocked until ApkeSU-native patches exist.</string>
     <string name="optional_config">Optional config</string>
     <string name="custom_build_time">Custom build time</string>
     <string name="submit_build">Submit build</string>
@@ -73,7 +72,7 @@
     <string name="github_login_not_ready">Not logged in. Tap GitHub login or paste a token.</string>
     <string name="github_login_ready">Token saved. Builds can be submitted.</string>
     <string name="github_login_browser_opened">GitHub login opened in browser.</string>
-    <string name="github_browser_login_needs_custom_client">Browser OAuth needs your own GitHub OAuth App with abk://oauth as the callback URL. Use GitHub login instead.</string>
+    <string name="github_browser_login_needs_custom_client">Browser OAuth needs your own GitHub OAuth App with apkesu://oauth as the callback URL. Use GitHub login instead.</string>
     <string name="github_login_exchanging">Finishing GitHub login&#8230;</string>
     <string name="github_login_no_code">GitHub did not return an authorization code.</string>
     <string name="github_login_state_mismatch">GitHub login state mismatch. Try again.</string>
@@ -108,14 +107,9 @@
     <string name="enable_ntsync">Enable NTSYNC</string>
     <string name="enable_networking_configs">Enable networking configs</string>
     <string name="virtualization_support">Virtualization support</string>
-    <string name="abk_bbg">ABK BBG</string>
-    <string name="abk_ddk">ABK DDK</string>
-    <string name="abk_kpm">ABK KPM</string>
-    <string name="abk_rekernel">ABK Re-Kernel</string>
     <string name="oplus_patch_mode">OPlus patch mode</string>
     <string name="open_run">Open run</string>
     <string name="open_actions">Open Actions</string>
-    <string name="danger_zone">High-risk ABK switches</string>
     <string name="status_dispatching">Starting GitHub Actions workflow&#8230;</string>
     <string name="status_started_with_target">Build started: %1$s (%2$s / %3$s)</string>
     <string name="status_failed">Build failed to start: %1$s</string>
@@ -167,7 +161,6 @@
     <string name="error_token">Enter a GitHub token with Actions write access.</string>
     <string name="error_github_client_id">Enter a GitHub OAuth Client ID first.</string>
     <string name="error_target">Complete the GKI target fields.</string>
-    <string name="error_unsupported_high_risk">Disable BBG, DDK, KPM, and Re-Kernel for this ApkeSU build.</string>
     <string name="error_repo_admin_rights">This GitHub account cannot build in the selected repository. The app will use your own fork when possible; otherwise fork the repository first.</string>
     <string name="error_fork_preparing">GitHub is still preparing your fork. Try building again in about one minute.</string>
     <string name="error_no_gki_workflow">No GKI workflow was found. Tap Install GKI workflow, or build again and the app will try to install it automatically.</string>

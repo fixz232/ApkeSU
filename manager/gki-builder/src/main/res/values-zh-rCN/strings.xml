@@ -4,7 +4,7 @@
     <string name="home_title">ApkeSU Kernel</string>
     <string name="home_ready">就绪</string>
     <string name="home_build_label">构建：%1$s / %2$s</string>
-    <string name="chip_abk_flow">ABK 流程</string>
+    <string name="chip_gki_flow">GKI 流程</string>
     <string name="chip_token_missing">未配置 Token</string>
     <string name="chip_token_ready">Token 已保存</string>
     <string name="status_root">账户</string>
@@ -33,7 +33,6 @@
     <string name="update_channel">更新通道</string>
     <string name="use_latest_susfs_summary">选择 SUSFS 时使用最新 SUSFS 源码。</string>
     <string name="feature_switches">功能开关</string>
-    <string name="danger_zone_summary">这些 ABK 开关仅保留入口；ApkeSU 原生补丁未接入前会阻止提交。</string>
     <string name="optional_config">可选配置</string>
     <string name="custom_build_time">自定义构建时间</string>
     <string name="submit_build">提交构建</string>
@@ -73,7 +72,7 @@
     <string name="github_login_not_ready">未登录。点击 GitHub 登录，或手动粘贴 Token。</string>
     <string name="github_login_ready">Token 已保存，可以提交构建。</string>
     <string name="github_login_browser_opened">已在浏览器打开 GitHub 登录。</string>
-    <string name="github_browser_login_needs_custom_client">网页登录需要你自己的 GitHub OAuth App，并把回调地址设为 abk://oauth。请直接使用 GitHub 登录。</string>
+    <string name="github_browser_login_needs_custom_client">网页登录需要你自己的 GitHub OAuth App，并把回调地址设为 apkesu://oauth。请直接使用 GitHub 登录。</string>
     <string name="github_login_exchanging">正在完成 GitHub 登录&#8230;</string>
     <string name="github_login_no_code">GitHub 没有返回授权码。</string>
     <string name="github_login_state_mismatch">GitHub 登录状态校验失败，请重试。</string>
@@ -108,14 +107,9 @@
     <string name="enable_ntsync">启用 NTsync 补丁</string>
     <string name="enable_networking_configs">启用网络增强</string>
     <string name="virtualization_support">虚拟化支持</string>
-    <string name="abk_bbg">启用 BBG 防格机</string>
-    <string name="abk_ddk">启用 DDK 防格机 LSM</string>
-    <string name="abk_kpm">启用 KPM 功能</string>
-    <string name="abk_rekernel">启用 Re-Kernel 驱动</string>
     <string name="oplus_patch_mode">OPlus 补丁模式</string>
     <string name="open_run">打开运行</string>
     <string name="open_actions">打开 Actions</string>
-    <string name="danger_zone">高风险 ABK 开关</string>
     <string name="status_dispatching">正在启动 GitHub Actions 流程&#8230;</string>
     <string name="status_started_with_target">构建已启动：%1$s（%2$s / %3$s）</string>
     <string name="status_failed">构建启动失败：%1$s</string>
@@ -167,7 +161,6 @@
     <string name="error_token">请填写具有 Actions 写入权限的 GitHub Token。</string>
     <string name="error_github_client_id">请先填写 GitHub OAuth Client ID。</string>
     <string name="error_target">请补全 GKI 目标参数。</string>
-    <string name="error_unsupported_high_risk">请关闭 BBG、DDK、KPM 和 Re-Kernel 后再提交 ApkeSU 构建。</string>
     <string name="error_repo_admin_rights">当前 GitHub 账号不能在所选仓库构建。软件会尽量使用你自己的 fork；如果还失败，请先 fork 仓库。</string>
     <string name="error_fork_preparing">GitHub 还在准备你的 fork，请大约一分钟后再点构建。</string>
     <string name="error_no_gki_workflow">没有找到 GKI 工作流。请点安装 GKI 工作流，或再次构建让软件自动安装。</string>

@@ -79,10 +79,6 @@ class MainActivity : Activity() {
     private lateinit var zramSwitch: Switch
     private lateinit var ntsyncSwitch: Switch
     private lateinit var networkingSwitch: Switch
-    private lateinit var bbgSwitch: Switch
-    private lateinit var ddkSwitch: Switch
-    private lateinit var kpmSwitch: Switch
-    private lateinit var rekernelSwitch: Switch
     private lateinit var latestSusfsSwitch: Switch
     private lateinit var oauthStatusText: TextView
     private lateinit var diagnosticStatusText: TextView
@@ -158,7 +154,7 @@ class MainActivity : Activity() {
         pageBody.addView(heroCard {
             addView(title(getString(R.string.home_ready), 23, Color.WHITE))
             addView(muted(getString(R.string.home_build_label, form.androidVersion, form.kernelVersion), HERO_TEXT))
-            addView(chipRow(listOf(accountChip(), getString(R.string.chip_abk_flow), form.featureSet)))
+            addView(chipRow(listOf(accountChip(), getString(R.string.chip_gki_flow), form.featureSet)))
         })
 
         val grid = LinearLayout(this).apply {
@@ -267,16 +263,6 @@ class MainActivity : Activity() {
             virtualizationSpinner = addSpinnerField(getString(R.string.virtualization_support), VIRTUALIZATION_OPTIONS)
             oplusSpinner = addSpinnerField(getString(R.string.oplus_patch_mode), OPLUS_OPTIONS)
             bindFeatureSwitches()
-        })
-
-        pageBody.addView(card {
-            addView(title(getString(R.string.danger_zone), 18, WARNING))
-            addView(muted(getString(R.string.danger_zone_summary), WARNING_MUTED))
-            bbgSwitch = addSwitchField(getString(R.string.abk_bbg), null)
-            ddkSwitch = addSwitchField(getString(R.string.abk_ddk), null)
-            kpmSwitch = addSwitchField(getString(R.string.abk_kpm), null)
-            rekernelSwitch = addSwitchField(getString(R.string.abk_rekernel), null)
-            bindHighRiskSwitches()
         })
 
         pageBody.addView(card {
@@ -440,13 +426,6 @@ class MainActivity : Activity() {
         setSpinner(oplusSpinner, form.oplusPatchMode)
     }
 
-    private fun bindHighRiskSwitches() {
-        bbgSwitch.isChecked = form.useBbg
-        ddkSwitch.isChecked = form.useDdk
-        kpmSwitch.isChecked = form.useKpm
-        rekernelSwitch.isChecked = form.useRekernel
-    }
-
     private fun syncFormFromUi() {
         val channel = if (::channelSpinner.isInitialized) {
             selected(channelSpinner, channelLabel())
@@ -483,10 +462,6 @@ class MainActivity : Activity() {
             } else {
                 form.virtualizationSupport
             },
-            useBbg = if (::bbgSwitch.isInitialized) checked(bbgSwitch, form.useBbg) else form.useBbg,
-            useDdk = if (::ddkSwitch.isInitialized) checked(ddkSwitch, form.useDdk) else form.useDdk,
-            useKpm = if (::kpmSwitch.isInitialized) checked(kpmSwitch, form.useKpm) else form.useKpm,
-            useRekernel = if (::rekernelSwitch.isInitialized) checked(rekernelSwitch, form.useRekernel) else form.useRekernel,
             oplusPatchMode = if (::oplusSpinner.isInitialized) selected(oplusSpinner, form.oplusPatchMode) else form.oplusPatchMode,
         )
         store.save(form)
@@ -624,7 +599,7 @@ class MainActivity : Activity() {
 
     private fun runDiagnostics() {
         syncFormFromUi()
-        val error = form.validationError(requireToken = true, allowMissingTarget = true, allowHighRisk = true)
+        val error = form.validationError(requireToken = true, allowMissingTarget = true)
         if (error != null) {
             showDiagnosticStatus(getString(error), true)
             return
@@ -679,7 +654,7 @@ class MainActivity : Activity() {
 
     private fun installWorkflowBundle() {
         syncFormFromUi()
-        val error = form.validationError(requireToken = true, allowMissingTarget = true, allowHighRisk = true)
+        val error = form.validationError(requireToken = true, allowMissingTarget = true)
         if (error != null) {
             showDiagnosticStatus(getString(error), true)
             return
@@ -707,7 +682,7 @@ class MainActivity : Activity() {
 
     private fun checkWorkflow() {
         syncFormFromUi()
-        val error = form.validationError(requireToken = true, allowMissingTarget = true, allowHighRisk = true)
+        val error = form.validationError(requireToken = true, allowMissingTarget = true)
         if (error != null) {
             showOAuthStatus(getString(error), true)
             return
@@ -917,9 +892,8 @@ class MainActivity : Activity() {
 
             val names = artifact.entries().asSequence().map { it.name }.toList()
             val hasAnyKernelZip = names.any { it.endsWith("-AnyKernel3.zip") || it.endsWith("AnyKernel3.zip") }
-            val hasBundleManifest = names.any { it.endsWith("ABK_BUNDLE_MANIFEST.json") }
             val mentionsApkeSu = names.any { it.contains("ApkeSU", ignoreCase = true) }
-            if (hasAnyKernelZip && (hasBundleManifest || mentionsApkeSu)) {
+            if (hasAnyKernelZip && mentionsApkeSu) {
                 return getString(R.string.verify_gki_legacy_ok)
             }
         }
@@ -952,7 +926,7 @@ class MainActivity : Activity() {
 
     private fun handleOAuthIntent(intent: Intent?): Boolean {
         val uri = intent?.data ?: return false
-        if (uri.scheme != "abk" || uri.host != "oauth") return false
+        if (uri.scheme != "apkesu" || uri.host != "oauth") return false
         val code = uri.getQueryParameter("code").orEmpty()
         val state = uri.getQueryParameter("state").orEmpty()
         val expectedState = historyPrefs().getString(KEY_OAUTH_STATE, "").orEmpty()
@@ -1068,7 +1042,6 @@ class MainActivity : Activity() {
     private fun BuilderForm.validationError(
         requireToken: Boolean = true,
         allowMissingTarget: Boolean = false,
-        allowHighRisk: Boolean = false,
     ): Int? {
         val target = normalized()
         return when {
@@ -1083,8 +1056,6 @@ class MainActivity : Activity() {
                     target.osPatchLevel.isBlank() ||
                     target.featureSet.isBlank()
                 ) -> R.string.error_target
-            !allowHighRisk && (target.useBbg || target.useDdk || target.useKpm || target.useRekernel) ->
-                R.string.error_unsupported_high_risk
             else -> null
         }
     }

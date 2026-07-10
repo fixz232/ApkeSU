@@ -26,7 +26,7 @@
 
                 <data
                     android:host="oauth"
-                    android:scheme="abk" />
+                    android:scheme="apkesu" />
             </intent-filter>
         </activity>
     </application>

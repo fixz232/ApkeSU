@@ -12,10 +12,10 @@ import android.util.Base64
 
 const val DEFAULT_OWNER = "fixz232"
 const val DEFAULT_REPO = "ApkeSU"
-const val DEFAULT_REF = "main"
-const val DEFAULT_WORKFLOW = "gki-custom.yml"
+const val DEFAULT_REF = "ApkeSU"
+const val DEFAULT_WORKFLOW = "gki-main.yml"
 const val DEFAULT_GITHUB_CLIENT_ID = "Ov23li8skGo6AFPBeSTh"
-const val GITHUB_OAUTH_REDIRECT_URI = "abk://oauth"
+const val GITHUB_OAUTH_REDIRECT_URI = "apkesu://oauth"
 
 data class BuilderForm(
     val owner: String = DEFAULT_OWNER,
@@ -39,10 +39,6 @@ data class BuilderForm(
     val useNtsync: Boolean = false,
     val useNetworking: Boolean = false,
     val virtualizationSupport: String = "off",
-    val useBbg: Boolean = false,
-    val useDdk: Boolean = false,
-    val useKpm: Boolean = false,
-    val useRekernel: Boolean = false,
     val uploadAuxArtifacts: Boolean = true,
     val oplusPatchMode: String = "off",
     val oplusReferenceRef: String = "main",
@@ -392,8 +388,6 @@ object GkiBuilderApi {
         val candidates = listOf(
             target.workflowFile.substringAfterLast('/'),
             DEFAULT_WORKFLOW,
-            "gki-custom.yml",
-            "gki-abk-main.yml",
             "gki-main.yml",
             "gki-oneplus-realme.yml",
         ).map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -880,7 +874,6 @@ object GkiBuilderApi {
         val workflow = workflowFile.substringAfterLast('/').lowercase()
         return when (workflow) {
             "gki-main.yml" -> mainGkiWorkflowInputs()
-            "gki-abk-main.yml" -> abkMainWorkflowInputs()
             "gki-oneplus-realme.yml" -> onePlusWorkflowInputs()
             else -> customGkiWorkflowInputs()
         }
@@ -903,10 +896,6 @@ object GkiBuilderApi {
             .put("use_ntsync", useNtsync)
             .put("use_networking", useNetworking)
             .put("virtualization_support", virtualizationSupport)
-            .put("use_bbg", useBbg)
-            .put("use_ddk", useDdk)
-            .put("use_kpm", useKpm)
-            .put("use_rekernel", useRekernel)
             .put("upload_aux_artifacts", uploadAuxArtifacts)
             .put("oplus_patch_mode", oplusPatchMode)
             .put("oplus_reference_ref", oplusReferenceRef)
@@ -920,24 +909,6 @@ object GkiBuilderApi {
             .put("use_repo", useRepo)
             .put("use_latest_susfs", useLatestSusfs)
             .put("build_bypass", buildBypass)
-    }
-
-    private fun BuilderForm.abkMainWorkflowInputs(): JSONObject {
-        return mainGkiWorkflowInputs()
-            .put("build_time", buildTime)
-            .put("use_zram", useZram)
-            .put("zram_full_algo", zramFullAlgo)
-            .put("zram_extra_algos", zramExtraAlgos)
-            .put("use_ntsync", useNtsync)
-            .put("use_networking", useNetworking)
-            .put("virtualization_support", virtualizationSupport)
-            .put("use_bbg", useBbg)
-            .put("use_ddk", useDdk)
-            .put("use_kpm", useKpm)
-            .put("use_rekernel", useRekernel)
-            .put("upload_aux_artifacts", uploadAuxArtifacts)
-            .put("oplus_patch_mode", oplusPatchMode)
-            .put("oplus_reference_ref", oplusReferenceRef)
     }
 
     private fun BuilderForm.onePlusWorkflowInputs(): JSONObject {
@@ -1101,8 +1072,6 @@ object GkiBuilderApi {
         val candidates = listOf(
             form.workflowFile.substringAfterLast('/'),
             DEFAULT_WORKFLOW,
-            "gki-custom.yml",
-            "gki-abk-main.yml",
             "gki-main.yml",
             "gki-oneplus-realme.yml",
         ).map { it.lowercase() }.distinct()
