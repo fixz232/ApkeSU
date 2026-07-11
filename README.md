@@ -2,9 +2,7 @@
 
 ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目，主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
-TG 组织：https://t.me/+vIE0TtF9xxgyYzQ1
-
-频道：https://t.me/+LkrMQKXtXvpmYmNl
+TG 组织：https://t.me/+LkrMQKXtXvpmYmNl
 
 QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.qq.com/q/8O7qvLM3zq
 
