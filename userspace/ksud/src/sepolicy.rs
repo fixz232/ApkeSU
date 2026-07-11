@@ -762,6 +762,11 @@ pub fn live_patch(policy: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn live_patch_strict(policy: &str) -> Result<()> {
+    let result = parse_sepolicy(policy.trim(), true)?;
+    apply_rules_batch(&result, true)
+}
+
 pub fn apply_file<P: AsRef<Path>>(path: P) -> Result<()> {
     let input = std::fs::read_to_string(path)?;
     live_patch(&input)

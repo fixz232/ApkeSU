@@ -39,7 +39,7 @@ mod android {
 
     pub(super) fn ensure_gki_kernel() -> Result<()> {
         let version = get_kernel_version()?;
-        let is_gki = version.0 == 5 && version.1 >= 10 || version.2 > 5;
+        let is_gki = version.0 > 5 || version.0 == 5 && version.1 >= 10;
         ensure!(is_gki, "only support GKI kernel");
         Ok(())
     }
@@ -217,16 +217,34 @@ mod android {
         "boot".to_string()
     }
 
-    pub fn get_slot_suffix(ota: bool) -> String {
-        let mut slot_suffix = utils::getprop("ro.boot.slot_suffix").unwrap_or_default();
-        if !slot_suffix.is_empty() && ota {
-            if slot_suffix == "_a" {
-                slot_suffix = "_b".to_string();
-            } else {
-                slot_suffix = "_a".to_string();
-            }
+    fn normalize_slot_suffix(value: &str) -> String {
+        let slot = value.trim().trim_start_matches('_');
+        if slot.is_empty() {
+            String::new()
+        } else {
+            format!("_{slot}")
         }
-        slot_suffix
+    }
+
+    pub fn get_slot_suffix(ota: bool) -> Result<String> {
+        let mut slot_suffix =
+            normalize_slot_suffix(&utils::getprop("ro.boot.slot_suffix").unwrap_or_default());
+        if slot_suffix.is_empty()
+            && let Some(slot) = utils::getprop("ro.boot.slot")
+        {
+            slot_suffix = normalize_slot_suffix(&slot);
+        }
+
+        if !ota {
+            return Ok(slot_suffix);
+        }
+
+        match slot_suffix.as_str() {
+            "_a" => Ok("_b".to_string()),
+            "_b" => Ok("_a".to_string()),
+            "" => bail!("cannot determine the current A/B slot"),
+            value => bail!("unsupported A/B slot suffix: {value}"),
+        }
     }
 
     pub fn list_available_partitions() -> Vec<String> {
@@ -239,8 +257,8 @@ mod android {
     }
 
     pub fn find_partition_path(name: &str, ota: bool) -> Option<PathBuf> {
-        let slot_suffix = get_slot_suffix(ota);
-        partition_path_candidates(name, &slot_suffix)
+        let slot_suffix = get_slot_suffix(ota).ok()?;
+        partition_path_candidates(name, &slot_suffix, !ota)
             .into_iter()
             .find(|path| path.exists())
     }
@@ -250,31 +268,52 @@ mod android {
         ota: bool,
         is_replace_kernel: bool,
         partition: &Option<String>,
-    ) -> PathBuf {
-        let slot_suffix = get_slot_suffix(ota);
+    ) -> Result<PathBuf> {
+        let slot_suffix = get_slot_suffix(ota)?;
         let name = choose_boot_partition(kmi, is_replace_kernel, partition);
-        find_partition_path(&name, ota)
-            .unwrap_or_else(|| PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}")))
+        Ok(find_partition_path(&name, ota)
+            .unwrap_or_else(|| PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}"))))
     }
 
-    fn partition_path_candidates(name: &str, slot_suffix: &str) -> Vec<PathBuf> {
+    fn partition_path_candidates(
+        name: &str,
+        slot_suffix: &str,
+        allow_unsuffixed: bool,
+    ) -> Vec<PathBuf> {
         let mut candidates = vec![
             PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}")),
             PathBuf::from(format!("/dev/block/bootdevice/by-name/{name}{slot_suffix}")),
         ];
-        candidates.extend(platform_by_name_candidates(name, slot_suffix));
-        candidates.extend([
-            PathBuf::from(format!("/dev/block/by-name/{name}")),
-            PathBuf::from(format!("/dev/block/bootdevice/by-name/{name}")),
-            PathBuf::from(format!("/dev/block/{name}")),
-        ]);
+        candidates.extend(platform_by_name_candidates(
+            name,
+            slot_suffix,
+            allow_unsuffixed,
+        ));
+        if allow_unsuffixed || slot_suffix.is_empty() {
+            candidates.extend([
+                PathBuf::from(format!("/dev/block/by-name/{name}")),
+                PathBuf::from(format!("/dev/block/bootdevice/by-name/{name}")),
+                PathBuf::from(format!("/dev/block/{name}")),
+            ]);
+        }
         candidates
     }
 
-    fn platform_by_name_candidates(name: &str, slot_suffix: &str) -> Vec<PathBuf> {
+    fn platform_by_name_candidates(
+        name: &str,
+        slot_suffix: &str,
+        allow_unsuffixed: bool,
+    ) -> Vec<PathBuf> {
         let mut candidates = Vec::new();
         let platform = Path::new("/dev/block/platform");
-        collect_platform_by_name_candidates(platform, name, slot_suffix, 4, &mut candidates);
+        collect_platform_by_name_candidates(
+            platform,
+            name,
+            slot_suffix,
+            allow_unsuffixed,
+            4,
+            &mut candidates,
+        );
         candidates
     }
 
@@ -282,10 +321,11 @@ mod android {
         base: &Path,
         name: &str,
         slot_suffix: &str,
+        allow_unsuffixed: bool,
         depth: u8,
         candidates: &mut Vec<PathBuf>,
     ) {
-        push_by_name_children(base, name, slot_suffix, candidates);
+        push_by_name_children(base, name, slot_suffix, allow_unsuffixed, candidates);
         if depth == 0 {
             return;
         }
@@ -300,6 +340,7 @@ mod android {
                     &path,
                     name,
                     slot_suffix,
+                    allow_unsuffixed,
                     depth - 1,
                     candidates,
                 );
@@ -311,20 +352,21 @@ mod android {
         base: &Path,
         name: &str,
         slot_suffix: &str,
+        allow_unsuffixed: bool,
         candidates: &mut Vec<PathBuf>,
     ) {
         let by_name = base.join("by-name");
         candidates.push(by_name.join(format!("{name}{slot_suffix}")));
-        candidates.push(by_name.join(name));
+        if allow_unsuffixed || slot_suffix.is_empty() {
+            candidates.push(by_name.join(name));
+        }
     }
 
     pub(super) fn post_ota() -> Result<()> {
         use crate::assets::BOOTCTL_PATH;
         use crate::defs::ADB_DIR;
         let status = Command::new(BOOTCTL_PATH).arg("hal-info").status()?;
-        if !status.success() {
-            return Ok(());
-        }
+        ensure!(status.success(), "bootctl HAL is unavailable: {status}");
 
         let current_slot = Command::new(BOOTCTL_PATH)
             .arg("get-current-slot")
@@ -332,11 +374,20 @@ mod android {
             .stdout;
         let current_slot = String::from_utf8(current_slot)?;
         let current_slot = current_slot.trim();
-        let target_slot = i32::from(current_slot == "0");
+        let target_slot = match current_slot {
+            "0" => "1",
+            "1" => "0",
+            value => bail!("invalid current boot slot: {value}"),
+        };
 
-        Command::new(BOOTCTL_PATH)
-            .arg(format!("set-active-boot-slot {target_slot}"))
+        let status = Command::new(BOOTCTL_PATH)
+            .arg("set-active-boot-slot")
+            .arg(target_slot)
             .status()?;
+        ensure!(
+            status.success(),
+            "failed to activate boot slot {target_slot}: {status}"
+        );
 
         let post_fs_data = Path::new(ADB_DIR).join("post-fs-data.d");
         utils::ensure_dir_exists(&post_fs_data)?;
@@ -654,7 +705,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
         } else {
             #[cfg(target_os = "android")]
             {
-                auto_boot_partition_path(&kmi, ota, is_replace_kernel, &partition)
+                auto_boot_partition_path(&kmi, ota, is_replace_kernel, &partition)?
             }
             #[cfg(not(target_os = "android"))]
             {
@@ -923,7 +974,7 @@ pub fn restore(args: BootRestoreArgs) -> Result<()> {
     } else {
         #[cfg(target_os = "android")]
         {
-            auto_boot_partition_path(&kmi, false, false, &None)
+            auto_boot_partition_path(&kmi, false, false, &None)?
         }
         #[cfg(not(target_os = "android"))]
         {

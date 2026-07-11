@@ -155,6 +155,7 @@ fun HomePagerMiuix(
                 backdrop = backdrop,
                 barColor = topBarColors.container,
                 contentColor = topBarColors.content,
+                onDiagnoseClick = actions.onDiagnoseClick,
             )
         },
         popupHost = { },
@@ -201,6 +202,7 @@ private fun TopBar(
     backdrop: LayerBackdrop?,
     barColor: Color,
     contentColor: Color,
+    onDiagnoseClick: () -> Unit,
 ) {
     BlurredBar(backdrop) {
         Row(
@@ -221,6 +223,13 @@ private fun TopBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            IconButton(onClick = onDiagnoseClick) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = stringResource(R.string.root_diagnose),
+                    tint = contentColor,
+                )
+            }
             Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 RebootListPopupMiuix(tint = contentColor)
             }
@@ -344,7 +353,7 @@ private fun ActivatedStatusCard(
                     }
                     Text(
                         modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(id = R.string.home_working),
+                        text = stringResource(state.rootRuntimeState.labelRes),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = primaryContentColor,
@@ -2219,6 +2228,7 @@ private fun previewHomeScreenState(
     isKernelPrBuild = false,
     requiresNewKernel = false,
     isRootAvailable = ksuVersion != null,
+    rootRuntimeState = if (ksuVersion != null) RootRuntimeState.Running else RootRuntimeState.DriverDisconnected,
     isSafeMode = isSafeMode,
     isLateLoadMode = isLateLoadMode,
     currentManagerVersionCode = 10000,

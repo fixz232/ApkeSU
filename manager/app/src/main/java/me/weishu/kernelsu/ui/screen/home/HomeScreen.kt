@@ -2,6 +2,19 @@ package me.weishu.kernelsu.ui.screen.home
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,9 +22,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +55,8 @@ fun HomePager(
 ) {
     val viewModel = viewModel<HomeViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val diagnosticReport by viewModel.diagnosticReport.collectAsStateWithLifecycle()
+    val diagnosticRunning by viewModel.diagnosticRunning.collectAsStateWithLifecycle()
     val mainState = LocalMainPagerState.current
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
@@ -98,9 +117,11 @@ fun HomePager(
                 navigator.push(Route.Install)
             }
         },
-        onSuperuserClick = { if (!uiState.showRequireKernelWarning) mainState.animateToPage(1) },
-        onModuleClick = { if (!uiState.showRequireKernelWarning) mainState.animateToPage(2) },
+        onSuperuserClick = { if (uiState.isFullFeatured) mainState.animateToPage(1) },
+        onModuleClick = { if (uiState.isFullFeatured) mainState.animateToPage(2) },
         onOpenUrl = uriHandler::openUri,
+        onStyleSettingsClick = { navigator.push(Route.PreInstallStyleSettings) },
+        onDiagnoseClick = viewModel::runRootDiagnostics,
         onJailbreakClick = {
             if (jailbreakInProgress) return@HomeActions
             if (uiState.isLateLoadMode) {
@@ -133,48 +154,77 @@ fun HomePager(
         },
     )
 
-    when (LocalInterfaceStyle.current) {
-        InterfaceStyle.Skrootpro.value -> {
-            HomePagerSkrootpro(
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (LocalInterfaceStyle.current) {
+            InterfaceStyle.Skrootpro.value -> HomePagerSkrootpro(
                 state = uiState,
                 actions = actions,
                 bottomInnerPadding = bottomInnerPadding,
             )
-            return
+
+            InterfaceStyle.Delta.value -> HomePagerDelta(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+
+            InterfaceStyle.Alpha.value -> HomePagerAlpha(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+
+            else -> when (LocalUiMode.current) {
+                UiMode.Miuix -> HomePagerMiuix(
+                    state = uiState,
+                    actions = actions,
+                    bottomInnerPadding = bottomInnerPadding,
+                    installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
+                )
+
+                UiMode.Material -> HomePagerMaterial(
+                    state = uiState,
+                    actions = actions,
+                    bottomInnerPadding = bottomInnerPadding,
+                    installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
+                )
+            }
         }
 
-        InterfaceStyle.Delta.value -> {
-            HomePagerDelta(
-                state = uiState,
-                actions = actions,
-                bottomInnerPadding = bottomInnerPadding,
-            )
-            return
-        }
-
-        InterfaceStyle.Alpha.value -> {
-            HomePagerAlpha(
-                state = uiState,
-                actions = actions,
-                bottomInnerPadding = bottomInnerPadding,
-            )
-            return
+        if (!uiState.isFullFeatured) {
+            val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                    WindowInsets.captionBar.asPaddingValues().calculateBottomPadding() +
+                    bottomInnerPadding + 18.dp
+            FloatingActionButton(
+                onClick = {
+                    if (uiState.isKernelActive) {
+                        mainState.animateToPage(3)
+                    } else {
+                        actions.onStyleSettingsClick()
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 18.dp, bottom = bottomPadding)
+                    .size(52.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = stringResource(
+                        if (uiState.isKernelActive) R.string.settings else R.string.settings_ui_mode
+                    ),
+                )
+            }
         }
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> HomePagerMiuix(
-            state = uiState,
-            actions = actions,
-            bottomInnerPadding = bottomInnerPadding,
-            installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
-        )
-
-        UiMode.Material -> HomePagerMaterial(
-            state = uiState,
-            actions = actions,
-            bottomInnerPadding = bottomInnerPadding,
-            installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
-        )
-    }
+    RootDiagnosticDialog(
+        running = diagnosticRunning,
+        report = diagnosticReport,
+        onDismissRequest = {
+            if (!diagnosticRunning) viewModel.dismissDiagnosticReport()
+        },
+    )
 }

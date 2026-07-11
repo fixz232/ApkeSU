@@ -19,7 +19,6 @@ import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
 import me.weishu.kernelsu.ui.component.profile.dialogs.SingleSelectDialog
 import me.weishu.kernelsu.ui.util.listAppProfileTemplates
-import me.weishu.kernelsu.ui.util.setSepolicy
 import me.weishu.kernelsu.ui.viewmodel.getTemplateInfoById
 
 private data class TemplateOption(
@@ -58,7 +57,7 @@ fun TemplateConfigMaterial(
             onConfirm = { selected ->
                 val tid = selected.id
                 val templateInfo = getTemplateInfoById(tid)
-                if (templateInfo != null && setSepolicy(tid, templateInfo.rules.joinToString("\n"))) {
+                if (templateInfo != null) {
                     onProfileChange(
                         profile.copy(
                             rootTemplate = tid,

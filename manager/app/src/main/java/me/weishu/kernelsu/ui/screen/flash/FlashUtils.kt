@@ -2,8 +2,6 @@ package me.weishu.kernelsu.ui.screen.flash
 
 import android.content.Context
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.os.Parcelable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteForever
@@ -139,76 +137,9 @@ fun flashIt(
     }
 }
 
-@Composable
-fun FlashEffect(
-    flashIt: FlashIt,
-    text: String,
-    logContent: StringBuilder,
-    onTextUpdate: (String) -> Unit,
-    onShowRebootChange: (Boolean) -> Unit,
-    onFlashingStatusChange: (FlashingStatus) -> Unit,
-    onFlashSuccess: () -> Unit,
-    enabled: Boolean = true
-) {
-    val flashErrorCode = stringResource(R.string.flash_error_code)
-    val flashCheckLog = stringResource(R.string.flash_check_log)
-
-    LaunchedEffect(enabled) {
-        if (!enabled || text.isNotEmpty()) {
-            return@LaunchedEffect
-        }
-        var currentText = text
-        val mainHandler = Handler(Looper.getMainLooper())
-        withContext(Dispatchers.IO) {
-            val result = runCatching {
-                flashIt(flashIt, onStdout = {
-                    val tempText = "$it\n"
-                    if (tempText.startsWith("[H[J")) { // clear command
-                        currentText = tempText.substring(6)
-                    } else {
-                        currentText += tempText
-                    }
-                    mainHandler.post {
-                        onTextUpdate(currentText)
-                    }
-                    logContent.append(it).append("\n")
-                }, onStderr = {
-                    logContent.append(it).append("\n")
-                })
-            }.getOrElse { throwable ->
-                val message = throwable.localizedMessage ?: throwable.javaClass.simpleName
-                logContent.append(message).append("\n")
-                FlashResult(1, message, false)
-            }
-
-            result.apply {
-                if (code != 0) {
-                    currentText += "$flashErrorCode: $code.\n $err $flashCheckLog\n"
-                    mainHandler.post {
-                        onTextUpdate(currentText)
-                    }
-                }
-                if (showReboot) {
-                    currentText += "\n\n\n"
-                    mainHandler.post {
-                        onTextUpdate(currentText)
-                        onShowRebootChange(true)
-                    }
-                }
-                mainHandler.post {
-                    if (code == 0) {
-                        onFlashSuccess()
-                    }
-                    onFlashingStatusChange(if (code == 0) FlashingStatus.SUCCESS else FlashingStatus.FAILED)
-                }
-            }
-        }
-    }
-}
-
 fun saveLog(
     context: Context,
-    logContent: StringBuilder,
+    logContent: String,
     scope: CoroutineScope,
     savedMessage: String,
     failedMessage: String,
@@ -217,13 +148,15 @@ fun saveLog(
     return {
         scope.launch {
             val result = runCatching {
-                val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
-                val date = format.format(Date())
-                saveTextToDownloads(
-                    context = context,
-                    displayName = "KernelSU_install_log_${date}.log",
-                    text = logContent.toString(),
-                )
+                withContext(Dispatchers.IO) {
+                    val format = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.getDefault())
+                    val date = format.format(Date())
+                    saveTextToDownloads(
+                        context = context,
+                        displayName = "KernelSU_install_log_${date}.log",
+                        text = logContent,
+                    )
+                }
             }
             result.onSuccess { path ->
                 showMessage("$savedMessage: $path")

@@ -68,7 +68,6 @@
     <string name="profile_selinux_domain">डोमेन</string>
     <string name="module_downloading">मॉड्यूल डाउनलोड करत आहे: %s</string>
     <string name="module_start_downloading">डाउनलोड करणे सुरू करा: %s</string>
-    <string name="new_version_available">नवीन आवृत्ती: %s उपलब्ध आहे, डाउनलोड करण्यासाठी क्लिक करा</string>
     <string name="force_stop_app">सक्तीने थांबा</string>
     <string name="launch_app">लाँच करा</string>
     <string name="restart_app">पुन्हा सुरू करा</string>

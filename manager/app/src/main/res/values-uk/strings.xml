@@ -71,7 +71,6 @@
     <string name="launch_app">Запустити</string>
     <string name="force_stop_app">Примусова зупинка</string>
     <string name="restart_app">Перезапустити</string>
-    <string name="new_version_available">Доступна нова версія %s, натисніть, щоб оновити!</string>
     <string name="failed_to_update_sepolicy">Не вдалося оновити правила SELinux для %s</string>
     <string name="module_changelog">Журнал змін</string>
     <string name="require_kernel_version">Поточна версія ApkeSU %1$d занадто низька для належної роботи менеджера. Будь ласка, оновіть його до версії %2$d або вище!</string>
@@ -97,8 +96,6 @@
     <string name="enable_web_debugging">Налагодження WebView</string>
     <string name="select_kmi">Виберіть KMI</string>
     <string name="install_next">Далі</string>
-    <string name="settings_check_update">Перевірити наявність оновлень</string>
-    <string name="settings_check_update_summary">Автоматична перевірка оновлень під час відкриття програми.</string>
     <string name="enable_web_debugging_summary">Можна використовувати для налагодження веб-інтерфейсу. Вмикайте лише за потреби.</string>
     <string name="direct_install">Пряме встановлення (рекомендовано)</string>
     <string name="select_file">Виберіть файл</string>
@@ -109,10 +106,8 @@
     <string name="select_file_tip">%1$s образ розділу рекомендується</string>
     <string name="grant_root_failed">Не вдалося отримати root!</string>
     <string name="open">Відкрити</string>
-    <string name="settings_uninstall_temporary">Тимчасово видалити</string>
     <string name="settings_uninstall_permanent">Видалити назавжди</string>
     <string name="settings_restore_stock_image">Відновити стокове зображення</string>
-    <string name="settings_uninstall_temporary_message">Тимчасово видалити ApkeSU, відновити початковий стан після наступного перезавантаження.</string>
     <string name="settings_uninstall">Видалити</string>
     <string name="flashing">Прошивка</string>
     <string name="flash_success">Прошивку виконано</string>

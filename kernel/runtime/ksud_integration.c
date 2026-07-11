@@ -1,4 +1,5 @@
 #include "feature/selinux_hide.h"
+#include <linux/atomic.h>
 #include <linux/rcupdate.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
@@ -83,6 +84,8 @@ static void stop_init_rc_hook();
 static void stop_execve_hook();
 
 static struct work_struct stop_input_hook_work;
+static atomic_t input_hook_registered = ATOMIC_INIT(0);
+static atomic_t input_hook_stop_requested = ATOMIC_INIT(0);
 
 #define MAX_ARG_STRINGS 0x7FFFFFFF
 struct user_arg_ptr {
@@ -499,7 +502,7 @@ static void ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *
     fput(file);
 }
 
-static unsigned int volumedown_pressed_count = 0;
+static atomic_t volumedown_pressed_count = ATOMIC_INIT(0);
 
 static bool is_volumedown_enough(unsigned int count)
 {
@@ -513,8 +516,8 @@ int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *v
         pr_info("KEY_VOLUMEDOWN val: %d\n", val);
         if (val) {
             // key pressed, count it
-            volumedown_pressed_count += 1;
-            if (is_volumedown_enough(volumedown_pressed_count)) {
+            unsigned int pressed_count = atomic_inc_return(&volumedown_pressed_count);
+            if (is_volumedown_enough(pressed_count)) {
                 ksu_stop_input_hook_runtime();
             }
         }
@@ -538,8 +541,9 @@ bool ksu_is_safe_mode()
     // stop hook first!
     ksu_stop_input_hook_runtime();
 
-    pr_info("volumedown_pressed_count: %d\n", volumedown_pressed_count);
-    if (is_volumedown_enough(volumedown_pressed_count)) {
+    unsigned int pressed_count = atomic_read(&volumedown_pressed_count);
+    pr_info("volumedown_pressed_count: %u\n", pressed_count);
+    if (is_volumedown_enough(pressed_count)) {
         // pressed over 3 times
         pr_info("KEY_VOLUMEDOWN pressed max times, safe mode detected!\n");
         safe_mode = true;
@@ -641,7 +645,8 @@ static struct kprobe input_event_kp = {
 
 static void do_stop_input_hook(struct work_struct *work)
 {
-    unregister_kprobe(&input_event_kp);
+    if (atomic_xchg(&input_hook_registered, 0))
+        unregister_kprobe(&input_event_kp);
 }
 
 static void stop_init_rc_hook()
@@ -653,11 +658,9 @@ static void stop_init_rc_hook()
 
 void ksu_stop_input_hook_runtime(void)
 {
-    static bool input_hook_stopped = false;
-    if (input_hook_stopped) {
+    if (atomic_cmpxchg(&input_hook_stop_requested, 0, 1)) {
         return;
     }
-    input_hook_stopped = true;
     bool ret = schedule_work(&stop_input_hook_work);
     pr_info("unregister input kprobe: %d!\n", ret);
 }
@@ -670,18 +673,19 @@ void __init ksu_ksud_init()
     ksu_syscall_table_hook(__NR_read, ksu_sys_read, &orig_sys_read);
     ksu_syscall_table_hook(__NR_fstat, ksu_sys_fstat, &orig_sys_fstat);
 
-    ret = register_kprobe(&input_event_kp);
-    pr_info("ksud: input_event_kp: %d\n", ret);
-
     INIT_WORK(&stop_input_hook_work, do_stop_input_hook);
+    ret = register_kprobe(&input_event_kp);
+    if (!ret)
+        atomic_set(&input_hook_registered, 1);
+    pr_info("ksud: input_event_kp: %d\n", ret);
 }
 
 void __exit ksu_ksud_exit()
 {
-    // TODO:
-    // this should be done before unregister vfs_read_kp
-    // stop_init_rc_hook();
-    unregister_kprobe(&input_event_kp);
+    atomic_set(&input_hook_stop_requested, 1);
+    if (atomic_xchg(&input_hook_registered, 0))
+        unregister_kprobe(&input_event_kp);
+    cancel_work_sync(&stop_input_hook_work);
 
     if (module_rc_buf) {
         free_module_rc();

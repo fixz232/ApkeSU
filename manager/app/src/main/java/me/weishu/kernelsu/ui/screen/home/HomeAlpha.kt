@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.InstallMobile
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -137,10 +138,16 @@ private fun AlphaStatusCard(
                 )
                 AlphaInfoLine(
                     label = "Root",
-                    value = alphaYesNo(state.isRootAvailable),
+                    value = stringResource(state.rootRuntimeState.labelRes),
                     strong = true,
                 )
             }
+            AlphaOutlinedButton(
+                text = stringResource(R.string.root_diagnose),
+                icon = Icons.Rounded.Info,
+                onClick = actions.onDiagnoseClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

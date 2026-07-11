@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -81,6 +82,7 @@ class ModuleViewModel(
     private val updateInfoMutex = Mutex()
     private var updateInfoCache: MutableMap<String, ModuleUpdateCache> = mutableMapOf()
     private val updateInfoInFlight = mutableSetOf<String>()
+    private val moduleOperations = mutableSetOf<String>()
     private val searchQuery = MutableStateFlow("")
 
     private var fetchJob: Job? = null
@@ -338,15 +340,22 @@ class ModuleViewModel(
             }
         }
 
-        val fetchedEntries = coroutineScope {
-            modulesToFetch.map { (id, module, signature) ->
-                async {
-                    val info = withTimeoutOrNull(5_000L) {
-                        withContext(Dispatchers.IO) { checkUpdate(module) }
-                    } ?: ModuleUpdateInfo.Empty
-                    id to ModuleUpdateCache(signature, info)
-                }
-            }.awaitAll()
+        val fetchedEntries = try {
+            coroutineScope {
+                modulesToFetch.map { (id, module, signature) ->
+                    async {
+                        val info = withTimeoutOrNull(5_000L) {
+                            withContext(Dispatchers.IO) { checkUpdate(module) }
+                        } ?: ModuleUpdateInfo.Empty
+                        id to ModuleUpdateCache(signature, info)
+                    }
+                }.awaitAll()
+            }
+        } catch (error: Exception) {
+            updateInfoMutex.withLock {
+                modulesToFetch.forEach { (id, _, _) -> updateInfoInFlight.remove(id) }
+            }
+            throw error
         }
 
         val changedEntries = mutableListOf<Pair<String, ModuleUpdateInfo>>()
@@ -409,58 +418,102 @@ class ModuleViewModel(
         _moduleEvent.trySend(effect)
     }
 
+    private fun beginModuleOperation(id: String): Boolean =
+        synchronized(moduleOperations) { moduleOperations.add(id) }
+
+    private fun endModuleOperation(id: String) {
+        synchronized(moduleOperations) { moduleOperations.remove(id) }
+    }
+
+    private suspend fun executeModuleCommand(label: String, command: () -> Boolean): Boolean {
+        return try {
+            withContext(Dispatchers.IO) { command() }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.e(TAG, "$label failed", error)
+            false
+        }
+    }
+
+    private suspend fun reloadModulesAfterOperation() {
+        try {
+            loadModuleList(resort = false)
+            syncModuleUpdateInfo(_uiState.value.modules)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.e(TAG, "reload modules after operation failed", error)
+        }
+    }
+
     fun toggleModule(module: Module) {
+        if (!beginModuleOperation(module.id)) return
         viewModelScope.launch {
-            val res = ksuApp.resources
-            val success = withContext(Dispatchers.IO) {
-                toggleModuleUtil(module.id, !module.enabled)
-            }
-            if (success) {
-                fetchModuleList(checkUpdate = true, resort = false)
-                emitEffect(ModuleEffect.SnackBar(res.getString(R.string.reboot_to_apply)))
-            } else {
-                val message = if (module.enabled) R.string.module_failed_to_disable else R.string.module_failed_to_enable
-                emitEffect(ModuleEffect.SnackBar(res.getString(message).format(module.name)))
+            try {
+                val res = ksuApp.resources
+                val success = executeModuleCommand("toggle module ${module.id}") {
+                    toggleModuleUtil(module.id, !module.enabled)
+                }
+                if (success) {
+                    reloadModulesAfterOperation()
+                    emitEffect(ModuleEffect.SnackBar(res.getString(R.string.reboot_to_apply)))
+                } else {
+                    val message = if (module.enabled) R.string.module_failed_to_disable else R.string.module_failed_to_enable
+                    emitEffect(ModuleEffect.SnackBar(res.getString(message).format(module.name)))
+                }
+            } finally {
+                endModuleOperation(module.id)
             }
         }
     }
 
     fun uninstallModule(module: Module) {
+        if (!beginModuleOperation(module.id)) return
         viewModelScope.launch {
-            val res = ksuApp.resources
-            val success = withContext(Dispatchers.IO) {
-                uninstallModuleUtil(module.id)
-            }
-            if (success) {
-                fetchModuleList(checkUpdate = true, resort = false)
-            }
-            _uiState.update { it.copy(confirmDialogState = null) }
-            emitEffect(
-                ModuleEffect.SnackBar(
-                    res.getString(
-                        if (success) R.string.module_uninstall_success else R.string.module_uninstall_failed
-                    ).format(module.name)
+            try {
+                val res = ksuApp.resources
+                val success = executeModuleCommand("uninstall module ${module.id}") {
+                    uninstallModuleUtil(module.id)
+                }
+                if (success) {
+                    reloadModulesAfterOperation()
+                }
+                _uiState.update { it.copy(confirmDialogState = null) }
+                emitEffect(
+                    ModuleEffect.SnackBar(
+                        res.getString(
+                            if (success) R.string.module_uninstall_success else R.string.module_uninstall_failed
+                        ).format(module.name)
+                    )
                 )
-            )
+            } finally {
+                endModuleOperation(module.id)
+            }
         }
     }
 
     fun undoUninstallModule(module: Module) {
+        if (!beginModuleOperation(module.id)) return
         viewModelScope.launch {
-            val res = ksuApp.resources
-            val success = withContext(Dispatchers.IO) {
-                undoUninstallModuleUtil(module.id)
-            }
-            if (success) {
-                fetchModuleList(checkUpdate = true, resort = false)
-            }
-            emitEffect(
-                ModuleEffect.SnackBar(
-                    res.getString(
-                        if (success) R.string.module_undo_uninstall_success else R.string.module_undo_uninstall_failed
-                    ).format(module.name)
+            try {
+                val res = ksuApp.resources
+                val success = executeModuleCommand("undo uninstall module ${module.id}") {
+                    undoUninstallModuleUtil(module.id)
+                }
+                if (success) {
+                    reloadModulesAfterOperation()
+                }
+                emitEffect(
+                    ModuleEffect.SnackBar(
+                        res.getString(
+                            if (success) R.string.module_undo_uninstall_success else R.string.module_undo_uninstall_failed
+                        ).format(module.name)
+                    )
                 )
-            )
+            } finally {
+                endModuleOperation(module.id)
+            }
         }
     }
 

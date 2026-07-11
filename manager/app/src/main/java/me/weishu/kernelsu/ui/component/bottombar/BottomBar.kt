@@ -16,7 +16,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalMainPagerState
@@ -25,20 +24,9 @@ import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.alpha.AlphaBottomBar
 import me.weishu.kernelsu.ui.component.delta.DeltaBottomBar
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproBottomBar
-import me.weishu.kernelsu.ui.util.ksuRootAvailable
-import me.weishu.kernelsu.ui.util.rootAvailable
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import kotlin.math.abs
-
-internal fun hasFullFeaturedManager(): Boolean {
-    val isManager = runCatching { Natives.isManager }.getOrDefault(false)
-    if (!isManager) return false
-    val requiresNewKernel = runCatching { Natives.requireNewKernel() }.getOrDefault(true)
-    if (requiresNewKernel) return false
-    return runCatching { rootAvailable() }.getOrDefault(false) ||
-        runCatching { ksuRootAvailable() }.getOrDefault(false)
-}
 
 class MainPagerState(
     val pagerState: PagerState,
@@ -50,9 +38,13 @@ class MainPagerState(
     var isNavigating by mutableStateOf(false)
         private set
 
+    var fullFeatured by mutableStateOf(false)
+        private set
+
     private var navJob: Job? = null
 
     fun animateToPage(targetIndex: Int) {
+        if (targetIndex in 1..2 && !fullFeatured) return
         if (targetIndex == selectedPage) return
 
         navJob?.cancel()
@@ -90,6 +82,13 @@ class MainPagerState(
             selectedPage = pagerState.currentPage
         }
     }
+
+    fun updateFeatureAvailability(available: Boolean) {
+        fullFeatured = available
+        if (!available && selectedPage in 1..2) {
+            animateToPage(0)
+        }
+    }
 }
 
 @Composable
@@ -108,6 +107,8 @@ fun BottomBar(
     backdrop: Backdrop?,
     modifier: Modifier = Modifier,
 ) {
+    if (!LocalMainPagerState.current.fullFeatured) return
+
     if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
         val mainState = LocalMainPagerState.current
         SkrootproBottomBar(
@@ -149,6 +150,8 @@ fun SideRail(
     blurBackdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
+    if (!LocalMainPagerState.current.fullFeatured) return
+
     when (LocalUiMode.current) {
         UiMode.Miuix -> NavigationRailMiuix(blurBackdrop, modifier)
         UiMode.Material -> NavigationRailMaterial(modifier)

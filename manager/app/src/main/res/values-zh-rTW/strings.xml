@@ -72,7 +72,6 @@
     <string name="profile_selinux_domain">定域</string>
     <string name="module_update">更新</string>
     <string name="module_start_downloading">準備下載模組：%s</string>
-    <string name="new_version_available">版本 %s 現已開放下載，點選開始更新。</string>
     <string name="launch_app">開始執行</string>
     <string name="force_stop_app">強制停止</string>
     <string name="failed_to_update_sepolicy">無法為「%s」更新 SELinux 規則</string>
@@ -100,8 +99,6 @@
     <string name="enable_web_debugging">啟用 WebView 偵錯</string>
     <string name="grant_root_failed">無法獲取 Root 權限！</string>
     <string name="open">開啟</string>
-    <string name="settings_check_update">檢查更新</string>
-    <string name="settings_check_update_summary">開啟本應用程式時，自動檢查更新</string>
     <string name="select_file">選擇檔案</string>
     <string name="install_inactive_slot">安裝至非作用擴充槽（適用於 OTA 更新過後）</string>
     <string name="install_inactive_slot_warning">你的裝置將在重新啟動時**強制**開機至目前的非作用擴充槽！\n確保僅在 OTA 更新過後選擇此選項。\n是否繼續？</string>
@@ -112,9 +109,7 @@
     <string name="install_boot_image_tip">Android 13+ 或部分新機型請使用 init_boot，舊機型請使用 boot。</string>
     <string name="install_file_not_selected">未選擇</string>
     <string name="settings_uninstall">解除安裝</string>
-    <string name="settings_uninstall_temporary">暫時性解除安裝</string>
     <string name="settings_restore_stock_image">恢復原廠映像檔</string>
-    <string name="settings_uninstall_temporary_message">暫時解除安裝 ApkeSU。會在下次重新啟動時恢復原狀。</string>
     <string name="settings_uninstall_permanent">永久性解除安裝</string>
     <string name="settings_uninstall_permanent_message">徹底解除安裝 ApkeSU（含 Root 授權與所有的模組）。</string>
     <string name="flashing">正在閃刷</string>
@@ -123,6 +118,7 @@
     <string name="flash_failed">閃刷失敗</string>
     <string name="flash_error_code">錯誤代碼</string>
     <string name="flash_check_log">請儲存並檢查日誌。</string>
+    <string name="flash_interrupted">閃刷結果回傳已中斷。為避免重複寫入分割區，請先重新啟動裝置再重試。</string>
     <string name="selected_lkm">已選定 LKM：%s</string>
     <string name="save_log">儲存日誌</string>
     <string name="action">執行</string>
@@ -253,14 +249,10 @@
     <string name="settings_startup_sound_duration">啟動音效時長</string>
     <string name="settings_startup_sound_duration_summary">到達設定時間後自動停止播放。</string>
     <string name="settings_startup_sound_duration_value">%1$d 秒</string>
-    <string name="settings_startup_sound_preview">試聽啟動音效</string>
-    <string name="settings_startup_sound_clear">清除啟動音效</string>
     <string name="settings_startup_sound_play_failed">無法播放這個啟動音效。</string>
     <string name="settings_click_sound">點擊音效</string>
     <string name="settings_click_sound_summary">選擇一個音訊檔案，點擊介面控制項時播放。</string>
     <string name="settings_click_sound_selected_summary">已選擇點擊音效，點一下可重新選擇。</string>
-    <string name="settings_click_sound_preview">試聽點擊音效</string>
-    <string name="settings_click_sound_clear">清除點擊音效</string>
     <string name="settings_click_sound_play_failed">無法播放這個點擊音效。</string>
     <string name="settings_sound_effects">音效設定</string>
     <string name="settings_sound_effects_summary">管理啟動音效、點擊音效和背景音樂。</string>

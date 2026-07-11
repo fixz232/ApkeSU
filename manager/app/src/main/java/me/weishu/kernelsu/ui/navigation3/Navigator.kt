@@ -27,6 +27,7 @@ class Navigator(
      * Push a key onto the back stack.
      */
     fun push(key: NavKey) {
+        if (backStack.lastOrNull() == key) return
         backStack.add(key)
     }
 

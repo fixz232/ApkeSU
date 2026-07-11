@@ -39,9 +39,6 @@ fun NavigationRailMiuix(
     blurBackdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
-    val fullFeatured = hasFullFeaturedManager()
-    if (!fullFeatured) return
-
     val mainState = LocalMainPagerState.current
     val customIcons = LocalCustomNavigationIcons.current
 

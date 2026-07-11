@@ -14,11 +14,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -75,9 +76,11 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
@@ -118,6 +121,7 @@ import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
+import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
 import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
@@ -145,6 +149,7 @@ import me.weishu.kernelsu.ui.util.ManagerUpdateChecker
 import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getFileName
+import me.weishu.kernelsu.ui.util.getInstalledKsudStatus
 import me.weishu.kernelsu.ui.util.install
 import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
@@ -177,13 +182,15 @@ class MainActivity : ComponentActivity() {
         val requiresNewKernel = runCatching { Natives.requireNewKernel() }.getOrDefault(true)
         if ((isManager && !requiresNewKernel) || ksuVersion > 0) {
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { install() }
+                runCatching { check(install()) { "ksud install command failed" } }
+                    .onSuccess { KernelStatusEvents.requestRefresh() }
                     .onFailure { Log.e(TAG, "install ksud failed", it) }
             }
         } else {
             lifecycleScope.launch(Dispatchers.IO) {
                 if (ensureManagerRegistered()) {
-                    runCatching { install() }
+                    runCatching { check(install()) { "ksud install command failed" } }
+                        .onSuccess { KernelStatusEvents.requestRefresh() }
                         .onFailure { Log.e(TAG, "install ksud failed", it) }
                 }
             }
@@ -316,6 +323,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.SoundEffects> { SoundEffectsScreen() }
                                 entry<Route.StartupAnimation> { StartupAnimationScreen() }
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
+                                entry<Route.PreInstallStyleSettings> { PreInstallStyleSettingsScreen() }
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
                                 entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
@@ -347,9 +355,20 @@ class MainActivity : ComponentActivity() {
                     }
                     val globalGlassBackdrop = rememberBlurBackdrop(effectiveEnableBlur)
                     val currentRoute = navigator.current() as? Route
+                    var routeInitialized by remember { mutableStateOf(false) }
+                    var navigationTransitionActive by remember { mutableStateOf(false) }
+                    LaunchedEffect(currentRoute) {
+                        if (!routeInitialized) {
+                            routeInitialized = true
+                        } else {
+                            navigationTransitionActive = true
+                            delay(NAV_TRANSITION_DURATION_MS.toLong())
+                            navigationTransitionActive = false
+                        }
+                    }
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
                     val globalScrollEffectState = rememberGlobalScrollEffectState(
-                        enabled = uiState.globalScrollEffectEnabled,
+                        enabled = uiState.globalScrollEffectEnabled && !navigationTransitionActive,
                         effectValue = uiState.globalScrollEffect,
                     )
 
@@ -574,9 +593,7 @@ private fun Modifier.customClickSound(uriString: String?, volume: Float): Modifi
     }
 }
 
-private const val NAV_ENTER_TRANSITION_DURATION_MS = 120
-private const val NAV_ENTER_TRANSITION_DELAY_MS = 70
-private const val NAV_EXIT_TRANSITION_DURATION_MS = 100
+private const val NAV_TRANSITION_DURATION_MS = 200
 private const val MAX_MANAGER_UPDATE_CHANGELOG_LENGTH = 4000
 private const val TAG = "MainActivity"
 
@@ -589,38 +606,34 @@ private fun <T : Any> stableNavPopTransition(): AnimatedContentTransitionScope<S
 }
 
 private fun stableNavForwardTransitionContentTransform(): ContentTransform {
-    val enterAlphaSpec = tween<Float>(
-        durationMillis = NAV_ENTER_TRANSITION_DURATION_MS,
-        delayMillis = NAV_ENTER_TRANSITION_DELAY_MS,
-        easing = FastOutSlowInEasing,
-    )
-    val exitAlphaSpec = tween<Float>(
-        durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
+    val alphaSpec = tween<Float>(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec),
-        initialContentExit = fadeOut(animationSpec = exitAlphaSpec),
+        targetContentEnter = fadeIn(animationSpec = alphaSpec) +
+            slideInHorizontally(
+                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+            ) { width -> width / 12 },
+        initialContentExit = fadeOut(animationSpec = alphaSpec) +
+            slideOutHorizontally(
+                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+            ) { width -> -width / 16 },
         targetContentZIndex = 1f,
-        sizeTransform = SizeTransform(clip = true),
+        sizeTransform = null,
     )
 }
 
 private fun stableNavPopTransitionContentTransform(): ContentTransform {
-    val enterAlphaSpec = tween<Float>(
-        durationMillis = NAV_ENTER_TRANSITION_DURATION_MS,
-        delayMillis = NAV_ENTER_TRANSITION_DELAY_MS,
-        easing = FastOutSlowInEasing,
-    )
-    val exitAlphaSpec = tween<Float>(
-        durationMillis = NAV_EXIT_TRANSITION_DURATION_MS,
-        easing = FastOutSlowInEasing,
-    )
+    val alphaSpec = tween<Float>(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = enterAlphaSpec),
-        initialContentExit = fadeOut(animationSpec = exitAlphaSpec),
+        targetContentEnter = fadeIn(animationSpec = alphaSpec) +
+            slideInHorizontally(
+                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+            ) { width -> -width / 12 },
+        initialContentExit = fadeOut(animationSpec = alphaSpec) +
+            slideOutHorizontally(
+                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+            ) { width -> width / 16 },
         targetContentZIndex = 1f,
-        sizeTransform = SizeTransform(clip = true),
+        sizeTransform = null,
     )
 }
 
@@ -642,17 +655,26 @@ fun MainScreen(
     val isFullFeatured by produceState(initialValue = false, refreshTick) {
         val fullFeatured = kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching { Natives.refreshInfo() }
-            if (runCatching { ensureManagerRegistered() }.getOrDefault(false)) {
-                return@withContext true
+            val managerRegistered = runCatching {
+                Natives.isManager || ensureManagerRegistered()
+            }.getOrDefault(false)
+            val installedKsud = if (managerRegistered) {
+                runCatching { getInstalledKsudStatus() }.getOrNull()
+            } else {
+                null
             }
             runCatching {
-                ((Natives.isManager && !Natives.requireNewKernel()) || Natives.version > 0) &&
-                    rootAvailable()
+                managerRegistered &&
+                    Natives.version > 0 &&
+                    !Natives.requireNewKernel() &&
+                    ksuRootAvailable() &&
+                    installedKsud?.present == true &&
+                    installedKsud.versionCode == BuildConfig.VERSION_CODE
             }.getOrDefault(false)
         }
         value = fullFeatured
     }
-    var userScrollEnabled by remember(isFullFeatured) { mutableStateOf(isFullFeatured) }
+    val userScrollEnabled = isFullFeatured
     val uiMode = LocalUiMode.current
     val surfaceColor = when (uiMode) {
         UiMode.Material -> MaterialTheme.colorScheme.surface // Blur is not used in Material, this is just a placeholder
@@ -676,6 +698,10 @@ fun MainScreen(
     val currentPage = mainPagerState.pagerState.currentPage
     LaunchedEffect(currentPage) {
         mainPagerState.syncPage()
+    }
+
+    LaunchedEffect(isFullFeatured) {
+        mainPagerState.updateFeatureAvailability(isFullFeatured)
     }
 
     MainScreenBackHandler(mainPagerState, navController)

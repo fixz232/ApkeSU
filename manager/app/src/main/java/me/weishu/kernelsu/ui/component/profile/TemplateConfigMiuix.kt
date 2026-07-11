@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.util.listAppProfileTemplates
-import me.weishu.kernelsu.ui.util.setSepolicy
 import me.weishu.kernelsu.ui.viewmodel.getTemplateInfoById
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -59,7 +58,7 @@ fun TemplateConfigMiuix(
                     if (index < 0 || index >= profileTemplates.size) return@OverlayDropdownPreference
                     val selected = profileTemplates[index]
                     val templateInfo = getTemplateInfoById(selected)
-                    if (templateInfo != null && setSepolicy(selected, templateInfo.rules.joinToString("\n"))) {
+                    if (templateInfo != null) {
                         onProfileChange(
                             profile.copy(
                                 rootTemplate = selected,

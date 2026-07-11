@@ -50,7 +50,6 @@
     <string name="module_update">تحديث</string>
     <string name="module_downloading">تحميل الإضافة: %s</string>
     <string name="module_start_downloading">ابدأ التنزيل: %s</string>
-    <string name="new_version_available">الإصدار الجديد: %s متاح ، انقر للتحديث.</string>
     <string name="launch_app">تشغيل</string>
     <string name="profile_default">الإفتراضي</string>
     <string name="profile_template">نموذج</string>
@@ -95,8 +94,6 @@
     <string name="app_profile_template_view">عرض القالب</string>
     <string name="grant_root_failed">فشل في منح صلاحية الجذر!</string>
     <string name="open">فتح</string>
-    <string name="settings_check_update_summary">التحقق تلقائيًا من وجود تحديثات عند فتح التطبيق</string>
-    <string name="settings_check_update">التحقق من التحديث</string>
     <string name="enable_web_debugging">تمكين تصحيح أخطاء WebView</string>
     <string name="enable_web_debugging_summary">يمكن استخدامه لتصحيح أخطاء WebUI، يرجى تمكينه فقط عند الحاجة.</string>
     <string name="install_next">التالي</string>
@@ -109,7 +106,6 @@
     <string name="select_kmi">اختر KMI</string>
     <string name="select_file_tip">يوصى باستخدام صورة القسم %1$s</string>
     <string name="settings_uninstall">إلغاء التثبيت</string>
-    <string name="settings_uninstall_temporary">إلغاء التثبيت مؤقتًا</string>
     <string name="settings_uninstall_permanent">إلغاء التثبيت بشكل دائم</string>
     <string name="settings_restore_stock_image">استعادة الصورة الاصلية</string>
     <string name="settings_uninstall_permanent_message">‬إلغاء تثبيت ApkeSU .(الجذر وجميع الوحدات) بشكل كامل ودائم.</string>
@@ -118,7 +114,6 @@
     <string name="flash_failed">فشل التركيب</string>
     <string name="selected_lkm">LKM المحددة: %s</string>
     <string name="settings_restore_stock_image_message">استعادة صورة المصنع المخزنة (في حالة وجود نسخة احتياطية)، والتي تُستخدم عادة قبل OTA؛ إذا كنت بحاجة إلى إلغاء تثبيت ApkeSU، فيرجى استخدام \"إلغاء التثبيت الدائم\".</string>
-    <string name="settings_uninstall_temporary_message">قم بإلغاء تثبيت ApkeSU مؤقتًا، واستعد إلى حالته الأصلية بعد إعادة التشغيل التالية.</string>
     <string name="save_log">حفظ السجلات</string>
     <string name="action">إجراء</string>
     <string name="log_saved">السجلات محفوظة</string>

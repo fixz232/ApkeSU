@@ -32,6 +32,28 @@ fn exec_shell_commands(commands: &[(&str, &[&str])], log_prefix: &str) -> Result
     Ok(())
 }
 
+fn property_context_paths() -> Result<(String, String)> {
+    let debuggable_context = sys_prop::get_context("ro.debuggable")
+        .context("Failed to get context for ro.debuggable")?;
+    let adb_secure_context = sys_prop::get_context("ro.adb.secure")
+        .context("Failed to get context for ro.adb.secure")?;
+    Ok((
+        format!("/dev/__properties__/{debuggable_context}"),
+        format!("/dev/__properties__/{adb_secure_context}"),
+    ))
+}
+
+fn chmod_property_files(mode: &str, debuggable_path: &str, adb_secure_path: &str) -> Result<()> {
+    exec_shell_commands(
+        &[
+            ("chmod", &[mode, "/dev/__properties__/properties_serial"]),
+            ("chmod", &[mode, debuggable_path]),
+            ("chmod", &[mode, adb_secure_path]),
+        ],
+        "Executing",
+    )
+}
+
 fn enable_adb_root(port: u16) -> Result<()> {
     // We are in limited root by magica
     anyhow::ensure!(
@@ -42,28 +64,11 @@ fn enable_adb_root(port: u16) -> Result<()> {
     sys_prop::init().context("Failed to initialize system property API")?;
     let rp = resetprop();
 
-    let debuggable_context = sys_prop::get_context("ro.debuggable")
-        .context("Failed to get context for ro.debuggable")?;
-    info!("ro.debuggable context: {debuggable_context}");
-
-    let adb_secure_context = sys_prop::get_context("ro.adb.secure")
-        .context("Failed to get context for ro.adb.secure")?;
-    info!("ro.adb.secure context: {adb_secure_context}");
-
-    let props_serial = "/dev/__properties__/properties_serial";
-    let debuggable_context = format!("/dev/__properties__/{debuggable_context}");
-    let adb_secure_context = format!("/dev/__properties__/{adb_secure_context}");
+    let (debuggable_context, adb_secure_context) = property_context_paths()?;
     let port_str = port.to_string();
 
     // chmod property files to writable
-    exec_shell_commands(
-        &[
-            ("chmod", &["0644", props_serial]),
-            ("chmod", &["0644", &debuggable_context]),
-            ("chmod", &["0644", &adb_secure_context]),
-        ],
-        "Executing",
-    )?;
+    chmod_property_files("0644", &debuggable_context, &adb_secure_context)?;
 
     // Set properties via internal API
     rp.set("ro.debuggable", "1")
@@ -73,12 +78,10 @@ fn enable_adb_root(port: u16) -> Result<()> {
         .context("Failed to set ro.adb.secure")?;
     info!("Executing: resetprop -n ro.adb.secure 0");
 
-    // Restore permissions and restart adbd
+    // Restore permissions before exposing the restarted adbd.
+    chmod_property_files("0444", &debuggable_context, &adb_secure_context)?;
     exec_shell_commands(
         &[
-            ("chmod", &["0444", props_serial]),
-            ("chmod", &["0444", &debuggable_context]),
-            ("chmod", &["0444", &adb_secure_context]),
             ("setprop", &["service.adb.root", "1"]),
             ("setprop", &["service.adb.tcp.port", &port_str]),
             ("setprop", &["ctl.restart", "adbd"]),
@@ -93,30 +96,38 @@ pub fn disable_adb_root() -> Result<()> {
     // We have full root now, no need to chmod
     sys_prop::init().context("Failed to initialize system property API")?;
     let rp = resetprop();
+    let (debuggable_context, adb_secure_context) = property_context_paths()?;
 
-    info!("Restoring: resetprop -n ro.debuggable 0");
-    rp.set("ro.debuggable", "0")
-        .context("Failed to set ro.debuggable")?;
+    let restore_result = (|| -> Result<()> {
+        info!("Restoring: resetprop -n ro.debuggable 0");
+        rp.set("ro.debuggable", "0")
+            .context("Failed to set ro.debuggable")?;
 
-    info!("Restoring: resetprop -n ro.adb.secure 1");
-    rp.set("ro.adb.secure", "1")
-        .context("Failed to set ro.adb.secure")?;
+        info!("Restoring: resetprop -n ro.adb.secure 1");
+        rp.set("ro.adb.secure", "1")
+            .context("Failed to set ro.adb.secure")?;
 
-    for prop in &[
-        "service.adb.root",
-        "service.adb.tcp.port",
-        "ro.boot.selinux",
-    ] {
-        info!("Restoring: resetprop --delete {prop}");
-        let _ = rp.delete(prop);
-        if let Ok(ctx) = sys_prop::get_context(prop) {
-            let _ = rp.rebuild(&ctx);
+        for prop in &[
+            "service.adb.root",
+            "service.adb.tcp.port",
+            "ro.boot.selinux",
+        ] {
+            info!("Restoring: resetprop --delete {prop}");
+            let _ = rp.delete(prop);
+            if let Ok(ctx) = sys_prop::get_context(prop) {
+                let _ = rp.rebuild(&ctx);
+            }
+        }
+        exec_shell_commands(&[("setprop", &["ctl.restart", "adbd"])], "Restoring")
+    })();
+    let permission_result = chmod_property_files("0444", &debuggable_context, &adb_secure_context);
+    match (restore_result, permission_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(error), Err(permission_error)) => {
+            bail!("{error:#}; property permission cleanup also failed: {permission_error:#}")
         }
     }
-
-    exec_shell_commands(&[("setprop", &["ctl.restart", "adbd"])], "Restoring")?;
-
-    Ok(())
 }
 
 fn connect_to_device(port: u16) -> Result<ADBTcpDevice> {
@@ -153,40 +164,56 @@ pub fn run(
         crate::defs::DEFAULT_MANAGER_PACKAGE
     );
 
-    enable_adb_root(port)?;
-
-    let mut device = connect_to_device(port)?;
-
-    let self_path = std::env::current_exe().context("Failed to get self exe path")?;
-
-    // Execute late-load with --post-magica via adb shell.
-    // The late-load process has full root + su domain and will:
-    // 1. Load kernelsu.ko, enforce SELinux, run stage scripts
-    // 2. Restore adb properties (disable adb root/tcp mode)
-    let allow_shell_arg = if allow_shell { " --allow-shell" } else { "" };
-    let manager_uid_arg = manager_uid
-        .map(|uid| format!(" --manager-uid {uid}"))
-        .unwrap_or_default();
-    let self_path = self_path.to_string_lossy();
-    let cmd = format!(
-        "{} late-load --post-magica --package-name {}{}{}",
-        shell_quote(&self_path),
-        shell_quote(package_name),
-        manager_uid_arg,
-        allow_shell_arg
-    );
-    info!("Executing '{cmd}' via adb shell...");
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    if let Err(e) = device.shell_command(&cmd, Some(&mut stdout), Some(&mut stderr)) {
-        info!("adb shell finished with error (may be expected): {e}");
-    }
-    if !stdout.is_empty() {
-        info!("stdout: {}", String::from_utf8_lossy(&stdout));
-    }
-    if !stderr.is_empty() {
-        info!("stderr: {}", String::from_utf8_lossy(&stderr));
+    if let Err(error) = enable_adb_root(port) {
+        if let Err(cleanup_error) = disable_adb_root() {
+            bail!("{error:#}; adb cleanup also failed: {cleanup_error:#}");
+        }
+        return Err(error);
     }
 
-    Ok(())
+    let result = (|| -> Result<()> {
+        let mut device = connect_to_device(port)?;
+        let self_path = std::env::current_exe().context("Failed to get self exe path")?;
+
+        // Execute late-load with --post-magica via adb shell.
+        // The child also restores ADB state; the parent repeats cleanup below so
+        // failures before the child starts cannot leave an insecure ADB daemon.
+        let allow_shell_arg = if allow_shell { " --allow-shell" } else { "" };
+        let manager_uid_arg = manager_uid
+            .map(|uid| format!(" --manager-uid {uid}"))
+            .unwrap_or_default();
+        let self_path = self_path.to_string_lossy();
+        let cmd = format!(
+            "{} late-load --post-magica --package-name {}{}{}",
+            shell_quote(&self_path),
+            shell_quote(package_name),
+            manager_uid_arg,
+            allow_shell_arg
+        );
+        info!("Executing '{cmd}' via adb shell...");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        if let Err(e) = device.shell_command(&cmd, Some(&mut stdout), Some(&mut stderr)) {
+            info!("adb shell finished with error (may be expected): {e}");
+        }
+        if !stdout.is_empty() {
+            info!("stdout: {}", String::from_utf8_lossy(&stdout));
+        }
+        if !stderr.is_empty() {
+            info!("stderr: {}", String::from_utf8_lossy(&stderr));
+        }
+        Ok(())
+    })();
+
+    let cleanup_result = disable_adb_root();
+    match (result, cleanup_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(()), Err(cleanup_error)) => {
+            Err(cleanup_error).context("failed to restore ADB state after Magica")
+        }
+        (Err(error), Err(cleanup_error)) => {
+            bail!("{error:#}; adb cleanup also failed: {cleanup_error:#}")
+        }
+    }
 }

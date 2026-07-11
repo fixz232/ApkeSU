@@ -322,7 +322,7 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var autoJailbreak: Boolean
         get() = prefs.getBoolean("auto_jailbreak", false)
         set(value) {
-            runCatching {
+            val applied = runCatching {
                 ksuApp.packageManager.setComponentEnabledSetting(
                     ComponentName(ksuApp, BootCompletedReceiver::class.java),
                     if (value) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
@@ -330,9 +330,11 @@ class SettingsRepositoryImpl : SettingsRepository {
                 )
             }.onFailure {
                 Log.e("Settings", "failed to change boot receiver state to $value", it)
-            }
-            prefs.edit {
-                putBoolean("auto_jailbreak", value)
+            }.isSuccess
+            if (applied) {
+                prefs.edit {
+                    putBoolean("auto_jailbreak", value)
+                }
             }
         }
 

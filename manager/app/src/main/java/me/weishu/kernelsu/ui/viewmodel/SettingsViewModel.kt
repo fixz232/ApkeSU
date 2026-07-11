@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,7 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_OVERLAY
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_LITE
 import me.weishu.kernelsu.ui.util.LauncherIconOption
 
@@ -47,15 +49,15 @@ class SettingsViewModel(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var refreshJob: Job? = null
 
     init {
-        viewModelScope.launch(refreshExceptionHandler) {
-            refresh()
-        }
+        refresh()
     }
 
     fun refresh() {
-        viewModelScope.launch(refreshExceptionHandler) {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(refreshExceptionHandler) {
             val checkModuleUpdate = repo.checkModuleUpdate
             val showVersionMismatchWarning = repo.showVersionMismatchWarning
             val showGkiWarning = repo.showGkiWarning
@@ -218,6 +220,14 @@ class SettingsViewModel(
                     builtinMountVariant = builtinMountStatus.variant,
                     isBuiltinMountWebUiAvailable = builtinMountStatus.webUi,
                     builtinMountConflict = builtinMountStatus.conflict,
+                    builtinMountSourceUrl = builtinMountStatus.sourceUrl,
+                    builtinMountArchiveSha256 = builtinMountStatus.archiveSha256,
+                    builtinMountLkmCount = builtinMountStatus.lkmCount,
+                    builtinMountSupportedKmis = builtinMountStatus.supportedKmis,
+                    builtinMountCurrentKmi = builtinMountStatus.currentKmi,
+                    builtinMountCompatibility = builtinMountStatus.compatibility,
+                    builtinMountLkmPurpose = builtinMountStatus.lkmPurpose,
+                    builtinMountIsApkeSuRootDriver = builtinMountStatus.apkeSuRootDriver,
                     isKPatchNextInstalled = kPatchNextStatus.installed,
                     isKPatchNextEnabled = kPatchNextStatus.enabled,
                     isKPatchNextPendingUpdate = kPatchNextStatus.pendingUpdate,
@@ -792,11 +802,14 @@ class SettingsViewModel(
     fun setSelinuxHideEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val status = repo.setSelinuxHideEnabled(enabled)
-            repo.execKsudFeatureSave()
-            _uiState.update { it.copy(isSelinuxHideEnabled = enabled) }
             when (status) {
-                0 -> {}
+                0 -> {
+                    repo.execKsudFeatureSave()
+                    _uiState.update { it.copy(isSelinuxHideEnabled = enabled) }
+                }
                 -OsConstants.EAGAIN -> {
+                    repo.execKsudFeatureSave()
+                    _uiState.update { it.copy(isSelinuxHideEnabled = enabled) }
                     withContext(Dispatchers.Main) {
                         Toast.makeText(ksuApp, R.string.settings_selinux_hide_reboot_required,
                             Toast.LENGTH_LONG).show()
@@ -814,7 +827,7 @@ class SettingsViewModel(
 
     fun setAutoJailbreak(enabled: Boolean) {
         repo.autoJailbreak = enabled
-        _uiState.update { it.copy(autoJailbreak = enabled) }
+        _uiState.update { it.copy(autoJailbreak = repo.autoJailbreak) }
     }
 
     fun setSulogEnabled(enabled: Boolean) {
@@ -881,8 +894,8 @@ class SettingsViewModel(
         }
     }
 
-    fun setBuiltinMountVariant(@Suppress("UNUSED_PARAMETER") index: Int) {
-        val variant = BUILTIN_MOUNT_VARIANT_LITE
+    fun setBuiltinMountVariant(index: Int) {
+        val variant = if (index == 1) BUILTIN_MOUNT_VARIANT_FULL else BUILTIN_MOUNT_VARIANT_LITE
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setBuiltinMountVariant(variant)) {
                 refreshBuiltinMountStatus()
@@ -937,6 +950,14 @@ class SettingsViewModel(
                 builtinMountVariant = status.variant,
                 isBuiltinMountWebUiAvailable = status.webUi,
                 builtinMountConflict = status.conflict,
+                builtinMountSourceUrl = status.sourceUrl,
+                builtinMountArchiveSha256 = status.archiveSha256,
+                builtinMountLkmCount = status.lkmCount,
+                builtinMountSupportedKmis = status.supportedKmis,
+                builtinMountCurrentKmi = status.currentKmi,
+                builtinMountCompatibility = status.compatibility,
+                builtinMountLkmPurpose = status.lkmPurpose,
+                builtinMountIsApkeSuRootDriver = status.apkeSuRootDriver,
             )
         }
     }

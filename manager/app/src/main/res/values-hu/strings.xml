@@ -70,7 +70,6 @@
     <string name="profile_umount_modules">Modulok leválasztása</string>
     <string name="failed_to_update_app_profile">Nem sikerült frissíteni az App Profilt ehhez: %s</string>
     <string name="settings_umount_modules_default_summary">A \"Modulok leválasztása\" globális alapértelmezett értéke az App Profile-ban. Ha engedélyezve van, eltávolít minden modulmódosítást a rendszerből azon alkalmazások esetében, amelyeknek nincs profilja beállítva.</string>
-    <string name="new_version_available">Elérhető az új, %s verzió, kattintson a frissítéshez.</string>
     <string name="failed_to_update_sepolicy">Nem sikerült frissíteni az SELinux szabályokat a következőhöz: %s</string>
     <string name="require_kernel_version">A jelenlegi ApkeSU verzió %1$d túlságosan elavult a megfelelő működéshez. Kérjük frissítsen a %2$d verzióra vagy újabbra!</string>
     <string name="app_profile_template_import_success">Sikeresen importálva</string>
@@ -101,8 +100,6 @@
     <string name="select_file_tip">%1$s partíció képfájl ajánlott</string>
     <string name="select_kmi">KMI kiválasztása</string>
     <string name="install_next">Következő</string>
-    <string name="settings_uninstall_temporary">Ideiglenes eltávolítás</string>
-    <string name="settings_uninstall_temporary_message">A ApkeSU ideiglenes eltávolítása, az eredeti állapot visszaállítása a következő újraindítás után.</string>
     <string name="settings_uninstall">Eltávolítás</string>
     <string name="flashing">Telepítés</string>
     <string name="flash_success">Sikeres telepítés</string>
@@ -117,8 +114,6 @@
     <string name="direct_install">Közvetlen telepítés (Ajánlott)</string>
     <string name="install_inactive_slot_warning">Az eszköze **KÉNYSZERÍTETTEN** a jelenleg inaktív helyről fog indulni újraindítás után!\nCsak az OTA befejezése után használja.\nFolytatja?</string>
     <string name="settings_restore_stock_image_message">Állítsa vissza a gyári képfájlt (ha létezik biztonsági mentés). Általában OTA előtt használják. Ha a ApkeSU-t szeretné eltávolítani, használja a végleges eltávolítás opciót.</string>
-    <string name="settings_check_update">Frissítés ellenőrzése</string>
-    <string name="settings_check_update_summary">Automatikusan keressen frissítéseket az alkalmazás megnyitásakor</string>
     <string name="log_saved">Mentett naplók</string>
     <string name="settings_sucompat">su bináris átirányítása</string>
     <string name="settings_sucompat_summary">Lehetővé teszi az App Profile-ban Superuser engedéllyel rendelkező alkalmazások számára, hogy superuser shell-t kapjanak a /system/bin/su végrehajtásával; csak új folyamatoknál hatékony.</string>

@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAlt
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -89,6 +90,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -106,12 +108,14 @@ import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_FILE_NAME
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_MIME_TYPE
 import me.weishu.kernelsu.ui.util.HiddenPathConfigState
+import me.weishu.kernelsu.ui.util.HiddenPathVisibilityResult
 import me.weishu.kernelsu.ui.util.clearHiddenPathLogs
 import me.weishu.kernelsu.ui.util.getHiddenPathConfig
 import me.weishu.kernelsu.ui.util.getHiddenPathLogs
 import me.weishu.kernelsu.ui.util.parseHiddenPathConfigJson
 import me.weishu.kernelsu.ui.util.saveAndApplyHiddenPathConfig
 import me.weishu.kernelsu.ui.util.toConfigJson
+import me.weishu.kernelsu.ui.util.testHiddenPathVisibility
 import me.weishu.kernelsu.ui.util.unloadHiddenPathKernelPaths
 import org.json.JSONArray
 import org.json.JSONObject
@@ -163,7 +167,7 @@ private const val TEXT_CLIPBOARD_EMPTY = "\u526a\u8d34\u677f\u91cc\u6ca1\u6709\u
 private const val TEXT_EMPTY_TEMPLATE = "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u914d\u7f6e\u6a21\u677f"
 private const val TEXT_TEMPLATE_NAME_EMPTY = "\u8bf7\u5148\u8f93\u5165\u6a21\u677f\u540d\u79f0"
 private const val TEXT_DUPLICATE_ITEM = "\u8be5\u9879\u5df2\u5b58\u5728"
-private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u5305\u542b\u9017\u53f7\u3001\u53cc\u5f15\u53f7\u3001\u53cd\u659c\u6760\u6216\u63a7\u5236\u5b57\u7b26"
+private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u662f\u6839\u76ee\u5f55\uff0c\u4e5f\u4e0d\u80fd\u5305\u542b .\u3001..\u3001\u9017\u53f7\u3001\u53cc\u5f15\u53f7\u3001\u53cd\u659c\u6760\u6216\u63a7\u5236\u5b57\u7b26"
 private const val TEXT_INVALID_APP = "\u5305\u540d\u6216 UID \u65e0\u6548\uff1a\u53ea\u80fd\u4f7f\u7528\u6570\u5b57\u3001\u5b57\u6bcd\u3001.\u3001_\u3001-\u3001:"
 private const val TEXT_NO_PATH = "\u8def\u5f84\u5217\u8868\u4e3a\u7a7a\uff0c\u8bf7\u5148\u6dfb\u52a0\u8981\u9690\u85cf\u7684\u8def\u5f84"
 private const val TEXT_NO_APP = "\u5df2\u5f00\u542f\u6309\u5e94\u7528 UID \u9690\u85cf\uff0c\u8bf7\u6dfb\u52a0\u5305\u540d\u6216 UID\uff1b\u8981\u5168\u5c40\u751f\u6548\u5c31\u5173\u95ed\u8fd9\u4e2a\u5f00\u5173"
@@ -171,6 +175,11 @@ private const val TEXT_MANAGED_PATH_GLOBAL_BLOCK = "\u9690\u85cf /data/adb \u6a2
 private const val TEXT_WAITING_CONFIG = "\u7b49\u5f85\u914d\u7f6e"
 private const val TEXT_WAITING_LOAD = "\u5f85\u52a0\u8f7d"
 private const val TEXT_RUNNING = "\u8fd0\u884c\u4e2d"
+private const val TEXT_VISIBILITY_TEST = "UID \u53ef\u89c1\u6027\u5b9e\u6d4b"
+private const val TEXT_VISIBILITY_TEST_SUMMARY = "\u4ee5\u6307\u5b9a Android UID \u5b9e\u9645\u8bbf\u95ee\u8def\u5f84\uff0c\u7528\u4e8e\u786e\u8ba4\u5185\u6838\u9690\u85cf\u662f\u5426\u771f\u6b63\u751f\u6548\u3002"
+private const val TEXT_VISIBILITY_TEST_ACTION = "\u5f00\u59cb\u5b9e\u6d4b"
+private const val TEXT_VISIBILITY_USE_CONFIG = "\u4f7f\u7528\u5f53\u524d\u914d\u7f6e"
+private const val TEXT_VISIBILITY_UID_INVALID = "\u8bf7\u8f93\u5165\u6709\u6548\u7684 Android \u5e94\u7528 UID"
 private const val PREF_HIDDEN_PATH_TEMPLATES = "hidden_path_config_templates"
 private const val PREF_KEY_TEMPLATES = "templates"
 
@@ -212,6 +221,10 @@ fun HiddenPathConfigScreen() {
     var appInput by rememberSaveable { mutableStateOf("") }
     var templateName by rememberSaveable { mutableStateOf("") }
     var templates by remember { mutableStateOf(loadHiddenPathTemplates(context)) }
+    var visibilityUidInput by rememberSaveable { mutableStateOf("") }
+    var visibilityPathInput by rememberSaveable { mutableStateOf("") }
+    var visibilityTesting by remember { mutableStateOf(false) }
+    var visibilityResult by remember { mutableStateOf<HiddenPathVisibilityResult?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument(HIDDEN_PATH_CONFIG_MIME_TYPE),
@@ -343,45 +356,82 @@ fun HiddenPathConfigScreen() {
     }
 
     fun applyHiddenPathConfig() {
+        if (applying || unloadingActive) return
+        applying = true
         scope.launch {
-            applying = true
-            val ok = saveAndApplyHiddenPathConfig(
-                sanitizeHiddenPathConfig(config)
-            )
-            config = getHiddenPathConfig()
-            logs = getHiddenPathLogs()
-            applying = false
-            Toast.makeText(
-                context,
-                if (ok) TEXT_APPLY_OK else TEXT_APPLY_FAIL,
-                Toast.LENGTH_LONG,
-            ).show()
-            if (!ok) {
-                selectedTab = 1
+            try {
+                val ok = saveAndApplyHiddenPathConfig(
+                    sanitizeHiddenPathConfig(config)
+                )
+                config = getHiddenPathConfig()
+                logs = getHiddenPathLogs()
+                Toast.makeText(
+                    context,
+                    if (ok) TEXT_APPLY_OK else TEXT_APPLY_FAIL,
+                    Toast.LENGTH_LONG,
+                ).show()
+                if (!ok) {
+                    selectedTab = 1
+                }
+            } finally {
+                applying = false
             }
         }
     }
 
     fun unloadActiveHiddenPaths() {
+        if (applying || unloadingActive) return
+        unloadingActive = true
         scope.launch {
-            unloadingActive = true
-            val ok = unloadHiddenPathKernelPaths()
-            config = getHiddenPathConfig()
-            logs = getHiddenPathLogs()
-            unloadingActive = false
-            Toast.makeText(
-                context,
-                if (ok) TEXT_UNLOAD_ACTIVE_OK else TEXT_UNLOAD_ACTIVE_FAIL,
-                Toast.LENGTH_LONG,
-            ).show()
-            if (!ok) {
-                selectedTab = 1
+            try {
+                val ok = unloadHiddenPathKernelPaths()
+                config = getHiddenPathConfig()
+                logs = getHiddenPathLogs()
+                Toast.makeText(
+                    context,
+                    if (ok) TEXT_UNLOAD_ACTIVE_OK else TEXT_UNLOAD_ACTIVE_FAIL,
+                    Toast.LENGTH_LONG,
+                ).show()
+                if (!ok) {
+                    selectedTab = 1
+                }
+            } finally {
+                unloadingActive = false
+            }
+        }
+    }
+
+    fun testConfiguredVisibility() {
+        if (visibilityTesting) return
+        val uid = visibilityUidInput.trim().toIntOrNull()?.takeIf { it > 0 }
+        if (uid == null) {
+            Toast.makeText(context, TEXT_VISIBILITY_UID_INVALID, Toast.LENGTH_LONG).show()
+            return
+        }
+        val path = normalizeHiddenPath(visibilityPathInput)
+        if (path == null) {
+            Toast.makeText(context, TEXT_INVALID_PATH, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        visibilityTesting = true
+        visibilityResult = null
+        scope.launch {
+            try {
+                visibilityResult = testHiddenPathVisibility(uid, path)
+                logs = getHiddenPathLogs()
+            } finally {
+                visibilityTesting = false
             }
         }
     }
 
     LaunchedEffect(Unit) {
         config = getHiddenPathConfig()
+        visibilityPathInput = config.targetPaths.firstOrNull().orEmpty()
+        visibilityUidInput = config.appPackages.firstNotNullOfOrNull { entry ->
+            entry.toIntOrNull()?.toString()
+        }.orEmpty()
         logs = getHiddenPathLogs()
         loading = false
     }
@@ -444,10 +494,30 @@ fun HiddenPathConfigScreen() {
                         templates = templates,
                         applying = applying,
                         unloadingActive = unloadingActive,
+                        visibilityUidInput = visibilityUidInput,
+                        visibilityPathInput = visibilityPathInput,
+                        visibilityTesting = visibilityTesting,
+                        visibilityResult = visibilityResult,
                         onPathInputChange = { pathInput = it },
                         onAppInputChange = { appInput = it },
                         onTemplateNameChange = { templateName = it },
                         onConfigChange = { config = it },
+                        onVisibilityUidChange = {
+                            visibilityUidInput = it.filter(Char::isDigit).take(10)
+                            visibilityResult = null
+                        },
+                        onVisibilityPathChange = {
+                            visibilityPathInput = it
+                            visibilityResult = null
+                        },
+                        onUseVisibilityConfig = {
+                            visibilityPathInput = config.targetPaths.firstOrNull().orEmpty()
+                            visibilityUidInput = config.appPackages.firstNotNullOfOrNull { entry ->
+                                entry.toIntOrNull()?.toString()
+                            }.orEmpty()
+                            visibilityResult = null
+                        },
+                        onTestVisibility = ::testConfiguredVisibility,
                         onImportConfig = {
                             importLauncher.launch(arrayOf(HIDDEN_PATH_CONFIG_MIME_TYPE, "text/*", "*/*"))
                         },
@@ -518,10 +588,18 @@ private fun HiddenPathConfigTab(
     templates: List<HiddenPathTemplate>,
     applying: Boolean,
     unloadingActive: Boolean,
+    visibilityUidInput: String,
+    visibilityPathInput: String,
+    visibilityTesting: Boolean,
+    visibilityResult: HiddenPathVisibilityResult?,
     onPathInputChange: (String) -> Unit,
     onAppInputChange: (String) -> Unit,
     onTemplateNameChange: (String) -> Unit,
     onConfigChange: (HiddenPathConfigState) -> Unit,
+    onVisibilityUidChange: (String) -> Unit,
+    onVisibilityPathChange: (String) -> Unit,
+    onUseVisibilityConfig: () -> Unit,
+    onTestVisibility: () -> Unit,
     onImportConfig: () -> Unit,
     onExportConfig: () -> Unit,
     onSaveTemplate: () -> Unit,
@@ -547,6 +625,19 @@ private fun HiddenPathConfigTab(
             config = config,
             unloadingActive = unloadingActive,
             onUnloadActive = onUnloadActive,
+        )
+
+        VisibilityProbeSection(
+            uidInput = visibilityUidInput,
+            pathInput = visibilityPathInput,
+            testing = visibilityTesting,
+            result = visibilityResult,
+            hasCurrentConfig = config.targetPaths.isNotEmpty() &&
+                config.appPackages.any { it.toIntOrNull() != null },
+            onUidChange = onVisibilityUidChange,
+            onPathChange = onVisibilityPathChange,
+            onUseCurrentConfig = onUseVisibilityConfig,
+            onTest = onTestVisibility,
         )
 
         ConfigSection(
@@ -676,6 +767,147 @@ private fun HiddenPathConfigTab(
             onSelectUid = onAddAppUid,
         )
     }
+}
+
+@Composable
+private fun VisibilityProbeSection(
+    uidInput: String,
+    pathInput: String,
+    testing: Boolean,
+    result: HiddenPathVisibilityResult?,
+    hasCurrentConfig: Boolean,
+    onUidChange: (String) -> Unit,
+    onPathChange: (String) -> Unit,
+    onUseCurrentConfig: () -> Unit,
+    onTest: () -> Unit,
+) {
+    ConfigSection(
+        title = TEXT_VISIBILITY_TEST,
+        summary = TEXT_VISIBILITY_TEST_SUMMARY,
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stacked = maxWidth < 380.dp
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VisibilityProbeFields(
+                        uidInput = uidInput,
+                        pathInput = pathInput,
+                        onUidChange = onUidChange,
+                        onPathChange = onPathChange,
+                        onTest = onTest,
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        modifier = Modifier.weight(0.35f),
+                        value = uidInput,
+                        onValueChange = onUidChange,
+                        label = { Text("UID") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next,
+                        ),
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.weight(0.65f),
+                        value = pathInput,
+                        onValueChange = onPathChange,
+                        label = { Text("\u8def\u5f84") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { onTest() }),
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                enabled = hasCurrentConfig && !testing,
+                onClick = onUseCurrentConfig,
+            ) {
+                Text(TEXT_VISIBILITY_USE_CONFIG)
+            }
+            Button(
+                modifier = Modifier.weight(1f),
+                enabled = !testing && uidInput.isNotBlank() && pathInput.isNotBlank(),
+                onClick = onTest,
+            ) {
+                if (testing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Rounded.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(TEXT_VISIBILITY_TEST_ACTION)
+                }
+            }
+        }
+
+        result?.let { probe ->
+            HorizontalDivider()
+            val resultText = when (probe.status) {
+                "not_visible" -> "\u4e0d\u53ef\u89c1\uff1a\u6307\u5b9a UID \u7684\u9690\u85cf\u5df2\u751f\u6548"
+                "visible" -> "\u4ecd\u53ef\u89c1\uff1a\u5f53\u524d\u9690\u85cf\u672a\u5bf9\u8be5 UID \u751f\u6548"
+                "missing" -> "\u76ee\u6807\u4e0d\u5b58\u5728\uff1aRoot \u89c6\u89d2\u4e5f\u627e\u4e0d\u5230\u8be5\u8def\u5f84"
+                else -> "\u63a2\u6d4b\u5931\u8d25\uff1a${probe.error.ifBlank { "\u672a\u77e5\u9519\u8bef" }}"
+            }
+            Text(
+                text = resultText,
+                style = MaterialTheme.typography.titleSmall,
+                color = when (probe.status) {
+                    "not_visible" -> MaterialTheme.colorScheme.primary
+                    "visible", "probe_failed" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                fontWeight = FontWeight.SemiBold,
+            )
+            StatusLine("UID", probe.uid.toString())
+            StatusLine("\u63a2\u6d4b\u8def\u5f84", probe.path)
+            StatusLine("pathmask", if (probe.moduleLoaded) "\u5df2\u52a0\u8f7d" else "\u672a\u52a0\u8f7d")
+            StatusLine("Root \u89c6\u89d2", if (probe.rootExists) "\u8def\u5f84\u5b58\u5728" else "\u8def\u5f84\u4e0d\u5b58\u5728")
+            StatusLine("resolved_count", probe.resolvedCount.ifBlank { "-" })
+        }
+    }
+}
+
+@Composable
+private fun VisibilityProbeFields(
+    uidInput: String,
+    pathInput: String,
+    onUidChange: (String) -> Unit,
+    onPathChange: (String) -> Unit,
+    onTest: () -> Unit,
+) {
+    OutlinedTextField(
+        modifier = Modifier.fillMaxWidth(),
+        value = uidInput,
+        onValueChange = onUidChange,
+        label = { Text("Android UID") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Next,
+        ),
+    )
+    OutlinedTextField(
+        modifier = Modifier.fillMaxWidth(),
+        value = pathInput,
+        onValueChange = onPathChange,
+        label = { Text("\u63a2\u6d4b\u8def\u5f84") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onTest() }),
+    )
 }
 
 @Composable
@@ -1605,8 +1837,9 @@ private fun sanitizeHiddenPathConfig(config: HiddenPathConfigState): HiddenPathC
 
 private fun normalizeHiddenPath(rawPath: String): String? {
     val path = rawPath.trim().trimEnd('/').ifEmpty { rawPath.trim() }
+    val hasTraversalSegment = path.split('/').any { segment -> segment == "." || segment == ".." }
     if (
-        path.startsWith("/") &&
+        path.startsWith("/") && path != "/" && !hasTraversalSegment &&
         !path.contains(",") &&
         !path.contains('\u0000') &&
         !path.contains('"') &&

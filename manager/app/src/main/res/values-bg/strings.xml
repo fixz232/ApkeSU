@@ -73,7 +73,6 @@
     <string name="module_update">Актуализиране</string>
     <string name="module_downloading">Изтегляне на модул: %s</string>
     <string name="module_start_downloading">Започни изтегляне: %s</string>
-    <string name="new_version_available">Нова версия %s е налична, натисни да актуализирате!</string>
     <string name="launch_app">Стартирай</string>
     <string name="force_stop_app">Принудително спиране</string>
     <string name="restart_app">Радтартирай</string>
@@ -100,8 +99,6 @@
     <string name="app_profile_template_save_failed">Неуспешно запазване на шаблон</string>
     <string name="app_profile_template_import_empty">Клипборда е празен!</string>
     <string name="app_profile_affects_following_apps">Засегва следните приложения</string>
-    <string name="settings_check_update">Провери за актуализаций</string>
-    <string name="settings_check_update_summary">Автоматично провери за актуализаций когато отворите приложението.</string>
     <string name="settings_module_check_update">Провери за актуализаций на модулите</string>
     <string name="grant_root_failed">Неуспешно даване на root права!</string>
     <string name="action">Действие</string>
@@ -119,10 +116,8 @@
     <string name="select_file_tip">Препоръчва се образ на дял %1$s</string>
     <string name="select_kmi">Изберете KMI</string>
     <string name="settings_uninstall">Премахнете</string>
-    <string name="settings_uninstall_temporary">Премахнете временно</string>
     <string name="settings_uninstall_permanent">Премахнете завинаги</string>
     <string name="settings_restore_stock_image">Възстановяване на стоков .img фаил</string>
-    <string name="settings_uninstall_temporary_message">Временно премахнете ApkeSU, ще се върне в нормално състояние след следващото рестартиране.</string>
     <string name="settings_uninstall_permanent_message">Премахване на ApkeSU (root и всички модули) напълно, завинаги.</string>
     <string name="settings_restore_stock_image_message">Възстановете фабричното копие (ако съществува резервно копие), обикновено използвано преди софтуерна актуализация; ако трябва да премахнете ApkeSU, моля, използвайте „Премахване завинаги“.</string>
     <string name="flashing">Флашване</string>

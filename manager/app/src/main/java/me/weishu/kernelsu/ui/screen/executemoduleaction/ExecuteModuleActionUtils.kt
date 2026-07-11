@@ -137,12 +137,10 @@ private fun openLsposedManager(context: Context): Boolean {
         }
     }
 
-    val action = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        "android.telephony.action.SECRET_CODE"
-    } else {
-        "android.provider.Telephony.SECRET_CODE"
-    }
-    val secretCodeIntent = Intent(action, Uri.parse("android_secret_code://5776733")).apply {
+    val secretCodeIntent = Intent(
+        "android.telephony.action.SECRET_CODE",
+        Uri.parse("android_secret_code://5776733")
+    ).apply {
         setPackage("android")
         addFlags(flags)
     }

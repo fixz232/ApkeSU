@@ -35,24 +35,29 @@ class SuperUserRepositoryImpl : SuperUserRepository {
     override suspend fun getAppList(): Result<Pair<List<AppInfo>, List<Int>>> = withContext(Dispatchers.IO) {
         runCatching {
             val start = SystemClock.elapsedRealtime()
+            val rootResult = runCatching {
+                withTimeout(ROOT_APP_LIST_TIMEOUT_MILLIS) {
+                    getAppListFromKsuService()
+                }
+            }.onFailure {
+                Log.w(TAG, "root package query failed, falling back to current user", it)
+            }.getOrNull()
+
+            if (rootResult != null && rootResult.first.isNotEmpty()) {
+                return@runCatching rootResult
+            }
+
             val allowedUids = getAllowListUids()
             val localPackages = getInstalledPackagesLocal(0)
             val localApps = localPackages.mapNotNull { packageInfo ->
                 parseAppInfo(packageInfo, allowedUids)
             }
-
-            if (localApps.isNotEmpty()) {
-                Log.i(
-                    TAG,
-                    "load local cost: ${SystemClock.elapsedRealtime() - start}, packages: ${localApps.size}, allowed: ${allowedUids.size}"
-                )
-                return@runCatching localApps to listOf(0)
-            }
-
-            Log.w(TAG, "local package list is empty, falling back to KsuService")
-            withTimeout(ROOT_APP_LIST_TIMEOUT_MILLIS) {
-                getAppListFromKsuService()
-            }
+            Log.i(
+                TAG,
+                "load local fallback cost: ${SystemClock.elapsedRealtime() - start}, " +
+                    "packages: ${localApps.size}, allowed: ${allowedUids.size}"
+            )
+            localApps to listOf(0)
         }
     }
 

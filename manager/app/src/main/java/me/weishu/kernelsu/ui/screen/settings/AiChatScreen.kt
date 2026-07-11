@@ -60,6 +60,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,12 +70,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
@@ -98,6 +101,7 @@ import kotlin.math.max
 @Composable
 fun AiChatScreen() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     val prefs = remember {
@@ -127,7 +131,10 @@ fun AiChatScreen() {
     var testingApi by rememberSaveable { mutableStateOf(false) }
     var loadingModules by rememberSaveable { mutableStateOf(false) }
     var activeCall by remember { mutableStateOf<Call?>(null) }
-    var nextMessageId by remember { mutableStateOf(1L) }
+    var activeAssistantId by remember { mutableStateOf<Long?>(null) }
+    var requestGeneration by remember { mutableLongStateOf(0L) }
+    var nextMessageId by remember { mutableLongStateOf(1L) }
+    var historyLoaded by remember { mutableStateOf(false) }
     val messages = remember { mutableStateListOf<AiMessage>() }
     val pendingAttachments = remember { mutableStateListOf<AiAttachment>() }
     val listState = rememberLazyListState()
@@ -137,9 +144,12 @@ fun AiChatScreen() {
         messages.clear()
         messages.addAll(restored)
         nextMessageId = (restored.maxOfOrNull { it.id } ?: 0L) + 1L
+        historyLoaded = true
     }
 
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
+    LaunchedEffect(historyLoaded, messages.size, messages.lastOrNull()?.text) {
+        if (!historyLoaded) return@LaunchedEffect
+        delay(HISTORY_SAVE_DEBOUNCE_MS)
         saveAiChatHistory(prefs, messages)
     }
 
@@ -184,8 +194,16 @@ fun AiChatScreen() {
     }
 
     fun stopGeneration() {
+        requestGeneration += 1L
         activeCall?.cancel()
         activeCall = null
+        activeAssistantId?.let { id ->
+            val current = messages.firstOrNull { it.id == id }
+            if (current?.text == resources.getString(R.string.ai_chat_generating)) {
+                updateMessage(id, resources.getString(R.string.ai_chat_stopped))
+            }
+        }
+        activeAssistantId = null
         sending = false
     }
 
@@ -208,29 +226,43 @@ fun AiChatScreen() {
         input = ""
         pendingAttachments.clear()
         sending = true
+        val generation = requestGeneration + 1L
+        requestGeneration = generation
         scope.launch {
             var streamedText = ""
-            val assistantId = addMessage(AiRole.Assistant, context.getString(R.string.ai_chat_generating))
+            val assistantId = addMessage(AiRole.Assistant, resources.getString(R.string.ai_chat_generating))
+            activeAssistantId = assistantId
             val result = runCatching {
                 requestAiChatStream(
                     config = config,
                     messages = messages.filterNot { it.id == assistantId },
-                    onCall = { call -> scope.launch { activeCall = call } },
+                    onCall = { call ->
+                        withContext(Dispatchers.Main.immediate) {
+                            if (generation == requestGeneration) {
+                                activeCall = call
+                            } else {
+                                call.cancel()
+                            }
+                        }
+                    },
                     onDelta = { delta ->
-                        scope.launch {
-                            streamedText += delta
-                            updateMessage(assistantId, streamedText)
+                        withContext(Dispatchers.Main.immediate) {
+                            if (generation == requestGeneration) {
+                                streamedText += delta
+                                updateMessage(assistantId, streamedText)
+                            }
                         }
                     },
                 )
             }
+            if (generation != requestGeneration) return@launch
             result.onSuccess { reply ->
-                updateMessage(assistantId, reply.ifBlank { streamedText.ifBlank { context.getString(R.string.ai_chat_empty_response) } })
+                updateMessage(assistantId, reply.ifBlank { streamedText.ifBlank { resources.getString(R.string.ai_chat_empty_response) } })
             }.onFailure { error ->
                 if (streamedText.isBlank()) {
                     updateMessage(
                         assistantId,
-                        context.getString(R.string.ai_chat_request_failed, error.message ?: error.javaClass.simpleName)
+                        resources.getString(R.string.ai_chat_request_failed, error.message ?: error.javaClass.simpleName)
                     )
                     val index = messages.indexOfFirst { it.id == assistantId }
                     if (index >= 0) {
@@ -239,6 +271,7 @@ fun AiChatScreen() {
                 }
             }
             activeCall = null
+            activeAssistantId = null
             sending = false
         }
     }
@@ -424,7 +457,7 @@ fun AiChatScreen() {
                         }.onFailure { error ->
                             Toast.makeText(
                                 context,
-                                context.getString(
+                                resources.getString(
                                     R.string.ai_chat_modules_failed,
                                     error.message ?: error.javaClass.simpleName,
                                 ),
@@ -815,8 +848,8 @@ private fun AttachmentChips(attachments: List<AiAttachment>) {
 private suspend fun requestAiChatStream(
     config: AiApiConfig,
     messages: List<AiMessage>,
-    onCall: (Call) -> Unit,
-    onDelta: (String) -> Unit,
+    onCall: suspend (Call) -> Unit,
+    onDelta: suspend (String) -> Unit,
 ): String = withContext(Dispatchers.IO) {
     val body = buildChatRequestBody(config, messages, stream = true).toString()
     val requestBuilder = Request.Builder()
@@ -968,7 +1001,10 @@ private fun parseAiResponse(body: String): String {
     return content.toString().ifBlank { body.take(MAX_ERROR_BODY_CHARS) }
 }
 
-private fun parseAiStreamResponse(response: okhttp3.Response, onDelta: (String) -> Unit): String {
+private suspend fun parseAiStreamResponse(
+    response: okhttp3.Response,
+    onDelta: suspend (String) -> Unit,
+): String {
     val builder = StringBuilder()
     val source = response.body.source()
     while (!source.exhausted()) {
@@ -1242,4 +1278,5 @@ private const val MAX_TEXT_ATTACHMENT_CHARS = 80_000
 private const val MAX_IMAGE_ATTACHMENT_BYTES = 3 * 1024 * 1024
 private const val MAX_ERROR_BODY_CHARS = 4000
 private const val MAX_MODULE_DESCRIPTION_CHARS = 240
+private const val HISTORY_SAVE_DEBOUNCE_MS = 400L
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()

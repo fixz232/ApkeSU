@@ -163,6 +163,16 @@ pub fn register_default_manager_appid() {
     register_manager_appid(resolve_manager_appid(defs::DEFAULT_MANAGER_PACKAGE, None));
 }
 
+pub fn register_manager(package_name: &str, manager_uid: Option<u32>) -> Result<()> {
+    ensure_this_manager_package(package_name)?;
+    let appid = resolve_manager_appid(package_name, manager_uid)
+        .context("unable to resolve the ApkeSU manager appid")?;
+    ksucalls::set_manager_appid(appid)
+        .with_context(|| format!("failed to register manager appid {appid}"))?;
+    println!("{appid}");
+    Ok(())
+}
+
 pub fn run(
     package_name: &str,
     manager_uid: Option<u32>,

@@ -70,7 +70,6 @@
     <string name="force_stop_app">Prisilna ustavitev</string>
     <string name="profile_selinux_rules">Pravila</string>
     <string name="module_start_downloading">Začni z nalaganjem: %s</string>
-    <string name="new_version_available">Na voljo je nova verzija: %s, kliknite za nadgradnjo</string>
     <string name="failed_to_update_sepolicy">Napaka pri posodobitvi SELinux pravil za: %s</string>
     <string name="home_not_installed">Ni nameščeno</string>
     <string name="selinux_status_enforcing">Enforcing</string>

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+#include <mutex>
 #include <unistd.h>
 #include <utility>
 #include <android/log.h>
@@ -16,13 +17,13 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
-#include <unistd.h>
 #include <climits>
 #include <fcntl.h>
 #include <cerrno>
 #include "ksu.h"
 
 static int fd = -1;
+static std::mutex fd_mutex;
 
 static inline void set_fd_recv_timeout(int socket_fd) {
     struct timeval timeout = {};
@@ -194,6 +195,7 @@ static int ensure_driver_fd(bool allow_install) {
 
 template<typename... Args>
 static int ksuctl_impl(bool allow_install, unsigned long op, Args &&... args) {
+    std::lock_guard<std::mutex> lock(fd_mutex);
     int driver_fd = ensure_driver_fd(allow_install);
     if (driver_fd < 0) {
         errno = ENODEV;
@@ -226,8 +228,10 @@ static int ksuctl_scan_only(unsigned long op, Args &&... args) {
 }
 
 static struct ksu_get_info_cmd g_version {};
+static std::mutex info_mutex;
 
 struct ksu_get_info_cmd get_info() {
+    std::lock_guard<std::mutex> lock(info_mutex);
     if (!g_version.version) {
         if (ksuctl(KSU_IOCTL_GET_INFO, &g_version) < 0) {
             auto legacy = legacy_get_info();
@@ -241,7 +245,10 @@ struct ksu_get_info_cmd get_info() {
 }
 
 void refresh_info() {
-    g_version = {};
+    {
+        std::lock_guard<std::mutex> lock(info_mutex);
+        g_version = {};
+    }
     get_info();
 }
 

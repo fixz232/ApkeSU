@@ -70,7 +70,6 @@
     <string name="module_update">Güncelle</string>
     <string name="module_downloading">Modül indiriliyor: %s</string>
     <string name="module_start_downloading">İndirme başladı: %s</string>
-    <string name="new_version_available">Yeni sürüm: %s kullanılabilir, güncellemek için tıklayın!</string>
     <string name="launch_app">Uygulamayı başlat</string>
     <string name="force_stop_app">Uygulamayı durmaya zorla</string>
     <string name="restart_app">Uygulamayı yeniden başlat</string>
@@ -95,8 +94,6 @@
     <string name="app_profile_template_import_success">Başarıyla içe aktarıldı</string>
     <string name="app_profile_template_save_failed">Şablon kaydedilemedi</string>
     <string name="app_profile_template_import_empty">Pano boş!</string>
-    <string name="settings_check_update">Güncellemeleri kontrol et</string>
-    <string name="settings_check_update_summary">Uygulamayı açarken güncellemeleri otomatik denetle.</string>
     <string name="grant_root_failed">Root izni verilemedi!</string>
     <string name="open">Aç</string>
     <string name="enable_web_debugging">WebView hata ayıklaması</string>
@@ -110,10 +107,8 @@
     <string name="install_next">Sonraki</string>
     <string name="select_kmi">KMI seçin</string>
     <string name="select_file_tip">%1$s bölüm imajı önerilir</string>
-    <string name="settings_uninstall_temporary">Geçici olarak kaldır</string>
     <string name="settings_uninstall_permanent">Kalıcı olarak kaldır</string>
     <string name="settings_restore_stock_image">Stok imajı geri yükle</string>
-    <string name="settings_uninstall_temporary_message">ApkeSU\'yu geçici olarak kaldır, bir sonraki yeniden başlatmadan sonra orijinal durumuna geri yükle.</string>
     <string name="settings_uninstall">Kaldır</string>
     <string name="settings_uninstall_permanent_message">ApkeSU\'yu (root ve tüm modülleri) tamamen ve kalıcı olarak kaldırır</string>
     <string name="settings_restore_stock_image_message">Stok fabrika imajını geri yükler (eğer yedek varsa), bu işlem genellikle OTA güncellemesinden önce yapılır; ApkeSU\'yu kaldırmanız gerekiyorsa lütfen \"Kalıcı olarak kaldır\" seçeneğini kullanın.</string>

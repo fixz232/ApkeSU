@@ -50,7 +50,8 @@ fun SuperUserPager(
     val onToggleShowOnlyPrimaryUserApps: () -> Unit = {
         viewModel.toggleShowOnlyPrimaryUserApps()
     }
-    val onOpenProfile: (GroupedApps) -> Unit = { group ->
+    val onOpenProfile: (GroupedApps) -> Unit = fun(group: GroupedApps) {
+        if (navigator.current() is Route.AppProfile) return
         navigator.push(Route.AppProfile(group.uid))
         viewModel.markNeedRefresh()
     }

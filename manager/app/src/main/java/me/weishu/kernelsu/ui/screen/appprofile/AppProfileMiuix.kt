@@ -64,7 +64,6 @@ import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.listAppProfileTemplates
 import me.weishu.kernelsu.ui.util.ownerNameForUid
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
-import me.weishu.kernelsu.ui.util.setSepolicy
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -344,7 +343,7 @@ private fun AppProfileInner(
                         if (templates.isNotEmpty()) {
                             val selected = profile.rootTemplate ?: templates[0]
                             val info = me.weishu.kernelsu.ui.viewmodel.getTemplateInfoById(selected)
-                            if (info != null && setSepolicy(selected, info.rules.joinToString("\n"))) {
+                            if (info != null) {
                                 onProfileChange(
                                     profile.copy(
                                         rootUseDefault = false,
@@ -355,13 +354,6 @@ private fun AppProfileInner(
                                         capabilities = info.capabilities,
                                         context = info.context,
                                         namespace = info.namespace,
-                                    )
-                                )
-                            } else if (profile.rootTemplate != selected || profile.rootUseDefault) {
-                                onProfileChange(
-                                    profile.copy(
-                                        rootUseDefault = false,
-                                        rootTemplate = selected
                                     )
                                 )
                             }

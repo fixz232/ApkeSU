@@ -271,10 +271,18 @@ private fun SelectInstallMethod(
             content = state.installMethodOptions.map { option ->
                 {
                     val selected = option.javaClass == state.installMethod?.javaClass
+                    val requiresRoot = option == InstallMethod.DirectInstall ||
+                            option == InstallMethod.DirectInstallToInactiveSlot
+                    val available = !requiresRoot || state.rootAvailable
                     SegmentedRadioItem(
                         title = stringResource(option.label),
-                        summary = if (selected) state.installMethod.summary ?: option.summary else option.summary,
+                        summary = if (available) {
+                            if (selected) state.installMethod.summary ?: option.summary else option.summary
+                        } else {
+                            stringResource(R.string.direct_install_root_required)
+                        },
                         selected = selected,
+                        enabled = available,
                         onClick = { onClick(option) }
                     )
                 }

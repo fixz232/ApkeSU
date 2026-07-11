@@ -66,7 +66,6 @@
     <string name="profile_selinux_rules">กฎ</string>
     <string name="module_downloading">กำลังดาวน์โหลดโมดูล: %s</string>
     <string name="module_start_downloading">กำลังเริ่มดาวน์โหลด: %s</string>
-    <string name="new_version_available">เวอร์ชัน %s พร้อมใช้งาน คลิกเพื่ออัปเกรด !</string>
     <string name="force_stop_app">บังคับหยุด</string>
     <string name="restart_app">รีสตาร์ท</string>
     <string name="settings_umount_modules_default_summary">หากเปิดใช้งานค่าเริ่มต้นโดยทั่วไปสำหรับ \"Umount โมดูล\" ในโปรไฟล์แอป จะเป็นการลบการแก้ไขโมดูลทั้งหมดในระบบสำหรับแอปพลิเคชันที่ไม่มีการตั้งค่าโปรไฟล์</string>
@@ -95,8 +94,6 @@
     <string name="app_profile_template_view">ดูเทมเพลต</string>
     <string name="open">เปิด</string>
     <string name="grant_root_failed">ไม่สามารถให้สิทธิ์รูทได้!</string>
-    <string name="settings_check_update">ตรวจสอบการอัปเดต</string>
-    <string name="settings_check_update_summary">ตรวจสอบการอัปเดตโดยอัตโนมัติเมื่อเปิดแอป</string>
     <string name="enable_web_debugging">การแก้ไขข้อบกพร่อง WebView</string>
     <string name="select_kmi">เลือก KMI</string>
     <string name="install_next">ต่อไป</string>
@@ -110,13 +107,11 @@
 \nดำเนินการต่อหรือไม่?</string>
     <string name="settings_uninstall_permanent">ถอนการติดตั้งถาวร</string>
     <string name="settings_restore_stock_image">เรียกคืนอิมเมจดั้งเดิม</string>
-    <string name="settings_uninstall_temporary_message">ถอนการติดตั้ง ApkeSU ชั่วคราว จะคืนค่าเป็นสถานะดั้งเดิมหลังจากรีบูตในครั้งถัดไป</string>
     <string name="flashing">กำลังแฟลช</string>
     <string name="flash_success">แฟลชสำเร็จ</string>
     <string name="flash_failed">แฟลชล้มเหลว</string>
     <string name="selected_lkm">เลือก LKM: %s</string>
     <string name="settings_uninstall">ถอนการติดตั้ง</string>
-    <string name="settings_uninstall_temporary">ถอนการติดตั้งชั่วคราว</string>
     <string name="settings_uninstall_permanent_message">การถอนการติดตั้ง ApkeSU (การรูทและโมดูลทั้งหมด) อย่างสมบูรณ์</string>
     <string name="settings_restore_stock_image_message">คืนค่าโรงงานอิมเมจดั้งเดิม (หากมีข้อมูลสำรอง) ส่วนใหญ่มักใช้ก่อนทำการ OTA ซึ่งหากคุณต้องการถอนการติดตั้ง ApkeSU โปรดใช้ \"ถอนการติดตั้งถาวร\"</string>
     <string name="save_log">บันทึก logs</string>

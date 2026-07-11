@@ -424,6 +424,8 @@ static int selinux_hide_feature_set(u64 value)
             ret = ksu_selinux_hide_enable();
             if (!ret) {
                 ksu_selinux_hide_running = true;
+            } else if (ret != -EAGAIN) {
+                ksu_selinux_hide_enabled = false;
             }
         }
     } else {

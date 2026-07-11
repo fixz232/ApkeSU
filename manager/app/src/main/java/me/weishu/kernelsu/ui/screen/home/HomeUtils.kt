@@ -80,7 +80,13 @@ fun homeWarningMessages(state: HomeUiState): List<String> = buildList {
         }
         add(message)
     }
+    if (state.rootRuntimeState == RootRuntimeState.VersionMismatch &&
+        !state.showVersionMismatchWarning &&
+        !state.showRequireKernelWarning
+    ) {
+        add(stringResource(R.string.root_runtime_version_warning))
+    }
     if (state.showRootWarning) {
-        add(stringResource(id = R.string.grant_root_failed))
+        add(stringResource(id = R.string.root_daemon_warning))
     }
 }

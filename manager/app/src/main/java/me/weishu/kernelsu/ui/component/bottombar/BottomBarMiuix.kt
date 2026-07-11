@@ -65,9 +65,6 @@ fun BottomBarMiuix(
     backdrop: Backdrop?,
     modifier: Modifier,
 ) {
-    val fullFeatured = hasFullFeaturedManager()
-    if (!fullFeatured) return
-
     val mainState = LocalMainPagerState.current
     val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current

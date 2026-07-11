@@ -172,8 +172,8 @@ private fun InstallInputPanel(
 
 @Composable
 private fun InstallMethodOptionsCard(
+    state: InstallUiState,
     options: List<InstallMethod>,
-    selectedMethod: InstallMethod?,
     onClick: (InstallMethod) -> Unit,
 ) {
     if (options.isEmpty()) return
@@ -187,13 +187,22 @@ private fun InstallMethodOptionsCard(
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
             options.forEach { option ->
                 val interactionSource = remember { MutableInteractionSource() }
-                val selected = option.javaClass == selectedMethod?.javaClass
+                val selected = option.javaClass == state.installMethod?.javaClass
+                val requiresRoot = option == InstallMethod.DirectInstall ||
+                        option == InstallMethod.DirectInstallToInactiveSlot
+                val available = !requiresRoot || state.rootAvailable
+                val summary = if (available) {
+                    if (selected) state.installMethod.summary ?: option.summary else option.summary
+                } else {
+                    stringResource(R.string.direct_install_root_required)
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .toggleable(
                             value = selected,
+                            enabled = available,
                             onValueChange = { onClick(option) },
                             role = Role.RadioButton,
                             indication = LocalIndication.current,
@@ -202,8 +211,9 @@ private fun InstallMethodOptionsCard(
                 ) {
                     CheckboxPreference(
                         title = stringResource(id = option.label),
-                        summary = if (selected) selectedMethod.summary ?: option.summary else option.summary,
+                        summary = summary,
                         checked = selected,
+                        enabled = available,
                         onCheckedChange = { onClick(option) },
                     )
                 }
@@ -467,8 +477,8 @@ private fun SelectInstallMethod(
             )
         }
         InstallMethodOptionsCard(
+            state = state,
             options = otherOptions,
-            selectedMethod = state.installMethod,
             onClick = onClick,
         )
     }

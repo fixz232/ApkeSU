@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,16 +27,25 @@ import me.weishu.kernelsu.data.repository.SHOW_VERSION_MISMATCH_WARNING_KEY
 import me.weishu.kernelsu.getKernelVersion
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.screen.home.HomeUiState
+import me.weishu.kernelsu.ui.screen.home.RootRuntimeState
 import me.weishu.kernelsu.ui.screen.home.SystemInfo
 import me.weishu.kernelsu.ui.screen.home.getManagerVersion
+import me.weishu.kernelsu.ui.util.apkeSuKernelModuleLoaded
 import me.weishu.kernelsu.ui.util.apkeSuRootAvailable
+import me.weishu.kernelsu.ui.util.collectRootDiagnosticInfo
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getModuleCount
+import me.weishu.kernelsu.ui.util.getInstalledKsudStatus
 import me.weishu.kernelsu.ui.util.getSELinuxStatusRaw
 import me.weishu.kernelsu.ui.util.getSuperuserCount
 import me.weishu.kernelsu.ui.util.isHiddenPathLkmMode
+import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.resolveDeviceName
 import me.weishu.kernelsu.ui.util.rootAvailable
+import java.util.concurrent.atomic.AtomicLong
+import java.text.DateFormat
+import java.util.Date
+import org.json.JSONObject
 
 class HomeViewModel(
     private val repo: SettingsRepository = SettingsRepositoryImpl()
@@ -61,6 +71,12 @@ class HomeViewModel(
 
     private val _uiState = MutableStateFlow(fallbackState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private var refreshJob: Job? = null
+    private val refreshGeneration = AtomicLong(0L)
+    private val _diagnosticReport = MutableStateFlow<String?>(null)
+    val diagnosticReport: StateFlow<String?> = _diagnosticReport.asStateFlow()
+    private val _diagnosticRunning = MutableStateFlow(false)
+    val diagnosticRunning: StateFlow<Boolean> = _diagnosticRunning.asStateFlow()
 
     init {
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -72,13 +88,39 @@ class HomeViewModel(
     }
 
     fun refresh() {
-        viewModelScope.launch {
+        val generation = refreshGeneration.incrementAndGet()
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             val baseState = withContext(Dispatchers.IO) {
                 runCatching { Natives.refreshInfo() }
                 buildStateSafely()
             }
-            _uiState.update { baseState }
+            if (generation == refreshGeneration.get()) {
+                _uiState.update { baseState }
+            }
         }
+    }
+
+    fun runRootDiagnostics() {
+        if (_diagnosticRunning.value) return
+        _diagnosticRunning.value = true
+        _diagnosticReport.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val info = collectRootDiagnosticInfo()
+                _diagnosticReport.value = buildDiagnosticReport(info)
+                refresh()
+            } catch (throwable: Throwable) {
+                Log.e(TAG, "root diagnostics failed", throwable)
+                _diagnosticReport.value = "Root \u8bca\u65ad\u5931\u8d25\n${throwable.message.orEmpty()}"
+            } finally {
+                _diagnosticRunning.value = false
+            }
+        }
+    }
+
+    fun dismissDiagnosticReport() {
+        _diagnosticReport.value = null
     }
 
     private fun buildStateSafely(): HomeUiState {
@@ -91,37 +133,62 @@ class HomeViewModel(
     private fun buildState(): HomeUiState {
         val kernelVersion = getKernelVersion()
         var isManager = runCatching { Natives.isManager }.getOrDefault(false)
-        val ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
-        val isKsuRootAvailable = ksuVersion != null ||
-                runCatching { apkeSuRootAvailable() }.getOrDefault(false)
-        if (!isManager && isKsuRootAvailable) {
+        var ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
+        var ksuDaemonRoot = runCatching { ksuRootAvailable() }.getOrDefault(false)
+        val driverConnected = ksuVersion != null ||
+            runCatching { apkeSuRootAvailable() }.getOrDefault(false)
+        val fallbackRoot = runCatching { rootAvailable() }.getOrDefault(false)
+        if (!isManager && driverConnected && fallbackRoot) {
             isManager = runCatching { ensureManagerRegistered() }.getOrDefault(false)
+            if (isManager) {
+                runCatching { Natives.refreshInfo() }
+                ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
+                ksuDaemonRoot = runCatching { ksuRootAvailable() }.getOrDefault(false)
+            }
         }
         val kernelUAPIVersion = ksuVersion?.let { runCatching { Natives.kernelUAPIVersion }.getOrNull() }
         val managerUAPIVersion = runCatching { Natives.managerUAPIVersion }.getOrDefault(0)
         val lkmMode = ksuVersion?.let {
             if (kernelVersion.isGKI()) runCatching { Natives.isLkmMode }.getOrNull() else null
         }
-        val isRootAvailable = isKsuRootAvailable || runCatching { rootAvailable() }.getOrDefault(false)
         val hiddenPathLkmMode = lkmMode == true &&
-            isRootAvailable &&
+            ksuDaemonRoot &&
             runCatching { isHiddenPathLkmMode() }.getOrDefault(false)
         val managerVersion = getManagerVersion(ksuApp)
+        val requiresNewKernel = isManager && runCatching { Natives.requireNewKernel() }.getOrDefault(false)
+        val uapiMismatch = isManager && runCatching { Natives.checkUAPIMismatch() }.getOrDefault(false)
+        val managerOlderThanDriver = ksuVersion?.let { managerVersion.versionCode < it.toLong() } == true
+        val installedKsud = if (isManager && ksuDaemonRoot) {
+            runCatching { getInstalledKsudStatus() }.getOrNull()
+        } else {
+            null
+        }
+        val ksudVersionMismatch = installedKsud?.let {
+            !it.present || it.versionCode != BuildConfig.VERSION_CODE
+        } == true
+        val rootRuntimeState = RootRuntimeState.resolve(
+            driverConnected = driverConnected,
+            managerRegistered = isManager,
+            daemonRootAvailable = ksuDaemonRoot,
+            versionMismatch = requiresNewKernel || uapiMismatch ||
+                managerOlderThanDriver || ksudVersionMismatch,
+        )
 
         return HomeUiState(
             kernelVersion = kernelVersion,
             ksuVersion = ksuVersion,
-            isKernelActive = ksuVersion != null || isKsuRootAvailable,
+            isKernelActive = driverConnected,
             lkmMode = lkmMode,
             hiddenPathLkmMode = hiddenPathLkmMode,
             isManager = isManager,
             isManagerPrBuild = BuildConfig.IS_PR_BUILD,
             isKernelPrBuild = runCatching { Natives.isPrBuild }.getOrDefault(false),
-            requiresNewKernel = isManager && runCatching { Natives.requireNewKernel() }.getOrDefault(false),
-            uapiMismatch = isManager && runCatching { Natives.checkUAPIMismatch() }.getOrDefault(false),
+            requiresNewKernel = requiresNewKernel,
+            uapiMismatch = uapiMismatch,
             kernelUAPIVersion = kernelUAPIVersion,
             managerUAPIVersion = managerUAPIVersion,
-            isRootAvailable = isRootAvailable,
+            isRootAvailable = ksuDaemonRoot,
+            rootRuntimeState = rootRuntimeState,
             isSafeMode = runCatching { Natives.isSafeMode }.getOrDefault(false),
             isLateLoadMode = runCatching { Natives.isLateLoadMode }.getOrDefault(false),
             currentManagerVersionCode = managerVersion.versionCode,
@@ -133,7 +200,7 @@ class HomeViewModel(
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0),
             systemInfo = SystemInfo(
                 kernelVersion = runCatching { Os.uname().release }.getOrDefault("unknown"),
-                managerVersion = "${managerVersion.versionName} (${managerVersion.versionCode}-${managerUAPIVersion})",
+                managerVersion = "${managerVersion.versionName} (${managerVersion.versionCode})",
                 deviceModel = runCatching { resolveDeviceName() }.getOrDefault(Build.MODEL),
                 fingerprint = Build.FINGERPRINT,
                 selinuxStatus = runCatching { getSELinuxStatusRaw() }.getOrDefault("unknown"),
@@ -147,18 +214,30 @@ class HomeViewModel(
     private fun fallbackState(): HomeUiState {
         val managerVersion = runCatching { getManagerVersion(ksuApp) }.getOrNull()
         val managerUAPIVersion = runCatching { Natives.managerUAPIVersion }.getOrDefault(0)
+        val ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
+        val isKernelActive = ksuVersion != null || apkeSuKernelModuleLoaded()
+        val isManager = isKernelActive && runCatching { Natives.isManager }.getOrDefault(false)
+        val ksuDaemonRoot = isKernelActive && runCatching { ksuRootAvailable() }.getOrDefault(false)
+        val rootRuntimeState = RootRuntimeState.resolve(
+            driverConnected = isKernelActive,
+            managerRegistered = isManager,
+            daemonRootAvailable = ksuDaemonRoot,
+            versionMismatch = true,
+        )
         return HomeUiState(
             kernelVersion = runCatching { getKernelVersion() }.getOrElse { KernelVersion(0, 0, 0) },
-            ksuVersion = null,
+            ksuVersion = ksuVersion,
+            isKernelActive = isKernelActive,
             managerUAPIVersion = managerUAPIVersion,
             kernelUAPIVersion = null,
             lkmMode = null,
-            isManager = false,
+            isManager = isManager,
             isManagerPrBuild = BuildConfig.IS_PR_BUILD,
             isKernelPrBuild = false,
             requiresNewKernel = false,
             uapiMismatch = false,
-            isRootAvailable = false,
+            isRootAvailable = ksuDaemonRoot,
+            rootRuntimeState = rootRuntimeState,
             isSafeMode = false,
             isLateLoadMode = false,
             currentManagerVersionCode = managerVersion?.versionCode ?: BuildConfig.VERSION_CODE.toLong(),
@@ -172,7 +251,7 @@ class HomeViewModel(
             moduleCount = 0,
             systemInfo = SystemInfo(
                 kernelVersion = runCatching { Os.uname().release }.getOrDefault("unknown"),
-                managerVersion = "${managerVersion?.versionName ?: BuildConfig.VERSION_NAME} (${managerVersion?.versionCode ?: BuildConfig.VERSION_CODE}-$managerUAPIVersion)",
+                managerVersion = "${managerVersion?.versionName ?: BuildConfig.VERSION_NAME} (${managerVersion?.versionCode ?: BuildConfig.VERSION_CODE})",
                 deviceModel = Build.MODEL,
                 fingerprint = Build.FINGERPRINT,
                 selinuxStatus = "unknown",
@@ -180,6 +259,60 @@ class HomeViewModel(
             ),
         )
     }
+
+    private fun buildDiagnosticReport(info: me.weishu.kernelsu.ui.util.RootDiagnosticInfo): String {
+        val packagedCode = parseVersionCode(info.packagedKsudVersion)
+        val installedCode = parseVersionCode(info.installedKsudVersion)
+        val daemonVersionMatches = packagedCode != null && packagedCode == installedCode
+        val driverConnected = info.driverVersion > 0 || info.kernelModuleLoaded || info.ksuRootShell
+        val versionMismatch = (info.kernelUapi > 0 && info.kernelUapi != info.managerUapi) ||
+            (info.driverVersion > 0 && BuildConfig.VERSION_CODE < info.driverVersion) ||
+            !daemonVersionMatches
+        val state = RootRuntimeState.resolve(
+            driverConnected = driverConnected,
+            managerRegistered = info.managerRegistered,
+            daemonRootAvailable = info.ksuRootShell,
+            versionMismatch = versionMismatch,
+        )
+        val timestamp = DateFormat.getDateTimeInstance().format(Date())
+        val mode = when (info.workMode) {
+            "lkm" -> "LKM"
+            "gki" -> "GKI"
+            "late_load" -> "\u8d8a\u72f1\u6a21\u5f0f"
+            else -> "\u672a\u77e5"
+        }
+
+        return buildString {
+            appendLine("ApkeSU Root \u8bca\u65ad")
+            appendLine("\u65f6\u95f4: $timestamp")
+            appendLine("\u7ed3\u8bba: ${ksuApp.getString(state.labelRes)}")
+            appendLine()
+            appendLine("\u9a71\u52a8\u8fde\u63a5: ${healthLabel(info.driverVersion > 0 || info.kernelModuleLoaded || info.ksuRootShell)}")
+            appendLine("\u9a71\u52a8\u7248\u672c: ${info.driverVersion.takeIf { it > 0 } ?: "-"}")
+            appendLine("\u5185\u6838\u6a21\u5757\u6807\u8bb0: ${presentLabel(info.kernelModuleLoaded)}")
+            appendLine("ApkeSU Root Shell: ${healthLabel(info.ksuRootShell)}")
+            appendLine("\u5907\u7528 su Root Shell: ${presentLabel(info.fallbackRootShell)}")
+            appendLine("\u7ba1\u7406\u5668\u6ce8\u518c: ${healthLabel(info.managerRegistered)}")
+            appendLine("\u7ba1\u7406\u5668: ${info.managerPackage} (UID ${info.managerUid})")
+            appendLine("UAPI: manager=${info.managerUapi}, kernel=${info.kernelUapi}")
+            appendLine()
+            appendLine("APK \u5185\u7f6e ksud: ${info.packagedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
+            appendLine("\u5df2\u5b89\u88c5 ksud: ${info.installedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
+            appendLine("ksud \u7248\u672c\u4e00\u81f4: ${healthLabel(daemonVersionMatches)}")
+            appendLine("KMI: ${info.currentKmi.ifBlank { "-" }}")
+            appendLine("\u5f53\u524d\u69fd\u4f4d: ${info.currentSlot.ifBlank { "\u65e0\u69fd\u4f4d" }}")
+            appendLine("\u5de5\u4f5c\u6a21\u5f0f: $mode")
+            appendLine("\u9690\u85cf\u8def\u5f84 LKM: ${presentLabel(info.hiddenPathLkm)}")
+        }.trimEnd()
+    }
+
+    private fun parseVersionCode(raw: String): Int? {
+        return runCatching { JSONObject(raw).optString("versionCode").toIntOrNull() }.getOrNull()
+    }
+
+    private fun healthLabel(value: Boolean): String = if (value) "\u6b63\u5e38" else "\u5f02\u5e38"
+
+    private fun presentLabel(value: Boolean): String = if (value) "\u5b58\u5728" else "\u4e0d\u5b58\u5728"
 
     private companion object {
         const val TAG = "HomeViewModel"

@@ -71,7 +71,6 @@
     <string name="module_update">Обновить</string>
     <string name="module_downloading">Скачивание модуля: %s</string>
     <string name="module_start_downloading">Начало скачивания: %s</string>
-    <string name="new_version_available">Новая версия: %s доступна, нажмите чтобы скачать!</string>
     <string name="force_stop_app">Остановить принудительно</string>
     <string name="failed_to_update_sepolicy">Не удалось обновить правила SELinux для %s</string>
     <string name="launch_app">Запустить</string>
@@ -97,8 +96,6 @@
     <string name="app_profile_template_delete">Удалить</string>
     <string name="app_profile_template_import_empty">Буфер обмена пуст!</string>
     <string name="app_profile_template_view">Просмотр шаблона</string>
-    <string name="settings_check_update">Проверять наличие обновлений</string>
-    <string name="settings_check_update_summary">Автоматическая проверка обновлений при открытии приложения.</string>
     <string name="grant_root_failed">Не удалось выдать root!</string>
     <string name="open">Открыть</string>
     <string name="enable_web_debugging">Отладка WebView</string>
@@ -112,10 +109,8 @@
 \n Продолжить?</string>
     <string name="select_kmi">Выбрать KMI</string>
     <string name="select_file_tip">%1$s образ раздела рекомендуется</string>
-    <string name="settings_uninstall_temporary">Удалить на время</string>
     <string name="settings_uninstall_permanent_message">Удалить ApkeSU (root и все модули) полностью.</string>
     <string name="settings_uninstall_permanent">Удалить полностью</string>
-    <string name="settings_uninstall_temporary_message">Временно удалить ApkeSU, восстановить исходное состояние после следующей перезагрузки.</string>
     <string name="settings_uninstall">Удалить</string>
     <string name="settings_restore_stock_image">Восстановить сток образ</string>
     <string name="settings_restore_stock_image_message">Восстановить исходный заводской образ (если существует резервная копия), обычно используется перед OTA; если вам нужно удалить ApkeSU, используйте «Удалить полностью».</string>

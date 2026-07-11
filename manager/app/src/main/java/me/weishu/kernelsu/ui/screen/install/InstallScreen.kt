@@ -76,7 +76,10 @@ fun InstallScreen() {
     val isAbDevice by produceState(initialValue = false) {
         value = loadInstallState(false) { isAbDevice() }
     }
-    val isGkiDevice by produceState(initialValue = false) {
+    val initialIsGkiDevice = remember {
+        runCatching { getKernelVersion().isGKI() }.getOrDefault(false)
+    }
+    val isGkiDevice by produceState(initialValue = initialIsGkiDevice) {
         value = loadInstallState(false) { withContext(Dispatchers.IO) { getKernelVersion().isGKI() } }
     }
 
@@ -95,9 +98,9 @@ fun InstallScreen() {
             add(InstallMethod.SelectFile(summary = if (isGkiDevice) selectFileTip else selectFileTipNoGki))
             add(InstallMethod.HiddenPathLkmPatch(summary = hiddenPathLkmPatchSummary))
             if (rootAvailable) add(InstallMethod.AnyKernel())
-            if (rootAvailable && isGkiDevice) {
+            if (isGkiDevice) {
                 add(InstallMethod.DirectInstall)
-                if (isAbDevice) add(InstallMethod.DirectInstallToInactiveSlot)
+                if (rootAvailable && isAbDevice) add(InstallMethod.DirectInstallToInactiveSlot)
             }
         }
     }
@@ -269,7 +272,8 @@ fun InstallScreen() {
         is InstallMethod.SelectFile -> method.uri != null
         is InstallMethod.HiddenPathLkmPatch -> method.uri != null
         is InstallMethod.AnyKernel -> method.uri != null
-        else -> true
+        is InstallMethod.DirectInstall,
+        is InstallMethod.DirectInstallToInactiveSlot -> rootAvailable
     }
 
     val state = InstallUiState(
@@ -280,6 +284,7 @@ fun InstallScreen() {
         currentKmi = currentKmi,
         slotSuffix = slotSuffix,
         installMethodOptions = installMethodOptions,
+        rootAvailable = rootAvailable,
         canSelectPartition = displayPartitions.isNotEmpty() &&
                 (installMethod is InstallMethod.SelectFile ||
                         installMethod is InstallMethod.HiddenPathLkmPatch ||
@@ -292,7 +297,13 @@ fun InstallScreen() {
     )
     val actions = InstallScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
-        onSelectMethod = { method ->
+        onSelectMethod = onSelectMethod@{ method ->
+            if ((method is InstallMethod.DirectInstall ||
+                    method is InstallMethod.DirectInstallToInactiveSlot) && !rootAvailable
+            ) {
+                showMessage(resources.getString(R.string.direct_install_root_required))
+                return@onSelectMethod
+            }
             installMethod = method
             if (method !is InstallMethod.SelectFile && method !is InstallMethod.HiddenPathLkmPatch) {
                 selectedBootImageFileName = ""

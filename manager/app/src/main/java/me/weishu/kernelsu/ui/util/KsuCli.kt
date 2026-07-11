@@ -36,11 +36,13 @@ private const val TAG = "KsuCli"
 private const val SHELL_JOB_TIMEOUT_MILLIS = 10_000L
 private const val ANDROID_16_API = 36
 private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
+private val managerRegistrationLock = Any()
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
 const val KPATCH_NEXT_MODULE_ID = "KPatch-Next"
 const val BUILTIN_MOUNT_MODE_OVERLAY = "overlay"
 const val BUILTIN_MOUNT_MODE_MAGIC = "magic"
 const val BUILTIN_MOUNT_VARIANT_LITE = "lite"
+const val BUILTIN_MOUNT_VARIANT_FULL = "full"
 const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
 const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
 
@@ -65,6 +67,14 @@ data class BuiltinMountStatus(
     val defaultMode: String = BUILTIN_MOUNT_MODE_OVERLAY,
     val variant: String = BUILTIN_MOUNT_VARIANT_LITE,
     val webUi: Boolean = false,
+    val sourceUrl: String = "",
+    val archiveSha256: String = "",
+    val lkmCount: Int = 0,
+    val supportedKmis: List<String> = emptyList(),
+    val currentKmi: String = "",
+    val compatibility: String = "unknown",
+    val lkmPurpose: String = "",
+    val apkeSuRootDriver: Boolean = false,
 )
 
 data class KPatchNextStatus(
@@ -99,6 +109,40 @@ data class HiddenPathConfigState(
     val resolvedCount: String = "",
     val activeTargetPaths: String = "",
     val lastLog: String = "",
+)
+
+data class HiddenPathVisibilityResult(
+    val uid: Int = -1,
+    val path: String = "",
+    val status: String = "probe_failed",
+    val visible: Boolean = false,
+    val rootExists: Boolean = false,
+    val moduleLoaded: Boolean = false,
+    val resolvedCount: String = "",
+    val error: String = "",
+)
+
+data class RootDiagnosticInfo(
+    val driverVersion: Int = 0,
+    val kernelModuleLoaded: Boolean = false,
+    val ksuRootShell: Boolean = false,
+    val fallbackRootShell: Boolean = false,
+    val managerRegistered: Boolean = false,
+    val managerPackage: String = BuildConfig.APPLICATION_ID,
+    val managerUid: Int = -1,
+    val kernelUapi: Int = 0,
+    val managerUapi: Int = 0,
+    val packagedKsudVersion: String = "",
+    val installedKsudVersion: String = "",
+    val currentKmi: String = "",
+    val currentSlot: String = "",
+    val workMode: String = "unknown",
+    val hiddenPathLkm: Boolean = false,
+)
+
+data class InstalledKsudStatus(
+    val present: Boolean = false,
+    val versionCode: Int? = null,
 )
 
 data class RescueImageState(
@@ -312,10 +356,10 @@ fun execKsud(args: String, newShell: Boolean = false): Boolean {
 
     return if (newShell) {
         withNewRootShell {
-            ShellUtils.fastCmdResult(this, "${getKsuDaemonPath()} $args")
+            ShellUtils.fastCmdResult(this, "${shellQuote(getKsuDaemonPath())} $args")
         }
     } else {
-        ShellUtils.fastCmdResult(getRootShell(), "${getKsuDaemonPath()} $args")
+        ShellUtils.fastCmdResult(getRootShell(), "${shellQuote(getKsuDaemonPath())} $args")
     }
 }
 
@@ -350,7 +394,7 @@ suspend fun getBuiltinMountStatus(): BuiltinMountStatus = withContext(Dispatcher
             .takeIf { it == BUILTIN_MOUNT_MODE_OVERLAY || it == BUILTIN_MOUNT_MODE_MAGIC }
             ?: BUILTIN_MOUNT_MODE_OVERLAY
         val variant = obj.optString("variant", BUILTIN_MOUNT_VARIANT_LITE)
-            .takeIf { it == BUILTIN_MOUNT_VARIANT_LITE }
+            .takeIf { it == BUILTIN_MOUNT_VARIANT_LITE || it == BUILTIN_MOUNT_VARIANT_FULL }
             ?: BUILTIN_MOUNT_VARIANT_LITE
         BuiltinMountStatus(
             moduleId = obj.optString("moduleId", HYBRID_MOUNT_MODULE_ID),
@@ -364,6 +408,14 @@ suspend fun getBuiltinMountStatus(): BuiltinMountStatus = withContext(Dispatcher
             defaultMode = mode,
             variant = variant,
             webUi = obj.optBoolean("webui", false),
+            sourceUrl = obj.optString("sourceUrl", ""),
+            archiveSha256 = obj.optString("archiveSha256", ""),
+            lkmCount = obj.optInt("lkmCount", 0),
+            supportedKmis = obj.optJSONArray("supportedKmis").toStringList(),
+            currentKmi = obj.optString("currentKmi", ""),
+            compatibility = obj.optString("compatibility", "unknown"),
+            lkmPurpose = obj.optString("lkmPurpose", ""),
+            apkeSuRootDriver = obj.optBoolean("apkesuRootDriver", false),
         )
     }.getOrElse {
         Log.w(TAG, "builtin-mount status unavailable", it)
@@ -386,8 +438,13 @@ fun setBuiltinMountDefaultMode(mode: String): Boolean {
     return execKsud("builtin-mount set-default-mode $normalized", true)
 }
 
-fun setBuiltinMountVariant(@Suppress("UNUSED_PARAMETER") variant: String): Boolean {
-    return execKsud("builtin-mount set-variant $BUILTIN_MOUNT_VARIANT_LITE", true)
+fun setBuiltinMountVariant(variant: String): Boolean {
+    val normalized = if (variant == BUILTIN_MOUNT_VARIANT_FULL) {
+        BUILTIN_MOUNT_VARIANT_FULL
+    } else {
+        BUILTIN_MOUNT_VARIANT_LITE
+    }
+    return execKsud("builtin-mount set-variant $normalized", true)
 }
 
 suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO) {
@@ -614,6 +671,60 @@ fun unloadHiddenPathKernelPaths(): Boolean {
     return execKsud("pathmask unload", true)
 }
 
+suspend fun testHiddenPathVisibility(uid: Int, path: String): HiddenPathVisibilityResult =
+    withContext(Dispatchers.IO) {
+        if (uid < 0 || path.isBlank()) {
+            return@withContext HiddenPathVisibilityResult(error = "invalid UID or path")
+        }
+        if (shouldSkipUnsafeKsudCommand()) {
+            return@withContext HiddenPathVisibilityResult(error = "root shell unavailable")
+        }
+
+        runCatching {
+            val stdout = ArrayList<String>()
+            val stderr = ArrayList<String>()
+            val command = "${shellQuote(getKsuDaemonPath())} pathmask test-visibility " +
+                "--uid $uid --path ${shellQuote(path)}"
+            val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+                getRootShell().newJob()
+                    .add(command)
+                    .to(stdout, stderr)
+                    .exec()
+            }
+            if (result == null) {
+                KsuCli.reset()
+                return@runCatching HiddenPathVisibilityResult(
+                    uid = uid,
+                    path = path,
+                    error = "visibility probe timed out",
+                )
+            }
+            if (!result.isSuccess) {
+                return@runCatching HiddenPathVisibilityResult(
+                    uid = uid,
+                    path = path,
+                    error = stderr.joinToString("\n").ifBlank { "visibility probe failed" },
+                )
+            }
+
+            val obj = JSONObject(stdout.joinToString("\n"))
+            HiddenPathVisibilityResult(
+                uid = obj.optInt("uid", uid),
+                path = obj.optString("path", path),
+                status = obj.optString("status", "probe_failed"),
+                visible = obj.optBoolean("visible", false),
+                rootExists = obj.optBoolean("rootExists", false),
+                moduleLoaded = obj.optBoolean("moduleLoaded", false),
+                resolvedCount = obj.optString("resolvedCount", ""),
+                error = obj.optString("error", ""),
+            )
+        }.getOrElse {
+            Log.w(TAG, "pathmask visibility probe unavailable", it)
+            KsuCli.reset()
+            HiddenPathVisibilityResult(uid = uid, path = path, error = it.message.orEmpty())
+        }
+    }
+
 suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
         return@withContext RescueStatus()
@@ -824,11 +935,12 @@ suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatc
     valueLine.substringAfter("Value:").trim().toLongOrNull()
 }
 
-fun install() {
+fun install(): Boolean {
     val start = SystemClock.elapsedRealtime()
     val libadbroot = File(ksuApp.applicationInfo.nativeLibraryDir, "libadbroot.so").absolutePath
-    val result = execKsud("install --libadbroot $libadbroot", true)
+    val result = execKsud("install --libadbroot ${shellQuote(libadbroot)}", true)
     Log.w(TAG, "install result: $result, cost: ${SystemClock.elapsedRealtime() - start}ms")
+    return result
 }
 
 fun listModules(): String {
@@ -896,9 +1008,9 @@ fun getSuperuserCount(): Int {
 
 fun toggleModule(id: String, enable: Boolean): Boolean {
     val cmd = if (enable) {
-        "module enable $id"
+        "module enable ${shellQuote(id)}"
     } else {
-        "module disable $id"
+        "module disable ${shellQuote(id)}"
     }
     val result = execKsud(cmd, true)
     Log.i(TAG, "$cmd result: $result")
@@ -906,14 +1018,14 @@ fun toggleModule(id: String, enable: Boolean): Boolean {
 }
 
 fun undoUninstallModule(id: String): Boolean {
-    val cmd = "module undo-uninstall $id"
+    val cmd = "module undo-uninstall ${shellQuote(id)}"
     val result = execKsud(cmd, true)
     Log.i(TAG, "undo uninstall module $id result: $result")
     return result
 }
 
 fun uninstallModule(id: String): Boolean {
-    val cmd = "module uninstall $id"
+    val cmd = "module uninstall ${shellQuote(id)}"
     val result = execKsud(cmd, true)
     Log.i(TAG, "uninstall module $id result: $result")
     return result
@@ -1004,12 +1116,16 @@ fun flashModule(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
-    install()
+    if (!install()) {
+        val error = "Failed to install the ApkeSU daemon"
+        onStderr(error)
+        return FlashResult(1, error, false)
+    }
 
     val file = copyUriToCache(uri, "module.zip")
     try {
-        val cmd = "module install ${file.absolutePath}"
-        val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
+        val cmd = "module install ${shellQuote(file.absolutePath)}"
+        val result = flashWithIO("${shellQuote(getKsuDaemonPath())} $cmd", onStdout, onStderr)
         Log.i("KernelSU", "install module $uri result: $result")
 
         return FlashResult(result)
@@ -1034,7 +1150,7 @@ fun runModuleAction(
     }
 
     val result = withNewRootShell(true) {
-        newJob().add("${getKsuDaemonPath()} module action $moduleId")
+        newJob().add("${shellQuote(getKsuDaemonPath())} module action ${shellQuote(moduleId)}")
             .to(stdoutCallback, stderrCallback).exec()
     }
 
@@ -1046,14 +1162,18 @@ fun runModuleAction(
 fun restoreBoot(
     onStdout: (String) -> Unit, onStderr: (String) -> Unit
 ): FlashResult {
-    val result = flashWithIO("${getKsuDaemonPath()} boot-restore -f", onStdout, onStderr)
+    val result = flashWithIO("${shellQuote(getKsuDaemonPath())} boot-restore -f", onStdout, onStderr)
     return FlashResult(result)
 }
 
 fun uninstallPermanently(
     onStdout: (String) -> Unit, onStderr: (String) -> Unit
 ): FlashResult {
-    val result = flashWithIO("${getKsuDaemonPath()} uninstall --package-name ${BuildConfig.APPLICATION_ID}", onStdout, onStderr)
+    val result = flashWithIO(
+        "${shellQuote(getKsuDaemonPath())} uninstall --package-name ${shellQuote(BuildConfig.APPLICATION_ID)}",
+        onStdout,
+        onStderr,
+    )
     return FlashResult(result)
 }
 
@@ -1090,7 +1210,7 @@ fun installBoot(
         // no boot.img, use -f to flash
         " -f"
     } else {
-        " -b ${bootFile.absolutePath}"
+        " -b ${shellQuote(bootFile.absolutePath)}"
     }
 
     if (allowShell) {
@@ -1109,15 +1229,15 @@ fun installBoot(
     when (lkm) {
         is LkmSelection.LkmUri -> {
             lkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
-            cmd += " -m ${lkmFile.absolutePath}"
+            cmd += " -m ${shellQuote(lkmFile.absolutePath)}"
         }
 
         is LkmSelection.KmiString -> {
-            cmd += " --kmi ${lkm.value}"
+            cmd += " --kmi ${shellQuote(lkm.value)}"
         }
 
         is LkmSelection.PathMaskKmiString -> {
-            cmd += " --pathmask-lkm --kmi ${lkm.value}"
+            cmd += " --pathmask-lkm --kmi ${shellQuote(lkm.value)}"
         }
 
         LkmSelection.KmiNone -> {
@@ -1129,11 +1249,11 @@ fun installBoot(
     if (bootFile != null) {
         val downloadsDir =
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        cmd += " -o $downloadsDir"
+        cmd += " -o ${shellQuote(downloadsDir.absolutePath)}"
     }
 
     partition?.let { part ->
-        cmd += " --partition $part"
+        cmd += " --partition ${shellQuote(part)}"
     }
 
     return try {
@@ -1141,16 +1261,22 @@ fun installBoot(
             // Direct install writes the patched boot immediately. Refresh the
             // persistent daemon first so the next boot keeps the APK-bundled
             // ksud/version instead of an older /data/adb/ksud copy.
-            install()
+            if (!install()) {
+                val error = "Failed to install the ApkeSU daemon before direct install"
+                onStderr(error)
+                return FlashResult(1, error, false)
+            }
         }
 
-        val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
+        val result = flashWithIO("${shellQuote(getKsuDaemonPath())} $cmd", onStdout, onStderr)
         Log.i("KernelSU", "install boot result: ${result.isSuccess}")
 
         if (result.isSuccess) {
             // Keep /data/adb/ksud available after reboot for both direct flash and
             // manually flashed patched images.
-            install()
+            if (!install()) {
+                onStderr("Warning: patched successfully, but failed to refresh the ApkeSU daemon")
+            }
         }
 
         // if boot uri is empty, it is direct install, when success, we should show reboot button
@@ -1172,7 +1298,11 @@ fun reboot(reason: String = "") {
         // KEYCODE_POWER = 26, hide incorrect "Factory data reset" message
         ShellUtils.fastCmd(shell, "/system/bin/input keyevent 26")
     }
-    ShellUtils.fastCmd(shell, "/system/bin/svc power reboot $reason || /system/bin/reboot $reason")
+    val quotedReason = shellQuote(reason)
+    ShellUtils.fastCmd(
+        shell,
+        "/system/bin/svc power reboot $quotedReason || /system/bin/reboot $quotedReason"
+    )
 }
 
 fun flashAnyKernelZip(
@@ -1244,7 +1374,19 @@ fun ksuRootAvailable(): Boolean {
     }.getOrDefault(false)
 }
 
+fun apkeSuKernelModuleLoaded(): Boolean {
+    return runCatching {
+        File("/sys/module/kernelsu").isDirectory ||
+            File("/sys/module/apkesu").isDirectory
+    }.getOrDefault(false)
+}
+
 fun apkeSuRootAvailable(): Boolean {
+    if (runCatching { Natives.version > 0 }.getOrDefault(false) ||
+        apkeSuKernelModuleLoaded()
+    ) {
+        return true
+    }
     if (ksuRootAvailable()) {
         return true
     }
@@ -1269,58 +1411,143 @@ fun apkeSuRootAvailable(): Boolean {
 
             val marker = ShellUtils.fastCmd(
                 this,
-                "if [ -d /sys/module/kernelsu ] || " +
-                    "grep -q '^kernelsu ' /proc/modules 2>/dev/null || " +
-                    "{ [ -d /data/adb/ksu ] && " +
-                    "{ [ -x /data/adb/ksud ] || [ -x /data/adb/ksu/bin/ksud ] || " +
-                    "[ -f /data/adb/ksu/.allowlist ]; }; }; then echo 1; else echo 0; fi"
+                "if [ -d /sys/module/kernelsu ] || [ -d /sys/module/apkesu ] || " +
+                    "grep -Eq '^(kernelsu|apkesu) ' /proc/modules 2>/dev/null; " +
+                    "then echo 1; else echo 0; fi"
             ).trim()
             marker == "1"
         }
     }.getOrDefault(false)
 }
 
-fun ensureManagerRegistered(): Boolean {
-    if (runCatching { Natives.refreshInfo(); Natives.isManager }.getOrDefault(false)) {
-        return true
-    }
-    if (!apkeSuRootAvailable()) {
-        return false
-    }
+suspend fun collectRootDiagnosticInfo(): RootDiagnosticInfo = withContext(Dispatchers.IO) {
+    runCatching { Natives.refreshInfo() }
+    val driverVersion = runCatching { Natives.version }.getOrDefault(0)
+    val managerRegistered = runCatching { Natives.isManager }.getOrDefault(false)
+    val kernelUapi = runCatching { Natives.kernelUAPIVersion }.getOrDefault(0)
+    val managerUapi = runCatching { Natives.managerUAPIVersion }.getOrDefault(0)
+    val lkmMode = runCatching { Natives.isLkmMode }.getOrDefault(false)
+    val lateLoadMode = runCatching { Natives.isLateLoadMode }.getOrDefault(false)
+    val ksuRootShell = ksuRootAvailable()
+    val kernelModuleLoaded = apkeSuKernelModuleLoaded()
+    val ksud = shellQuote(getKsuDaemonPath())
 
-    val managerUid = Os.getuid()
-    val managerAppId = managerUid % 100_000
-    val result = runCatching {
-        val ksud = shellQuote(getKsuDaemonPath())
-        val packageName = shellQuote(BuildConfig.APPLICATION_ID)
-        val command = """
-            KSU_MANAGER_APPID=$managerAppId
-            KSU_MANAGER_PARAM=/sys/module/kernelsu/parameters/ksu_debug_manager_appid
-            if [ -w "${'$'}KSU_MANAGER_PARAM" ]; then
-                echo "${'$'}KSU_MANAGER_APPID" > "${'$'}KSU_MANAGER_PARAM" 2>/dev/null || true
-            fi
-            $ksud late-load --package-name $packageName --manager-uid $managerUid || true
-            if [ -w "${'$'}KSU_MANAGER_PARAM" ]; then
-                echo "${'$'}KSU_MANAGER_APPID" > "${'$'}KSU_MANAGER_PARAM" 2>/dev/null || true
-            fi
-        """.trimIndent()
+    var fallbackRootShell = false
+    var packagedKsudVersion = ""
+    var installedKsudVersion = ""
+    var currentKmi = ""
+    var currentSlot = ""
+    runCatching {
         withNewRootShell {
-            newJob().add(command).exec()
+            fallbackRootShell = isRoot
+            packagedKsudVersion = ShellUtils.fastCmd(
+                this,
+                "$ksud debug userspace-version 2>/dev/null",
+            ).trim()
+            installedKsudVersion = ShellUtils.fastCmd(
+                this,
+                "if [ -x /data/adb/ksud ]; then " +
+                    "/data/adb/ksud debug userspace-version 2>/dev/null; else echo missing; fi",
+            ).trim()
+            currentKmi = ShellUtils.fastCmd(
+                this,
+                "$ksud boot-info current-kmi 2>/dev/null",
+            ).trim()
+            currentSlot = ShellUtils.fastCmd(
+                this,
+                "getprop ro.boot.slot_suffix 2>/dev/null",
+            ).trim().ifBlank {
+                ShellUtils.fastCmd(this, "getprop ro.boot.slot 2>/dev/null").trim()
+            }
         }
     }.onFailure {
-        Log.w(TAG, "register manager appid failed", it)
-    }.getOrNull()
-
-    if (result?.isSuccess != true) {
-        Log.w(TAG, "register manager appid failed: ${result?.err?.joinToString("\n")}")
-        return false
+        Log.w(TAG, "collect root shell diagnostics failed", it)
     }
 
-    KsuCli.reset()
+    val workMode = when {
+        lateLoadMode -> "late_load"
+        lkmMode -> "lkm"
+        driverVersion > 0 || kernelModuleLoaded || ksuRootShell -> "gki"
+        else -> "unknown"
+    }
+    RootDiagnosticInfo(
+        driverVersion = driverVersion,
+        kernelModuleLoaded = kernelModuleLoaded,
+        ksuRootShell = ksuRootShell,
+        fallbackRootShell = fallbackRootShell,
+        managerRegistered = managerRegistered,
+        managerUid = Os.getuid(),
+        kernelUapi = kernelUapi,
+        managerUapi = managerUapi,
+        packagedKsudVersion = packagedKsudVersion,
+        installedKsudVersion = installedKsudVersion,
+        currentKmi = currentKmi,
+        currentSlot = currentSlot,
+        workMode = workMode,
+        hiddenPathLkm = if (fallbackRootShell && lkmMode) {
+            isHiddenPathLkmMode()
+        } else {
+            false
+        },
+    )
+}
+
+fun getInstalledKsudStatus(): InstalledKsudStatus {
     return runCatching {
-        Natives.refreshInfo()
-        Natives.isManager
-    }.getOrDefault(false)
+        withNewRootShell {
+            if (!isRoot) return@withNewRootShell InstalledKsudStatus()
+            val stdout = ArrayList<String>()
+            newJob()
+                .add(
+                    "if [ -x /data/adb/ksud ]; then " +
+                        "echo present; /data/adb/ksud debug userspace-version 2>/dev/null; " +
+                        "else echo missing; fi"
+                )
+                .to(stdout, null)
+                .exec()
+            val present = stdout.firstOrNull()?.trim() == "present"
+            val versionCode = stdout.firstOrNull { it.trim().startsWith("{") }
+                ?.let { JSONObject(it).optString("versionCode").toIntOrNull() }
+            InstalledKsudStatus(present = present, versionCode = versionCode)
+        }
+    }.getOrElse {
+        Log.w(TAG, "installed ksud status unavailable", it)
+        InstalledKsudStatus()
+    }
+}
+
+fun ensureManagerRegistered(): Boolean {
+    return synchronized(managerRegistrationLock) {
+        if (runCatching { Natives.refreshInfo(); Natives.isManager }.getOrDefault(false)) {
+            return@synchronized true
+        }
+        if (!apkeSuRootAvailable()) {
+            return@synchronized false
+        }
+
+        val managerUid = Os.getuid()
+        val result = runCatching {
+            val ksud = shellQuote(getKsuDaemonPath())
+            val packageName = shellQuote(BuildConfig.APPLICATION_ID)
+            val command = "$ksud register-manager --package-name $packageName --manager-uid $managerUid"
+            withNewRootShell {
+                newJob().add(command).exec()
+            }
+        }.onFailure {
+            Log.w(TAG, "register manager appid failed", it)
+        }.getOrNull()
+
+        if (result?.isSuccess != true) {
+            Log.w(TAG, "register manager appid failed: ${result?.err?.joinToString("\n")}")
+            return@synchronized false
+        }
+
+        KsuCli.reset()
+        runCatching {
+            Natives.refreshInfo()
+            Natives.isManager
+        }.getOrDefault(false)
+    }
 }
 
 private fun shouldSkipUnsafeKsudCommand(): Boolean {
@@ -1400,16 +1627,18 @@ fun isSepolicyValid(rules: String?): Boolean {
         return true
     }
     val shell = getRootShell()
-    val result =
-        shell.newJob().add("${getKsuDaemonPath()} sepolicy check '$rules'").to(ArrayList(), null)
+    val result = shell.newJob()
+        .add("${shellQuote(getKsuDaemonPath())} sepolicy check ${shellQuote(rules)}")
+        .to(ArrayList(), null)
             .exec()
     return result.isSuccess
 }
 
 fun getSepolicy(pkg: String): String {
     val shell = getRootShell()
-    val result =
-        shell.newJob().add("${getKsuDaemonPath()} profile get-sepolicy $pkg").to(ArrayList(), null)
+    val result = shell.newJob()
+        .add("${shellQuote(getKsuDaemonPath())} profile get-sepolicy ${shellQuote(pkg)}")
+        .to(ArrayList(), null)
             .exec()
     Log.i(TAG, "code: ${result.code}, out: ${result.out}, err: ${result.err}")
     return result.out.joinToString("\n")
@@ -1417,7 +1646,8 @@ fun getSepolicy(pkg: String): String {
 
 fun setSepolicy(pkg: String, rules: String): Boolean {
     val shell = getRootShell()
-    val result = shell.newJob().add("${getKsuDaemonPath()} profile set-sepolicy $pkg '$rules'")
+    val result = shell.newJob()
+        .add("${shellQuote(getKsuDaemonPath())} profile set-sepolicy ${shellQuote(pkg)} ${shellQuote(rules)}")
         .to(ArrayList(), null).exec()
     Log.i(TAG, "set sepolicy result: ${result.code}")
     return result.isSuccess
@@ -1425,26 +1655,26 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 
 fun listAppProfileTemplates(): List<String> {
     val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile list-templates").to(ArrayList(), null)
+    return shell.newJob().add("${shellQuote(getKsuDaemonPath())} profile list-templates").to(ArrayList(), null)
         .exec().out
 }
 
 fun getAppProfileTemplate(id: String): String {
     val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile get-template ${shellQuote(id)}")
+    return shell.newJob().add("${shellQuote(getKsuDaemonPath())} profile get-template ${shellQuote(id)}")
         .to(ArrayList(), null).exec().out.joinToString("\n")
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
     val shell = getRootShell()
-    val cmd = "${getKsuDaemonPath()} profile set-template ${shellQuote(id)} ${shellQuote(template)}"
+    val cmd = "${shellQuote(getKsuDaemonPath())} profile set-template ${shellQuote(id)} ${shellQuote(template)}"
     return shell.newJob().add(cmd)
         .to(ArrayList(), null).exec().isSuccess
 }
 
 fun deleteAppProfileTemplate(id: String): Boolean {
     val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile delete-template ${shellQuote(id)}")
+    return shell.newJob().add("${shellQuote(getKsuDaemonPath())} profile delete-template ${shellQuote(id)}")
         .to(ArrayList(), null).exec().isSuccess
 }
 
@@ -1523,7 +1753,7 @@ private fun List<String>.cleanConfigList(): List<String> {
 fun forceStopApp(packageName: String, userId: Int? = null) {
     val shell = getRootShell()
     val userArg = userId?.let { " --user $it" } ?: ""
-    val result = shell.newJob().add("am force-stop$userArg $packageName").exec()
+    val result = shell.newJob().add("am force-stop$userArg ${shellQuote(packageName)}").exec()
     Log.i(TAG, "force stop $packageName result: $result")
 }
 
@@ -1532,7 +1762,11 @@ fun launchApp(packageName: String, userId: Int? = null) {
     val userArg = userId?.let { " --user $it" } ?: ""
     val result =
         shell.newJob()
-            .add("cmd package resolve-activity --brief$userArg $packageName | tail -n 1 | xargs cmd activity start-activity$userArg -n")
+            .add(
+                "component=\$(cmd package resolve-activity --brief$userArg ${shellQuote(packageName)} | " +
+                    "tail -n 1); [ -n \"\$component\" ] && " +
+                    "cmd activity start-activity$userArg -n \"\$component\""
+            )
             .exec()
     Log.i(TAG, "launch $packageName result: $result")
 }

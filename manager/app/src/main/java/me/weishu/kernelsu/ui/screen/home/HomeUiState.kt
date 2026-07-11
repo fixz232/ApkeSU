@@ -1,11 +1,36 @@
 package me.weishu.kernelsu.ui.screen.home
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import me.weishu.kernelsu.KernelVersion
+import me.weishu.kernelsu.R
 
 private const val LKM_MODE_LABEL = "LKM"
 private const val HIDDEN_PATH_LKM_MODE_LABEL = "\u9690\u85cf\u8def\u5f84LKM"
 private const val GKI_MODE_LABEL = "GKI"
+
+enum class RootRuntimeState(@StringRes val labelRes: Int) {
+    DriverDisconnected(R.string.root_state_driver_disconnected),
+    ManagerUnregistered(R.string.root_state_manager_unregistered),
+    DaemonError(R.string.root_state_daemon_error),
+    VersionMismatch(R.string.root_state_version_mismatch),
+    Running(R.string.root_state_running);
+
+    companion object {
+        fun resolve(
+            driverConnected: Boolean,
+            managerRegistered: Boolean,
+            daemonRootAvailable: Boolean,
+            versionMismatch: Boolean,
+        ): RootRuntimeState = when {
+            !driverConnected -> DriverDisconnected
+            !managerRegistered -> ManagerUnregistered
+            !daemonRootAvailable -> DaemonError
+            versionMismatch -> VersionMismatch
+            else -> Running
+        }
+    }
+}
 
 @Immutable
 data class HomeUiState(
@@ -22,6 +47,7 @@ data class HomeUiState(
     val requiresNewKernel: Boolean,
     val uapiMismatch: Boolean,
     val isRootAvailable: Boolean,
+    val rootRuntimeState: RootRuntimeState = RootRuntimeState.DriverDisconnected,
     val isSafeMode: Boolean,
     val isLateLoadMode: Boolean,
     val currentManagerVersionCode: Long,
@@ -37,7 +63,7 @@ data class HomeUiState(
         get() = systemInfo.selinuxStatus == "Permissive"
 
     val isFullFeatured: Boolean
-        get() = isKernelActive && isManager && !requiresNewKernel && isRootAvailable
+        get() = rootRuntimeState == RootRuntimeState.Running
 
     val showGkiWarning: Boolean
         get() = showGkiWarningSetting && isKernelActive && lkmMode == false
@@ -59,10 +85,10 @@ data class HomeUiState(
         get() = isManager && showRequireKernelWarning && uapiMismatch
 
     val showRootWarning: Boolean
-        get() = isKernelActive && !isRootAvailable
+        get() = rootRuntimeState == RootRuntimeState.DaemonError
 
     val showManagerWarning: Boolean
-        get() = isKernelActive && !isManager
+        get() = rootRuntimeState == RootRuntimeState.ManagerUnregistered
 
     val showManagerPrBuildWarning: Boolean
         get() = isManager && isManagerPrBuild
@@ -88,4 +114,6 @@ data class HomeActions(
     val onModuleClick: () -> Unit,
     val onOpenUrl: (String) -> Unit,
     val onJailbreakClick: () -> Unit = {},
+    val onStyleSettingsClick: () -> Unit = {},
+    val onDiagnoseClick: () -> Unit = {},
 )

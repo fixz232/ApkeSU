@@ -35,10 +35,7 @@ import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
 fun NavigationRailMaterial(
     modifier: Modifier = Modifier,
 ) {
-    val fullFeatured = hasFullFeaturedManager()
     val mainPagerState = LocalMainPagerState.current
-
-    if (!fullFeatured) return
 
     val items = listOf(
         MaterialRailDestination(CustomNavigationIconSlot.Home, Icons.Filled.Home, Icons.Outlined.Home),

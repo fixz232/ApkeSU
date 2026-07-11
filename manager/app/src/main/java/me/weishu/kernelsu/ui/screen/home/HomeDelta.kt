@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.InstallMobile
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
@@ -129,7 +130,7 @@ private fun DeltaStatusCard(
                 )
                 Text(
                     text = if (state.isKernelActive) {
-                        "v${state.ksuVersionLabel}"
+                        "${stringResource(state.rootRuntimeState.labelRes)} · v${state.ksuVersionLabel}"
                     } else {
                         stringResource(R.string.home_not_installed)
                     },
@@ -151,6 +152,12 @@ private fun DeltaStatusCard(
                         icon = Icons.Rounded.InstallMobile,
                         onClick = actions.onInstallClick,
                         background = DeltaColors.AccentSoft,
+                    )
+                    DeltaPillButton(
+                        text = stringResource(R.string.root_diagnose),
+                        icon = Icons.Rounded.Info,
+                        onClick = actions.onDiagnoseClick,
+                        background = DeltaColors.SurfaceDeep,
                     )
                     if (!state.isKernelActive) {
                         DeltaPillButton(

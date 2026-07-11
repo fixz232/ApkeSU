@@ -47,7 +47,6 @@
     <string name="profile_selinux_rules">Mga Tuntunin</string>
     <string name="module_downloading">Nagda-download ng modyul: %s</string>
     <string name="module_start_downloading">Simulan ang pag-download: %s</string>
-    <string name="new_version_available">Bagong bersyon: Available ang %s, i-click para mag-upgrade.</string>
     <string name="launch_app">Ilunsad</string>
     <string name="force_stop_app">Sapilitang itigil</string>
     <string name="restart_app">I-restart</string>
@@ -99,8 +98,6 @@
     <string name="app_profile_template_import_success">Matagumpay na na-import</string>
     <string name="app_profile_template_save_failed">Nabigong i-save ang template</string>
     <string name="app_profile_template_import_empty">Walang laman ang clipboard!</string>
-    <string name="settings_check_update">Tumingin para sa mga update</string>
-    <string name="settings_check_update_summary">Awtomatikong tumingin para sa mga update kapag binubuksan ang app</string>
     <string name="grant_root_failed">Nabigong ibigay ang root!</string>
     <string name="action">Aksyon</string>
     <string name="open">Buksan</string>
@@ -114,10 +111,8 @@
     <string name="select_file_tip">Inirerekomenda ang %1$s partition image</string>
     <string name="select_kmi">Pumili ng KMI</string>
     <string name="settings_uninstall">I-uninstall</string>
-    <string name="settings_uninstall_temporary">Pansamantalang i-uninstall</string>
     <string name="settings_uninstall_permanent">Permanenteng i-uninstall</string>
     <string name="settings_restore_stock_image">Ibalik ang stock image</string>
-    <string name="settings_uninstall_temporary_message">Pansamantalang i-uninstall ang ApkeSU, ibabalik sa orihinal na kalagayan pagkatapos ng susunod na reboot.</string>
     <string name="settings_uninstall_permanent_message">Ina-uninstall ang ApkeSU (root at lahat ng mga module) nang tuluyan at permanente.</string>
     <string name="settings_restore_stock_image_message">Ibalik ang stock factory image (kung may umiiral na backup), kadalasan na ginagamit bago ng OTA; kung kailangan mong i-uninstall ang ApkeSU, mangyaring gamitin ang \"Permanenteng i-uninstall\".</string>
     <string name="flashing">Nagfa-flash</string>

@@ -51,6 +51,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,6 +79,7 @@ import me.weishu.kernelsu.ui.util.runRescueCommand
 import me.weishu.kernelsu.ui.util.saveRescueConfig
 import me.weishu.kernelsu.ui.util.testRescueEnvironment
 import java.io.File
+import java.util.Locale
 
 private const val TITLE = "救砖保护"
 
@@ -88,7 +90,7 @@ fun RescueProtectionScreen() {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var status by remember { mutableStateOf(RescueStatus()) }
     var logs by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
@@ -697,7 +699,7 @@ private fun RescueHelpCard() {
     RescueCard(title = "什么时候会自动回滚") {
         HelpLine("刷写 boot/init_boot/vendor_boot 后，下次启动会进入待验证状态。")
         HelpLine("待验证状态下连续启动失败达到 2 次，会触发自动回滚。")
-        HelpLine("普通启动连续失败达到 3 次，会触发自动回滚。")
+        HelpLine("未处于待验证状态的普通启动不会自动回滚，避免旧备份误覆盖当前系统。")
         HelpLine("检测到 pstore 里的 panic、watchdog、oops 等启动失败线索，会触发自动回滚。")
         HelpLine("如果设备卡到 recovery/rec，且仍能运行 ksud recovery-check，也会尝试自动回滚。")
         HelpLine("自动恢复最多尝试 3 次；超过限制后会关闭保护，避免循环恢复。")
@@ -854,7 +856,7 @@ private fun StepLine(index: Int, title: String, summary: String) {
 private fun formatSize(size: Long): String {
     if (size <= 0) return "-"
     val mib = size / 1024.0 / 1024.0
-    return String.format("%.1f MiB", mib)
+    return String.format(Locale.getDefault(), "%.1f MiB", mib)
 }
 
 private suspend fun copyRescueImageToCache(context: Context, uri: Uri, partition: String): File = withContext(Dispatchers.IO) {

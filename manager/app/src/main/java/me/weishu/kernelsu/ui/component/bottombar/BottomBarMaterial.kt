@@ -45,10 +45,7 @@ import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
 
 @Composable
 fun BottomBarMaterial() {
-    val fullFeatured = hasFullFeaturedManager()
     val mainPagerState = LocalMainPagerState.current
-
-    if (!fullFeatured) return
 
     val items = listOf(
         MaterialBottomDestination(CustomNavigationIconSlot.Home, Icons.Filled.Home, Icons.Outlined.Home),

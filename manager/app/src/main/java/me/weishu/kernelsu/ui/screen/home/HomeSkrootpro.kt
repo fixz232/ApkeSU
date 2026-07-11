@@ -54,7 +54,7 @@ fun HomePagerSkrootpro(
     val outputText = if (!state.isKernelActive) {
         stringResource(R.string.skrootpro_env_not_installed)
     } else {
-        stringResource(R.string.skrootpro_env_active)
+        "${stringResource(state.rootRuntimeState.labelRes)}\n${stringResource(R.string.skrootpro_env_active)}"
     }
 
     SkrootproScreen(
@@ -87,7 +87,7 @@ fun HomePagerSkrootpro(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(356.dp)
+                    .height(402.dp)
                     .padding(horizontal = 8.dp),
             ) {
                 Column(
@@ -133,6 +133,12 @@ fun HomePagerSkrootpro(
                     SkrootproButton(
                         text = stringResource(R.string.skrootpro_test_root),
                         onClick = actions.onSuperuserClick,
+                        modifier = Modifier.fillMaxWidth(0.95f),
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+                    SkrootproButton(
+                        text = stringResource(R.string.root_diagnose),
+                        onClick = actions.onDiagnoseClick,
                         modifier = Modifier.fillMaxWidth(0.95f),
                     )
                     Spacer(modifier = Modifier.height(5.dp))

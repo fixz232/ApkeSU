@@ -16,7 +16,6 @@
     <string name="module_update">Ažuriranje</string>
     <string name="module_downloading">Skidanje module: %s</string>
     <string name="module_start_downloading">Započnite sa skidanjem: %s</string>
-    <string name="new_version_available">Nova verzija: %s je dostupna, kliknite da skinete</string>
     <string name="launch_app">Pokrenite</string>
     <string name="force_stop_app">Prisilno Zaustavite</string>
     <string name="restart_app">Resetujte</string>

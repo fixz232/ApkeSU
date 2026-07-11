@@ -202,6 +202,13 @@ private fun HomeHeader(actions: HomeActions) {
                         actions.onOpenUrl(learnUrl)
                     }
                 )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.root_diagnose)) },
+                    onClick = {
+                        expanded = false
+                        actions.onDiagnoseClick()
+                    }
+                )
             }
         }
     }
@@ -279,7 +286,7 @@ private fun PrimaryStatusTile(
     val hasLkmWallpaper = showLkmWallpaperActions && (wallpaperBitmap != null || !lkmVideoUriString.isNullOrBlank())
     val workingMode = state.workingModeLabel
     val statusTitle = when {
-        installed -> stringResource(R.string.home_working)
+        installed -> stringResource(state.rootRuntimeState.labelRes)
         installable -> stringResource(R.string.home_not_installed)
         else -> stringResource(R.string.home_unsupported)
     }
@@ -2023,6 +2030,7 @@ private fun previewHomeScreenState(
     isKernelPrBuild = false,
     requiresNewKernel = false,
     isRootAvailable = ksuVersion != null,
+    rootRuntimeState = if (ksuVersion != null) RootRuntimeState.Running else RootRuntimeState.DriverDisconnected,
     isSafeMode = isSafeMode,
     isLateLoadMode = isLateLoadMode,
     currentManagerVersionCode = 10000,

@@ -71,7 +71,6 @@
     <string name="settings_umount_modules_default">預設卸載模組</string>
     <string name="module_downloading">正在下載模組：%s</string>
     <string name="module_start_downloading">開始下載：%s</string>
-    <string name="new_version_available">現有新版本 %s，請即升級！</string>
     <string name="launch_app">啟動</string>
     <string name="force_stop_app">強制停止</string>
     <string name="restart_app">重新啟動</string>
@@ -109,8 +108,6 @@
     <string name="install_file_not_selected">未選擇</string>
     <string name="grant_root_failed">授予 Root 權限失敗！</string>
     <string name="open">開啟</string>
-    <string name="settings_check_update">檢查更新</string>
-    <string name="settings_check_update_summary">開啟本程式時自動檢查更新</string>
     <string name="settings_uninstall">解除安裝</string>
     <string name="save_log">儲存日誌</string>
     <string name="processing">處理中…</string>
@@ -167,10 +164,8 @@
     <string name="install_select_partition">選取分割區</string>
     <string name="install_upload_lkm_file">使用本地 LKM 檔案</string>
     <string name="install_only_support_ko_file">僅支援 .ko 格式檔案</string>
-    <string name="settings_uninstall_temporary">暫時解除安裝</string>
     <string name="settings_uninstall_permanent">永久解除安裝</string>
     <string name="settings_restore_stock_image">恢復原廠映像</string>
-    <string name="settings_uninstall_temporary_message">暫時解除安裝 ApkeSU，下次重新啟動後恢復原狀</string>
     <string name="settings_uninstall_permanent_message">徹底永久解除安裝 ApkeSU（Root 權限及所有模組）</string>
     <string name="settings_restore_stock_image_message">恢復原廠映像（如有備份），通常用於 OTA 前；如需解除安裝 ApkeSU，請使用「永久解除安裝」</string>
     <string name="flashing">正在刷入</string>
@@ -178,6 +173,7 @@
     <string name="flash_failed">刷入失敗</string>
     <string name="flash_error_code">錯誤代碼</string>
     <string name="flash_check_log">請儲存並檢查日誌。</string>
+    <string name="flash_interrupted">刷入結果回傳已中斷。為避免重複寫入分區，請先重新啟動裝置再重試。</string>
     <string name="selected_lkm">已選取 LKM：%s</string>
     <string name="log_saved">日誌已儲存</string>
     <string name="log_save_failed">日誌儲存失敗</string>
@@ -320,14 +316,10 @@
     <string name="settings_startup_sound_duration">啟動音效時長</string>
     <string name="settings_startup_sound_duration_summary">到達設定時間後自動停止播放。</string>
     <string name="settings_startup_sound_duration_value">%1$d 秒</string>
-    <string name="settings_startup_sound_preview">試聽啟動音效</string>
-    <string name="settings_startup_sound_clear">清除啟動音效</string>
     <string name="settings_startup_sound_play_failed">無法播放這個啟動音效。</string>
     <string name="settings_click_sound">點擊音效</string>
     <string name="settings_click_sound_summary">選擇一個音訊檔案，點擊介面控制項時播放。</string>
     <string name="settings_click_sound_selected_summary">已選擇點擊音效，點一下可重新選擇。</string>
-    <string name="settings_click_sound_preview">試聽點擊音效</string>
-    <string name="settings_click_sound_clear">清除點擊音效</string>
     <string name="settings_click_sound_play_failed">無法播放這個點擊音效。</string>
     <string name="settings_sound_effects">音效設定</string>
     <string name="settings_sound_effects_summary">管理啟動音效、點擊音效和背景音樂。</string>

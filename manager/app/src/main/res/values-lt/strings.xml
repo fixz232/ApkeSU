@@ -47,7 +47,6 @@
     <string name="module_update">Atnaujinti</string>
     <string name="module_downloading">Atsisiunčiamas modulis: %s</string>
     <string name="module_start_downloading">Pradedamas atsisiuntimas: %s</string>
-    <string name="new_version_available">Nauja versija: %s pasiekiama, spustelėkite norėdami atsinaujinti</string>
     <string name="launch_app">Paleisti</string>
     <string name="force_stop_app">Priversti sustoti</string>
     <string name="restart_app">Perkrauti</string>

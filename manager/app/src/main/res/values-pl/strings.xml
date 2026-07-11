@@ -69,7 +69,6 @@
     <string name="module_update">Zaktualizuj</string>
     <string name="module_downloading">Pobieranie modułu: %s</string>
     <string name="module_start_downloading">Rozpocznij pobieranie: %s</string>
-    <string name="new_version_available">Nowa wersja %s jest dostępna. Kliknij, aby zaktualizować!</string>
     <string name="launch_app">Uruchom</string>
     <string name="force_stop_app">Wymuś zatrzymanie</string>
     <string name="restart_app">Restartuj</string>
@@ -108,13 +107,9 @@
     <string name="app_profile_template_id_exist">Szablon o takim identyfikatorze już istnieje!</string>
     <string name="grant_root_failed">Nie udało się przyznać roota!</string>
     <string name="open">Otwórz</string>
-    <string name="settings_check_update">Wyszukaj aktualizacje</string>
-    <string name="settings_check_update_summary">Wyszukuj aktualizacje automatycznie przy otwieraniu aplikacji.</string>
     <string name="settings_uninstall_permanent">Odinstaluj zupełnie</string>
     <string name="settings_restore_stock_image">Przywróć obraz fabryczny</string>
-    <string name="settings_uninstall_temporary">Odinstaluj tymczasowo</string>
     <string name="settings_uninstall">Odinstaluj</string>
-    <string name="settings_uninstall_temporary_message">Tymczasowo odinstaluj ApkeSU, przywróć do oryginalnego stanu po następnym ponownym uruchomieniu.</string>
     <string name="settings_uninstall_permanent_message">Całkowite i trwałe odinstalowanie ApkeSU (root i wszystkich modułów).</string>
     <string name="settings_restore_stock_image_message">Przywróć obraz fabryczny (jeśli istnieje kopia zapasowa), zwykle używany przed OTA; jeśli chcesz odinstalować ApkeSU, użyj opcji \"Odinstaluj całkowicie\".</string>
     <string name="flashing">Flashowanie</string>

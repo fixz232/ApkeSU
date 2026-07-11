@@ -75,7 +75,6 @@
     <string name="profile_selinux_rules">Reeglid</string>
     <string name="module_update">Uuenda</string>
     <string name="module_downloading">Mooduli allalaadimine: %s</string>
-    <string name="new_version_available">Uus versioon %s on saadaval, klõpsa täiendamiseks.</string>
     <string name="restart_app">Taaskäivita</string>
     <string name="module_changelog">Muudatuste logi</string>
     <string name="app_profile_template_name">Nimi</string>
@@ -95,8 +94,6 @@
     <string name="settings_umount_modules_default_summary">Globaalne vaikeväärtus \"Lahtihaagitud moodulitele\" rakenduseprofiilis. Lubamisel eemaldab see kõik moodulite süsteemimuudatused rakendustele, millel ei ole profiili määratud.</string>
     <string name="enable_web_debugging_summary">Saab kasutada WebUI silumiseks, palun luba ainult vajadusel.</string>
     <string name="grant_root_failed">Juurkasutaja andmine ebaõnnestus!</string>
-    <string name="settings_check_update">Kontrolli uuendusi</string>
-    <string name="settings_check_update_summary">Rakenduse avamisel kontrolli automaatselt uuendusi</string>
     <string name="open">Ava</string>
     <string name="enable_web_debugging">Luba WebView silumine</string>
     <string name="save_log">Salvesta Logid</string>
@@ -105,7 +102,6 @@
     <string name="install_next">Edasi</string>
     <string name="install_inactive_slot_warning">Sinu seade **SUNNITAKSE** pärast taaskäivitust ebaaktiivsesse lahtrisse käivituma!\nKasuta seda valikut vaid siis, kui tegid üle-õhu uuenduse.\nJätkad?</string>
     <string name="settings_uninstall">Eemalda</string>
-    <string name="settings_uninstall_temporary_message">Eemalda ApkeSU ajutiselt, taasta pärast taaskäivitust algseisu.</string>
     <string name="settings_uninstall_permanent_message">ApkeSU eemaldamine (juurkasutaja ja kõik moodulid) täielikult ja püsivalt.</string>
     <string name="settings_restore_stock_image_message">Taasta tehase-vaiketõmmis (kui varundus eksisteerib), tavaliselt kasutatakse enne üle-õhu uuendust; kui soovid ApkeSU-d eemaldada, palun kasuta \"Eemalda püsivalt\".</string>
     <string name="flashing">Välgutamine</string>
@@ -115,7 +111,6 @@
     <string name="direct_install">Otsene paigaldus (soovitatud)</string>
     <string name="select_file">Vali fail</string>
     <string name="install_inactive_slot">Paigalda ebaaktiivsesse lahtrisse (pärast üle-õhu uuendust)</string>
-    <string name="settings_uninstall_temporary">Eemalda ajutiselt</string>
     <string name="settings_uninstall_permanent">Eemalda püsivalt</string>
     <string name="settings_restore_stock_image">Taasta vaikimisi tõmmis</string>
     <string name="settings_sucompat">Suuna su binaarfail ümber</string>

@@ -8,7 +8,7 @@ use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::Command,
 };
 
@@ -33,7 +33,6 @@ const LEGACY_LOOP_FLAG_PATH: &str = "/cache/mochen_boot_loop_flag";
 const LEGACY_PANIC_FLAG_PATH: &str = "/cache/mochen_kernel_panic";
 const LEGACY_TMP_MODULE_DISABLE_PATH: &str = "/cache/tmp_modules_disable";
 const MAX_AUTO_RESTORE_ATTEMPTS: u32 = 3;
-const BOOT_FAILURE_TRIGGER_COUNT: u32 = 3;
 const PENDING_BOOT_FAILURE_TRIGGER_COUNT: u32 = 2;
 
 #[derive(Clone, Debug, Default)]
@@ -338,7 +337,7 @@ pub fn check_on_post_fs_data() {
 
     if Path::new(RESTORE_LOCK_PATH).exists() {
         append_log("restore lock exists; mark boot healthy and skip auto restore");
-        clear_runtime_markers();
+        clear_restore_markers();
         let _ = fs::write(BOOT_OK_PATH, b"1");
         write_boot_count(0);
         write_auto_restore_attempts(0);
@@ -361,19 +360,20 @@ pub fn check_on_post_fs_data() {
         "post-fs-data rescue check: previous_boot_ok={previous_boot_ok}, pending_boot={pending_boot}, boot_count={next_count}"
     ));
 
-    let failure_hint = pending_boot && has_boot_failure_hint();
+    // On the first patched boot, pstore still describes the boot that performed the
+    // flash. Only trust failure evidence after another attempted boot.
+    let failure_hint = pending_boot && next_count > 1 && has_boot_failure_hint();
     let pending_boot_failed =
         pending_boot && next_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT && !previous_boot_ok;
-    let boot_count_failed = pending_boot && next_count >= BOOT_FAILURE_TRIGGER_COUNT;
-    if failure_hint || pending_boot_failed || boot_count_failed {
+    if failure_hint || pending_boot_failed {
         append_log(format!(
-            "auto restore triggered on post-fs-data: failure_hint={failure_hint}, pending_boot_failed={pending_boot_failed}, boot_count_failed={boot_count_failed}"
+            "auto restore triggered on post-fs-data: failure_hint={failure_hint}, pending_boot_failed={pending_boot_failed}"
         ));
     } else if !pending_boot {
         append_log("no pending flashed boot; normal boot counter will not trigger auto restore");
     }
 
-    if (failure_hint || pending_boot_failed || boot_count_failed)
+    if (failure_hint || pending_boot_failed)
         && let Err(err) = auto_restore_backups()
     {
         append_log(format!("auto restore failed: {err:#}"));
@@ -395,7 +395,7 @@ pub fn check_on_recovery_boot() {
 
     if Path::new(RESTORE_LOCK_PATH).exists() {
         append_log("restore lock exists in recovery; mark boot healthy and skip auto restore");
-        clear_runtime_markers();
+        clear_restore_markers();
         let _ = fs::write(BOOT_OK_PATH, b"1");
         write_boot_count(0);
         write_auto_restore_attempts(0);
@@ -764,7 +764,6 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     if let Some(slot) = plan.activate_slot.as_deref() {
         set_active_slot(slot)?;
     }
-    cleanup_after_restore();
     mark_skip_modules_once();
     mark_legacy_tmp_module_disable();
     disable_all_modules_after_restore();
@@ -775,7 +774,7 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     let _ = fs::remove_file(PENDING_BOOT_PATH);
     append_log("restore finished; rebooting");
     let _ = Command::new("sync").status();
-    request_reboot();
+    request_reboot().context("restore completed but reboot request failed")?;
     Ok(())
 }
 
@@ -860,7 +859,7 @@ fn set_block_writable(_file: &fs::File, _path: &str) -> Result<()> {
     Ok(())
 }
 
-fn request_reboot() {
+fn request_reboot() -> Result<()> {
     let commands: [(&str, &[&str]); 4] = [
         ("/system/bin/reboot", &[]),
         ("reboot", &[]),
@@ -872,7 +871,7 @@ fn request_reboot() {
         match Command::new(program).args(args).status() {
             Ok(status) if status.success() => {
                 append_log(format!("requested reboot via {program}"));
-                return;
+                return Ok(());
             }
             Ok(status) => {
                 append_log(format!("reboot command {program} exited with {status}"));
@@ -882,6 +881,7 @@ fn request_reboot() {
             }
         }
     }
+    bail!("all reboot commands failed")
 }
 
 fn set_active_slot(slot: &str) -> Result<()> {
@@ -959,55 +959,6 @@ fn bootctl_slot_number(slot: &str) -> Result<&'static str> {
     }
 }
 
-fn cleanup_after_restore() {
-    const CLEANUP_DIRS: &[&str] = &[
-        "/data/dalvik-cache",
-        "/data/resource-cache",
-        "/data/log",
-        "/cache",
-        "/cache/dalvik-cache",
-        "/cache/recovery",
-        "/data/ota",
-    ];
-
-    for dir in CLEANUP_DIRS {
-        cleanup_dir_contents(dir);
-    }
-}
-
-fn cleanup_dir_contents(dir: &str) {
-    let path = Path::new(dir);
-    if !path.is_dir() {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(path) else {
-        append_log(format!("skip cleanup: cannot read {dir}"));
-        return;
-    };
-
-    let mut removed = 0usize;
-    for entry in entries.flatten() {
-        let item = entry.path();
-        let result = match fs::symlink_metadata(&item) {
-            Ok(metadata) if metadata.file_type().is_dir() && !metadata.file_type().is_symlink() => {
-                fs::remove_dir_all(&item)
-            }
-            Ok(_) => fs::remove_file(&item),
-            Err(err) => Err(err),
-        };
-        match result {
-            Ok(()) => removed += 1,
-            Err(err) => append_log(format!("cleanup failed for {}: {err:#}", item.display())),
-        }
-    }
-    if removed > 0 {
-        append_log(format!(
-            "cleanup after restore: removed {removed} item(s) from {dir}"
-        ));
-    }
-}
-
 fn mark_skip_modules_once() {
     if let Err(err) = utils::ensure_dir_exists(RESCUE_DIR) {
         append_log(format!(
@@ -1049,6 +1000,12 @@ fn clear_runtime_markers() {
     }
 }
 
+fn clear_restore_markers() {
+    for path in [PENDING_BOOT_PATH, RESTORE_LOCK_PATH] {
+        let _ = fs::remove_file(path);
+    }
+}
+
 fn mark_legacy_tmp_module_disable() {
     if let Err(err) = fs::write(LEGACY_TMP_MODULE_DISABLE_PATH, b"1") {
         append_log(format!(
@@ -1083,7 +1040,28 @@ fn cleanup_legacy_rescue_flags() {
 fn find_partition(spec: &PartitionSpec) -> Result<Option<String>> {
     if let Some(path) = spec.custom_path.as_deref() {
         if Path::new(path).exists() {
-            return Ok(Some(path.to_string()));
+            let resolved = Path::new(path)
+                .canonicalize()
+                .with_context(|| format!("failed to resolve custom partition path {path}"))?;
+            if !resolved.starts_with("/dev/block") {
+                bail!(
+                    "custom partition path for {} resolves outside /dev/block: {}",
+                    spec.name,
+                    resolved.display()
+                );
+            }
+            #[cfg(target_os = "android")]
+            {
+                use std::os::unix::fs::FileTypeExt;
+                if !fs::metadata(&resolved)?.file_type().is_block_device() {
+                    bail!(
+                        "custom partition path for {} is not a block device: {}",
+                        spec.name,
+                        resolved.display()
+                    );
+                }
+            }
+            return Ok(Some(resolved.display().to_string()));
         }
         bail!(
             "custom partition path for {} does not exist: {path}",
@@ -1158,7 +1136,20 @@ fn validate_manifest_context_for_restore() -> Result<Value> {
         .unwrap_or_default();
     let now_fingerprint = utils::getprop("ro.build.fingerprint").unwrap_or_default();
     if !saved_fingerprint.is_empty() && saved_fingerprint != now_fingerprint {
-        bail!("device fingerprint mismatch; please create a fresh backup");
+        if !is_recovery_boot() {
+            bail!("device fingerprint mismatch; please create a fresh backup");
+        }
+
+        let saved_device = manifest
+            .get("device")
+            .and_then(|device| device.get("device"))
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let now_device = utils::getprop("ro.product.device").unwrap_or_default();
+        if saved_device.is_empty() || now_device.is_empty() || saved_device != now_device {
+            bail!("device identity mismatch in recovery; refusing rescue restore");
+        }
+        append_log("recovery fingerprint differs; device codename matched backup manifest");
     }
 
     let saved_config = manifest.get("config").cloned().unwrap_or_else(|| json!({}));
@@ -1257,7 +1248,12 @@ fn config_json(config: &RescueConfig) -> Value {
 
 fn sanitize_partition_path(path: &str) -> Option<String> {
     let path = path.trim();
-    if path.starts_with("/dev/block/")
+    let candidate = Path::new(path);
+    if candidate.is_absolute()
+        && candidate.starts_with("/dev/block")
+        && candidate
+            .components()
+            .all(|component| matches!(component, Component::RootDir | Component::Normal(_)))
         && !path.contains('\0')
         && !path.contains('"')
         && !path.contains('\'')
@@ -1362,10 +1358,14 @@ fn backup_path(path: &Path) -> PathBuf {
 }
 
 fn current_slot() -> String {
-    utils::getprop("ro.boot.slot_suffix").unwrap_or_default()
+    boot_patch::get_slot_suffix(false).unwrap_or_default()
 }
 
 fn boot_mode() -> String {
+    boot_mode_values().into_iter().next().unwrap_or_default()
+}
+
+fn boot_mode_values() -> Vec<String> {
     [
         "ro.bootmode",
         "ro.boot.bootmode",
@@ -1376,16 +1376,15 @@ fn boot_mode() -> String {
     .into_iter()
     .filter_map(utils::getprop)
     .map(|value| value.trim().to_ascii_lowercase())
-    .find(|value| !value.is_empty() && value != "unknown")
-    .unwrap_or_default()
+    .filter(|value| !value.is_empty() && value != "unknown")
+    .collect()
 }
 
 fn is_recovery_boot() -> bool {
-    let mode = boot_mode();
-    if mode == "1" || mode == "recovery" || mode == "rec" || mode.contains("recovery") {
-        return true;
-    }
-    mode.is_empty() && boot_reason_text().contains("recovery")
+    boot_mode_values()
+        .iter()
+        .any(|mode| mode == "1" || mode == "recovery" || mode == "rec" || mode.contains("recovery"))
+        || boot_reason_text().contains("recovery")
 }
 
 fn device_summary() -> Value {
@@ -1459,7 +1458,7 @@ fn has_kernel_panic_hint() -> bool {
 
 fn has_boot_reason_failure_hint() -> bool {
     let text = boot_reason_text();
-    let found = has_failure_text(&text);
+    let found = has_boot_reason_failure_text(&text);
     if found {
         append_log(format!("boot failure hint found in boot reason: {text}"));
     }
@@ -1508,24 +1507,53 @@ fn has_pstore_failure_hint() -> bool {
 fn has_failure_text(text: &str) -> bool {
     text.lines().any(|line| {
         let line = line.to_ascii_lowercase();
-        line.contains("panic")
-            || line.contains("watchdog")
+        let has_failure_word = line.contains("fail")
+            || line.contains("error")
+            || line.contains("invalid")
+            || line.contains("mismatch")
+            || line.contains("corrupt");
+        line.contains("kernel panic")
+            || line.contains("panic - not syncing")
+            || line.contains("watchdog bite")
+            || line.contains("watchdog bark")
+            || line.contains("watchdog timeout")
+            || line.contains("watchdog reset")
             || line.contains("ramdump")
-            || line.contains("dm-verity")
             || line.contains("boot verification")
             || line.contains("dtb load fail")
-            || line.contains("dtbo")
-            || line.contains("avb")
-            || line.contains("vbmeta")
-            || line.contains("init_boot")
-            || line.contains("vendor_boot")
-            || line.contains("vendor_boot mismatch")
-            || line.contains("gki kmi")
-            || line.contains("kmi mismatch")
             || line.contains("verification failed")
             || line.contains("invalid magic")
             || line.contains("bad magic")
+            || has_failure_word
+                && [
+                    "dm-verity",
+                    "dtb",
+                    "dtbo",
+                    "avb",
+                    "vbmeta",
+                    "init_boot",
+                    "vendor_boot",
+                    "gki",
+                    "kmi",
+                ]
+                .iter()
+                .any(|token| line.contains(token))
     })
+}
+
+fn has_boot_reason_failure_text(text: &str) -> bool {
+    let text = text.to_ascii_lowercase();
+    [
+        "kernel_panic",
+        "kernel panic",
+        "watchdog",
+        "ramdump",
+        "dm-verity",
+        "boot verification",
+        "hard_reset",
+    ]
+    .iter()
+    .any(|token| text.contains(token))
 }
 
 fn sha256_of(path: &str) -> String {

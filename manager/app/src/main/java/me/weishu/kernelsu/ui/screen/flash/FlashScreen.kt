@@ -1,8 +1,10 @@
 package me.weishu.kernelsu.ui.screen.flash
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,7 +13,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,16 +32,19 @@ fun FlashScreen(flashIt: FlashIt) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var text by rememberSaveable { mutableStateOf("") }
-    val logContent = remember { StringBuilder() }
-    var showRebootAction by rememberSaveable { mutableStateOf(false) }
-    var flashingStatus by rememberSaveable { mutableStateOf(FlashingStatus.FLASHING) }
+    val flashViewModel = viewModel<FlashViewModel>()
+    val executionState by flashViewModel.state.collectAsStateWithLifecycle()
     val needJailbreakWarning = flashIt.needsJailbreakFlashWarning() && Natives.isLateLoadMode
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
+    var operationRequested by rememberSaveable(flashIt) { mutableStateOf(false) }
+    var refreshSent by rememberSaveable(flashIt) { mutableStateOf(false) }
     val uiMode = LocalUiMode.current
     val snackbarHost = remember { SnackbarHostState() }
     val logSavedMessage = stringResource(R.string.log_saved)
     val logSaveFailedMessage = stringResource(R.string.log_save_failed)
+    val flashErrorCode = stringResource(R.string.flash_error_code)
+    val flashCheckLog = stringResource(R.string.flash_check_log)
+    val flashInterrupted = stringResource(R.string.flash_interrupted)
 
     fun showMessage(message: String) {
         scope.launch {
@@ -49,26 +56,40 @@ fun FlashScreen(flashIt: FlashIt) {
         }
     }
 
-    FlashEffect(
-        flashIt = flashIt,
-        text = text,
-        logContent = logContent,
-        onTextUpdate = { text = it },
-        onShowRebootChange = { showRebootAction = it },
-        onFlashingStatusChange = { flashingStatus = it },
-        onFlashSuccess = { KernelStatusEvents.requestRefresh() },
-        enabled = flashingEnabled,
-    )
+    LaunchedEffect(flashingEnabled, flashIt, executionState.started) {
+        if (!flashingEnabled) return@LaunchedEffect
+        if (!operationRequested) {
+            operationRequested = true
+            flashViewModel.start(flashIt, flashErrorCode, flashCheckLog)
+        } else if (!executionState.started) {
+            flashViewModel.markInterrupted(flashInterrupted)
+        }
+    }
+
+    LaunchedEffect(executionState.status) {
+        if (executionState.status == FlashingStatus.SUCCESS && !refreshSent) {
+            refreshSent = true
+            KernelStatusEvents.requestRefresh()
+        }
+    }
+
+    val flashInProgress = executionState.started &&
+        executionState.status == FlashingStatus.FLASHING
+    BackHandler(enabled = flashInProgress) {
+        // A partition write may continue after its UI coroutine is cancelled.
+    }
 
     val state = FlashUiState(
-        text = text,
-        showRebootAction = showRebootAction,
-        flashingStatus = flashingStatus,
+        text = executionState.text,
+        showRebootAction = executionState.showRebootAction,
+        flashingStatus = executionState.status,
         showJailbreakWarning = needJailbreakWarning && !flashingEnabled,
     )
     val actions = FlashScreenActions(
-        onBack = dropUnlessResumed { navigator.pop() },
-        onSaveLog = saveLog(context, logContent, scope, logSavedMessage, logSaveFailedMessage) {
+        onBack = dropUnlessResumed {
+            if (!flashInProgress) navigator.pop()
+        },
+        onSaveLog = saveLog(context, executionState.log, scope, logSavedMessage, logSaveFailedMessage) {
             showMessage(it)
         },
         onReboot = {

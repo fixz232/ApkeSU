@@ -107,6 +107,14 @@ data class SettingsUiState(
     val builtinMountVariant: String = BUILTIN_MOUNT_VARIANT_LITE,
     val isBuiltinMountWebUiAvailable: Boolean = false,
     val builtinMountConflict: String? = null,
+    val builtinMountSourceUrl: String = "",
+    val builtinMountArchiveSha256: String = "",
+    val builtinMountLkmCount: Int = 0,
+    val builtinMountSupportedKmis: List<String> = emptyList(),
+    val builtinMountCurrentKmi: String = "",
+    val builtinMountCompatibility: String = "unknown",
+    val builtinMountLkmPurpose: String = "",
+    val builtinMountIsApkeSuRootDriver: Boolean = false,
 
     // Built-in KPatch Next
     val isKPatchNextInstalled: Boolean = false,
@@ -197,6 +205,7 @@ data class SettingsScreenActions(
     val onSetBuiltinMountEnabled: (Boolean) -> Unit,
     val onSetBuiltinMountDefaultMode: (Int) -> Unit,
     val onSetBuiltinMountVariant: (Int) -> Unit,
+    val onShowBuiltinMountDetails: () -> Unit,
     val onOpenBuiltinMountWebUi: () -> Unit,
     val onSetKPatchNextEnabled: (Boolean) -> Unit,
     val onOpenKPatchNextWebUi: () -> Unit,

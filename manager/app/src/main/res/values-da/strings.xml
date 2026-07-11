@@ -43,7 +43,6 @@
     <string name="profile_umount_modules_summary">Hvis denne indstilling aktiveres, kan ApkeSU gendanne alle ændrede filer af modulerne til denne app.</string>
     <string name="module_update">Opdatering</string>
     <string name="module_downloading">Downloader modulet: %s</string>
-    <string name="new_version_available">Ny version %s er tilgængelig, klik for at opgradere!</string>
     <string name="launch_app">Start</string>
     <string name="force_stop_app">Tving stop</string>
     <string name="failed_to_update_sepolicy">Opdatering af SELinux-regler mislykkedes for %s</string>
@@ -99,8 +98,6 @@
     <string name="app_profile_template_import_success">Importér med succes</string>
     <string name="app_profile_template_save_failed">Kunne ikke gemme skabelon</string>
     <string name="app_profile_template_import_empty">Udklipsholderen er tom!</string>
-    <string name="settings_check_update">Check for opdateringer</string>
-    <string name="settings_check_update_summary">Søg automatisk efter opdateringer, når appen åbnes.</string>
     <string name="grant_root_failed">Kunne ikke tildelle root!</string>
     <string name="action">Handling</string>
     <string name="open">Åbn</string>
@@ -114,10 +111,8 @@
     <string name="select_file_tip">%1$s partitionsbillede anbefales</string>
     <string name="select_kmi">Vælg KMI</string>
     <string name="settings_uninstall">Afinstaller</string>
-    <string name="settings_uninstall_temporary">Afinstaller midlertidigt</string>
     <string name="settings_uninstall_permanent">Afinstaller permanent</string>
     <string name="settings_restore_stock_image">Gendan systemets standardbillede</string>
-    <string name="settings_uninstall_temporary_message">Afinstaller ApkeSU midlertidigt, og gendan til den oprindelige tilstand efter næste genstart.</string>
     <string name="settings_uninstall_permanent_message">Afinstallation af ApkeSU (root og alle moduler) fuldstændigt og permanent.</string>
     <string name="settings_restore_stock_image_message">Gendan det originale fabriksbillede (hvis en sikkerhedskopi eksisterer), hvilket normalt bruges før en OTA-opdatering; hvis du skal afinstallere ApkeSU, skal du bruge \"Afinstaller permanent\".</string>
     <string name="flashing">Flashing</string>

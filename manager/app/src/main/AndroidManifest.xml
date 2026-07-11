@@ -272,13 +272,10 @@
             android:name=".magica.BootCompletedReceiver"
             android:directBootAware="true"
             android:enabled="false"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="${applicationId}.magica.LAUNCH" />
             </intent-filter>
         </receiver>
     </application>

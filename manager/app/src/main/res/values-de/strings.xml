@@ -36,7 +36,6 @@
     <string name="module_start_downloading">Starte Download: %s</string>
     <string name="failed_to_update_sepolicy">Aktualisieren der SELinux-Regeln schlug fehl für %s</string>
     <string name="launch_app">Starten</string>
-    <string name="new_version_available">Neue Version %s verfügbar, tippen zum Aktualisieren!</string>
     <string name="force_stop_app">Stopp erzwingen</string>
     <string name="restart_app">Neustarten</string>
     <string name="home_manager_version">Manager-Version</string>
@@ -106,15 +105,11 @@
 \nFortfahren?</string>
     <string name="grant_root_failed">Root-Zugriff konnte nicht gewährt werden!</string>
     <string name="open">Öffnen</string>
-    <string name="settings_check_update">Auf Aktualisierungen prüfen</string>
-    <string name="settings_check_update_summary">Prüfe automatisch auf Aktualisierungen, wenn die App geöffnet wird.</string>
-    <string name="settings_uninstall_temporary">Temporär deinstallieren</string>
     <string name="settings_uninstall">Deinstallieren</string>
     <string name="settings_uninstall_permanent_message">ApkeSU (Root und alle Module) vollständig und dauerhaft deinstallieren.</string>
     <string name="save_log">Protokolle Speichern</string>
     <string name="settings_uninstall_permanent">Permanent deinstallieren</string>
     <string name="settings_restore_stock_image">Standard-Abbild wiederherstellen</string>
-    <string name="settings_uninstall_temporary_message">ApkeSU temporär deinstallieren, originalen Status nach dem nächsten Neustart wiederherstellen.</string>
     <string name="settings_restore_stock_image_message">Das Standard Werksabbild wiederherstellen (falls ein Backup existiert), normalerweise vor einem OTA zu verwenden; falls Sie ApkeSU deinstallieren müssen, nutzen Sie bitte \"Permanent deinstallieren\".</string>
     <string name="flashing">Schreibt</string>
     <string name="flash_success">Schreiben erfolgreich</string>

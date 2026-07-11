@@ -7,28 +7,34 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{defs, metamodule, module, utils};
+use crate::{boot_patch, defs, metamodule, module, utils};
 
 pub const HYBRID_MOUNT_MODULE_ID: &str = "hybrid_mount";
 
 const CONFIG_PATH: &str = "/data/adb/hybrid-mount/config.toml";
 const BUILTIN_VARIANT_PATH: &str = "/data/adb/hybrid-mount/builtin_variant";
 const BUILTIN_LITE_ZIP: &[u8] = include_bytes!("../builtin/hybrid-mount-lite.zip");
+const BUILTIN_FULL_ZIP: &[u8] = include_bytes!("../builtin/hybrid-mount-full.zip");
 const MODULE_NAME_FALLBACK: &str = "Hybrid Mount Lite";
-const MODULE_VERSION_FALLBACK: &str = "4.1.0-1719";
-const MODULE_VERSION_CODE_FALLBACK: &str = "401000";
+const MODULE_VERSION_FALLBACK: &str = "4.2.0-1815";
+const MODULE_VERSION_CODE_FALLBACK: &str = "402000";
 const HYBRID_MOUNT_BINARY: &str = "hybrid-mount";
 const COMPAT_MARKER_FILE: &str = ".ksu_builtin_mount_compat";
+const SOURCE_URL: &str = "https://github.com/Hybrid-Mount/meta-hybrid_mount/releases/tag/v4.2.0";
+const KASUMI_LKM_PREFIX: &str = "kasumi_lkm/";
+const KASUMI_LKM_SUFFIX: &str = "_arm64_kasumi_lkm.ko";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BuiltinMountVariant {
     Lite,
+    Full,
 }
 
 impl BuiltinMountVariant {
     pub fn parse(value: &str) -> Result<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
-            "lite" | "full" | "kasumi" | "experimental" => Ok(Self::Lite),
+            "lite" => Ok(Self::Lite),
+            "full" | "kasumi" | "experimental" => Ok(Self::Full),
             _ => bail!("unsupported builtin mount variant: {value}"),
         }
     }
@@ -36,12 +42,14 @@ impl BuiltinMountVariant {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Lite => "lite",
+            Self::Full => "full",
         }
     }
 
     pub const fn archive(self) -> &'static [u8] {
         match self {
             Self::Lite => BUILTIN_LITE_ZIP,
+            Self::Full => BUILTIN_FULL_ZIP,
         }
     }
 }
@@ -92,6 +100,16 @@ pub fn print_status() {
     let version_code = module_prop
         .get("versionCode")
         .map_or(MODULE_VERSION_CODE_FALLBACK, String::as_str);
+    let archive_info = read_archive_lkm_info(variant);
+    let current_kmi = boot_patch::get_current_kmi().unwrap_or_default();
+    let compatibility = match variant {
+        BuiltinMountVariant::Lite => "not_required",
+        BuiltinMountVariant::Full if current_kmi.is_empty() => "unknown",
+        BuiltinMountVariant::Full if archive_info.supported_kmis.contains(&current_kmi) => {
+            "compatible"
+        }
+        BuiltinMountVariant::Full => "unsupported",
+    };
 
     println!(
         "{}",
@@ -107,8 +125,52 @@ pub fn print_status() {
             "defaultMode": default_mode,
             "variant": variant.as_str(),
             "webui": webui,
+            "sourceUrl": SOURCE_URL,
+            "archiveSha256": sha256::digest(variant.archive()),
+            "lkmCount": archive_info.lkm_count,
+            "supportedKmis": archive_info.supported_kmis,
+            "currentKmi": current_kmi,
+            "compatibility": compatibility,
+            "lkmPurpose": "Kasumi mount and concealment features",
+            "apkesuRootDriver": false,
         })
     );
+}
+
+#[derive(Default)]
+struct ArchiveLkmInfo {
+    lkm_count: usize,
+    supported_kmis: Vec<String>,
+}
+
+fn read_archive_lkm_info(variant: BuiltinMountVariant) -> ArchiveLkmInfo {
+    let Ok(mut archive) = zip::ZipArchive::new(Cursor::new(variant.archive())) else {
+        return ArchiveLkmInfo::default();
+    };
+    let mut supported_kmis = Vec::new();
+    let mut lkm_count = 0;
+    for index in 0..archive.len() {
+        let Ok(file) = archive.by_index(index) else {
+            continue;
+        };
+        let name = file.name();
+        let Some(file_name) = name.strip_prefix(KASUMI_LKM_PREFIX) else {
+            continue;
+        };
+        let Some(kmi) = file_name.strip_suffix(KASUMI_LKM_SUFFIX) else {
+            continue;
+        };
+        if !kmi.is_empty() {
+            lkm_count += 1;
+            supported_kmis.push(kmi.to_owned());
+        }
+    }
+    supported_kmis.sort();
+    supported_kmis.dedup();
+    ArchiveLkmInfo {
+        lkm_count,
+        supported_kmis,
+    }
 }
 
 pub fn print_default_mode() {
@@ -121,9 +183,8 @@ pub fn enable() -> Result<()> {
     let module_dir = module_dir();
     let mode = read_default_mode();
     let variant = read_variant();
-    write_default_mode(mode)?;
-    remove_builtin_symlink_if_active()?;
     install_or_update_builtin_module(&module_dir, variant)?;
+    write_default_mode_for_variant(mode, variant)?;
     cleanup_legacy_module_dirs()?;
     remove_disable_marker(&module_dir)?;
     ensure_compat_module_entry(&module_dir)?;
@@ -164,9 +225,8 @@ pub fn set_variant(variant: BuiltinMountVariant) -> Result<()> {
     if enabled {
         ensure_no_conflicting_metamodule()?;
         let mode = read_default_mode();
-        write_default_mode(mode)?;
-        remove_builtin_symlink_if_active()?;
         install_or_update_builtin_module(&module_dir, variant)?;
+        write_default_mode_for_variant(mode, variant)?;
         cleanup_legacy_module_dirs()?;
         remove_disable_marker(&module_dir)?;
         ensure_compat_module_entry(&module_dir)?;
@@ -252,6 +312,19 @@ fn install_or_update_builtin_module(module_dir: &Path, variant: BuiltinMountVari
     utils::ensure_dir_exists(parent)?;
 
     let tmp_dir = parent.join(format!("{HYBRID_MOUNT_MODULE_ID}.tmp"));
+    let backup_dir = parent.join(format!("{HYBRID_MOUNT_MODULE_ID}.backup"));
+    if backup_dir.exists() || backup_dir.is_symlink() {
+        if module_dir.exists() || module_dir.is_symlink() {
+            remove_path(&backup_dir)?;
+        } else {
+            fs::rename(&backup_dir, module_dir).with_context(|| {
+                format!(
+                    "failed to restore interrupted builtin mount update from {}",
+                    backup_dir.display()
+                )
+            })?;
+        }
+    }
     utils::ensure_clean_dir(&tmp_dir)?;
 
     let mut archive = zip::ZipArchive::new(Cursor::new(variant.archive()))
@@ -262,16 +335,38 @@ fn install_or_update_builtin_module(module_dir: &Path, variant: BuiltinMountVari
 
     prepare_extracted_builtin_module(&tmp_dir)?;
 
-    if module_dir.exists() || module_dir.is_symlink() {
-        remove_path(module_dir)?;
+    let had_previous = module_dir.exists() || module_dir.is_symlink();
+    if had_previous {
+        fs::rename(module_dir, &backup_dir).with_context(|| {
+            format!(
+                "failed to preserve existing builtin mount dir {}",
+                module_dir.display()
+            )
+        })?;
     }
-    fs::rename(&tmp_dir, module_dir).with_context(|| {
-        format!(
-            "failed to replace builtin mount dir {} with {}",
-            module_dir.display(),
-            tmp_dir.display()
-        )
-    })?;
+    if let Err(error) = fs::rename(&tmp_dir, module_dir) {
+        if had_previous {
+            fs::rename(&backup_dir, module_dir).with_context(|| {
+                format!(
+                    "failed to restore {} after update error: {error}",
+                    module_dir.display()
+                )
+            })?;
+        }
+        return Err(error).with_context(|| {
+            format!(
+                "failed to replace builtin mount dir {} with {}",
+                module_dir.display(),
+                tmp_dir.display()
+            )
+        });
+    }
+    if had_previous && let Err(error) = remove_path(&backup_dir) {
+        log::warn!(
+            "failed to remove builtin mount backup {}: {error}",
+            backup_dir.display()
+        );
+    }
     Ok(())
 }
 
@@ -333,14 +428,6 @@ fn remove_disable_marker(module_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn remove_builtin_symlink_if_active() -> Result<()> {
-    let module_dir = module_dir();
-    if is_same_path_as_active_metamodule(&module_dir) || metamodule_symlink_points_to(&module_dir) {
-        metamodule::remove_symlink()?;
-    }
-    Ok(())
-}
-
 fn cleanup_legacy_module_dirs() -> Result<()> {
     remove_path_if_exists(&legacy_module_dir())?;
     remove_path_if_exists(&legacy_update_dir())?;
@@ -370,6 +457,20 @@ fn ensure_compat_module_entry(module_dir: &Path) -> Result<()> {
         compat_dir.join("module.prop"),
     )
     .with_context(|| "failed to copy builtin mount module.prop to compat entry")?;
+
+    let kasumi_lkm_dir = module_dir.join("kasumi_lkm");
+    if kasumi_lkm_dir.exists() {
+        let compat_kasumi_lkm_dir = compat_dir.join("kasumi_lkm");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&kasumi_lkm_dir, &compat_kasumi_lkm_dir).with_context(|| {
+            format!(
+                "failed to symlink {} to {}",
+                kasumi_lkm_dir.display(),
+                compat_kasumi_lkm_dir.display()
+            )
+        })?;
+    }
+
     utils::ensure_file_exists(compat_dir.join(COMPAT_MARKER_FILE))?;
 
     #[cfg(unix)]
@@ -521,14 +622,18 @@ fn parse_default_mode_line(line: &str) -> Option<MountMode> {
 }
 
 fn write_default_mode(mode: MountMode) -> Result<()> {
+    write_default_mode_for_variant(mode, read_variant())
+}
+
+fn write_default_mode_for_variant(mode: MountMode, variant: BuiltinMountVariant) -> Result<()> {
     let config = Path::new(CONFIG_PATH);
     let parent = config
         .parent()
         .with_context(|| format!("{} has no parent", config.display()))?;
     utils::ensure_dir_exists(parent)?;
 
-    let content =
-        fs::read_to_string(config).unwrap_or_else(|_| default_config(mode, read_variant()));
+    let content = fs::read_to_string(config).unwrap_or_else(|_| default_config(mode, variant));
+    let content = reconcile_variant_config(content, variant);
     let mut found = false;
     let mut output = String::new();
     for line in content.lines() {
@@ -565,8 +670,42 @@ fn write_default_mode(mode: MountMode) -> Result<()> {
     Ok(())
 }
 
-fn default_config(mode: MountMode, _variant: BuiltinMountVariant) -> String {
-    format!(
+fn reconcile_variant_config(mut content: String, variant: BuiltinMountVariant) -> String {
+    match variant {
+        BuiltinMountVariant::Lite => remove_kasumi_sections(&content),
+        BuiltinMountVariant::Full => {
+            if !content.lines().any(|line| line.trim() == "[kasumi]") {
+                if !content.ends_with('\n') {
+                    content.push('\n');
+                }
+                content.push_str(full_kasumi_config());
+            }
+            content
+        }
+    }
+}
+
+fn remove_kasumi_sections(content: &str) -> String {
+    let mut output = String::new();
+    let mut skip_section = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(section) = trimmed
+            .strip_prefix('[')
+            .and_then(|value| value.strip_suffix(']'))
+        {
+            skip_section = section == "kasumi" || section.starts_with("kasumi.");
+        }
+        if !skip_section {
+            output.push_str(line);
+            output.push('\n');
+        }
+    }
+    output
+}
+
+fn default_config(mode: MountMode, variant: BuiltinMountVariant) -> String {
+    let mut config = format!(
         "default_mode = \"{}\"\n\
          disable_umount = false\n\
          enable_overlay_fallback = false\n\
@@ -574,5 +713,45 @@ fn default_config(mode: MountMode, _variant: BuiltinMountVariant) -> String {
          mountsource = \"KSU\"\n\
          overlay_mode = \"ext4\"\n",
         mode.as_str()
-    )
+    );
+    if variant == BuiltinMountVariant::Full {
+        config.push_str(full_kasumi_config());
+    }
+    config
+}
+
+const fn full_kasumi_config() -> &'static str {
+    "\n\
+     [kasumi]\n\
+     cmdline_value = \"\"\n\
+     enable_hidexattr = false\n\
+     enable_kernel_debug = false\n\
+     enable_maps_spoof = false\n\
+     enable_mount_hide = false\n\
+     enable_statfs_spoof = false\n\
+     enable_stealth = false\n\
+     enabled = false\n\
+     hide_uids = []\n\
+     lkm_autoload = true\n\
+     lkm_dir = \"/data/adb/modules/hybrid_mount/kasumi_lkm\"\n\
+     lkm_kmi_override = \"\"\n\
+     mirror_path = \"/dev/kasumi_mirror\"\n\
+     uname_mode = \"scoped\"\n\
+     \n\
+     [kasumi.mount_hide]\n\
+     enabled = false\n\
+     path_pattern = \"\"\n\
+     \n\
+     [kasumi.statfs_spoof]\n\
+     enabled = false\n\
+     path = \"\"\n\
+     spoof_f_type = 0\n\
+     \n\
+     [kasumi.uname]\n\
+     domainname = \"\"\n\
+     machine = \"\"\n\
+     nodename = \"\"\n\
+     release = \"\"\n\
+     sysname = \"\"\n\
+     version = \"\"\n"
 }

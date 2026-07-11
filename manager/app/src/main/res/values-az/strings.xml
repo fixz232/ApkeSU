@@ -65,7 +65,6 @@
     <string name="profile_selinux_rules">Qaydalar</string>
     <string name="module_update">Güncəllə</string>
     <string name="module_start_downloading">Endirməni başlat: %s</string>
-    <string name="new_version_available">Yeni versiya: %s əlçatandır, endirmək üçün toxunun</string>
     <string name="module_downloading">Modul yüklənir: %s</string>
     <string name="profile_umount_modules_summary">Bu seçimi aktivləşdirmək ApkeSU-ya bu proqram üçün modullar tərəfindən hər hansı dəyişdirilmiş faylları bərpa etməyə imkan verəcək.</string>
     <string name="launch_app">Aç</string>

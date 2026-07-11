@@ -69,7 +69,6 @@
     <string name="module_update">Ažuriranje</string>
     <string name="module_downloading">Preuzimanje module: %s</string>
     <string name="module_start_downloading">Započnite sa preuzimanjem: %s</string>
-    <string name="new_version_available">Nova verzija %s je dostupna, kliknite za nadogradnju!</string>
     <string name="launch_app">Pokrenite</string>
     <string name="force_stop_app">Prisilno zaustavi</string>
     <string name="restart_app">Resetujte</string>
@@ -97,8 +96,6 @@
     <string name="app_profile_template_import_success">Uspješno uvezeno</string>
     <string name="app_profile_template_save_failed">Spremanje predloška nije uspjelo</string>
     <string name="app_profile_template_import_empty">Međuspremnik je prazan!</string>
-    <string name="settings_check_update">Provjeri za ažuriranja</string>
-    <string name="settings_check_update_summary">Automatski provjeri za ažuriranja prilikom otvaranja aplikacije.</string>
     <string name="grant_root_failed">Dodjeljivanje root pristupa nije uspjelo!</string>
     <string name="action">Radnja</string>
     <string name="open">Otvori</string>
@@ -114,10 +111,8 @@
     <string name="select_file_tip">Preporučuje se particija %1$s</string>
     <string name="select_kmi">Odaberi KMI</string>
     <string name="settings_uninstall">Deinstaliraj</string>
-    <string name="settings_uninstall_temporary">Privremeno deinstaliraj</string>
     <string name="settings_uninstall_permanent">Trajno deinstaliraj</string>
     <string name="settings_restore_stock_image">Vrati stock image</string>
-    <string name="settings_uninstall_temporary_message">Privremeno deinstaliraj ApkeSU, vrati u izvorno stanje nakon sljedećeg ponovnog pokretanja.</string>
     <string name="settings_uninstall_permanent_message">Potpuno i trajno deinstaliranje ApkeSU-a (root i svi moduli).</string>
     <string name="settings_restore_stock_image_message">Vrati stock factory image (ako postoji sigurnosna kopija), obično se koristi prije OTA-e; ako trebate deinstalirati ApkeSU, koristite \"Trajno deinstaliraj\".</string>
     <string name="flashing">Flešanje</string>

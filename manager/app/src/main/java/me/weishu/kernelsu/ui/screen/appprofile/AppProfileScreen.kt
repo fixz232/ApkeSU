@@ -17,6 +17,8 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
@@ -32,6 +34,7 @@ import me.weishu.kernelsu.ui.util.restartApp
 import me.weishu.kernelsu.ui.util.setSepolicy
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import me.weishu.kernelsu.ui.viewmodel.getTemplateInfoById
+import java.util.concurrent.atomic.AtomicLong
 
 @Composable
 fun AppProfileScreen(uid: Int) {
@@ -72,6 +75,11 @@ fun AppProfileScreen(uid: Int) {
     var profile by rememberSaveable(uid, packageName) {
         mutableStateOf(initialProfile)
     }
+    var persistedProfile by remember(uid, packageName) {
+        mutableStateOf(initialProfile)
+    }
+    val profileWriteMutex = remember(uid, packageName) { Mutex() }
+    val profileWriteGeneration = remember(uid, packageName) { AtomicLong(0L) }
 
     val failToUpdateAppProfile = stringResource(R.string.failed_to_update_app_profile).format(primaryAppInfo.label)
     val failToUpdateSepolicy = stringResource(R.string.failed_to_update_sepolicy).format(primaryAppInfo.label)
@@ -108,34 +116,60 @@ fun AppProfileScreen(uid: Int) {
         onManageTemplate = {
             navigator.push(Route.AppProfileTemplate)
         },
-        onProfileChange = { updatedProfile ->
+        onProfileChange = profileChange@ { updatedProfile ->
+            if (updatedProfile.allowSu && uid < 2000 && uid != 1000) {
+                showMessage(suNotAllowed)
+                return@profileChange
+            }
+
+            val generation = profileWriteGeneration.incrementAndGet()
+            profile = updatedProfile
+
             scope.launch {
-                if (updatedProfile.allowSu) {
-                    if (uid < 2000 && uid != 1000) {
-                        showMessage(suNotAllowed)
-                        return@launch
+                profileWriteMutex.withLock {
+                    // Drop queued intermediate clicks. A write already in progress is allowed to
+                    // finish, then the newest profile is applied after it.
+                    if (generation != profileWriteGeneration.get()) return@withLock
+
+                    val desiredRules = updatedProfile.rules.takeIf {
+                        updatedProfile.allowSu && !updatedProfile.rootUseDefault
+                    }.orEmpty()
+                    val sepolicyUpdated = withContext(Dispatchers.IO) {
+                        setSepolicy(updatedProfile.name, desiredRules)
                     }
-                    if (!updatedProfile.rootUseDefault
-                        && updatedProfile.rules.isNotEmpty()
-                        && !setSepolicy(profile.name, updatedProfile.rules)
-                    ) {
-                        showMessage(failToUpdateSepolicy)
-                        return@launch
+                    if (!sepolicyUpdated) {
+                        if (generation == profileWriteGeneration.get()) {
+                            profile = persistedProfile
+                            showMessage(failToUpdateSepolicy)
+                        }
+                        return@withLock
                     }
-                }
-                val updated = withContext(Dispatchers.IO) {
-                    if (Natives.setAppProfile(updatedProfile)) {
-                        true
+
+                    val updated = withContext(Dispatchers.IO) {
+                        if (Natives.setAppProfile(updatedProfile)) {
+                            true
+                        } else {
+                            ensureManagerRegistered() && Natives.setAppProfile(updatedProfile)
+                        }
+                    }
+                    if (updated) {
+                        persistedProfile = updatedProfile
+                        if (generation == profileWriteGeneration.get()) {
+                            profile = updatedProfile
+                            if (uiMode == UiMode.Material) {
+                                viewModel.loadAppList()
+                            }
+                        }
                     } else {
-                        ensureManagerRegistered() && Natives.setAppProfile(updatedProfile)
-                    }
-                }
-                if (!updated) {
-                    showMessage(failToUpdateAppProfile)
-                } else {
-                    profile = updatedProfile
-                    if (uiMode == UiMode.Material) {
-                        viewModel.loadAppList()
+                        withContext(Dispatchers.IO) {
+                            setSepolicy(persistedProfile.name, persistedProfile.rules.takeIf {
+                                persistedProfile.allowSu && !persistedProfile.rootUseDefault
+                            }.orEmpty())
+                        }
+                        if (generation == profileWriteGeneration.get()) {
+                            profile = persistedProfile
+                            showMessage(failToUpdateAppProfile)
+                        }
                     }
                 }
             }

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.ElectricalServices
 import androidx.compose.material.icons.filled.Fence
 import androidx.compose.material.icons.filled.FolderDelete
 import androidx.compose.material.icons.filled.ImageSearch
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Policy
@@ -89,6 +90,7 @@ import me.weishu.kernelsu.ui.component.material.SendLogBottomSheet
 import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
@@ -595,6 +597,31 @@ private fun SettingsMaterialContent(
                         items = builtinMountModeItems,
                         selectedIndex = if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 1 else 0,
                         onItemSelected = actions.onSetBuiltinMountDefaultMode
+                    )
+                },
+                {
+                    val builtinMountVariantItems = listOf(
+                        stringResource(id = R.string.settings_builtin_mount_variant_lite),
+                        stringResource(id = R.string.settings_builtin_mount_variant_full),
+                    )
+                    SegmentedDropdownItem(
+                        icon = Icons.Filled.Layers,
+                        title = stringResource(id = R.string.settings_builtin_mount_variant),
+                        summary = stringResource(id = R.string.settings_builtin_mount_variant_summary),
+                        items = builtinMountVariantItems,
+                        selectedIndex = if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 1 else 0,
+                        onItemSelected = actions.onSetBuiltinMountVariant
+                    )
+                },
+                {
+                    SegmentedListItem(
+                        onClick = actions.onShowBuiltinMountDetails,
+                        headlineContent = { Text(stringResource(R.string.settings_builtin_mount_details)) },
+                        supportingContent = { Text(stringResource(R.string.settings_builtin_mount_details_summary)) },
+                        leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                        },
                     )
                 },
                 {

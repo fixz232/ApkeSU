@@ -6,8 +6,8 @@ use std::{
     collections::BTreeSet,
     ffi::CString,
     fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
+    io::{self, Write},
+    path::{Component, Path},
     process::Command,
     thread,
     time::Duration,
@@ -78,6 +78,60 @@ pub fn print_status() {
     );
 }
 
+pub fn test_visibility(uid: u32, path: &str) -> Result<()> {
+    let path = sanitize_target_path(path).context("invalid visibility probe path")?;
+    let root_exists = fs::symlink_metadata(&path).is_ok();
+    let module_loaded = is_module_loaded();
+    let resolved_count = read_sysfs_param("resolved_count").unwrap_or_default();
+
+    let (status, visible, error) = if root_exists {
+        match probe_path_as_uid(uid, &path) {
+            Ok(()) => ("visible", true, String::new()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                ("not_visible", false, String::new())
+            }
+            Err(error) => ("probe_failed", false, error.to_string()),
+        }
+    } else {
+        ("missing", false, String::new())
+    };
+
+    append_log(format!(
+        "visibility probe: uid={uid}, path={path}, status={status}, module_loaded={module_loaded}"
+    ));
+    println!(
+        "{}",
+        json!({
+            "uid": uid,
+            "path": path,
+            "status": status,
+            "visible": visible,
+            "rootExists": root_exists,
+            "moduleLoaded": module_loaded,
+            "resolvedCount": resolved_count,
+            "error": error,
+        })
+    );
+    Ok(())
+}
+
+fn probe_path_as_uid(uid: u32, path: &str) -> io::Result<()> {
+    // This command exits immediately after probing, so dropping all credentials
+    // in-process cannot leak into another ksud operation.
+    unsafe {
+        if libc::setgroups(0, std::ptr::null()) != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if libc::setresgid(uid, uid, uid) != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if libc::setresuid(uid, uid, uid) != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    fs::symlink_metadata(path).map(|_| ())
+}
+
 pub fn import_config(file: &Path) -> Result<()> {
     let result = import_config_inner(file);
     if let Err(err) = &result {
@@ -134,7 +188,15 @@ fn apply_inner() -> Result<()> {
         append_log("unloaded old pathmask module");
     }
 
-    let existing_count = wait_for_any_target_path(&config)?;
+    let existing_count = match wait_for_any_target_path(&config) {
+        Ok(count) => count,
+        Err(error) => {
+            if let Err(restore_err) = restore_last_good(&kmi, &ko_data) {
+                append_log(format!("restore last good config failed: {restore_err:#}"));
+            }
+            return Err(error);
+        }
+    };
     append_log(format!(
         "target path precheck passed: {existing_count}/{} currently exists",
         config.target_paths.len()
@@ -148,8 +210,19 @@ fn apply_inner() -> Result<()> {
         return Err(err.context("failed to load pathmask with current config"));
     }
 
+    let resolved_count = read_sysfs_param("resolved_count")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0);
+    if resolved_count == 0 {
+        append_log("pathmask loaded but resolved_count is zero; rolling back");
+        let _ = unload_loaded_pathmask(true);
+        if let Err(restore_err) = restore_last_good(&kmi, &ko_data) {
+            append_log(format!("restore last good config failed: {restore_err:#}"));
+        }
+        bail!("pathmask did not resolve any configured target path");
+    }
+
     write_config(LAST_GOOD_CONFIG_PATH, &config)?;
-    let resolved_count = read_sysfs_param("resolved_count").unwrap_or_default();
     append_log(format!(
         "pathmask loaded successfully, resolved_count={resolved_count}"
     ));
@@ -439,11 +512,17 @@ fn string_array(value: Option<&Value>) -> Vec<String> {
 
 fn sanitize_target_path(path: &str) -> Option<String> {
     let path = normalize_target_path(path);
-    if path.starts_with('/')
+    let candidate = Path::new(&path);
+    if path != "/"
+        && candidate.is_absolute()
+        && candidate
+            .components()
+            .all(|component| matches!(component, Component::RootDir | Component::Normal(_)))
         && !path.contains(',')
         && !path.contains('\0')
         && !path.contains('"')
         && !path.contains('\\')
+        && !path.chars().any(char::is_control)
     {
         Some(path)
     } else {

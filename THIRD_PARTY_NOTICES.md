@@ -122,40 +122,26 @@ Suggested release check:
   cd manager
   ./gradlew :app:dependencies --configuration releaseRuntimeClasspath
 
-4. LKM and GKI build inputs
----------------------------
+4. LKM build inputs
+-------------------
 
 Source files:
 
   - .github/workflows/build-lkm.yml
   - .github/workflows/ddk-lkm.yml
-  - .github/workflows/gki-build.yml
-  - .github/actions/gki-download-kernel/action.yml
-  - .github/actions/gki-setup-build-environment/action.yml
-  - .github/actions/gki-susfs/action.yml
 
 Direct external build inputs:
 
 | Input | Version/ref used by repo | License/source note |
 | --- | --- | --- |
-| ghcr.io/ylarod/ddk-min | `${kmi}-20260313` | Android GKI DDK container used only to compile kernelsu.ko. Kernel headers and generated kernel build files follow the Android common kernel/Linux GPL-2.0-only model; LLVM/Clang and Android build tools keep their own upstream notices. Keep the container/upstream notices with published KO build logs where applicable. |
-| Android GKI kernel manifest/tree | `common-${android}-${kernel}-${os_patch_level}` or deprecated fallback | Android common kernel source from android.googlesource.com. The kernel tree follows Linux kernel GPL-2.0-only plus per-file SPDX notices. |
-| Google repo tool | downloaded from storage.googleapis.com/git-repo-downloads/repo | Android repo client; keep upstream notices when redistributing tooling. |
-| WildKernels/kernel_patches | default branch at workflow runtime | External GKI patch helper repository cloned during workflow. |
-| WildKernels/AnyKernel3 | branch `gki-2.0` | AnyKernel3 packaging tree cloned during workflow. |
-| simonpunk/susfs4ksu | branch `gki-${version}`, optionally pinned by .github/config/gki-commits.json | SUSFS source and patches cloned during workflow. Preserve its upstream license/notices with SUSFS-enabled kernel artifacts. |
-| cctv18/oppo_oplus_realme_sm8750 | user-selected ref, default `main` | Optional OPlus SM8750/MT6991 6.6 reference patch source for the dedicated GKI profile. Preserve its upstream notices when publishing artifacts that include patches from it. |
+| ghcr.io/ylarod/ddk-min | `${kmi}-20260313` | Android DDK container used only to compile kernelsu.ko. Kernel headers and generated kernel build files follow the Android common kernel/Linux GPL-2.0-only model; LLVM/Clang and Android build tools keep their own upstream notices. Keep the container/upstream notices with published KO build logs where applicable. |
 | GitHub Actions official actions | checkout, upload-artifact | Build-service actions used at CI time; not vendored into release artifacts. |
 
-The repository does not vendor the full Android GKI kernel tree, DDK container,
-AnyKernel3 tree, kernel_patches tree, SUSFS repository, or OPlus reference
-patch repository. They are fetched by CI at build time and remain governed by
-their own upstream licenses.
+The repository does not vendor the DDK container. It is fetched by CI at build
+time and remains governed by its upstream licenses.
 
-When publishing a KO, boot image, or AnyKernel3 package, include:
+When publishing a KO package, include:
 
   - the exact ApkeSU source revision;
   - the exact KMI and DDK release;
-  - the Android GKI branch or manifest used;
-  - any external patch repository commit used;
   - the generated binary artifact and enough build instructions to reproduce it.

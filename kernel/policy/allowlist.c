@@ -133,6 +133,13 @@ static bool profile_valid(struct app_profile *profile)
     }
 
     if (profile->allow_su) {
+        if (strnlen(profile->rp_config.template_name,
+                    sizeof(profile->rp_config.template_name)) >=
+            sizeof(profile->rp_config.template_name)) {
+            pr_err("invalid template_name in app_profile: %s\n", profile->key);
+            return false;
+        }
+
 #ifndef CONFIG_KSU_DISABLE_POLICY
         if (profile->rp_config.profile.groups_count > KSU_MAX_GROUPS) {
             pr_err("invalid groups_count in app_profile: %s\n", profile->key);
@@ -551,7 +558,7 @@ void ksu_load_allow_list()
     app_profile_size = version < KSU_APP_PROFILE_VER ? kAppProfileSizePreV4 : sizeof(struct app_profile);
 
     while (true) {
-        struct app_profile profile;
+        struct app_profile profile = {};
 
         ret = kernel_read(fp, &profile, app_profile_size, &off);
 
@@ -563,8 +570,15 @@ void ksu_load_allow_list()
 
         migrate_profile(version, &profile);
 
-        pr_info("load_allow_uid, name: %s, uid: %d, allow: %d\n", profile.key, profile.curr_uid, profile.allow_su);
-        ksu_set_app_profile(&profile);
+        ret = ksu_set_app_profile(&profile);
+        if (!ret) {
+            pr_info("load_allow_uid, name: %.*s, uid: %d, allow: %d\n",
+                    (int)sizeof(profile.key), profile.key, profile.curr_uid,
+                    profile.allow_su);
+        } else {
+            pr_warn("skip invalid allowlist profile: uid=%d, error=%zd\n",
+                    profile.curr_uid, ret);
+        }
     }
     ksu_show_allow_list();
     filp_close(fp, 0);

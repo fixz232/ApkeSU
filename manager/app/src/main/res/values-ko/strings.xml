@@ -49,7 +49,6 @@
     <string name="settings_umount_modules_default_summary">앱 프로필 메뉴의 \"모듈 마운트 해제\" 설정에 대한 전역 기본값을 지정합니다. 활성화하면 개별 프로필이 설정되지 않은 앱에는 시스템에 대한 모듈의 모든 수정 사항이 제외됩니다.</string>
     <string name="restart_app">다시 시작</string>
     <string name="profile_selinux_rules">규칙</string>
-    <string name="new_version_available">새 %s 버전을 사용할 수 있습니다, 여기를 눌러 업그레이드하세요!</string>
     <string name="module_start_downloading">다운로드 시작: %s</string>
     <string name="force_stop_app">강제 중지</string>
     <string name="profile_default">기본값</string>
@@ -84,14 +83,12 @@
     <string name="enable_web_debugging">WebView 디버깅</string>
     <string name="require_kernel_version">현재 ApkeSU %1$d 버전은 매니저가 정상 작동하기에 너무 낮습니다. %2$d 버전 이상으로 업그레이드하세요!</string>
     <string name="action">액션</string>
-    <string name="settings_uninstall_temporary">임시 제거</string>
     <string name="open">열기</string>
     <string name="install_inactive_slot_warning">재부팅 후 기기가 **강제로** 비활성 슬롯으로 부팅합니다!\nOTA가 완료된 후에만 이 옵션을 사용하세요.\n계속할까요?</string>
     <string name="flash_success">플래싱 성공</string>
     <string name="flash_failed">플래싱 실패</string>
     <string name="settings_uninstall">제거</string>
     <string name="settings_uninstall_permanent">영구 제거</string>
-    <string name="settings_uninstall_temporary_message">임시적으로 ApkeSU를 제거하고, 다음 재부팅 이후 기존 상태로 복구합니다.</string>
     <string name="settings_profile_template">앱 프로필 템플릿</string>
     <string name="settings_profile_template_summary">로컬 및 온라인의 앱 프로필 템플릿을 관리합니다.</string>
     <string name="app_profile_template_id">ID</string>
@@ -117,8 +114,6 @@
     <string name="install_inactive_slot">비활성 슬롯에 설치 (OTA 이후)</string>
     <string name="settings_restore_stock_image">제조사 이미지로 복구</string>
     <string name="settings_restore_stock_image_message">제조사 이미지로 복구 (백업 존재 시), OTA 이전에 사용합니다. ApkeSU를 제거해야 하는 경우, \"영구 삭제\"를 사용하세요.</string>
-    <string name="settings_check_update">업데이트 확인</string>
-    <string name="settings_check_update_summary">앱 실행 시 자동으로 업데이트를 확인합니다.</string>
     <string name="log_saved">로그 저장됨</string>
     <string name="module_sort_enabled_first">활성화 우선</string>
     <string name="module_sort_action_first">액션 우선</string>

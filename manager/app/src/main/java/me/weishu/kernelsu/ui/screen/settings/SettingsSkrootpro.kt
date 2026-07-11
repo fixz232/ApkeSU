@@ -22,17 +22,22 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.Slider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,6 +73,7 @@ import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproSectionTitle
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
@@ -147,6 +153,12 @@ fun SettingPagerSkrootpro(
                     onClick = actions.onOpenLauncherIcon,
                 )
                 SkrootproActionRow(
+                    title = stringResource(R.string.settings_navigation_icons),
+                    summary = stringResource(R.string.settings_navigation_icons_summary),
+                    leadingIcon = Icons.Rounded.Apps,
+                    onClick = actions.onOpenNavigationIcons,
+                )
+                SkrootproActionRow(
                     title = stringResource(R.string.home_card_wallpapers),
                     summary = stringResource(R.string.home_card_wallpapers_summary),
                     leadingIcon = Icons.Rounded.Wallpaper,
@@ -219,6 +231,49 @@ fun SettingPagerSkrootpro(
                 expanded = rootFeaturesExpanded,
                 onExpandedChange = { rootFeaturesExpanded = it },
             ) {
+                val suCompatOptions = listOf(
+                    stringResource(R.string.settings_mode_enable_by_default),
+                    stringResource(R.string.settings_mode_disable_until_reboot),
+                    stringResource(R.string.settings_mode_disable_always),
+                )
+                var suCompatExpanded by remember { mutableStateOf(false) }
+                val suCompatSummary = when (uiState.suCompatStatus) {
+                    "unsupported" -> stringResource(R.string.feature_status_unsupported_summary)
+                    "managed" -> stringResource(R.string.feature_status_managed_summary)
+                    else -> suCompatOptions.getOrElse(uiState.suCompatMode) { suCompatOptions.first() }
+                }
+                Box {
+                    SkrootproActionRow(
+                        title = stringResource(R.string.settings_sucompat),
+                        summary = suCompatSummary,
+                        leadingIcon = Icons.Rounded.RemoveModerator,
+                        onClick = {
+                            if (uiState.suCompatStatus == "supported") suCompatExpanded = true
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = suCompatExpanded,
+                        onDismissRequest = { suCompatExpanded = false },
+                    ) {
+                        suCompatOptions.forEachIndexed { index, label ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                leadingIcon = {
+                                    if (uiState.suCompatMode == index) {
+                                        androidx.compose.material3.Icon(
+                                            Icons.Rounded.Check,
+                                            contentDescription = null,
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    suCompatExpanded = false
+                                    actions.onSetSuCompatMode(index)
+                                },
+                            )
+                        }
+                    }
+                }
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_kernel_umount),
                     checked = uiState.isKernelUmountEnabled,
@@ -291,6 +346,28 @@ fun SettingPagerSkrootpro(
                             if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 0 else 1
                         )
                     },
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_builtin_mount_variant),
+                    summary = stringResource(
+                        if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) {
+                            R.string.settings_builtin_mount_variant_full
+                        } else {
+                            R.string.settings_builtin_mount_variant_lite
+                        }
+                    ),
+                    leadingIcon = Icons.Rounded.Apps,
+                    onClick = {
+                        actions.onSetBuiltinMountVariant(
+                            if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 0 else 1
+                        )
+                    },
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_builtin_mount_details),
+                    summary = stringResource(R.string.settings_builtin_mount_details_summary),
+                    leadingIcon = Icons.Rounded.Info,
+                    onClick = actions.onShowBuiltinMountDetails,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_builtin_mount_webui),

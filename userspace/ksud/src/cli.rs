@@ -98,6 +98,18 @@ enum Commands {
         manager_uid: Option<u32>,
     },
 
+    /// Register this Manager with an already loaded KernelSU kernel
+    #[command(hide = true)]
+    RegisterManager {
+        /// manager package name
+        #[arg(long, default_value_t = String::from(defs::DEFAULT_MANAGER_PACKAGE))]
+        package_name: String,
+
+        /// manager uid supplied by the Manager app
+        #[arg(long)]
+        manager_uid: Option<u32>,
+    },
+
     /// Emulate system reboot
     SoftReboot,
 
@@ -293,6 +305,9 @@ enum Debug {
 
     /// Get kernel version
     Version,
+
+    /// Get ksud userspace version as JSON
+    UserspaceVersion,
 
     /// For testing
     Test,
@@ -532,6 +547,17 @@ enum Pathmask {
 
     /// Apply saved config by hot-reloading pathmask LKM
     Apply,
+
+    /// Probe whether a path is visible after dropping to an Android UID
+    TestVisibility {
+        /// Android application UID to probe as
+        #[arg(long)]
+        uid: u32,
+
+        /// Absolute path to probe
+        #[arg(long)]
+        path: String,
+    },
 
     /// Unload current pathmask LKM and clear kernel hidden paths
     Unload,
@@ -850,6 +876,7 @@ pub fn run() -> Result<()> {
                 Pathmask::Import { file } => pathmask::import_config(&file),
                 Pathmask::ImportJson { json } => pathmask::import_config_text(&json),
                 Pathmask::Apply => pathmask::apply(),
+                Pathmask::TestVisibility { uid, path } => pathmask::test_visibility(uid, &path),
                 Pathmask::Unload => pathmask::unload(),
                 Pathmask::Logs => {
                     pathmask::print_logs();
@@ -934,6 +961,10 @@ pub fn run() -> Result<()> {
             }
             result
         }
+        Commands::RegisterManager {
+            package_name,
+            manager_uid,
+        } => crate::late_load::register_manager(&package_name, manager_uid),
         Commands::Services => {
             if ksucalls::get_version() <= 0 {
                 info!("KernelSU not available, exiting services");
@@ -944,13 +975,13 @@ pub fn run() -> Result<()> {
         }
         Commands::Sulogd => sulog::run_sulogd(),
         Commands::Profile { command } => match command {
-            Profile::GetSepolicy { package } => crate::profile::get_sepolicy(package),
+            Profile::GetSepolicy { package } => crate::profile::get_sepolicy(&package),
             Profile::SetSepolicy { package, policy } => {
-                crate::profile::set_sepolicy(package, policy)
+                crate::profile::set_sepolicy(&package, policy)
             }
-            Profile::GetTemplate { id } => crate::profile::get_template(id),
-            Profile::SetTemplate { id, template } => crate::profile::set_template(id, template),
-            Profile::DeleteTemplate { id } => crate::profile::delete_template(id),
+            Profile::GetTemplate { id } => crate::profile::get_template(&id),
+            Profile::SetTemplate { id, template } => crate::profile::set_template(&id, template),
+            Profile::DeleteTemplate { id } => crate::profile::delete_template(&id),
             Profile::ListTemplates => crate::profile::list_templates(),
         },
 
@@ -981,6 +1012,16 @@ pub fn run() -> Result<()> {
             }
             Debug::Version => {
                 println!("Kernel Version: {}", ksucalls::get_version());
+                Ok(())
+            }
+            Debug::UserspaceVersion => {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "versionCode": defs::VERSION_CODE.trim(),
+                        "versionName": defs::VERSION_NAME.trim(),
+                    })
+                );
                 Ok(())
             }
             Debug::Su { global_mnt } => crate::su::grant_root(global_mnt),
@@ -1037,7 +1078,9 @@ pub fn run() -> Result<()> {
             BootInfo::IsAbDevice => {
                 let val = crate::utils::getprop("ro.build.ab_update")
                     .unwrap_or_else(|| String::from("false"));
-                let is_ab = val.trim().to_lowercase() == "true";
+                let slot_suffix = crate::boot_patch::get_slot_suffix(false).unwrap_or_default();
+                let is_ab = val.trim().eq_ignore_ascii_case("true")
+                    || matches!(slot_suffix.as_str(), "_a" | "_b");
                 println!("{}", if is_ab { "true" } else { "false" });
                 return Ok(());
             }
@@ -1048,7 +1091,7 @@ pub fn run() -> Result<()> {
                 return Ok(());
             }
             BootInfo::SlotSuffix { ota } => {
-                let suffix = crate::boot_patch::get_slot_suffix(ota);
+                let suffix = crate::boot_patch::get_slot_suffix(ota)?;
                 println!("{suffix}");
                 return Ok(());
             }

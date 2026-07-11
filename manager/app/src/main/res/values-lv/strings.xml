@@ -63,7 +63,6 @@
     <string name="module_update">Atjaunināt</string>
     <string name="module_downloading">Lejupielādē moduli: %s</string>
     <string name="module_start_downloading">Sākt lejupielādi: %s</string>
-    <string name="new_version_available">Jaunā versija: %s ir pieejama, noklikšķiniet, lai atjauninātu</string>
     <string name="launch_app">Palaist</string>
     <string name="force_stop_app">Piespiedu apstāšana</string>
     <string name="restart_app">Restartēt aplikāciju</string>
@@ -103,16 +102,12 @@
 \nTurpināt?</string>
     <string name="direct_install">Tiešā instalēšana (Ieteicams)</string>
     <string name="settings_uninstall">Atinstalēt</string>
-    <string name="settings_uninstall_temporary">Pagaidu atinstalēšana</string>
     <string name="settings_restore_stock_image">Atjaunot oriģinālo attēlu</string>
-    <string name="settings_uninstall_temporary_message">Īslaicīgi atinstalēt ApkeSU, pēc nākamās restartēšanas atjaunot sākotnējo stāvokli.</string>
     <string name="settings_uninstall_permanent_message">ApkeSU (saknes un visu moduļu) pilnīga atinstalēšana.</string>
     <string name="settings_restore_stock_image_message">Atjaunojot rūpnīcas attēlu (ja ir dublējums), ko parasti izmanto pirms OTA; ja nepieciešams atinstalēt ApkeSU, lūdzu, izmantojiet \"Neatgriezeniski atinstalēt\".</string>
     <string name="selected_lkm">Izvēlētais lkm: %s</string>
     <string name="grant_root_failed">Neizdevās piešķirt sakni!</string>
     <string name="open">Atvērt</string>
-    <string name="settings_check_update">Pārbaudīt atjauninājumus</string>
-    <string name="settings_check_update_summary">Automātiski pārbaudīt atjauninājumus atverot aplikāciju</string>
     <string name="enable_web_debugging_summary">Var izmantot WebUI atkļūdošanai, lūdzu, izmantot tikai tad, kad tas ir nepieciešams.</string>
     <string name="select_kmi">Izvēlieties KMI</string>
     <string name="settings_uninstall_permanent">Neatgriezeniski atinstalēt</string>

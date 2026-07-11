@@ -9,7 +9,6 @@ AGENTS.md
 __pycache__
 /dist/*
 !/dist/manager_identity.mk
-/.gki
 /repack-config.json
 .codex-*
 /release-local/

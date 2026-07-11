@@ -12,6 +12,7 @@ internal data class InstallUiState(
     val currentKmi: String,
     val slotSuffix: String,
     val installMethodOptions: List<InstallMethod>,
+    val rootAvailable: Boolean,
     val canSelectPartition: Boolean,
     val canInstall: Boolean,
     val advancedOptionsShown: Boolean,

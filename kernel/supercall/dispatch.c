@@ -1,4 +1,5 @@
 #include <linux/capability.h>
+#include <linux/atomic.h>
 #include <linux/cred.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -102,9 +103,8 @@ static int do_report_event(void __user *arg)
 
     switch (cmd.event) {
     case EVENT_POST_FS_DATA: {
-        static bool post_fs_data_lock = false;
-        if (!post_fs_data_lock) {
-            post_fs_data_lock = true;
+        static atomic_t post_fs_data_lock = ATOMIC_INIT(0);
+        if (atomic_cmpxchg(&post_fs_data_lock, 0, 1) == 0) {
             if (ksu_late_loaded) {
                 pr_info("post-fs-data skipped (late load)\n");
             } else {
@@ -115,9 +115,8 @@ static int do_report_event(void __user *arg)
         break;
     }
     case EVENT_BOOT_COMPLETED: {
-        static bool boot_complete_lock = false;
-        if (!boot_complete_lock) {
-            boot_complete_lock = true;
+        static atomic_t boot_complete_lock = ATOMIC_INIT(0);
+        if (atomic_cmpxchg(&boot_complete_lock, 0, 1) == 0) {
             if (ksu_late_loaded) {
                 pr_info("boot_complete skipped (late load)\n");
             } else {
@@ -588,6 +587,9 @@ static int add_try_umount(void __user *arg)
         if (len <= 0)
             return -EFAULT;
 
+        if (len >= sizeof(buf))
+            return -ENAMETOOLONG;
+
         buf[sizeof(buf) - 1] = '\0';
 
         new_entry = kzalloc(sizeof(*new_entry), GFP_KERNEL);
@@ -631,9 +633,12 @@ static int add_try_umount(void __user *arg)
 
     // this is just strcmp'd wipe anyway
     case KSU_UMOUNT_DEL: {
-        long len = strncpy_from_user(buf, (const char __user *)cmd.arg, sizeof(buf) - 1);
+        long len = strncpy_from_user(buf, (const char __user *)cmd.arg, sizeof(buf));
         if (len <= 0)
             return -EFAULT;
+
+        if (len >= sizeof(buf))
+            return -ENAMETOOLONG;
 
         buf[sizeof(buf) - 1] = '\0';
 

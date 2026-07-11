@@ -8,12 +8,9 @@ import android.content.Intent;
 import android.os.UserManager;
 import android.util.Log;
 
-import me.weishu.kernelsu.BuildConfig;
 import me.weishu.kernelsu.ui.util.KsuCliKt;
 
 public class BootCompletedReceiver extends BroadcastReceiver {
-    private static final String ACTION_MAGICA_LAUNCH = BuildConfig.APPLICATION_ID + ".magica.LAUNCH";
-
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null) {
@@ -21,22 +18,28 @@ public class BootCompletedReceiver extends BroadcastReceiver {
         }
         var action = intent.getAction();
         if (!Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
-                && !Intent.ACTION_BOOT_COMPLETED.equals(action)
-                && !ACTION_MAGICA_LAUNCH.equals(action)) {
+                && !Intent.ACTION_BOOT_COMPLETED.equals(action)) {
             return;
         }
-        if (KsuCliKt.rootAvailable()) return;
-        try {
-            var userContext = context;
-            var userManager = context.getSystemService(UserManager.class);
-            if (userManager != null && !userManager.isUserUnlocked()) {
-                userContext = context.createDeviceProtectedStorageContext();
-            }
-            userContext.startService(new Intent(userContext, MagicaService.class));
-            Log.i(TAG, "MagicaService started from boot action: " + action);
-        } catch (Throwable e) {
 
-            Log.e(TAG, "Failed to start MagicaService from boot action: " + action, e);
-        }
+        var pendingResult = goAsync();
+        var applicationContext = context.getApplicationContext();
+        Thread worker = new Thread(() -> {
+            try {
+                if (KsuCliKt.rootAvailable()) return;
+                var userContext = applicationContext;
+                var userManager = applicationContext.getSystemService(UserManager.class);
+                if (userManager != null && !userManager.isUserUnlocked()) {
+                    userContext = applicationContext.createDeviceProtectedStorageContext();
+                }
+                userContext.startService(new Intent(userContext, MagicaService.class));
+                Log.i(TAG, "MagicaService started from boot action: " + action);
+            } catch (Throwable e) {
+                Log.e(TAG, "Failed to start MagicaService from boot action: " + action, e);
+            } finally {
+                pendingResult.finish();
+            }
+        }, "ApkeSU-Magica-Boot");
+        worker.start();
     }
 }

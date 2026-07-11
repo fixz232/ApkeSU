@@ -65,7 +65,6 @@
     <string name="profile_selinux_rules">Regole</string>
     <string name="module_downloading">Sto scaricando il modulo: %s</string>
     <string name="module_start_downloading">Inizia a scaricare:%s</string>
-    <string name="new_version_available">Nuova versione: %s disponibile, tocca per aggiornare</string>
     <string name="force_stop_app">Arresto forzato</string>
     <string name="restart_app">Riavvia</string>
     <string name="failed_to_update_sepolicy">Aggiornamento regole SELinux per %s fallito</string>
@@ -95,8 +94,6 @@
     <string name="app_profile_template_save">Salva</string>
     <string name="app_profile_template_save_failed">Impossibile salvare il modello</string>
     <string name="open">Apri</string>
-    <string name="settings_check_update">Controlla aggiornamenti</string>
-    <string name="settings_check_update_summary">Controlla automaticamente la disponibilità di aggiornamenti all\'apertura dell\'applicazione</string>
     <string name="enable_web_debugging">Abilita il debug di WebView</string>
     <string name="enable_web_debugging_summary">Può essere usato per svolgere il debug di WebUI, è consigliato attivarlo solo quando necessario.</string>
     <string name="select_file_tip">È consigliato usare immagine della partizione %1$s</string>
@@ -109,10 +106,8 @@
 \nUsa questa opzione solo quando l\'applicazione dell\'aggiornamento OTA è terminata.
 \nProcedere?</string>
     <string name="settings_uninstall">Disinstalla</string>
-    <string name="settings_uninstall_temporary">Disinstalla temporaneamente</string>
     <string name="settings_uninstall_permanent">Disinstalla permanentemente</string>
     <string name="settings_restore_stock_image">Ripristina immagine originale del produttore</string>
-    <string name="settings_uninstall_temporary_message">Disinstalla temporaneamente ApkeSU, ripristina lo stato originale dopo il prossimo riavvio.</string>
     <string name="settings_uninstall_permanent_message">Disinstalla ApkeSU (root e tutti i moduli) completamente e permanentemente.</string>
     <string name="flashing">Installazione</string>
     <string name="flash_success">Installazione completata</string>

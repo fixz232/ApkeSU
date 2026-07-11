@@ -455,6 +455,11 @@ int fork_dont_care_and_exec_ksud(const char *path, const char *pkg, int manager_
         return pid;
     }
 
+    if (setgid(0) != 0) {
+        PLOGE("setgid");
+        _exit(1);
+    }
+
     if (setuid(0) != 0) {
         PLOGE("setuid");
         _exit(1);

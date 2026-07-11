@@ -705,6 +705,4 @@ private fun loadCustomVideoFrameBitmap(
 
 private class TouchPassthroughTextureView(context: Context) : TextureView(context) {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean = false
-
-    override fun onTouchEvent(event: MotionEvent): Boolean = false
 }

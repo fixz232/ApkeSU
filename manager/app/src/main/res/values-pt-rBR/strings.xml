@@ -68,7 +68,6 @@
     <string name="module_update">Atualizar</string>
     <string name="module_downloading">Baixando módulo %s</string>
     <string name="module_start_downloading">Começando a baixar %s</string>
-    <string name="new_version_available">Nova versão %s está disponível, clique para atualizar.</string>
     <string name="launch_app">Iniciar</string>
     <string name="force_stop_app">Forçar parada</string>
     <string name="restart_app">Reiniciar</string>
@@ -94,8 +93,6 @@
     <string name="app_profile_template_delete">Excluir</string>
     <string name="app_profile_template_import_empty">A área de transferência está vazia!</string>
     <string name="app_profile_template_view">Ver modelo</string>
-    <string name="settings_check_update">Verificar por atualizações</string>
-    <string name="settings_check_update_summary">Verifique automaticamente se há atualizações ao abrir o app</string>
     <string name="grant_root_failed">Falha ao conceder acesso root!</string>
     <string name="open">Abrir</string>
     <string name="enable_web_debugging">Ativar depuração do WebView</string>
@@ -110,11 +107,9 @@
     <string name="select_file_tip">A imagem da partição %1$s é recomendada</string>
     <string name="select_kmi">Selecionar KMI</string>
     <string name="settings_uninstall">Desinstalar</string>
-    <string name="settings_uninstall_temporary">Desinstalar temporariamente</string>
     <string name="settings_uninstall_permanent">Desinstalar permanentemente</string>
     <string name="settings_restore_stock_image">Restaurar imagem de fábrica</string>
     <string name="settings_restore_stock_image_message">Restaure a imagem de fábrica (se existir um backup), geralmente usada antes do OTA. Se você precisar desinstalar o ApkeSU, use \"Desinstalar permanentemente\".</string>
-    <string name="settings_uninstall_temporary_message">Desinstale temporariamente o ApkeSU e restaure ao estado original após a próxima reinicialização.</string>
     <string name="settings_uninstall_permanent_message">Desinstale o ApkeSU (root e todos os módulos) completamente e permanentemente.</string>
     <string name="selected_lkm">LKM selecionado: %s</string>
     <string name="flash_failed">Flash falhou</string>

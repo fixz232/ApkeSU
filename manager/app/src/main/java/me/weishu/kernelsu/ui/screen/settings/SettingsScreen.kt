@@ -42,6 +42,7 @@ fun SettingPager(
     val showWallpaperPreview = rememberSaveable { mutableStateOf(false) }
     val showVideoBackgroundPreview = rememberSaveable { mutableStateOf(false) }
     val showWallpaperCropEditor = rememberSaveable { mutableStateOf(false) }
+    val showBuiltinMountDetails = rememberSaveable { mutableStateOf(false) }
     val wallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -153,6 +154,7 @@ fun SettingPager(
         onSetBuiltinMountEnabled = viewModel::setBuiltinMountEnabled,
         onSetBuiltinMountDefaultMode = viewModel::setBuiltinMountDefaultMode,
         onSetBuiltinMountVariant = viewModel::setBuiltinMountVariant,
+        onShowBuiltinMountDetails = { showBuiltinMountDetails.value = true },
         onOpenBuiltinMountWebUi = {
             context.startActivity(
                 Intent(context, WebUIActivity::class.java)
@@ -223,5 +225,10 @@ fun SettingPager(
         onDismissRequest = {
             showWallpaperCropEditor.value = false
         },
+    )
+    BuiltinMountDetailsDialog(
+        show = showBuiltinMountDetails.value,
+        uiState = uiState,
+        onDismissRequest = { showBuiltinMountDetails.value = false },
     )
 }

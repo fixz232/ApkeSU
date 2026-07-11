@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Fence
 import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.ImageSearch
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -89,6 +90,7 @@ import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
+import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
@@ -647,6 +649,40 @@ fun SettingPagerMiuix(
                                 },
                                 selectedIndex = if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 1 else 0,
                                 onSelectedIndexChange = actions.onSetBuiltinMountDefaultMode
+                            )
+
+                            val builtinMountVariantItems = listOf(
+                                stringResource(id = R.string.settings_builtin_mount_variant_lite),
+                                stringResource(id = R.string.settings_builtin_mount_variant_full),
+                            )
+                            OverlayDropdownPreference(
+                                title = stringResource(id = R.string.settings_builtin_mount_variant),
+                                summary = stringResource(id = R.string.settings_builtin_mount_variant_summary),
+                                items = builtinMountVariantItems,
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Layers,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_builtin_mount_variant),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                selectedIndex = if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 1 else 0,
+                                onSelectedIndexChange = actions.onSetBuiltinMountVariant
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_builtin_mount_details),
+                                summary = stringResource(R.string.settings_builtin_mount_details_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Info,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = null,
+                                        tint = colorScheme.onBackground,
+                                    )
+                                },
+                                onClick = actions.onShowBuiltinMountDetails,
                             )
 
                             ArrowPreference(
