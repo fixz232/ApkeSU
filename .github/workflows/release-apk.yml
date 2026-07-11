@@ -269,7 +269,7 @@ jobs:
 
       - name: Publish GitHub Release
         if: ${{ github.event_name == 'push' || inputs.create_github_release }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.release_tag }}
           name: ApkeSU APK ${{ steps.meta.outputs.release_tag }}
