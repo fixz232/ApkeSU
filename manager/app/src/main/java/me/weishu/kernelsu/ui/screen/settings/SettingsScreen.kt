@@ -22,7 +22,6 @@ import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MIME_TYPES
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
-import me.weishu.kernelsu.ui.util.HYBRID_MOUNT_MODULE_ID
 import me.weishu.kernelsu.ui.util.KPATCH_NEXT_MODULE_ID
 import me.weishu.kernelsu.ui.util.isCustomVideoBackground
 import me.weishu.kernelsu.ui.util.persistCustomImageReference
@@ -42,7 +41,6 @@ fun SettingPager(
     val showWallpaperPreview = rememberSaveable { mutableStateOf(false) }
     val showVideoBackgroundPreview = rememberSaveable { mutableStateOf(false) }
     val showWallpaperCropEditor = rememberSaveable { mutableStateOf(false) }
-    val showBuiltinMountDetails = rememberSaveable { mutableStateOf(false) }
     val wallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -151,17 +149,7 @@ fun SettingPager(
         onSetAdbRootEnabled = viewModel::setAdbRootEnabled,
         onSetAvcSpoofEnabled = viewModel::setAvcSpoofEnabled,
         onSetDefaultUmountModules = viewModel::setDefaultUmountModules,
-        onSetBuiltinMountEnabled = viewModel::setBuiltinMountEnabled,
-        onSetBuiltinMountDefaultMode = viewModel::setBuiltinMountDefaultMode,
-        onSetBuiltinMountVariant = viewModel::setBuiltinMountVariant,
-        onShowBuiltinMountDetails = { showBuiltinMountDetails.value = true },
-        onOpenBuiltinMountWebUi = {
-            context.startActivity(
-                Intent(context, WebUIActivity::class.java)
-                    .setData("kernelsu://webui/$HYBRID_MOUNT_MODULE_ID".toUri())
-                    .putExtra("id", HYBRID_MOUNT_MODULE_ID)
-            )
-        },
+        onOpenBuiltinMount = { navigator.push(Route.BuiltinMount) },
         onSetKPatchNextEnabled = viewModel::setKPatchNextEnabled,
         onOpenKPatchNextWebUi = {
             context.startActivity(
@@ -173,6 +161,7 @@ fun SettingPager(
         onOpenHiddenPathConfig = { navigator.push(Route.HiddenPathConfig) },
         onOpenAiChat = { navigator.push(Route.AiChat) },
         onOpenRescueProtection = { navigator.push(Route.RescueProtection) },
+        onOpenCpuSpoof = { navigator.push(Route.CpuSpoof) },
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,
         onSetAutoJailbreak = viewModel::setAutoJailbreak,
@@ -225,10 +214,5 @@ fun SettingPager(
         onDismissRequest = {
             showWallpaperCropEditor.value = false
         },
-    )
-    BuiltinMountDetailsDialog(
-        show = showBuiltinMountDetails.value,
-        uiState = uiState,
-        onDismissRequest = { showBuiltinMountDetails.value = false },
     )
 }

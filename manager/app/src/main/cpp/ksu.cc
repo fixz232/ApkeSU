@@ -427,3 +427,12 @@ bool is_avc_spoof_enabled() {
     }
     return supported && value != 0;
 }
+
+uint64_t get_kernel_hook_status() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_HOOK_STATUS, &value, &supported) || !supported) {
+        return UINT64_MAX;
+    }
+    return value;
+}

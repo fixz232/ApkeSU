@@ -123,6 +123,10 @@ fun HomePagerSkrootpro(
                         },
                     )
                     SystemStatusLine(
+                        label = stringResource(R.string.home_kernel_hook),
+                        value = kernelHookTypeLabel(state.kernelHookTypes),
+                    )
+                    SystemStatusLine(
                         label = "Adb",
                         value = stringResource(R.string.skrootpro_adb_disabled),
                     )

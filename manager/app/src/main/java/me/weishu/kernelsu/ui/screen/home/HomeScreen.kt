@@ -156,6 +156,13 @@ fun HomePager(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (LocalInterfaceStyle.current) {
+            InterfaceStyle.Studio.value -> HomePagerStudio(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+                installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
+            )
+
             InterfaceStyle.Skrootpro.value -> HomePagerSkrootpro(
                 state = uiState,
                 actions = actions,

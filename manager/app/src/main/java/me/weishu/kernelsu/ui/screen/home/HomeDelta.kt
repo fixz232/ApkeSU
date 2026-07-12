@@ -263,6 +263,10 @@ private fun DeltaManagerCard(state: HomeUiState) {
                 value = state.systemInfo.kernelVersion,
             )
             DeltaInfoLine(
+                label = stringResource(R.string.home_kernel_hook),
+                value = kernelHookTypeLabel(state.kernelHookTypes),
+            )
+            DeltaInfoLine(
                 label = stringResource(R.string.home_device_model),
                 value = state.systemInfo.deviceModel,
             )

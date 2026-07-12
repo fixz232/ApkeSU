@@ -89,8 +89,6 @@ import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
@@ -616,7 +614,7 @@ fun SettingPagerMiuix(
                             val builtinMountSummary = uiState.builtinMountConflict?.let {
                                 stringResource(id = R.string.settings_builtin_mount_conflict_summary, it)
                             } ?: stringResource(id = R.string.settings_builtin_mount_summary)
-                            SwitchPreference(
+                            ArrowPreference(
                                 title = stringResource(id = R.string.settings_builtin_mount),
                                 summary = builtinMountSummary,
                                 startAction = {
@@ -624,90 +622,10 @@ fun SettingPagerMiuix(
                                         Icons.Rounded.Layers,
                                         modifier = Modifier.padding(end = 6.dp),
                                         contentDescription = stringResource(id = R.string.settings_builtin_mount),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.isBuiltinMountEnabled,
-                                onCheckedChange = actions.onSetBuiltinMountEnabled
-                            )
-
-                            val builtinMountModeItems = listOf(
-                                stringResource(id = R.string.settings_builtin_mount_mode_overlay),
-                                stringResource(id = R.string.settings_builtin_mount_mode_magic),
-                            )
-                            OverlayDropdownPreference(
-                                title = stringResource(id = R.string.settings_builtin_mount_default_mode),
-                                summary = stringResource(id = R.string.settings_builtin_mount_default_mode_summary),
-                                items = builtinMountModeItems,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Apps,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_builtin_mount_default_mode),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                selectedIndex = if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 1 else 0,
-                                onSelectedIndexChange = actions.onSetBuiltinMountDefaultMode
-                            )
-
-                            val builtinMountVariantItems = listOf(
-                                stringResource(id = R.string.settings_builtin_mount_variant_lite),
-                                stringResource(id = R.string.settings_builtin_mount_variant_full),
-                            )
-                            OverlayDropdownPreference(
-                                title = stringResource(id = R.string.settings_builtin_mount_variant),
-                                summary = stringResource(id = R.string.settings_builtin_mount_variant_summary),
-                                items = builtinMountVariantItems,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Layers,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_builtin_mount_variant),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                selectedIndex = if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 1 else 0,
-                                onSelectedIndexChange = actions.onSetBuiltinMountVariant
-                            )
-
-                            ArrowPreference(
-                                title = stringResource(R.string.settings_builtin_mount_details),
-                                summary = stringResource(R.string.settings_builtin_mount_details_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Info,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = null,
                                         tint = colorScheme.onBackground,
                                     )
                                 },
-                                onClick = actions.onShowBuiltinMountDetails,
-                            )
-
-                            ArrowPreference(
-                                title = stringResource(id = R.string.settings_builtin_mount_webui),
-                                summary = stringResource(
-                                    id = if (uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable) {
-                                        R.string.settings_builtin_mount_webui_summary
-                                    } else {
-                                        R.string.settings_builtin_mount_webui_disabled_summary
-                                    }
-                                ),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.DeveloperMode,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_builtin_mount_webui),
-                                        tint = if (uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable) {
-                                            colorScheme.onBackground
-                                        } else {
-                                            colorScheme.disabledOnSecondaryVariant
-                                        }
-                                    )
-                                },
-                                enabled = uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable,
-                                onClick = actions.onOpenBuiltinMountWebUi
+                                onClick = actions.onOpenBuiltinMount,
                             )
 
                             SwitchPreference(
@@ -767,6 +685,20 @@ fun SettingPagerMiuix(
                                     )
                                 },
                                 onClick = actions.onOpenHiddenPathConfig
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(id = R.string.settings_cpu_spoof),
+                                summary = stringResource(id = R.string.settings_cpu_spoof_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.DeveloperMode,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_cpu_spoof),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onOpenCpuSpoof
                             )
 
                             ArrowPreference(
@@ -1047,7 +979,7 @@ private fun CollapsibleMiuixSection(
 
 private const val UPDATES_ITEM_COUNT = 3
 private const val ROOT_FEATURES_ITEM_COUNT = 7
-private const val ADVANCED_ITEM_COUNT = 10
+private const val ADVANCED_ITEM_COUNT = 11
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
     return 13

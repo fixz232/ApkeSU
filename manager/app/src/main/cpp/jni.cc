@@ -429,6 +429,12 @@ Java_me_weishu_kernelsu_Natives_setAvcSpoofEnabled(JNIEnv *env, jobject thiz, jb
 }
 
 extern "C"
+JNIEXPORT jlong JNICALL
+Java_me_weishu_kernelsu_Natives_getKernelHookStatus(JNIEnv *env, jobject thiz) {
+    return static_cast<jlong>(get_kernel_hook_status());
+}
+
+extern "C"
 JNIEXPORT jstring JNICALL
 Java_me_weishu_kernelsu_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid) {
     struct passwd *pw = getpwuid((uid_t) uid);

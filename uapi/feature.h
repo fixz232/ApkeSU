@@ -8,10 +8,19 @@ enum ksu_feature_id {
     KSU_FEATURE_ADB_ROOT = 3,
     KSU_FEATURE_SELINUX_HIDE = 4,
     KSU_FEATURE_AVC_SPOOF = 5,
+    /* Read-only runtime report for the core Hook dispatcher. */
+    KSU_FEATURE_HOOK_STATUS = 6,
 
     KSU_FEATURE_MAX
 };
 
 #define KSU_FEATURE_AVC_SPOOF_LEGACY 10003
+
+/* KSU_FEATURE_HOOK_STATUS bit flags. */
+#define KSU_HOOK_STATUS_MANAGER_READY (1ULL << 0)
+#define KSU_HOOK_STATUS_SYSCALL_HANDLERS (1ULL << 1)
+#define KSU_HOOK_STATUS_TRACEPOINT (1ULL << 2)
+#define KSU_HOOK_STATUS_KRETPROBES (1ULL << 3)
+#define KSU_HOOK_STATUS_LSM (1ULL << 4)
 
 #endif

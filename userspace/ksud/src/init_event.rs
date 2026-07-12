@@ -137,6 +137,13 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("load system.prop failed: {e}");
     }
 
+    // Apply property hiding before services and applications can inspect boot state.
+    crate::epkesu_hide::apply_if_enabled();
+
+    // CPU spoof uses the same post-fs-data window so apps observe the configured
+    // ro.soc.model from the beginning of the boot session.
+    crate::cpu_spoof::apply_if_enabled();
+
     // execute metamodule mount script
     if let Err(e) = metamodule::exec_mount_script(module_dir) {
         warn!("execute metamodule mount failed: {e}");
@@ -213,6 +220,8 @@ pub fn on_boot_completed() {
     crate::rescue::mark_boot_completed();
 
     run_stage("boot-completed", false);
+    // post-fs-data is the preferred early window. Retry here for devices whose
+    // property service was not ready during that stage.
     crate::epkesu_hide::apply_if_enabled();
 }
 

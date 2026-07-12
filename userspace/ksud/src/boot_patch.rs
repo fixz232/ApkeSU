@@ -197,9 +197,10 @@ mod android {
         kmi: &str,
         is_replace_kernel: bool,
         partition: &Option<String>,
+        ota: bool,
     ) -> String {
         let skip_init_boot = kmi.starts_with("android12-");
-        let init_boot_exist = find_partition_path("init_boot", false).is_some();
+        let init_boot_exists = find_partition_path("init_boot", ota).is_some();
 
         // if specific partition is specified, use it
         if let Some(part) = partition {
@@ -210,7 +211,7 @@ mod android {
         }
 
         // if init_boot exists and not skipping it, use it
-        if !is_replace_kernel && init_boot_exist && !skip_init_boot {
+        if !is_replace_kernel && init_boot_exists && !skip_init_boot {
             return "init_boot".to_string();
         }
 
@@ -234,6 +235,11 @@ mod android {
         {
             slot_suffix = normalize_slot_suffix(&slot);
         }
+        if slot_suffix.is_empty()
+            && let Some(slot) = slot_suffix_from_bootctl()
+        {
+            slot_suffix = slot;
+        }
 
         if !ota {
             return Ok(slot_suffix);
@@ -247,11 +253,39 @@ mod android {
         }
     }
 
-    pub fn list_available_partitions() -> Vec<String> {
+    fn slot_suffix_from_bootctl() -> Option<String> {
+        for bootctl in [
+            crate::assets::BOOTCTL_PATH,
+            "/system/bin/bootctl",
+            "/system_ext/bin/bootctl",
+        ] {
+            let Ok(output) = Command::new(bootctl).arg("get-current-slot").output() else {
+                continue;
+            };
+            if !output.status.success() {
+                continue;
+            }
+            let Some(slot_suffix) =
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .and_then(|slot| match slot.trim() {
+                        "0" => Some("_a".to_string()),
+                        "1" => Some("_b".to_string()),
+                        _ => None,
+                    })
+            else {
+                continue;
+            };
+            return Some(slot_suffix);
+        }
+        None
+    }
+
+    pub fn list_available_partitions(ota: bool) -> Vec<String> {
         let candidates = vec!["boot", "init_boot", "vendor_boot"];
         candidates
             .into_iter()
-            .filter(|name| find_partition_path(name, false).is_some())
+            .filter(|name| find_partition_path(name, ota).is_some())
             .map(ToString::to_string)
             .collect()
     }
@@ -270,9 +304,12 @@ mod android {
         partition: &Option<String>,
     ) -> Result<PathBuf> {
         let slot_suffix = get_slot_suffix(ota)?;
-        let name = choose_boot_partition(kmi, is_replace_kernel, partition);
-        Ok(find_partition_path(&name, ota)
-            .unwrap_or_else(|| PathBuf::from(format!("/dev/block/by-name/{name}{slot_suffix}"))))
+        let name = choose_boot_partition(kmi, is_replace_kernel, partition, ota);
+        find_partition_path(&name, ota).ok_or_else(|| {
+            anyhow!(
+                "target partition {name}{slot_suffix} is unavailable; choose a partition present in the target slot"
+            )
+        })
     }
 
     fn partition_path_candidates(
@@ -396,7 +433,6 @@ mod android {
         let sh_content = format!(
             r"
 {BOOTCTL_PATH} mark-boot-successful
-rm -f {BOOTCTL_PATH}
 rm -f /data/adb/post-fs-data.d/post_ota.sh
 "
         );

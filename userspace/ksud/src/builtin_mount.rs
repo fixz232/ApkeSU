@@ -593,8 +593,14 @@ fn write_variant(variant: BuiltinMountVariant) -> Result<()> {
         .parent()
         .with_context(|| format!("{} has no parent", path.display()))?;
     utils::ensure_dir_exists(parent)?;
-    fs::write(path, format!("{}\n", variant.as_str()))
-        .with_context(|| format!("failed to write {}", path.display()))
+    let temp_path = PathBuf::from(format!("{}.tmp.{}", path.display(), std::process::id()));
+    fs::write(&temp_path, format!("{}\n", variant.as_str()))
+        .with_context(|| format!("failed to write {}", temp_path.display()))?;
+    if let Err(err) = fs::rename(&temp_path, path) {
+        _ = fs::remove_file(&temp_path);
+        return Err(err).with_context(|| format!("failed to replace {}", path.display()));
+    }
+    Ok(())
 }
 
 fn read_default_mode() -> MountMode {

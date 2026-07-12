@@ -103,6 +103,20 @@ object Natives {
     external fun setAvcSpoofEnabled(enabled: Boolean): Boolean
 
     /**
+     * Runtime Hook report from the currently loaded kernel driver.
+     * Returns [HOOK_STATUS_UNSUPPORTED] when the driver predates this report.
+     */
+    val kernelHookStatus: Long
+        external get
+
+    const val HOOK_STATUS_UNSUPPORTED = -1L
+    const val HOOK_STATUS_MANAGER_READY = 1L shl 0
+    const val HOOK_STATUS_SYSCALL_HANDLERS = 1L shl 1
+    const val HOOK_STATUS_TRACEPOINT = 1L shl 2
+    const val HOOK_STATUS_KRETPROBES = 1L shl 3
+    const val HOOK_STATUS_LSM = 1L shl 4
+
+    /**
      * Get the user name for the uid.
      */
     external fun getUserName(uid: Int): String?

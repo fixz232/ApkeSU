@@ -96,6 +96,26 @@ data class KPatchNextStatus(
 
 data class EpkesuHideStatus(
     val enabled: Boolean = false,
+    val configured: Boolean = false,
+    val applied: Boolean = false,
+)
+
+data class CpuSpoofStatus(
+    val supported: Boolean = false,
+    val configured: Boolean = false,
+    val enabled: Boolean = false,
+    val applied: Boolean = false,
+    val current: String = "",
+    val target: String = "",
+    val original: String = "",
+    val manufacturer: String = "",
+    val platform: String = "",
+    val error: String = "",
+)
+
+data class CpuSpoofCommandResult(
+    val success: Boolean,
+    val error: String = "",
 )
 
 data class HiddenPathConfigState(
@@ -507,13 +527,20 @@ suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO
         return@withContext EpkesuHideStatus()
     }
 
-    val shell = getRootShell()
     val stdout = ArrayList<String>()
     val stderr = ArrayList<String>()
-    val result = shell.newJob()
-        .add("${getKsuDaemonPath()} epkesu-hide status")
-        .to(stdout, stderr)
-        .exec()
+    val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        getRootShell().newJob()
+            .add("${getKsuDaemonPath()} epkesu-hide status")
+            .to(stdout, stderr)
+            .exec()
+    }
+
+    if (result == null) {
+        Log.w(TAG, "epkesu-hide status timed out")
+        KsuCli.reset()
+        return@withContext EpkesuHideStatus()
+    }
 
     if (!result.isSuccess) {
         Log.w(TAG, "epkesu-hide status failed: ${stderr.joinToString("\n")}")
@@ -524,6 +551,8 @@ suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO
         val obj = JSONObject(stdout.joinToString("\n"))
         EpkesuHideStatus(
             enabled = obj.optBoolean("enabled", false),
+            configured = obj.optBoolean("configured", obj.optBoolean("enabled", false)),
+            applied = obj.optBoolean("applied", obj.optBoolean("enabled", false)),
         )
     }.getOrElse {
         Log.w(TAG, "parse epkesu-hide status failed: ${stdout.joinToString("\n")}", it)
@@ -534,6 +563,105 @@ suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO
 fun setEpkesuHideEnabled(enabled: Boolean): Boolean {
     val command = if (enabled) "enable" else "disable"
     return execKsud("epkesu-hide $command", true)
+}
+
+fun isCpuSpoofModelValid(model: String): Boolean {
+    val value = model.trim()
+    return value.isNotEmpty() &&
+        !value.startsWith('-') &&
+        value.toByteArray(Charsets.UTF_8).size <= 91 &&
+        value.none { it.isISOControl() }
+}
+
+suspend fun getCpuSpoofStatus(): CpuSpoofStatus = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext CpuSpoofStatus(error = "root_unavailable")
+    }
+
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        getRootShell().newJob()
+            .add("${shellQuote(getKsuDaemonPath())} cpu-spoof status")
+            .to(stdout, stderr)
+            .exec()
+    }
+
+    if (result == null) {
+        Log.w(TAG, "cpu-spoof status timed out")
+        KsuCli.reset()
+        return@withContext CpuSpoofStatus(error = "timeout")
+    }
+
+    if (!result.isSuccess) {
+        val error = stderr.joinToString("\n").trim().ifBlank { "status_failed" }
+        Log.w(TAG, "cpu-spoof status failed: $error")
+        return@withContext CpuSpoofStatus(error = error)
+    }
+
+    runCatching {
+        val obj = JSONObject(stdout.joinToString("\n"))
+        CpuSpoofStatus(
+            supported = obj.optBoolean("supported", false),
+            configured = obj.optBoolean("configured", false),
+            enabled = obj.optBoolean("enabled", false),
+            applied = obj.optBoolean("applied", false),
+            current = obj.optString("current", ""),
+            target = obj.optString("target", ""),
+            original = obj.optString("original", ""),
+            manufacturer = obj.optString("manufacturer", ""),
+            platform = obj.optString("platform", ""),
+            error = obj.optString("error", ""),
+        )
+    }.getOrElse {
+        Log.w(TAG, "parse cpu-spoof status failed: ${stdout.joinToString("\n")}", it)
+        CpuSpoofStatus(error = "parse_failed")
+    }
+}
+
+suspend fun saveCpuSpoofTarget(model: String): CpuSpoofCommandResult {
+    if (!isCpuSpoofModelValid(model)) {
+        return CpuSpoofCommandResult(false, "invalid_cpu_model")
+    }
+    return runCpuSpoofCommand("configure --model ${shellQuote(model.trim())}")
+}
+
+suspend fun setCpuSpoofEnabled(enabled: Boolean): CpuSpoofCommandResult {
+    return runCpuSpoofCommand(if (enabled) "enable" else "disable")
+}
+
+suspend fun restoreDefaultCpuSpoof(): CpuSpoofCommandResult {
+    return runCpuSpoofCommand("restore-default")
+}
+
+private suspend fun runCpuSpoofCommand(command: String): CpuSpoofCommandResult = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext CpuSpoofCommandResult(false, "root_unavailable")
+    }
+
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        getRootShell().newJob()
+            .add("${shellQuote(getKsuDaemonPath())} cpu-spoof $command")
+            .to(stdout, stderr)
+            .exec()
+    }
+    if (result == null) {
+        Log.w(TAG, "cpu-spoof command timed out: $command")
+        KsuCli.reset()
+        return@withContext CpuSpoofCommandResult(false, "timeout")
+    }
+
+    if (!result.isSuccess) {
+        val error = stderr.joinToString("\n").trim().ifBlank {
+            stdout.joinToString("\n").trim().ifBlank { "command_failed" }
+        }
+        Log.w(TAG, "cpu-spoof command failed: $command, $error")
+        return@withContext CpuSpoofCommandResult(false, error)
+    }
+
+    CpuSpoofCommandResult(true)
 }
 
 suspend fun getHiddenPathConfig(): HiddenPathConfigState = withContext(Dispatchers.IO) {
@@ -1588,10 +1716,10 @@ suspend fun isAbDevice(): Boolean = withContext(Dispatchers.IO) {
     ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} $cmd").trim().toBoolean()
 }
 
-suspend fun getDefaultPartition(): String = withContext(Dispatchers.IO) {
+suspend fun getDefaultPartition(ota: Boolean = false): String = withContext(Dispatchers.IO) {
     val shell = getRootShell()
     if (shell.isRoot) {
-        val cmd = "boot-info default-partition"
+        val cmd = if (ota) "boot-info default-partition --ota" else "boot-info default-partition"
         ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} $cmd").trim()
     } else {
         if (!Os.uname().release.contains("android12-")) "init_boot" else "boot"
@@ -1608,9 +1736,9 @@ suspend fun getSlotSuffix(ota: Boolean): String = withContext(Dispatchers.IO) {
     ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} $cmd").trim()
 }
 
-suspend fun getAvailablePartitions(): List<String> = withContext(Dispatchers.IO) {
+suspend fun getAvailablePartitions(ota: Boolean = false): List<String> = withContext(Dispatchers.IO) {
     val shell = getRootShell()
-    val cmd = "boot-info available-partitions"
+    val cmd = if (ota) "boot-info available-partitions --ota" else "boot-info available-partitions"
     val out = shell.newJob().add("${getKsuDaemonPath()} $cmd").to(ArrayList(), null).exec().out
     out.filter { it.isNotBlank() }.map { it.trim() }
 }

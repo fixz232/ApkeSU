@@ -57,6 +57,7 @@ object ThemeController {
         val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
         val uiMode = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE) ?: UiMode.DEFAULT_VALUE
         val defaultPreset = when (uiMode) {
+            InterfaceStyle.Studio.value -> ThemePreset.STUDIO
             InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
             InterfaceStyle.Alpha.value -> ThemePreset.ALPHA
             InterfaceStyle.Delta.value -> ThemePreset.DELTA

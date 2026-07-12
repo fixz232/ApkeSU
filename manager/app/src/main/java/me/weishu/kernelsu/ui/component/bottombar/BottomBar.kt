@@ -109,6 +109,16 @@ fun BottomBar(
 ) {
     if (!LocalMainPagerState.current.fullFeatured) return
 
+    if (LocalInterfaceStyle.current == InterfaceStyle.Studio.value) {
+        val mainState = LocalMainPagerState.current
+        StudioBottomBar(
+            selectedIndex = mainState.selectedPage,
+            onSelected = mainState::animateToPage,
+            modifier = modifier,
+        )
+        return
+    }
+
     if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
         val mainState = LocalMainPagerState.current
         SkrootproBottomBar(
@@ -151,6 +161,16 @@ fun SideRail(
     modifier: Modifier = Modifier,
 ) {
     if (!LocalMainPagerState.current.fullFeatured) return
+
+    if (LocalInterfaceStyle.current == InterfaceStyle.Studio.value) {
+        val mainState = LocalMainPagerState.current
+        StudioNavigationRail(
+            selectedIndex = mainState.selectedPage,
+            onSelected = mainState::animateToPage,
+            modifier = modifier,
+        )
+        return
+    }
 
     when (LocalUiMode.current) {
         UiMode.Miuix -> NavigationRailMiuix(blurBackdrop, modifier)

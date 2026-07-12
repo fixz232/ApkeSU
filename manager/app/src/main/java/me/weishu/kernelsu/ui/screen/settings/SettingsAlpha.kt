@@ -72,8 +72,6 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaShapes
 import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
 import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -251,67 +249,13 @@ fun SettingPagerAlpha(
                     checked = uiState.isDefaultUmountModules,
                     onCheckedChange = actions.onSetDefaultUmountModules,
                 )
-                AlphaSwitchRow(
+                AlphaActionRow(
                     title = stringResource(R.string.settings_builtin_mount),
                     summary = uiState.builtinMountConflict?.let {
                         stringResource(R.string.settings_builtin_mount_conflict_summary, it)
                     } ?: stringResource(R.string.settings_builtin_mount_summary),
-                    checked = uiState.isBuiltinMountEnabled,
-                    onCheckedChange = actions.onSetBuiltinMountEnabled,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_builtin_mount_default_mode),
-                    summary = stringResource(
-                        if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) {
-                            R.string.settings_builtin_mount_mode_magic
-                        } else {
-                            R.string.settings_builtin_mount_mode_overlay
-                        }
-                    ),
                     icon = Icons.Rounded.Apps,
-                    onClick = {
-                        actions.onSetBuiltinMountDefaultMode(
-                            if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 0 else 1
-                        )
-                    },
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_builtin_mount_variant),
-                    summary = stringResource(
-                        if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) {
-                            R.string.settings_builtin_mount_variant_full
-                        } else {
-                            R.string.settings_builtin_mount_variant_lite
-                        }
-                    ),
-                    icon = Icons.Rounded.Apps,
-                    onClick = {
-                        actions.onSetBuiltinMountVariant(
-                            if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 0 else 1
-                        )
-                    },
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_builtin_mount_details),
-                    summary = stringResource(R.string.settings_builtin_mount_details_summary),
-                    icon = Icons.Rounded.Info,
-                    onClick = actions.onShowBuiltinMountDetails,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_builtin_mount_webui),
-                    summary = stringResource(
-                        if (uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable) {
-                            R.string.settings_builtin_mount_webui_summary
-                        } else {
-                            R.string.settings_builtin_mount_webui_disabled_summary
-                        }
-                    ),
-                    icon = Icons.Rounded.DeveloperMode,
-                    onClick = {
-                        if (uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable) {
-                            actions.onOpenBuiltinMountWebUi()
-                        }
-                    },
+                    onClick = actions.onOpenBuiltinMount,
                 )
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_kpatch_next),
@@ -341,6 +285,12 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.hidden_path_config_summary),
                     icon = Icons.Rounded.Visibility,
                     onClick = actions.onOpenHiddenPathConfig,
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_cpu_spoof),
+                    summary = stringResource(R.string.settings_cpu_spoof_summary),
+                    icon = Icons.Rounded.DeveloperMode,
+                    onClick = actions.onOpenCpuSpoof,
                 )
                 AlphaActionRow(
                     title = stringResource(R.string.rescue_protection),

@@ -53,6 +53,7 @@ fun InstallScreen() {
     var lkmSelection by rememberSaveable { mutableStateOf<LkmSelection>(LkmSelection.KmiNone) }
     var partitionSelectionIndex by rememberSaveable { mutableIntStateOf(0) }
     var hasCustomSelected by rememberSaveable { mutableStateOf(false) }
+    var selectedPartitionName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedBootImageFileName by rememberSaveable { mutableStateOf("") }
     var hiddenPathImagePickerPending by rememberSaveable { mutableStateOf(false) }
     val showChooseKmiDialog = rememberSaveable { mutableStateOf(false) }
@@ -61,14 +62,16 @@ fun InstallScreen() {
     var allowShell by rememberSaveable { mutableStateOf(false) }
     var enableAdb by rememberSaveable { mutableStateOf(false) }
 
+    val isOta = installMethod is InstallMethod.DirectInstallToInactiveSlot
+
     val currentKmi by produceState(initialValue = "") {
         value = loadInstallState("") { getCurrentKmi() }
     }
-    val partitions by produceState(initialValue = emptyList<String>()) {
-        value = loadInstallState(emptyList<String>()) { getAvailablePartitions() }
+    val partitions by produceState(initialValue = emptyList<String>(), isOta) {
+        value = loadInstallState(emptyList<String>()) { getAvailablePartitions(isOta) }
     }
-    val defaultPartition by produceState(initialValue = "") {
-        value = loadInstallState("") { getDefaultPartition() }
+    val defaultPartition by produceState(initialValue = "", isOta) {
+        value = loadInstallState("") { getDefaultPartition(isOta) }
     }
     val rootAvailable by produceState(initialValue = false) {
         value = loadInstallState(false) { withContext(Dispatchers.IO) { rootAvailable() } }
@@ -105,7 +108,6 @@ fun InstallScreen() {
         }
     }
 
-    val isOta = installMethod is InstallMethod.DirectInstallToInactiveSlot
     val slotSuffix by produceState(initialValue = "", isOta) {
         value = loadInstallState("") { getSlotSuffix(isOta) }
     }
@@ -113,16 +115,28 @@ fun InstallScreen() {
         partitions.indexOf(defaultPartition).coerceAtLeast(0)
     }
 
-    LaunchedEffect(partitions, defaultIndex, hasCustomSelected, selectedBootImageFileName) {
+    LaunchedEffect(
+        partitions,
+        defaultIndex,
+        hasCustomSelected,
+        selectedBootImageFileName,
+        selectedPartitionName,
+    ) {
         if (partitions.isEmpty()) return@LaunchedEffect
-        if (!hasCustomSelected) {
-            val inferredIndex = inferPartitionFromImageName(selectedBootImageFileName)
-                ?.let(partitions::indexOf)
-                ?.takeIf { it >= 0 }
-            partitionSelectionIndex = (inferredIndex ?: defaultIndex).coerceIn(0, partitions.lastIndex)
-        } else if (partitionSelectionIndex > partitions.lastIndex) {
-            partitionSelectionIndex = partitions.lastIndex
+        val preferredPartition = if (hasCustomSelected) {
+            selectedPartitionName
+        } else {
+            inferPartitionFromImageName(selectedBootImageFileName) ?: defaultPartition
         }
+        val preferredIndex = preferredPartition
+            ?.let(partitions::indexOf)
+            ?.takeIf { it >= 0 }
+
+        if (hasCustomSelected && preferredIndex == null) {
+            hasCustomSelected = false
+            selectedPartitionName = null
+        }
+        partitionSelectionIndex = (preferredIndex ?: defaultIndex).coerceIn(0, partitions.lastIndex)
     }
 
     val displayPartitions = remember(partitions, defaultPartition) {
@@ -344,8 +358,11 @@ fun InstallScreen() {
         },
         onClearLkm = { lkmSelection = LkmSelection.KmiNone },
         onSelectPartition = { index ->
-            hasCustomSelected = true
-            partitionSelectionIndex = index
+            partitions.getOrNull(index)?.let { selectedPartition ->
+                hasCustomSelected = true
+                selectedPartitionName = selectedPartition
+                partitionSelectionIndex = index
+            }
         },
         onNext = {
             val method = installMethod

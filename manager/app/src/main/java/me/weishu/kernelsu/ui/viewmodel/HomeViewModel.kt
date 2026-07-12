@@ -27,6 +27,7 @@ import me.weishu.kernelsu.data.repository.SHOW_VERSION_MISMATCH_WARNING_KEY
 import me.weishu.kernelsu.getKernelVersion
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.screen.home.HomeUiState
+import me.weishu.kernelsu.ui.screen.home.KernelHookType
 import me.weishu.kernelsu.ui.screen.home.RootRuntimeState
 import me.weishu.kernelsu.ui.screen.home.SystemInfo
 import me.weishu.kernelsu.ui.screen.home.getManagerVersion
@@ -173,7 +174,16 @@ class HomeViewModel(
             versionMismatch = requiresNewKernel || uapiMismatch ||
                 managerOlderThanDriver || ksudVersionMismatch,
         )
-
+        val kernelHookStatus = if (driverConnected) {
+            runCatching { Natives.kernelHookStatus }.getOrDefault(Natives.HOOK_STATUS_UNSUPPORTED)
+        } else {
+            Natives.HOOK_STATUS_UNSUPPORTED
+        }
+        val hasTracepoint = if (kernelHookStatus == Natives.HOOK_STATUS_UNSUPPORTED) {
+            null
+        } else {
+            kernelHookStatus and Natives.HOOK_STATUS_TRACEPOINT != 0L
+        }
         return HomeUiState(
             kernelVersion = kernelVersion,
             ksuVersion = ksuVersion,
@@ -189,6 +199,10 @@ class HomeViewModel(
             managerUAPIVersion = managerUAPIVersion,
             isRootAvailable = ksuDaemonRoot,
             rootRuntimeState = rootRuntimeState,
+            kernelHookTypes = KernelHookType.resolve(
+                hasActiveDriver = driverConnected,
+                hasTracepoint = hasTracepoint,
+            ),
             isSafeMode = runCatching { Natives.isSafeMode }.getOrDefault(false),
             isLateLoadMode = runCatching { Natives.isLateLoadMode }.getOrDefault(false),
             currentManagerVersionCode = managerVersion.versionCode,
@@ -238,6 +252,7 @@ class HomeViewModel(
             uapiMismatch = false,
             isRootAvailable = ksuDaemonRoot,
             rootRuntimeState = rootRuntimeState,
+            kernelHookTypes = KernelHookType.resolve(hasActiveDriver = isKernelActive),
             isSafeMode = false,
             isLateLoadMode = false,
             currentManagerVersionCode = managerVersion?.versionCode ?: BuildConfig.VERSION_CODE.toLong(),

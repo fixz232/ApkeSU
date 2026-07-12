@@ -183,7 +183,10 @@ fun HomePagerMiuix(
                             installFeedbackActive = installFeedbackActive,
                         )
                         WarningSummaryCard(messages = homeWarningMessages(state))
-                        InfoCard(systemInfo = state.systemInfo)
+                        InfoCard(
+                            systemInfo = state.systemInfo,
+                            hookTypes = state.kernelHookTypes,
+                        )
                         SecondaryLinksCard(
                             onOpenUrl = actions.onOpenUrl,
                             showSupport = state.showHomeSupportCard,
@@ -1454,7 +1457,10 @@ private fun SecondaryLinksCard(
 }
 
 @Composable
-private fun InfoCard(systemInfo: SystemInfo) {
+private fun InfoCard(
+    systemInfo: SystemInfo,
+    hookTypes: List<KernelHookType> = emptyList(),
+) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1525,6 +1531,7 @@ private fun InfoCard(systemInfo: SystemInfo) {
             )
             SystemInfoPanelMiuix(
                 systemInfo = systemInfo,
+                hookTypes = hookTypes,
                 fingerprintExpanded = fingerprintExpanded,
                 onFingerprintExpandedChange = { fingerprintExpanded = it },
                 wallpaperState = systemInfoWallpaperState,
@@ -1606,6 +1613,7 @@ private fun StatusMonitorPanelMiuix(
 @Composable
 private fun SystemInfoPanelMiuix(
     systemInfo: SystemInfo,
+    hookTypes: List<KernelHookType>,
     fingerprintExpanded: Boolean,
     onFingerprintExpandedChange: (Boolean) -> Unit,
     wallpaperState: HomeMetricCardWallpaperState,
@@ -1614,6 +1622,7 @@ private fun SystemInfoPanelMiuix(
 ) {
     val videoUriString = wallpaperState.videoUriString
     val hasWallpaper = wallpaperBitmap != null || !videoUriString.isNullOrBlank()
+    val hookTypeDisplay = kernelHookTypeLabel(hookTypes)
     val rowColor = if (hasWallpaper) Color.White else colorScheme.onSurface
     val labelColor = if (hasWallpaper) {
         Color.White.copy(alpha = 0.72f)
@@ -1660,6 +1669,13 @@ private fun SystemInfoPanelMiuix(
                 value = systemInfo.kernelVersion,
                 maxLines = 3,
                 onCopy = { onCopyValue("kernel_version", systemInfo.kernelVersion) },
+                labelColor = labelColor,
+                valueColor = rowColor,
+            )
+            InfoRowMiuix(
+                label = stringResource(R.string.home_kernel_hook),
+                value = hookTypeDisplay,
+                onCopy = { onCopyValue("kernel_hook", hookTypeDisplay) },
                 labelColor = labelColor,
                 valueColor = rowColor,
             )

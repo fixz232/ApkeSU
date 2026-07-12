@@ -89,8 +89,6 @@ import me.weishu.kernelsu.ui.component.material.SegmentedSwitchItem
 import me.weishu.kernelsu.ui.component.material.SendLogBottomSheet
 import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_MAGIC
-import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
@@ -577,78 +575,14 @@ private fun SettingsMaterialContent(
                     val builtinMountSummary = uiState.builtinMountConflict?.let {
                         stringResource(id = R.string.settings_builtin_mount_conflict_summary, it)
                     } ?: stringResource(id = R.string.settings_builtin_mount_summary)
-                    SegmentedSwitchItem(
-                        icon = Icons.Filled.Layers,
-                        title = stringResource(id = R.string.settings_builtin_mount),
-                        summary = builtinMountSummary,
-                        checked = uiState.isBuiltinMountEnabled,
-                        onCheckedChange = actions.onSetBuiltinMountEnabled
-                    )
-                },
-                {
-                    val builtinMountModeItems = listOf(
-                        stringResource(id = R.string.settings_builtin_mount_mode_overlay),
-                        stringResource(id = R.string.settings_builtin_mount_mode_magic),
-                    )
-                    SegmentedDropdownItem(
-                        icon = Icons.Filled.Apps,
-                        title = stringResource(id = R.string.settings_builtin_mount_default_mode),
-                        summary = stringResource(id = R.string.settings_builtin_mount_default_mode_summary),
-                        items = builtinMountModeItems,
-                        selectedIndex = if (uiState.builtinMountDefaultMode == BUILTIN_MOUNT_MODE_MAGIC) 1 else 0,
-                        onItemSelected = actions.onSetBuiltinMountDefaultMode
-                    )
-                },
-                {
-                    val builtinMountVariantItems = listOf(
-                        stringResource(id = R.string.settings_builtin_mount_variant_lite),
-                        stringResource(id = R.string.settings_builtin_mount_variant_full),
-                    )
-                    SegmentedDropdownItem(
-                        icon = Icons.Filled.Layers,
-                        title = stringResource(id = R.string.settings_builtin_mount_variant),
-                        summary = stringResource(id = R.string.settings_builtin_mount_variant_summary),
-                        items = builtinMountVariantItems,
-                        selectedIndex = if (uiState.builtinMountVariant == BUILTIN_MOUNT_VARIANT_FULL) 1 else 0,
-                        onItemSelected = actions.onSetBuiltinMountVariant
-                    )
-                },
-                {
                     SegmentedListItem(
-                        onClick = actions.onShowBuiltinMountDetails,
-                        headlineContent = { Text(stringResource(R.string.settings_builtin_mount_details)) },
-                        supportingContent = { Text(stringResource(R.string.settings_builtin_mount_details_summary)) },
-                        leadingContent = { Icon(Icons.Filled.Info, contentDescription = null) },
+                        onClick = actions.onOpenBuiltinMount,
+                        headlineContent = { Text(stringResource(id = R.string.settings_builtin_mount)) },
+                        supportingContent = { Text(builtinMountSummary) },
+                        leadingContent = { Icon(Icons.Filled.Layers, contentDescription = null) },
                         trailingContent = {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                         },
-                    )
-                },
-                {
-                    SegmentedListItem(
-                        onClick = actions.onOpenBuiltinMountWebUi,
-                        enabled = uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable,
-                        headlineContent = { Text(stringResource(id = R.string.settings_builtin_mount_webui)) },
-                        supportingContent = {
-                            Text(
-                                stringResource(
-                                    id = if (uiState.isBuiltinMountEnabled && uiState.isBuiltinMountWebUiAvailable) {
-                                        R.string.settings_builtin_mount_webui_summary
-                                    } else {
-                                        R.string.settings_builtin_mount_webui_disabled_summary
-                                    }
-                                )
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.DeveloperMode,
-                                stringResource(id = R.string.settings_builtin_mount_webui)
-                            )
-                        },
-                        trailingContent = {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
-                        }
                     )
                 },
                 {
@@ -697,6 +631,22 @@ private fun SettingsMaterialContent(
                             Icon(
                                 Icons.Filled.Visibility,
                                 stringResource(id = R.string.hidden_path_config)
+                            )
+                        },
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    )
+                },
+                {
+                    SegmentedListItem(
+                        onClick = actions.onOpenCpuSpoof,
+                        headlineContent = { Text(stringResource(id = R.string.settings_cpu_spoof)) },
+                        supportingContent = { Text(stringResource(id = R.string.settings_cpu_spoof_summary)) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.DeveloperMode,
+                                stringResource(id = R.string.settings_cpu_spoof)
                             )
                         },
                         trailingContent = {

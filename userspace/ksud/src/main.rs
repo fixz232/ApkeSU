@@ -20,6 +20,8 @@ mod cli;
 #[cfg(not(target_os = "android"))]
 mod cli_non_android;
 #[cfg(target_os = "android")]
+mod cpu_spoof;
+#[cfg(target_os = "android")]
 mod debug;
 mod defs;
 #[cfg(target_os = "android")]

@@ -22,6 +22,7 @@ enum class UiMode(val value: String) {
 enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
     Miuix(UiMode.Miuix.value, R.string.interface_style_miuix),
     Material(UiMode.Material.value, R.string.interface_style_material),
+    Studio("studio", R.string.interface_style_studio),
     LiquidGlass("liquid_glass", R.string.interface_style_liquid_glass),
     Skrootpro("skrootpro", R.string.interface_style_skrootpro),
     Alpha("alpha", R.string.interface_style_alpha),

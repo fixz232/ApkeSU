@@ -458,6 +458,17 @@ void __init ksu_lsm_hook_init(void)
     pr_info("lsm_hook: init, tracked hooks=%d\n", READ_ONCE(ksu_lsm_hook_count));
 }
 
+int ksu_lsm_hook_active_count(void)
+{
+    int count;
+
+    mutex_lock(&ksu_lsm_hook_lock);
+    count = ksu_lsm_hook_count;
+    mutex_unlock(&ksu_lsm_hook_lock);
+
+    return count;
+}
+
 void __exit ksu_lsm_hook_exit(void)
 {
     struct ksu_lsm_hook *hooks[ARRAY_SIZE(ksu_lsm_hook_entries)];

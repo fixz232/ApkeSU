@@ -8,8 +8,8 @@ use log::{LevelFilter, error, info, warn};
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
 use crate::{
-    apk_sign, assets, builtin_mount, debug, defs, epkesu_hide, init_event, kpatch_next, ksu_uapi,
-    ksucalls, module, module_config, pathmask, rescue, sulog, utils,
+    apk_sign, assets, builtin_mount, cpu_spoof, debug, defs, epkesu_hide, init_event, kpatch_next,
+    ksu_uapi, ksucalls, module, module_config, pathmask, rescue, sulog, utils,
 };
 
 /// KernelSU userspace cli
@@ -44,6 +44,12 @@ enum Commands {
     EpkesuHide {
         #[command(subcommand)]
         command: EpkesuHide,
+    },
+
+    /// Manage persistent CPU model spoofing
+    CpuSpoof {
+        #[command(subcommand)]
+        command: CpuSpoof,
     },
 
     /// Manage built-in pathmask LKM
@@ -203,11 +209,19 @@ enum BootInfo {
     /// check if device is A/B capable
     IsAbDevice,
 
-    /// show auto-selected boot partition name
-    DefaultPartition,
+    /// show auto-selected boot partition name for current or OTA toggled slot
+    DefaultPartition {
+        /// toggle to another slot
+        #[arg(short = 'u', long, default_value = "false")]
+        ota: bool,
+    },
 
     /// list available partitions for current or OTA toggled slot
-    AvailablePartitions,
+    AvailablePartitions {
+        /// toggle to another slot
+        #[arg(short = 'u', long, default_value = "false")]
+        ota: bool,
+    },
 
     /// show slot suffix for current or OTA toggled slot
     SlotSuffix {
@@ -526,6 +540,28 @@ enum EpkesuHide {
 
     /// Apply ApkeSU Hide property changes now
     Apply,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum CpuSpoof {
+    /// Print CPU spoof status as JSON
+    Status,
+
+    /// Save a target CPU model and apply it if enabled
+    Configure {
+        /// Value written to ro.soc.model
+        #[arg(long)]
+        model: String,
+    },
+
+    /// Enable CPU spoofing and apply the configured target
+    Enable,
+
+    /// Disable CPU spoofing and restore the current boot's original CPU value
+    Disable,
+
+    /// Restore the original CPU value and remove the saved configuration
+    RestoreDefault,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -866,6 +902,19 @@ pub fn run() -> Result<()> {
                 EpkesuHide::Apply => epkesu_hide::apply(),
             }
         }
+        Commands::CpuSpoof { command } => {
+            utils::switch_mnt_ns(1)?;
+            match command {
+                CpuSpoof::Status => {
+                    cpu_spoof::print_status();
+                    Ok(())
+                }
+                CpuSpoof::Configure { model } => cpu_spoof::configure(&model),
+                CpuSpoof::Enable => cpu_spoof::enable(),
+                CpuSpoof::Disable => cpu_spoof::disable(),
+                CpuSpoof::RestoreDefault => cpu_spoof::restore_default(),
+            }
+        }
         Commands::Pathmask { command } => {
             utils::switch_mnt_ns(1)?;
             match command {
@@ -1084,9 +1133,9 @@ pub fn run() -> Result<()> {
                 println!("{}", if is_ab { "true" } else { "false" });
                 return Ok(());
             }
-            BootInfo::DefaultPartition => {
+            BootInfo::DefaultPartition { ota } => {
                 let kmi = crate::boot_patch::get_current_kmi().unwrap_or_else(|_| String::new());
-                let name = crate::boot_patch::choose_boot_partition(&kmi, false, &None);
+                let name = crate::boot_patch::choose_boot_partition(&kmi, false, &None, ota);
                 println!("{name}");
                 return Ok(());
             }
@@ -1095,8 +1144,8 @@ pub fn run() -> Result<()> {
                 println!("{suffix}");
                 return Ok(());
             }
-            BootInfo::AvailablePartitions => {
-                let parts = crate::boot_patch::list_available_partitions();
+            BootInfo::AvailablePartitions { ota } => {
+                let parts = crate::boot_patch::list_available_partitions(ota);
                 for p in &parts {
                     println!("{p}");
                 }

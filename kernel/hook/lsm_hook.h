@@ -71,6 +71,8 @@ void ksu_unregister_lsm_hook(struct ksu_lsm_hook *hook);
 // register/unregister. Safe to call more than once.
 void ksu_lsm_hook_init(void);
 
+int ksu_lsm_hook_active_count(void);
+
 // Restore all currently tracked LSM hooks in reverse order and clear the
 // internal registry. Call this from module exit to avoid leaving patched LSM
 // hook slots behind.

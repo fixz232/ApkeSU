@@ -72,6 +72,7 @@ fun themePreferenceKey(
 
 fun defaultThemePresetForUiMode(uiMode: String): ThemePreset {
     return when (uiMode) {
+        InterfaceStyle.Studio.value -> ThemePreset.STUDIO
         InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
         InterfaceStyle.Alpha.value -> ThemePreset.ALPHA
         InterfaceStyle.Delta.value -> ThemePreset.DELTA

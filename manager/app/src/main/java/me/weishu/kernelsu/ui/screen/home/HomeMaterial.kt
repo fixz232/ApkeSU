@@ -1362,6 +1362,10 @@ private fun InfoCard(state: HomeUiState) {
                 maxLines = 2,
             )
             InfoLine(
+                label = stringResource(R.string.home_kernel_hook),
+                value = kernelHookTypeLabel(state.kernelHookTypes),
+            )
+            InfoLine(
                 label = stringResource(R.string.home_system_version),
                 value = systemVersion,
             )

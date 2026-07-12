@@ -26,6 +26,7 @@
 #include "feature/adb_root.h"
 #include "feature/selinux_hide.h"
 #include "feature/avc_spoof.h"
+#include "feature/hook_status.h"
 #include "infra/symbol_resolver.h"
 
 #if defined(__x86_64__)
@@ -181,6 +182,8 @@ int __init kernelsu_init(void)
         ksu_file_wrapper_init();
     }
 
+    ksu_hook_status_init();
+
 #ifdef MODULE
 #ifndef CONFIG_KSU_DEBUG
     kobject_del(&THIS_MODULE->mkobj.kobj);
@@ -192,6 +195,7 @@ int __init kernelsu_init(void)
 void __exit kernelsu_exit(void)
 {
     // Phase 1: Stop all hooks first to prevent new callbacks
+    ksu_hook_status_exit();
     ksu_syscall_hook_manager_exit();
 
     ksu_supercalls_exit();

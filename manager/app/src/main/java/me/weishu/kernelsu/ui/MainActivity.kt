@@ -118,6 +118,8 @@ import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
+import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
+import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
@@ -328,6 +330,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
                                 entry<Route.RescueProtection> { RescueProtectionScreen() }
+                                entry<Route.CpuSpoof> { CpuSpoofScreen() }
+                                entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }

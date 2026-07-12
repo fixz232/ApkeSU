@@ -141,6 +141,11 @@ private fun AlphaStatusCard(
                     value = stringResource(state.rootRuntimeState.labelRes),
                     strong = true,
                 )
+                AlphaInfoLine(
+                    label = stringResource(R.string.home_kernel_hook),
+                    value = kernelHookTypeLabel(state.kernelHookTypes),
+                    strong = true,
+                )
             }
             AlphaOutlinedButton(
                 text = stringResource(R.string.root_diagnose),

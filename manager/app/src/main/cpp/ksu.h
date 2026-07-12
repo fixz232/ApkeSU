@@ -60,6 +60,9 @@ bool set_avc_spoof_enabled(bool enabled);
 
 bool is_avc_spoof_enabled();
 
+// Read-only kernel Hook status. UINT64_MAX means unsupported.
+uint64_t get_kernel_hook_status();
+
 bool get_allow_list(struct ksu_new_get_allow_list_cmd *);
 
 inline std::pair<int, int> legacy_get_info() {

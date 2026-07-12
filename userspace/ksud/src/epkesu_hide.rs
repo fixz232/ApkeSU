@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use const_format::concatcp;
 use prop_rs_android::resetprop::ResetProp;
 use prop_rs_android::sys_prop;
@@ -11,6 +11,8 @@ use crate::{defs, utils};
 
 const CONFIG_PATH: &str = concatcp!(defs::WORKING_DIR, ".epkesu_hide");
 const BACKUP_PATH: &str = concatcp!(defs::WORKING_DIR, ".epkesu_hide_props");
+const BACKUP_SESSION_PATH: &str = concatcp!(defs::WORKING_DIR, ".epkesu_hide_session");
+const BOOT_ID_PATH: &str = "/proc/sys/kernel/random/boot_id";
 
 const RESET_PROPS: &[(&str, &str)] = &[
     ("ro.boot.vbmeta.device_state", "locked"),
@@ -56,24 +58,54 @@ pub fn is_enabled() -> bool {
     fs::read_to_string(CONFIG_PATH).is_ok_and(|content| content.trim() == "1")
 }
 
+fn is_applied() -> bool {
+    if sys_prop::init().is_err() {
+        return false;
+    }
+
+    let Ok(backup) = read_backup() else {
+        return false;
+    };
+    // A stock device can already report values such as "locked". Only a
+    // backup created during this boot proves that this feature changed them.
+    if backup.is_empty() {
+        return false;
+    }
+    if !backup_belongs_to_current_boot().unwrap_or(false) {
+        return false;
+    }
+    verify_applied(&resetprop(), &backup)
+}
+
 pub fn print_status() {
+    let configured = is_enabled();
+    let applied = configured && is_applied();
     println!(
         "{}",
         json!({
-            "enabled": is_enabled(),
+            "enabled": configured && applied,
+            "configured": configured,
+            "applied": applied,
         })
     );
 }
 
 pub fn enable() -> Result<()> {
-    clear_backup();
-    if let Err(err) = apply() {
+    if !is_enabled() {
+        clear_backup();
+        clear_backup_session();
+    }
+
+    apply()?;
+
+    if let Err(err) = write_enabled(true) {
         if let Err(restore_err) = restore_backup() {
-            log::warn!("epkesu-hide: rollback failed after enable error: {restore_err:#}");
+            log::warn!("epkesu-hide: rollback failed after state write error: {restore_err:#}");
         }
         return Err(err);
     }
-    write_enabled(true)
+
+    Ok(())
 }
 
 pub fn disable() -> Result<()> {
@@ -82,15 +114,26 @@ pub fn disable() -> Result<()> {
 }
 
 pub fn apply_if_enabled() {
-    if is_enabled() {
-        clear_backup();
-        if let Err(err) = apply() {
-            log::warn!("epkesu-hide: apply failed: {err:#}");
-        }
+    if is_enabled()
+        && let Err(err) = apply()
+    {
+        log::warn!("epkesu-hide: apply failed: {err:#}");
     }
 }
 
 pub fn apply() -> Result<()> {
+    let result = apply_inner();
+    if let Err(err) = &result
+        && let Err(restore_err) = restore_backup()
+    {
+        log::warn!("epkesu-hide: rollback failed after apply error: {restore_err:#}");
+        log::warn!("epkesu-hide: original apply error: {err:#}");
+    }
+    result
+}
+
+fn apply_inner() -> Result<()> {
+    prepare_backup_for_current_boot()?;
     sys_prop::init().context("Failed to initialize system property API")?;
 
     let rp = resetprop();
@@ -109,12 +152,16 @@ pub fn apply() -> Result<()> {
         write_backup(&backup)?;
     }
 
+    if !verify_applied(&rp, &backup) {
+        bail!("no supported boot properties were applied");
+    }
+
     Ok(())
 }
 
 fn write_enabled(enabled: bool) -> Result<()> {
     utils::ensure_dir_exists(Path::new(defs::WORKING_DIR))?;
-    fs::write(CONFIG_PATH, if enabled { "1\n" } else { "0\n" })
+    write_atomic(CONFIG_PATH, if enabled { "1\n" } else { "0\n" })
         .with_context(|| format!("failed to write {CONFIG_PATH}"))
 }
 
@@ -177,6 +224,13 @@ fn backup_original(backup: &mut BTreeMap<String, String>, name: &str, value: &st
 fn restore_backup() -> Result<()> {
     let backup = read_backup()?;
     if backup.is_empty() {
+        clear_backup_session();
+        return Ok(());
+    }
+
+    if !backup_belongs_to_current_boot()? {
+        clear_backup();
+        clear_backup_session();
         return Ok(());
     }
 
@@ -187,11 +241,94 @@ fn restore_backup() -> Result<()> {
             .with_context(|| format!("Failed to restore {name}"))?;
     }
     clear_backup();
+    clear_backup_session();
     Ok(())
 }
 
 fn clear_backup() {
     _ = fs::remove_file(BACKUP_PATH);
+}
+
+fn clear_backup_session() {
+    _ = fs::remove_file(BACKUP_SESSION_PATH);
+}
+
+fn prepare_backup_for_current_boot() -> Result<()> {
+    let boot_id = current_boot_id()?;
+    let session = fs::read_to_string(BACKUP_SESSION_PATH)
+        .ok()
+        .map(|value| value.trim().to_owned());
+
+    if session.as_deref() != Some(boot_id.as_str()) {
+        clear_backup();
+        write_atomic(BACKUP_SESSION_PATH, &format!("{boot_id}\n"))
+            .with_context(|| format!("failed to write {BACKUP_SESSION_PATH}"))?;
+    }
+
+    Ok(())
+}
+
+fn backup_belongs_to_current_boot() -> Result<bool> {
+    let boot_id = current_boot_id()?;
+    let session = fs::read_to_string(BACKUP_SESSION_PATH)
+        .ok()
+        .map(|value| value.trim().to_owned());
+    Ok(session.as_deref() == Some(boot_id.as_str()))
+}
+
+fn current_boot_id() -> Result<String> {
+    let boot_id = fs::read_to_string(BOOT_ID_PATH)
+        .with_context(|| format!("failed to read {BOOT_ID_PATH}"))?
+        .trim()
+        .to_owned();
+    if boot_id.is_empty() {
+        bail!("{BOOT_ID_PATH} is empty");
+    }
+    Ok(boot_id)
+}
+
+fn verify_applied(rp: &ResetProp, backup: &BTreeMap<String, String>) -> bool {
+    let mut found_property = false;
+
+    for (name, expected) in RESET_PROPS {
+        let tracked = backup.contains_key(*name);
+        let Some(value) = rp.get(name) else {
+            if tracked {
+                return false;
+            }
+            continue;
+        };
+
+        if tracked {
+            found_property = true;
+            if value != *expected {
+                return false;
+            }
+        } else if !value.is_empty() && value == *expected {
+            found_property = true;
+        }
+    }
+
+    for (name, _, new_value) in CONTAINS_PROPS {
+        let tracked = backup.contains_key(*name);
+        let Some(value) = rp.get(name) else {
+            if tracked {
+                return false;
+            }
+            continue;
+        };
+
+        if tracked {
+            found_property = true;
+            if value != *new_value {
+                return false;
+            }
+        } else if value == *new_value {
+            found_property = true;
+        }
+    }
+
+    found_property
 }
 
 fn read_backup() -> Result<BTreeMap<String, String>> {
@@ -225,5 +362,15 @@ fn write_backup(backup: &BTreeMap<String, String>) -> Result<()> {
         content.push('\n');
     }
 
-    fs::write(BACKUP_PATH, content).with_context(|| format!("failed to write {BACKUP_PATH}"))
+    write_atomic(BACKUP_PATH, &content).with_context(|| format!("failed to write {BACKUP_PATH}"))
+}
+
+fn write_atomic(path: &str, content: &str) -> Result<()> {
+    let temp_path = format!("{path}.tmp.{}", std::process::id());
+    fs::write(&temp_path, content).with_context(|| format!("failed to write {temp_path}"))?;
+    if let Err(err) = fs::rename(&temp_path, path) {
+        _ = fs::remove_file(&temp_path);
+        return Err(err).with_context(|| format!("failed to replace {path}"));
+    }
+    Ok(())
 }

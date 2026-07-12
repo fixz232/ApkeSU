@@ -78,6 +78,21 @@ enum class ThemePreset(
         pageScale = 1.0f,
     ),
 
+    STUDIO(
+        value = "studio",
+        titleRes = me.weishu.kernelsu.R.string.theme_preset_studio,
+        summaryRes = me.weishu.kernelsu.R.string.theme_preset_studio_summary,
+        colorMode = ColorMode.SYSTEM,
+        keyColor = 0xFF08736B.toInt(),
+        paletteStyle = PaletteStyle.TonalSpot,
+        colorSpec = ColorSpec.SpecVersion.Default,
+        miuixMonet = false,
+        enableBlur = false,
+        enableFloatingBottomBar = false,
+        enableFloatingBottomBarBlur = false,
+        pageScale = 1.0f,
+    ),
+
     LIQUID_GLASS(
         value = "liquid_glass",
         titleRes = me.weishu.kernelsu.R.string.theme_preset_liquid_glass,
@@ -155,7 +170,7 @@ enum class ThemePreset(
 
     companion object {
         val workshopPresets: List<ThemePreset>
-            get() = entries.filterNot { it == CUSTOM }
+            get() = entries.filterNot { it == CUSTOM || it == STUDIO }
 
         fun fromValue(value: String?): ThemePreset = entries.find { it.value == value } ?: CLEAN_TOOL
     }
@@ -167,6 +182,7 @@ enum class ThemePreset(
             ALPHA -> InterfaceStyle.Alpha.value
             DELTA -> InterfaceStyle.Delta.value
             LIQUID_GLASS -> InterfaceStyle.LiquidGlass.value
+            STUDIO -> InterfaceStyle.Studio.value
             PREMIUM_GLOSS -> InterfaceStyle.Miuix.value
             GEEK_DARK -> InterfaceStyle.Material.value
             CLEAN_TOOL, DYNAMIC_COLOR -> if (currentUiMode == InterfaceStyle.Material.value) {

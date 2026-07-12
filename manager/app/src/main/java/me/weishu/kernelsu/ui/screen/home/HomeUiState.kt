@@ -1,7 +1,9 @@
 package me.weishu.kernelsu.ui.screen.home
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.res.stringResource
 import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.R
 
@@ -32,6 +34,32 @@ enum class RootRuntimeState(@StringRes val labelRes: Int) {
     }
 }
 
+enum class KernelHookType(@StringRes val labelRes: Int) {
+    Tracepoint(R.string.hook_type_tracepoint);
+
+    companion object {
+        fun resolve(
+            hasActiveDriver: Boolean,
+            hasTracepoint: Boolean? = null,
+        ): List<KernelHookType> = when {
+            !hasActiveDriver -> emptyList()
+            hasTracepoint == false -> emptyList()
+            else -> listOf(Tracepoint)
+        }
+    }
+}
+
+@Composable
+fun kernelHookTypeLabel(types: List<KernelHookType>): String {
+    if (types.isEmpty()) return "--"
+
+    val labels = ArrayList<String>(types.size)
+    for (type in types) {
+        labels += stringResource(type.labelRes)
+    }
+    return labels.joinToString(separator = " / ")
+}
+
 @Immutable
 data class HomeUiState(
     val kernelVersion: KernelVersion,
@@ -48,6 +76,7 @@ data class HomeUiState(
     val uapiMismatch: Boolean,
     val isRootAvailable: Boolean,
     val rootRuntimeState: RootRuntimeState = RootRuntimeState.DriverDisconnected,
+    val kernelHookTypes: List<KernelHookType> = emptyList(),
     val isSafeMode: Boolean,
     val isLateLoadMode: Boolean,
     val currentManagerVersionCode: Long,

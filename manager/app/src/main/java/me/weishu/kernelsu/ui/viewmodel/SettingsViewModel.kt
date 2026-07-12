@@ -253,6 +253,13 @@ class SettingsViewModel(
         }
 
         when (mode) {
+            InterfaceStyle.Studio.value -> {
+                repo.uiMode = mode
+                applyThemePreset(ThemePreset.STUDIO)
+                _uiState.update { it.copy(uiMode = mode) }
+                return
+            }
+
             InterfaceStyle.Skrootpro.value -> {
                 repo.uiMode = mode
                 applyThemePreset(ThemePreset.SKROOTPRO)
@@ -284,7 +291,8 @@ class SettingsViewModel(
 
         val oldMode = repo.uiMode
         val currentThemeMode = repo.themeMode
-        val isLeavingSpecialStyle = oldMode == InterfaceStyle.Skrootpro.value ||
+        val isLeavingSpecialStyle = oldMode == InterfaceStyle.Studio.value ||
+            oldMode == InterfaceStyle.Skrootpro.value ||
             oldMode == InterfaceStyle.Alpha.value ||
             oldMode == InterfaceStyle.Delta.value ||
             oldMode == InterfaceStyle.LiquidGlass.value
@@ -932,7 +940,8 @@ class SettingsViewModel(
     fun setEpkesuHideEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setEpkesuHideEnabled(enabled)) {
-                _uiState.update { it.copy(isEpkesuHideEnabled = enabled) }
+                val actualEnabled = repo.getEpkesuHideStatus()
+                _uiState.update { it.copy(isEpkesuHideEnabled = actualEnabled) }
             } else {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(ksuApp, R.string.settings_epkesu_hide_failed, Toast.LENGTH_LONG).show()
