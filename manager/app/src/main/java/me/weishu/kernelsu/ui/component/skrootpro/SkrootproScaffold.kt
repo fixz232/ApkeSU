@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -45,18 +46,84 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
+
+private data class SkrootproPalette(
+    val purple: Color,
+    val purpleDark: Color,
+    val magentaLine: Color,
+    val text: Color,
+    val muted: Color,
+    val faint: Color,
+    val success: Color,
+    val disabled: Color,
+    val disabledText: Color,
+    val surface: Color,
+    val surfaceStrong: Color,
+    val barSurface: Color,
+)
 
 object SkrootproColors {
-    val Purple = Color(0xFF7000F5)
-    val PurpleDark = Color(0xFF3A00B8)
-    val MagentaLine = Color(0xFFE000E8)
-    val Text = Color(0xFF1E1E1E)
-    val Muted = Color(0xFF7B7B7B)
-    val Faint = Color(0xFFD9D9D9)
-    val Success = Color(0xFF45A857)
-    val Disabled = Color(0xFFE2E2E2)
-    val DisabledText = Color(0xFF8B8B8B)
-    val BarSurface = Color(0xFFF5F5F6)
+    private val Light = SkrootproPalette(
+        purple = Color(0xFF7000F5),
+        purpleDark = Color(0xFF3A00B8),
+        magentaLine = Color(0xFFE000E8),
+        text = Color(0xFF1E1E1E),
+        muted = Color(0xFF7B7B7B),
+        faint = Color(0xFFD9D9D9),
+        success = Color(0xFF45A857),
+        disabled = Color(0xFFE2E2E2),
+        disabledText = Color(0xFF8B8B8B),
+        surface = Color.White,
+        surfaceStrong = Color(0xFFF5F6F8),
+        barSurface = Color(0xFFF5F5F6),
+    )
+
+    private val Dark = SkrootproPalette(
+        purple = Color(0xFF9D63FF),
+        purpleDark = Color(0xFF43188C),
+        magentaLine = Color(0xFFF05BF2),
+        text = Color(0xFFF0ECF5),
+        muted = Color(0xFFB7B0C0),
+        faint = Color(0xFF6E6875),
+        success = Color(0xFF6BD47F),
+        disabled = Color(0xFF39343F),
+        disabledText = Color(0xFF8E8796),
+        surface = Color(0xFF18191E),
+        surfaceStrong = Color(0xFF292A31),
+        barSurface = Color(0xFF202126),
+    )
+
+    val Purple: Color
+        @Composable @ReadOnlyComposable get() = current.purple
+    val PurpleDark: Color
+        @Composable @ReadOnlyComposable get() = current.purpleDark
+    val MagentaLine: Color
+        @Composable @ReadOnlyComposable get() = current.magentaLine
+    val Text: Color
+        @Composable @ReadOnlyComposable get() = current.text
+    val Muted: Color
+        @Composable @ReadOnlyComposable get() = current.muted
+    val Faint: Color
+        @Composable @ReadOnlyComposable get() = current.faint
+    val Success: Color
+        @Composable @ReadOnlyComposable get() = current.success
+    val Disabled: Color
+        @Composable @ReadOnlyComposable get() = current.disabled
+    val DisabledText: Color
+        @Composable @ReadOnlyComposable get() = current.disabledText
+    val Surface: Color
+        @Composable @ReadOnlyComposable get() = current.surface
+    val SurfaceStrong: Color
+        @Composable @ReadOnlyComposable get() = current.surfaceStrong
+    val BarSurface: Color
+        @Composable @ReadOnlyComposable get() = current.barSurface
+
+    private val current: SkrootproPalette
+        @Composable
+        @ReadOnlyComposable
+        get() = if (isInDarkTheme()) Dark else Light
 }
 
 @Composable
@@ -74,10 +141,15 @@ fun SkrootproScreen(
     bottomInnerPadding: Dp,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val background = if (LocalNightBackgroundEffectActive.current) {
+        SkrootproColors.Surface.copy(alpha = 0.72f)
+    } else {
+        Color.Transparent
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(background)
     ) {
         SkrootproTopBar(
             title = title,
@@ -185,7 +257,7 @@ private fun SkrootproNavItem(
     ) {
         Text(
             text = stringResource(destination.label),
-            color = if (selected) Color.White else Color(0xFF5B5B5B),
+            color = if (selected) Color.White else SkrootproColors.Muted,
             fontSize = skrootproSp(14.5f, maxScale = 1.0f),
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,

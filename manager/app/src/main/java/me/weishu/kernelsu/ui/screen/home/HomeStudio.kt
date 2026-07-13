@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -76,30 +78,41 @@ fun HomePagerStudio(
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = innerPadding,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = innerPadding.calculateTopPadding() + 14.dp,
+                end = 16.dp,
+                bottom = innerPadding.calculateBottomPadding() + bottomInnerPadding + 18.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    StudioRuntimePanel(
-                        state = state,
-                        installFeedbackActive = installFeedbackActive,
-                        onDiagnoseClick = actions.onDiagnoseClick,
-                    )
-                    StudioCommandDeck(state = state, actions = actions)
-                    if (!state.isKernelActive) {
-                        StudioJailbreakCommand(onClick = actions.onJailbreakClick)
-                    }
-                    if (warningMessages.isNotEmpty()) {
-                        StudioAttentionList(messages = warningMessages)
-                    }
-                    StudioDeviceContext(state = state)
+                StudioRuntimePanel(
+                    state = state,
+                    installFeedbackActive = installFeedbackActive,
+                    onDiagnoseClick = actions.onDiagnoseClick,
+                )
+            }
+            item {
+                StudioCommandDeck(state = state, actions = actions)
+            }
+            if (!state.isKernelActive) {
+                item {
+                    StudioJailbreakCommand(onClick = actions.onJailbreakClick)
+                }
+            }
+            if (warningMessages.isNotEmpty()) {
+                item {
+                    StudioAttentionList(messages = warningMessages)
+                }
+            }
+            item {
+                StudioDeviceContext(state = state)
+            }
+            if (state.showHomeSupportCard || state.showHomeLearnCard) {
+                item {
                     StudioProjectLinks(state = state, actions = actions)
-                    Spacer(modifier = Modifier.height(bottomInnerPadding + 10.dp))
                 }
             }
         }
@@ -238,8 +251,8 @@ private fun StudioRuntimePanel(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             StudioRuntimeFact(
-                label = stringResource(R.string.home_working_version),
-                value = state.ksuVersionLabel,
+                label = stringResource(R.string.home_manager_version),
+                value = state.systemInfo.managerVersion,
                 modifier = Modifier.weight(1f),
             )
             Box(

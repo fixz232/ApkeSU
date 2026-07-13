@@ -40,11 +40,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -67,6 +69,7 @@ import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
@@ -196,6 +199,10 @@ private fun VisualEffectsContent(
     actions: VisualEffectsActions,
     modifier: Modifier,
 ) {
+    val darkMode = isInDarkTheme()
+    val selectedNightEffect = NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect)
+    val nightEffectEnabled = darkMode && selectedNightEffect != NightBackgroundEffect.Off
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -219,12 +226,15 @@ private fun VisualEffectsContent(
         VisualEffectCard(
             title = stringResource(R.string.settings_global_snow),
             icon = Icons.Rounded.Visibility,
+            enabled = darkMode,
+            disabledMessage = stringResource(R.string.settings_visual_effects_dark_mode_only),
         ) {
             VisualSwitchRow(
                 title = stringResource(R.string.settings_global_snow),
                 summary = stringResource(R.string.settings_global_snow_summary),
-                checked = uiState.globalSnowEnabled,
+                checked = uiState.globalSnowEnabled && darkMode,
                 onCheckedChange = actions.onSetGlobalSnowEnabled,
+                enabled = darkMode,
             )
             VisualChoiceRow(
                 title = stringResource(R.string.settings_global_snow_effect),
@@ -232,12 +242,15 @@ private fun VisualEffectsContent(
                 items = GlobalSnowEffect.entries.map { stringResource(it.labelRes) },
                 selectedIndex = GlobalSnowEffect.selectedIndex(uiState.globalSnowEffect),
                 onItemSelected = actions.onSetGlobalSnowEffectIndex,
+                enabled = darkMode,
             )
         }
 
         VisualEffectCard(
             title = stringResource(R.string.settings_night_background_effect),
             icon = Icons.Rounded.Visibility,
+            enabled = darkMode,
+            disabledMessage = stringResource(R.string.settings_visual_effects_dark_mode_only),
         ) {
             VisualChoiceRow(
                 title = stringResource(R.string.settings_night_background_effect),
@@ -245,12 +258,14 @@ private fun VisualEffectsContent(
                 items = NightBackgroundEffect.entries.map { stringResource(it.labelRes) },
                 selectedIndex = NightBackgroundEffect.selectedIndex(uiState.nightBackgroundEffect),
                 onItemSelected = actions.onSetNightBackgroundEffectIndex,
+                enabled = darkMode,
             )
             VisualSwitchRow(
                 title = stringResource(R.string.settings_night_background_passthrough),
                 summary = stringResource(R.string.settings_night_background_passthrough_summary),
-                checked = uiState.nightBackgroundPassthrough,
+                checked = uiState.nightBackgroundPassthrough && nightEffectEnabled,
                 onCheckedChange = actions.onSetNightBackgroundPassthrough,
+                enabled = nightEffectEnabled,
             )
             if (uiState.nightBackgroundPassthrough) {
                 VisualSliderRow(
@@ -260,6 +275,7 @@ private fun VisualEffectsContent(
                     valueRange = MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY..MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
                     valueLabel = { "${(it * 100).roundToInt()}%" },
                     onValueChange = actions.onSetNightBackgroundPassthroughOpacity,
+                    enabled = nightEffectEnabled,
                 )
             }
         }
@@ -289,6 +305,8 @@ private fun VisualEffectsContent(
 private fun VisualEffectCard(
     title: String,
     icon: ImageVector,
+    enabled: Boolean = true,
+    disabledMessage: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
@@ -309,15 +327,22 @@ private fun VisualEffectCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
                 )
                 Text(
                     text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.62f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!enabled && disabledMessage != null) {
+                Text(
+                    text = disabledMessage,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
             content()
@@ -431,9 +456,12 @@ private fun VisualSwitchRow(
     summary: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -450,7 +478,8 @@ private fun VisualSwitchRow(
         }
         ExpressiveSwitch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = if (enabled) onCheckedChange else null,
+            enabled = enabled,
             showThumbIcon = false,
         )
     }
@@ -463,11 +492,17 @@ private fun VisualChoiceRow(
     items: List<String>,
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit,
+    enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(enabled) {
+        if (!enabled) expanded = false
+    }
     val selectedText = items.getOrElse(selectedIndex) { items.firstOrNull().orEmpty() }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -483,7 +518,10 @@ private fun VisualChoiceRow(
             )
         }
         Box {
-            OutlinedButton(onClick = { expanded = true }) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                enabled = enabled,
+            ) {
                 Text(
                     text = selectedText,
                     maxLines = 1,
@@ -516,9 +554,12 @@ private fun VisualSliderRow(
     valueRange: ClosedFloatingPointRange<Float>,
     valueLabel: (Float) -> String,
     onValueChange: (Float) -> Unit,
+    enabled: Boolean = true,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -547,6 +588,7 @@ private fun VisualSliderRow(
             value = value,
             valueRange = valueRange,
             onValueChange = onValueChange,
+            enabled = enabled,
         )
     }
 }

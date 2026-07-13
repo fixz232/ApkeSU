@@ -21,6 +21,8 @@ data class MainActivityUiState(
     val enableBlur: Boolean,
     val enableFloatingBottomBar: Boolean,
     val enableFloatingBottomBarBlur: Boolean,
+    val autoHideNavigationBar: Boolean,
+    val scrollHideNavigationBar: Boolean,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,

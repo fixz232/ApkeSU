@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
@@ -51,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -71,7 +72,9 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaColors
 import me.weishu.kernelsu.ui.component.alpha.AlphaShapes
 import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
 import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
+import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
+import me.weishu.kernelsu.ui.component.alpha.isStudioStyle
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -98,11 +101,11 @@ fun SettingPagerAlpha(
                 .verticalScroll(rememberScrollState())
                 .padding(
                     start = 16.dp,
-                    top = 18.dp,
+                    top = if (isStudioStyle()) 14.dp else 18.dp,
                     end = 16.dp,
                     bottom = contentPadding.calculateBottomPadding(),
                 ),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isStudioStyle()) 12.dp else 14.dp),
         ) {
             AlphaSection(title = stringResource(R.string.settings_ui_mode)) {
                 AlphaStylePicker(uiState = uiState, actions = actions)
@@ -334,6 +337,19 @@ fun SettingPagerAlpha(
 }
 
 @Composable
+fun SettingPagerStudio(
+    uiState: SettingsUiState,
+    actions: SettingsScreenActions,
+    bottomInnerPadding: Dp,
+) {
+    SettingPagerAlpha(
+        uiState = uiState,
+        actions = actions,
+        bottomInnerPadding = bottomInnerPadding,
+    )
+}
+
+@Composable
 private fun AlphaFeatureRows(
     uiState: SettingsUiState,
     actions: SettingsScreenActions,
@@ -427,7 +443,7 @@ private fun AlphaInlineSectionLabel(text: String) {
         text = text,
         color = AlphaColors.Accent,
         fontSize = alphaSp(12.5f),
-        fontWeight = FontWeight.Black,
+        fontWeight = alphaStrongWeight(),
         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -450,7 +466,8 @@ private fun AlphaSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(!collapsible) }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val studio = isStudioStyle()
+    Column(verticalArrangement = Arrangement.spacedBy(if (studio) 7.dp else 6.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -461,10 +478,10 @@ private fun AlphaSection(
         ) {
             Text(
                 text = title,
-                color = AlphaColors.Text,
-                fontSize = alphaSp(20f, maxScale = 1.04f),
-                lineHeight = alphaSp(24f, maxScale = 1.04f),
-                fontWeight = FontWeight.Black,
+                color = if (studio) AlphaColors.Accent else AlphaColors.Text,
+                fontSize = alphaSp(if (studio) 13.5f else 20f, maxScale = 1.04f),
+                lineHeight = alphaSp(if (studio) 17f else 24f, maxScale = 1.04f),
+                fontWeight = alphaStrongWeight(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -511,9 +528,9 @@ private fun AlphaStylePicker(
             ) {
                 Text(
                     text = stringResource(style.labelRes),
-                    color = if (selected) Color.White else AlphaColors.Muted,
+                    color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
                     fontSize = alphaSp(13f, maxScale = 1.0f),
-                    fontWeight = FontWeight.Black,
+                    fontWeight = alphaStrongWeight(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -537,7 +554,7 @@ private fun AlphaSwitchStylePicker(
             text = stringResource(R.string.settings_switch_style),
             color = AlphaColors.Text,
             fontSize = alphaSp(15f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -560,9 +577,9 @@ private fun AlphaSwitchStylePicker(
                 ) {
                     Text(
                         text = stringResource(style.labelRes),
-                        color = if (selected) Color.White else AlphaColors.Muted,
+                        color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
                         fontSize = alphaSp(13f, maxScale = 1.0f),
-                        fontWeight = FontWeight.Black,
+                        fontWeight = alphaStrongWeight(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -587,7 +604,7 @@ private fun AlphaSnowEffectPicker(
             text = stringResource(R.string.settings_global_snow_effect),
             color = AlphaColors.Text,
             fontSize = alphaSp(15f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -610,9 +627,9 @@ private fun AlphaSnowEffectPicker(
                 ) {
                     Text(
                         text = stringResource(effect.labelRes),
-                        color = if (selected) Color.White else AlphaColors.Muted,
+                        color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
                         fontSize = alphaSp(13f, maxScale = 1.0f),
-                        fontWeight = FontWeight.Black,
+                        fontWeight = alphaStrongWeight(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -637,7 +654,7 @@ private fun AlphaNightBackgroundEffectPicker(
             text = stringResource(R.string.settings_night_background_effect),
             color = AlphaColors.Text,
             fontSize = alphaSp(15f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -660,9 +677,9 @@ private fun AlphaNightBackgroundEffectPicker(
                 ) {
                     Text(
                         text = stringResource(effect.labelRes),
-                        color = if (selected) Color.White else AlphaColors.Muted,
+                        color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
                         fontSize = alphaSp(13f, maxScale = 1.0f),
-                        fontWeight = FontWeight.Black,
+                        fontWeight = alphaStrongWeight(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -687,7 +704,7 @@ private fun AlphaScrollEffectPicker(
             text = stringResource(R.string.settings_scroll_animation_effect),
             color = AlphaColors.Text,
             fontSize = alphaSp(15f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -710,9 +727,9 @@ private fun AlphaScrollEffectPicker(
                 ) {
                     Text(
                         text = stringResource(effect.labelRes),
-                        color = if (selected) Color.White else AlphaColors.Muted,
+                        color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
                         fontSize = alphaSp(13f, maxScale = 1.0f),
-                        fontWeight = FontWeight.Black,
+                        fontWeight = alphaStrongWeight(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -732,6 +749,7 @@ private fun AlphaActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 52.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -750,7 +768,7 @@ private fun AlphaActionRow(
                 text = title,
                 color = AlphaColors.Text,
                 fontSize = alphaSp(15f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -765,6 +783,14 @@ private fun AlphaActionRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        if (isStudioStyle()) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = AlphaColors.Muted,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -781,6 +807,7 @@ private fun AlphaSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 52.dp)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -790,7 +817,7 @@ private fun AlphaSwitchRow(
                 text = title,
                 color = if (enabled) AlphaColors.Text else AlphaColors.Disabled,
                 fontSize = alphaSp(15f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -837,7 +864,7 @@ private fun AlphaSliderRow(
                 text = title,
                 color = AlphaColors.Text,
                 fontSize = alphaSp(15f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

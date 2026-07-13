@@ -80,10 +80,7 @@ fun homeWarningMessages(state: HomeUiState): List<String> = buildList {
         }
         add(message)
     }
-    if (state.rootRuntimeState == RootRuntimeState.VersionMismatch &&
-        !state.showVersionMismatchWarning &&
-        !state.showRequireKernelWarning
-    ) {
+    if (state.showDaemonVersionWarning) {
         add(stringResource(R.string.root_runtime_version_warning))
     }
     if (state.showRootWarning) {

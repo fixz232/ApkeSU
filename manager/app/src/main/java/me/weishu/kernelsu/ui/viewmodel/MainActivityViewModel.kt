@@ -15,6 +15,7 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
@@ -24,6 +25,7 @@ import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_KEY
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
+import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.AppSettings
@@ -95,6 +97,8 @@ class MainActivityViewModel(
             enableBlur = if (isLiquidGlassInterface) false else settingRepo.enableBlur,
             enableFloatingBottomBar = settingRepo.enableFloatingBottomBar,
             enableFloatingBottomBarBlur = if (isLiquidGlassInterface) false else settingRepo.enableFloatingBottomBarBlur,
+            autoHideNavigationBar = settingRepo.autoHideNavigationBar,
+            scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
             globalSnowEnabled = settingRepo.globalSnowEnabled,
             globalSnowEffect = settingRepo.globalSnowEffect,
@@ -139,6 +143,8 @@ class MainActivityViewModel(
             enableBlur = false,
             enableFloatingBottomBar = false,
             enableFloatingBottomBarBlur = false,
+            autoHideNavigationBar = false,
+            scrollHideNavigationBar = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
             globalSnowEnabled = false,
             globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
@@ -190,6 +196,8 @@ class MainActivityViewModel(
             NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY,
             GLOBAL_SCROLL_EFFECT_ENABLED_KEY,
             GLOBAL_SCROLL_EFFECT_KEY,
+            AUTO_HIDE_NAVIGATION_BAR_KEY,
+            SCROLL_HIDE_NAVIGATION_BAR_KEY,
             DELTA_COLOR_VARIANT_KEY,
             "custom_wallpaper_uri",
             "custom_wallpaper_opacity",

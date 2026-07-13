@@ -426,29 +426,39 @@ fun ModulePagerMaterial(
                 }
                 return@PullToRefreshBox
             }
-            val latestModuleList = rememberUpdatedState(uiState.moduleList)
-            val latestRefreshing = rememberUpdatedState(uiState.isRefreshing)
-            ScrollToTopOnChange(
-                listState,
-                uiState.sortEnabledFirst,
-                uiState.sortActionFirst,
-                refreshTick,
-                isBusy = { latestRefreshing.value },
-            ) { latestModuleList.value }
-            ModuleList(
-                bottomInnerPadding = bottomInnerPadding,
-                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                listState = listState,
-                displayModules = uiState.moduleList,
-                updateInfoMap = uiState.updateInfo,
-                actions = actions,
-                onClickModule = { module ->
-                    if (module.hasWebUi) {
-                        actions.onOpenWebUi(module)
-                    }
-                },
-                onModuleAddShortcut = { module, type -> onModuleAddShortcut(module, type) },
-            )
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.loadError != null) {
+                    ModuleLoadErrorMaterial(
+                        onRetry = actions.onRefresh,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                val latestModuleList = rememberUpdatedState(uiState.moduleList)
+                val latestRefreshing = rememberUpdatedState(uiState.isRefreshing)
+                ScrollToTopOnChange(
+                    listState,
+                    uiState.sortEnabledFirst,
+                    uiState.sortActionFirst,
+                    refreshTick,
+                    isBusy = { latestRefreshing.value },
+                ) { latestModuleList.value }
+                ModuleList(
+                    bottomInnerPadding = bottomInnerPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    listState = listState,
+                    displayModules = uiState.moduleList,
+                    updateInfoMap = uiState.updateInfo,
+                    actions = actions,
+                    onClickModule = { module ->
+                        if (module.hasWebUi) {
+                            actions.onOpenWebUi(module)
+                        }
+                    },
+                    onModuleAddShortcut = { module, type -> onModuleAddShortcut(module, type) },
+                )
+            }
         }
     }
 
@@ -989,6 +999,33 @@ private fun ModuleItem(
         bitmap = wallpaperBitmap,
         onDismissRequest = { showWallpaperPreview = false },
     )
+}
+
+@Composable
+private fun ModuleLoadErrorMaterial(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.module_failed_to_load),
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Medium,
+            )
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.network_retry))
+            }
+        }
+    }
 }
 
 @Composable

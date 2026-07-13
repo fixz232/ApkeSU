@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.Module
+import me.weishu.kernelsu.data.model.ModuleUpdateInfo
 import me.weishu.kernelsu.ui.component.ObserveAsEvents
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
@@ -135,9 +136,20 @@ fun ModulePagerSkrootpro(
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
             )
 
-            if (modules.isEmpty()) {
+            if (uiState.loadError != null) {
+                SkrootproModuleLoadError(
+                    onRetry = actions.onRefresh,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
+
+            if (modules.isEmpty() && uiState.loadError == null) {
                 SkrootproEmptyText(
-                    text = stringResource(R.string.skrootpro_module_empty),
+                    text = if (uiState.hasLoaded) {
+                        stringResource(R.string.skrootpro_module_empty)
+                    } else {
+                        stringResource(R.string.refresh_refresh)
+                    },
                     modifier = Modifier.weight(1f),
                 )
             } else {
@@ -151,8 +163,13 @@ fun ModulePagerSkrootpro(
                     items(modules, key = { it.id }) { module ->
                         SkrootproModuleCard(
                             module = module,
+                            updateInfo = uiState.updateInfo[module.id],
+                            onUpdateClick = { updateInfo ->
+                                actions.onRequestUpdateConfirmation(module, updateInfo)
+                            },
                             onExecuteClick = { actions.onExecuteModuleAction(module) },
                             onDeleteClick = { actions.onRequestUninstallConfirmation(module) },
+                            onUndoUninstallClick = { actions.onUndoUninstallModule(module) },
                             onToggleClick = { actions.onToggleModule(module) },
                             onWebManageClick = { actions.onOpenWebUi(module) },
                         )
@@ -160,6 +177,35 @@ fun ModulePagerSkrootpro(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SkrootproModuleLoadError(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(SkrootproColors.Surface)
+            .padding(14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.module_failed_to_load),
+            color = SkrootproColors.Muted,
+            fontSize = skrootproSp(13f, maxScale = 1.0f),
+            fontWeight = FontWeight.Medium,
+        )
+        SkrootproButton(
+            text = stringResource(R.string.network_retry),
+            onClick = onRetry,
+            modifier = Modifier
+                .padding(top = 10.dp)
+                .width(120.dp),
+        )
     }
 }
 
@@ -221,11 +267,15 @@ private fun SkrootproSegment(
 @Composable
 private fun SkrootproModuleCard(
     module: Module,
+    updateInfo: ModuleUpdateInfo?,
+    onUpdateClick: (ModuleUpdateInfo) -> Unit,
     onExecuteClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onUndoUninstallClick: () -> Unit,
     onToggleClick: () -> Unit,
     onWebManageClick: () -> Unit,
 ) {
+    val pending = module.update || module.remove
     var menuExpanded by remember(module.id) { mutableStateOf(false) }
     var showWallpaperCrop by remember(module.id) { mutableStateOf(false) }
     var showWallpaperPreview by remember(module.id) { mutableStateOf(false) }
@@ -245,11 +295,11 @@ private fun SkrootproModuleCard(
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(4.dp))
             .clip(RoundedCornerShape(4.dp))
-            .background(Color.White),
+            .background(SkrootproColors.Surface),
     ) {
         ModuleCardWallpaperBackground(
             bitmap = wallpaperBitmap,
-            overlayColor = Color.White.copy(alpha = 0.70f),
+            overlayColor = SkrootproColors.Surface.copy(alpha = 0.70f),
         )
         Box(
             modifier = Modifier.padding(start = 20.dp, top = 9.dp, end = 14.dp, bottom = 9.dp)
@@ -295,6 +345,7 @@ private fun SkrootproModuleCard(
                     SkrootproButton(
                         text = stringResource(R.string.skrootpro_web_manage),
                         onClick = onWebManageClick,
+                        enabled = !pending,
                         modifier = Modifier
                             .padding(top = 5.dp)
                             .width(82.dp),
@@ -316,9 +367,18 @@ private fun SkrootproModuleCard(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {
+                    if (updateInfo != null && !module.remove) {
+                        DropdownMenuItem(
+                            text = { SkrootproMenuText(stringResource(R.string.module_update)) },
+                            onClick = {
+                                menuExpanded = false
+                                onUpdateClick(updateInfo)
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { SkrootproMenuText(stringResource(R.string.skrootpro_module_action_execute)) },
-                        enabled = module.hasActionScript,
+                        enabled = module.hasActionScript && !pending,
                         onClick = {
                             menuExpanded = false
                             onExecuteClick()
@@ -334,6 +394,7 @@ private fun SkrootproModuleCard(
                                 }
                             )
                         },
+                        enabled = !pending,
                         onClick = {
                             menuExpanded = false
                             onToggleClick()
@@ -403,13 +464,15 @@ private fun SkrootproModuleCard(
                     DropdownMenuItem(
                         text = {
                             SkrootproMenuText(
-                                stringResource(R.string.skrootpro_module_action_delete),
-                                color = Color(0xFFD32F2F),
+                                text = stringResource(
+                                    if (module.remove) R.string.undo else R.string.skrootpro_module_action_delete
+                                ),
+                                color = if (module.remove) SkrootproColors.Text else Color(0xFFD32F2F),
                             )
                         },
                         onClick = {
                             menuExpanded = false
-                            onDeleteClick()
+                            if (module.remove) onUndoUninstallClick() else onDeleteClick()
                         },
                     )
                 }

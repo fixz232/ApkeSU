@@ -141,7 +141,12 @@ fun ModulePagerDelta(
                 ),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                if (modules.isEmpty()) {
+                if (uiState.loadError != null) {
+                    item {
+                        DeltaModuleLoadError(onRetry = actions.onRefresh)
+                    }
+                }
+                if (modules.isEmpty() && uiState.loadError == null) {
                     item {
                         DeltaEmptyCard(
                             text = if (uiState.hasLoaded) {
@@ -179,6 +184,29 @@ fun ModulePagerDelta(
                         ),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DeltaModuleLoadError(onRetry: () -> Unit) {
+    DeltaCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.module_failed_to_load),
+                color = DeltaColors.Muted,
+                fontSize = deltaSp(14f),
+                fontWeight = FontWeight.Bold,
+            )
+            DeltaPillButton(
+                text = stringResource(R.string.network_retry),
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

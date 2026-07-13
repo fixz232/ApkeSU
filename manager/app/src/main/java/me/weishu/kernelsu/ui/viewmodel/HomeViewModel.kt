@@ -7,6 +7,7 @@ import android.system.Os
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ import me.weishu.kernelsu.ui.screen.home.KernelHookType
 import me.weishu.kernelsu.ui.screen.home.RootRuntimeState
 import me.weishu.kernelsu.ui.screen.home.SystemInfo
 import me.weishu.kernelsu.ui.screen.home.getManagerVersion
+import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
 import me.weishu.kernelsu.ui.util.apkeSuKernelModuleLoaded
 import me.weishu.kernelsu.ui.util.apkeSuRootAvailable
 import me.weishu.kernelsu.ui.util.collectRootDiagnosticInfo
@@ -111,7 +113,9 @@ class HomeViewModel(
                 val info = collectRootDiagnosticInfo()
                 _diagnosticReport.value = buildDiagnosticReport(info)
                 refresh()
-            } catch (throwable: Throwable) {
+            } catch (error: CancellationException) {
+                throw error
+            } catch (throwable: Exception) {
                 Log.e(TAG, "root diagnostics failed", throwable)
                 _diagnosticReport.value = "Root \u8bca\u65ad\u5931\u8d25\n${throwable.message.orEmpty()}"
             } finally {
@@ -158,7 +162,6 @@ class HomeViewModel(
         val managerVersion = getManagerVersion(ksuApp)
         val requiresNewKernel = isManager && runCatching { Natives.requireNewKernel() }.getOrDefault(false)
         val uapiMismatch = isManager && runCatching { Natives.checkUAPIMismatch() }.getOrDefault(false)
-        val managerOlderThanDriver = ksuVersion?.let { managerVersion.versionCode < it.toLong() } == true
         val installedKsud = if (isManager && ksuDaemonRoot) {
             runCatching { getInstalledKsudStatus() }.getOrNull()
         } else {
@@ -171,8 +174,12 @@ class HomeViewModel(
             driverConnected = driverConnected,
             managerRegistered = isManager,
             daemonRootAvailable = ksuDaemonRoot,
-            versionMismatch = requiresNewKernel || uapiMismatch ||
-                managerOlderThanDriver || ksudVersionMismatch,
+            blockingVersionMismatch = hasBlockingRootVersionMismatch(
+                managerVersionCode = managerVersion.versionCode,
+                driverVersion = ksuVersion,
+                requiresNewKernel = requiresNewKernel,
+                uapiMismatch = uapiMismatch,
+            ),
         )
         val kernelHookStatus = if (driverConnected) {
             runCatching { Natives.kernelHookStatus }.getOrDefault(Natives.HOOK_STATUS_UNSUPPORTED)
@@ -199,6 +206,7 @@ class HomeViewModel(
             managerUAPIVersion = managerUAPIVersion,
             isRootAvailable = ksuDaemonRoot,
             rootRuntimeState = rootRuntimeState,
+            daemonVersionMismatch = ksudVersionMismatch,
             kernelHookTypes = KernelHookType.resolve(
                 hasActiveDriver = driverConnected,
                 hasTracepoint = hasTracepoint,
@@ -236,7 +244,7 @@ class HomeViewModel(
             driverConnected = isKernelActive,
             managerRegistered = isManager,
             daemonRootAvailable = ksuDaemonRoot,
-            versionMismatch = true,
+            blockingVersionMismatch = false,
         )
         return HomeUiState(
             kernelVersion = runCatching { getKernelVersion() }.getOrElse { KernelVersion(0, 0, 0) },
@@ -278,16 +286,23 @@ class HomeViewModel(
     private fun buildDiagnosticReport(info: me.weishu.kernelsu.ui.util.RootDiagnosticInfo): String {
         val packagedCode = parseVersionCode(info.packagedKsudVersion)
         val installedCode = parseVersionCode(info.installedKsudVersion)
-        val daemonVersionMatches = packagedCode != null && packagedCode == installedCode
+        val packagedVersionMatches = packagedCode == BuildConfig.VERSION_CODE
+        val installedVersionMatches = installedCode == BuildConfig.VERSION_CODE
+        val daemonVersionMatches = packagedVersionMatches && installedVersionMatches
         val driverConnected = info.driverVersion > 0 || info.kernelModuleLoaded || info.ksuRootShell
-        val versionMismatch = (info.kernelUapi > 0 && info.kernelUapi != info.managerUapi) ||
-            (info.driverVersion > 0 && BuildConfig.VERSION_CODE < info.driverVersion) ||
-            !daemonVersionMatches
+        val uapiMismatch = info.kernelUapi > 0 && info.kernelUapi != info.managerUapi
+        val requiresNewKernel =
+            (info.driverVersion in 1 until Natives.minimalSupportedKernel) || uapiMismatch
         val state = RootRuntimeState.resolve(
             driverConnected = driverConnected,
             managerRegistered = info.managerRegistered,
             daemonRootAvailable = info.ksuRootShell,
-            versionMismatch = versionMismatch,
+            blockingVersionMismatch = hasBlockingRootVersionMismatch(
+                managerVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                driverVersion = info.driverVersion.takeIf { it > 0 },
+                requiresNewKernel = requiresNewKernel,
+                uapiMismatch = uapiMismatch,
+            ),
         )
         val timestamp = DateFormat.getDateTimeInstance().format(Date())
         val mode = when (info.workMode) {
@@ -304,6 +319,7 @@ class HomeViewModel(
             appendLine()
             appendLine("\u9a71\u52a8\u8fde\u63a5: ${healthLabel(info.driverVersion > 0 || info.kernelModuleLoaded || info.ksuRootShell)}")
             appendLine("\u9a71\u52a8\u7248\u672c: ${info.driverVersion.takeIf { it > 0 } ?: "-"}")
+            appendLine("\u9a71\u52a8\u4e0e\u7ba1\u7406\u5668\u7248\u672c\u4e00\u81f4: ${healthLabel(info.driverVersion == BuildConfig.VERSION_CODE)}")
             appendLine("\u5185\u6838\u6a21\u5757\u6807\u8bb0: ${presentLabel(info.kernelModuleLoaded)}")
             appendLine("ApkeSU Root Shell: ${healthLabel(info.ksuRootShell)}")
             appendLine("\u5907\u7528 su Root Shell: ${presentLabel(info.fallbackRootShell)}")
@@ -313,7 +329,9 @@ class HomeViewModel(
             appendLine()
             appendLine("APK \u5185\u7f6e ksud: ${info.packagedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
             appendLine("\u5df2\u5b89\u88c5 ksud: ${info.installedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
-            appendLine("ksud \u7248\u672c\u4e00\u81f4: ${healthLabel(daemonVersionMatches)}")
+            appendLine("APK \u5185\u7f6e ksud \u4e0e\u7ba1\u7406\u5668\u4e00\u81f4: ${healthLabel(packagedVersionMatches)}")
+            appendLine("\u5df2\u5b89\u88c5 ksud \u4e0e\u7ba1\u7406\u5668\u4e00\u81f4: ${healthLabel(installedVersionMatches)}")
+            appendLine("ksud \u6574\u4f53\u7248\u672c\u4e00\u81f4: ${healthLabel(daemonVersionMatches)}")
             appendLine("KMI: ${info.currentKmi.ifBlank { "-" }}")
             appendLine("\u5f53\u524d\u69fd\u4f4d: ${info.currentSlot.ifBlank { "\u65e0\u69fd\u4f4d" }}")
             appendLine("\u5de5\u4f5c\u6a21\u5f0f: $mode")

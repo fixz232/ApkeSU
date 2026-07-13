@@ -139,6 +139,7 @@
     <string name="module_failed_to_enable">Failed to enable module: %s</string>
     <string name="module_failed_to_disable">Failed to disable module: %s</string>
     <string name="module_empty">No module installed</string>
+    <string name="module_failed_to_load">Failed to load module list</string>
     <string name="module">Module</string>
     <string name="module_install_prompt_with_name">The following modules will be installed: %1$s</string>
     <string name="module_sort_action_first">Action first</string>
@@ -214,8 +215,6 @@
     <string name="settings_builtin_mount_mode_magic">Magic</string>
     <string name="settings_builtin_mount_variant">Built-in mount package</string>
     <string name="settings_builtin_mount_variant_summary">Choose Lite or the full Hybrid Mount / Kasumi experimental package.</string>
-    <string name="settings_builtin_mount_variant_lite">Hybrid Mount Lite</string>
-    <string name="settings_builtin_mount_variant_full">Full Hybrid Mount / Kasumi experimental</string>
     <string name="settings_builtin_mount_variant_lite_short">Lite</string>
     <string name="settings_builtin_mount_variant_full_short">Full experimental</string>
     <string name="settings_builtin_mount_webui">Advanced hybrid strategy</string>
@@ -224,7 +223,6 @@
     <string name="settings_builtin_mount_reboot_required">Reboot to apply built-in mount changes.</string>
     <string name="settings_builtin_mount_failed">Failed to update built-in mount.</string>
     <string name="settings_builtin_mount_details">Hybrid Mount package details</string>
-    <string name="settings_builtin_mount_details_summary">Show package source, SHA256, Kasumi KMI support, and compatibility.</string>
     <string name="settings_builtin_mount_not_root_driver">This package contains %1$d Kasumi LKM files for mount and concealment features. They are not ApkeSU Root drivers.</string>
     <string name="settings_builtin_mount_source">Source</string>
     <string name="settings_builtin_mount_sha256">ZIP SHA256</string>
@@ -388,6 +386,7 @@
     <string name="settings_epkesu_hide">ApkeSU Hide</string>
     <string name="settings_epkesu_hide_summary">把Bootloader解锁状态藏起来</string>
     <string name="settings_epkesu_hide_failed">Failed to update ApkeSU Hide.</string>
+    <string name="settings_builtin_mount_refresh">Refresh mount status</string>
     <string name="feature_status_unsupported_summary">Kernel does not support this feature</string>
     <string name="feature_status_managed_summary">This feature is managed by a module</string>
     <string name="settings_mode_enable_by_default">Enable (Default)</string>
@@ -425,12 +424,13 @@
     <string name="settings_switch_style">Switch style</string>
     <string name="settings_switch_style_summary">Choose the global style used by all on/off switches.</string>
     <string name="settings_switch_style_original">Original</string>
-    <string name="settings_switch_style_sun_moon">Sun and moon</string>
     <string name="settings_switch_style_capsule">Capsule</string>
-    <string name="settings_switch_style_minimal">Minimal</string>
-    <string name="settings_switch_style_neon">Neon</string>
+    <string name="settings_switch_style_cloud_star">Clouds and stars</string>
+    <string name="settings_switch_style_bb8">BB-8</string>
+    <string name="settings_switch_style_sparkle">Starburst energy</string>
     <string name="settings_section_visual_effects">Visual effects</string>
     <string name="settings_visual_effects_summary">Manage switch styles, snow, night backgrounds, passthrough, and scrolling feedback in one place.</string>
+    <string name="settings_visual_effects_dark_mode_only">Available in dark mode. Your current selection will be restored when dark mode is enabled.</string>
     <string name="settings_global_snow">Global snow</string>
     <string name="settings_global_snow_summary">Show a snow effect across the whole app.</string>
     <string name="settings_global_snow_effect">Snow effect</string>
@@ -474,7 +474,6 @@
     <string name="studio_system_snapshot">Device information</string>
     <string name="studio_attention">Attention required</string>
     <string name="studio_install_summary">Install or update</string>
-    <string name="studio_diagnose_summary">Inspect runtime state</string>
     <string name="studio_jailbreak_summary">Request temporary Root access</string>
     <string name="interface_style_skrootpro">SKRoot(Pro)</string>
     <string name="interface_style_alpha">Alpha</string>
@@ -757,6 +756,10 @@
     <string name="settings_enable_blur_summary">Enable blur effect for top and bottom bars.</string>
     <string name="settings_floating_bottom_bar">Floating bottom bar</string>
     <string name="settings_floating_bottom_bar_summary">Use Apple style floating bottom bar.</string>
+    <string name="settings_auto_hide_navigation_bar">Auto-hide navigation bar</string>
+    <string name="settings_auto_hide_navigation_bar_summary">Hide the navigation bar after 3 seconds without interaction. Touch anywhere to show it again.</string>
+    <string name="settings_scroll_hide_navigation_bar">Hide navigation bar while scrolling</string>
+    <string name="settings_scroll_hide_navigation_bar_summary">Hide while browsing downward and show while browsing upward.</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果。</string>
     <string name="show_only_primary_user_apps">Show only primary user apps</string>
@@ -802,10 +805,7 @@
     <string name="sort_reverse">Reverse</string>
     <string name="profile_flags_desc_no_new_privs">Prevent further privilege escalation via ApkeSU from within the context of this root profile.</string>
     <string name="home_kernel_hook">Hook type</string>
-    <string name="hook_type_syscall">Syscall Hook</string>
     <string name="hook_type_tracepoint">Tracepoint Hook</string>
-    <string name="hook_type_kretprobe">Kretprobe Hook</string>
-    <string name="hook_type_lsm">LSM Hook</string>
     <string name="settings_cpu_spoof">Custom CPU spoof</string>
     <string name="settings_cpu_spoof_summary">Read and override ro.soc.model when needed. Reapplies after reboot.</string>
     <string name="cpu_spoof_current_section">Current CPU</string>

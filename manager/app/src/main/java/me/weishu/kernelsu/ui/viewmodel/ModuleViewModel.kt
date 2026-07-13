@@ -261,29 +261,37 @@ class ModuleViewModel(
         ).thenBy(Collator.getInstance(Locale.getDefault()), Module::id)
     }
 
-    suspend fun loadModuleList(resort: Boolean = true) {
-        val parsedModules = withContext(Dispatchers.IO) {
-            repo.getModules().getOrElse {
-                Log.e(TAG, "fetchModuleList: ", it)
-                emptyList()
+    private suspend fun loadModuleList(resort: Boolean = true): Boolean {
+        return try {
+            val parsedModules = withContext(Dispatchers.IO) {
+                repo.getModules().getOrThrow()
             }
-        }
+            val renderState = withContext(Dispatchers.Default) {
+                buildModuleListRenderState(_uiState.value.copy(modules = parsedModules), resort)
+            }
 
-        val renderState = withContext(Dispatchers.Default) {
-            buildModuleListRenderState(_uiState.value.copy(modules = parsedModules), resort)
-        }
-
-        _uiState.update {
-            it.copy(
-                modules = parsedModules,
-                moduleList = renderState.moduleList,
-                searchResults = renderState.searchResults,
-                searchStatus = it.searchStatus.copy(
-                    resultStatus = renderState.searchResultStatus
+            _uiState.update {
+                it.copy(
+                    loadError = null,
+                    modules = parsedModules,
+                    moduleList = renderState.moduleList,
+                    searchResults = renderState.searchResults,
+                    searchStatus = it.searchStatus.copy(
+                        resultStatus = renderState.searchResultStatus
+                    )
                 )
-            )
+            }
+            isNeedRefresh = false
+            true
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.e(TAG, "fetchModuleList failed", error)
+            _uiState.update {
+                it.copy(loadError = error.message ?: error.javaClass.simpleName)
+            }
+            false
         }
-        isNeedRefresh = false
     }
 
     fun fetchModuleList(checkUpdate: Boolean = false, resort: Boolean = true) {
@@ -294,11 +302,11 @@ class ModuleViewModel(
             try {
                 val start = SystemClock.elapsedRealtime()
 
-                loadModuleList(resort)
-
-                if (checkUpdate) syncModuleUpdateInfo(_uiState.value.modules)
-
-                Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: ${_uiState.value.modules}")
+                val loaded = loadModuleList(resort)
+                if (loaded) {
+                    if (checkUpdate) syncModuleUpdateInfo(_uiState.value.modules)
+                    Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: ${_uiState.value.modules}")
+                }
             } finally {
                 if (generation == fetchGeneration) {
                     _uiState.update { it.copy(isRefreshing = false, hasLoaded = true) }
@@ -438,8 +446,9 @@ class ModuleViewModel(
 
     private suspend fun reloadModulesAfterOperation() {
         try {
-            loadModuleList(resort = false)
-            syncModuleUpdateInfo(_uiState.value.modules)
+            if (loadModuleList(resort = false)) {
+                syncModuleUpdateInfo(_uiState.value.modules)
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -543,7 +552,9 @@ class ModuleViewModel(
                     changelog = runCatching {
                         ksuApp.okhttpClient.newCall(
                             Request.Builder().url(changelogUrl).build()
-                        ).execute().body.string()
+                        ).execute().use { response ->
+                            if (response.isSuccessful) response.body.string() else ""
+                        }
                     }.getOrDefault("")
                 }
             }

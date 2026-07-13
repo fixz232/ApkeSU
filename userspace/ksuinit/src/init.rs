@@ -151,5 +151,5 @@ fn load_module_from_path(path: &str, params: &CStr) -> Result<()> {
     anyhow::ensure!(rustix::process::getpid().is_init(), "Invalid process");
     let buffer = std::fs::read(path).with_context(|| format!("Cannot read file {}", path))?;
     log::info!("load {path} with params {params:?}");
-    ksuinit::load_module(&buffer, &params)
+    ksuinit::load_module(&buffer, params)
 }

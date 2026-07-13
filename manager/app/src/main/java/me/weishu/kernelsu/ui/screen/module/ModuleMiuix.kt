@@ -579,11 +579,15 @@ fun ModulePagerMiuix(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                stringResource(R.string.module_empty),
-                                textAlign = TextAlign.Center,
-                                color = Color.Gray,
-                            )
+                            if (uiState.loadError != null) {
+                                MiuixModuleLoadError(onRetry = actions.onRefresh)
+                            } else {
+                                Text(
+                                    stringResource(R.string.module_empty),
+                                    textAlign = TextAlign.Center,
+                                    color = Color.Gray,
+                                )
+                            }
                         }
                     } else {
                         val latestModules = rememberUpdatedState(modules)
@@ -595,23 +599,35 @@ fun ModulePagerMiuix(
                             refreshTick,
                             isBusy = { latestRefreshing.value },
                         ) { latestModules.value }
-                        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
-                            ModuleList(
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            if (uiState.loadError != null) {
+                                MiuixModuleLoadError(
+                                    onRetry = actions.onRefresh,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                )
+                            }
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxHeight()
-                                    .scrollEndHaptic()
-                                    .overScrollVertical()
-                                    .nestedScroll(scrollBehavior.nestedScrollConnection)
-                                    .nestedScroll(nestedScrollConnection),
-                                modules = modules,
-                                updateInfoMap = uiState.updateInfo,
-                                actions = actions,
-                                onModuleAddShortcut = { module, type ->
-                                    onModuleAddShortcut(module, type)
-                                },
-                                contentPadding = contentPadding,
-                                listState = listState,
-                            )
+                                    .weight(1f)
+                                    .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
+                            ) {
+                                ModuleList(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .scrollEndHaptic()
+                                        .overScrollVertical()
+                                        .nestedScroll(scrollBehavior.nestedScrollConnection)
+                                        .nestedScroll(nestedScrollConnection),
+                                    modules = modules,
+                                    updateInfoMap = uiState.updateInfo,
+                                    actions = actions,
+                                    onModuleAddShortcut = { module, type ->
+                                        onModuleAddShortcut(module, type)
+                                    },
+                                    contentPadding = contentPadding,
+                                    listState = listState,
+                                )
+                            }
                         }
                     }
                 }
@@ -1215,6 +1231,32 @@ fun ModuleItem(
         bitmap = wallpaperBitmap,
         onDismissRequest = { showWallpaperPreview = false },
     )
+}
+
+@Composable
+private fun MiuixModuleLoadError(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(colorScheme.errorContainer)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.module_failed_to_load),
+            color = colorScheme.onErrorContainer,
+            textAlign = TextAlign.Center,
+        )
+        TextButton(
+            text = stringResource(R.string.network_retry),
+            onClick = onRetry,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
 }
 
 @Composable

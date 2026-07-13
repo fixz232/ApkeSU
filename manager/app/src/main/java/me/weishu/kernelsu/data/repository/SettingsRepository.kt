@@ -34,6 +34,8 @@ interface SettingsRepository {
     var enableBlur: Boolean
     var enableFloatingBottomBar: Boolean
     var enableFloatingBottomBarBlur: Boolean
+    var autoHideNavigationBar: Boolean
+    var scrollHideNavigationBar: Boolean
     var pageScale: Float
     var fontScale: Float
     var blurIntensity: Float

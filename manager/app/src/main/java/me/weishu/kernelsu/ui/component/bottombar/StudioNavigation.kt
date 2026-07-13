@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.component.bottombar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -141,12 +142,20 @@ fun StudioNavigationRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "A",
-            color = colorScheme.primary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(StudioNavigationItemShape)
+                .background(colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "A",
+                color = colorScheme.onPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         destinations.forEachIndexed { index, destination ->
             val selected = selectedIndex == index

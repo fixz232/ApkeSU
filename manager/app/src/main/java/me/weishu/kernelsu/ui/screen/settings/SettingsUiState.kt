@@ -46,6 +46,8 @@ data class SettingsUiState(
     val enableBlur: Boolean = true,
     val enableFloatingBottomBar: Boolean = false,
     val enableFloatingBottomBarBlur: Boolean = false,
+    val autoHideNavigationBar: Boolean = false,
+    val scrollHideNavigationBar: Boolean = false,
     val pageScale: Float = 1.0f,
     val fontScale: Float = ThemeAppearanceDefaults.FONT_SCALE,
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,

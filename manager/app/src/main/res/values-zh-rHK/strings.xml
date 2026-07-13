@@ -20,6 +20,7 @@
     <string name="module_failed_to_enable">無法啟用模組：%s</string>
     <string name="module_failed_to_disable">無法停用模組：%s</string>
     <string name="module_empty">未安裝模組</string>
+    <string name="module_failed_to_load">模組清單載入失敗</string>
     <string name="superuser_empty">找不到應用程式</string>
     <string name="superuser_failed_to_load">無法載入應用程式列表</string>
     <string name="module">模組</string>
@@ -230,6 +231,10 @@
     <string name="settings_enable_blur_summary">啟用頂部及底部欄的模糊效果</string>
     <string name="settings_floating_bottom_bar">懸浮底部欄</string>
     <string name="settings_floating_bottom_bar_summary">使用 Apple 風格懸浮底部欄</string>
+    <string name="settings_auto_hide_navigation_bar">自動隱藏導航欄（無操作 3 秒）</string>
+    <string name="settings_auto_hide_navigation_bar_summary">無操作 3 秒後隱藏導航欄，輕觸任意位置即可重新顯示。</string>
+    <string name="settings_scroll_hide_navigation_bar">滑動隱藏導航欄</string>
+    <string name="settings_scroll_hide_navigation_bar_summary">向下瀏覽時隱藏導航欄，向上瀏覽時重新顯示。</string>
     <string name="settings_enable_glass">液態玻璃</string>
     <string name="settings_enable_glass_summary">為懸浮底部欄啟用液態玻璃效果</string>
     <string name="show_only_primary_user_apps">僅顯示主要使用者 App</string>

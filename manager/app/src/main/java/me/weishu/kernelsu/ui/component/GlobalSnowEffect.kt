@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -61,7 +62,7 @@ fun GlobalSnowEffectOverlay(
     effectValue: String,
     modifier: Modifier = Modifier,
 ) {
-    if (!enabled) return
+    if (!enabled || !isInDarkTheme()) return
 
     val effect = GlobalSnowEffect.fromValue(effectValue)
     val spec = remember(effect) { SnowSpec.forEffect(effect) }
@@ -83,23 +84,30 @@ fun GlobalSnowEffectOverlay(
         if (size.width <= 1f || size.height <= 1f) return@Canvas
 
         val margin = 28.dp.toPx()
+        val fadeDistance = 56.dp.toPx()
         val wrapWidth = size.width + margin * 2f
         val travelHeight = size.height + margin * 2f
-        val wind = sin(progress * TWO_PI * 0.55f) * spec.gustStrength
+        val wind = sin(progress * TWO_PI) * spec.gustStrength
         flakes.forEach { flake ->
             val yProgress = (flake.baseY + progress * flake.speed) % 1f
-            val localSway = sin((progress * flake.swaySpeed + flake.phase) * TWO_PI) * flake.drift
-            val gustSway = sin((progress * 0.42f + flake.phase * 0.37f) * TWO_PI) *
+            val localSway = sin((yProgress + flake.phase) * TWO_PI) * flake.drift +
+                sin((yProgress * 2f + flake.phase * 0.73f) * TWO_PI) * flake.drift * 0.24f
+            val gustSway = sin((progress + flake.phase * 0.37f) * TWO_PI) *
                 spec.gustStrength * flake.depth
             val rawX = (flake.baseX + localSway + gustSway + spec.windBias * progress + wind) *
                 size.width
             val x = (((rawX + margin) % wrapWidth) + wrapWidth) % wrapWidth - margin
             val y = yProgress * travelHeight - margin
+            val edgeAlpha = minOf(
+                ((y + margin) / fadeDistance).coerceIn(0f, 1f),
+                ((size.height + margin - y) / fadeDistance).coerceIn(0f, 1f),
+            )
+            if (edgeAlpha <= 0.01f) return@forEach
             drawFlake(
                 effect = effect,
                 center = Offset(x, y),
                 radius = flake.radius,
-                alpha = flake.alpha,
+                alpha = flake.alpha * edgeAlpha,
                 twinkle = flake.twinkle(progress, spec.shimmer),
                 rotation = flake.rotation(progress),
                 depth = flake.depth,
@@ -133,36 +141,36 @@ private data class SnowSpec(
         fun forEffect(effect: GlobalSnowEffect): SnowSpec {
             return when (effect) {
                 GlobalSnowEffect.Gentle -> SnowSpec(
-                    count = 58,
-                    cycleMillis = 22000,
-                    minRadius = 1.4f,
-                    maxRadius = 4.8f,
-                    minAlpha = 0.22f,
-                    maxAlpha = 0.7f,
-                    minSpeed = 0.42f,
-                    maxSpeed = 0.96f,
-                    maxDrift = 0.046f,
+                    count = 64,
+                    cycleMillis = 24000,
+                    minRadius = 1.2f,
+                    maxRadius = 5.4f,
+                    minAlpha = 0.18f,
+                    maxAlpha = 0.74f,
+                    minSpeed = 0.36f,
+                    maxSpeed = 0.9f,
+                    maxDrift = 0.055f,
                     windBias = 0.018f,
-                    gustStrength = 0.024f,
+                    gustStrength = 0.02f,
                     trailAlpha = 0f,
-                    shimmer = 0.16f,
+                    shimmer = 0.12f,
                     color = Color.White,
                     accentColor = Color(0xFFEFF6FF),
                 )
 
                 GlobalSnowEffect.Blizzard -> SnowSpec(
-                    count = 86,
-                    cycleMillis = 14000,
-                    minRadius = 1.0f,
-                    maxRadius = 3.2f,
-                    minAlpha = 0.16f,
-                    maxAlpha = 0.58f,
-                    minSpeed = 0.95f,
-                    maxSpeed = 1.9f,
-                    maxDrift = 0.11f,
-                    windBias = 0.072f,
-                    gustStrength = 0.058f,
-                    trailAlpha = 0.72f,
+                    count = 82,
+                    cycleMillis = 15000,
+                    minRadius = 0.9f,
+                    maxRadius = 3.0f,
+                    minAlpha = 0.13f,
+                    maxAlpha = 0.54f,
+                    minSpeed = 1.0f,
+                    maxSpeed = 1.85f,
+                    maxDrift = 0.085f,
+                    windBias = 0.09f,
+                    gustStrength = 0.045f,
+                    trailAlpha = 0.62f,
                     shimmer = 0.08f,
                     color = Color.White,
                     accentColor = Color(0xFFDCEBFF),
@@ -205,15 +213,15 @@ private data class SnowSpec(
                 )
 
                 GlobalSnowEffect.Crystal -> SnowSpec(
-                    count = 50,
-                    cycleMillis = 21000,
+                    count = 36,
+                    cycleMillis = 26000,
                     minRadius = 1.8f,
-                    maxRadius = 5.2f,
-                    minAlpha = 0.24f,
-                    maxAlpha = 0.72f,
-                    minSpeed = 0.4f,
-                    maxSpeed = 0.98f,
-                    maxDrift = 0.048f,
+                    maxRadius = 6.2f,
+                    minAlpha = 0.22f,
+                    maxAlpha = 0.78f,
+                    minSpeed = 0.34f,
+                    maxSpeed = 0.82f,
+                    maxDrift = 0.042f,
                     windBias = 0.016f,
                     gustStrength = 0.022f,
                     trailAlpha = 0f,
@@ -264,7 +272,7 @@ private data class SnowFlake(
                 phase = random.nextFloat(),
                 depth = depth,
                 rotation = random.nextRange(-0.45f, 0.45f),
-                spinSpeed = random.nextRange(-0.38f, 0.38f),
+                spinSpeed = if (random.nextBoolean()) 1f else -1f,
                 shape = random.nextInt(100),
             )
         }
@@ -322,20 +330,76 @@ private fun DrawScope.drawFlake(
         }
 
         GlobalSnowEffect.Crystal -> {
-            val crystalColor = color.copy(alpha = visibleAlpha * 0.72f)
-            drawSpoke(center, rotation, radius * 1.7f, crystalColor, radius * 0.36f)
-            drawSpoke(center, rotation + PI_HALF, radius * 1.32f, crystalColor, radius * 0.32f)
-            drawSpoke(center, rotation + PI_QUARTER, radius * 0.95f, accentColor.copy(alpha = visibleAlpha * 0.76f), radius * 0.22f)
-            drawSpoke(center, rotation - PI_QUARTER, radius * 0.95f, accentColor.copy(alpha = visibleAlpha * 0.7f), radius * 0.2f)
-            drawCircle(color = accentColor.copy(alpha = visibleAlpha * 0.5f), radius = radius * 0.28f, center = center)
+            drawCircle(
+                color = accentColor.copy(alpha = visibleAlpha * 0.1f),
+                radius = radius * 2.2f,
+                center = center,
+            )
+            drawSnowCrystal(
+                center = center,
+                rotation = rotation,
+                length = radius * 1.75f,
+                color = color.copy(alpha = visibleAlpha * 0.82f),
+                accentColor = accentColor.copy(alpha = visibleAlpha * 0.7f),
+                strokeWidth = (radius * 0.22f).coerceAtLeast(0.65f),
+                detailed = shape > 34,
+            )
+            drawCircle(color = Color.White.copy(alpha = visibleAlpha * 0.78f), radius = radius * 0.22f, center = center)
         }
 
         GlobalSnowEffect.Gentle -> {
             drawCircle(color = accentColor.copy(alpha = visibleAlpha * 0.18f), radius = radius * 1.72f, center = center)
-            if (shape > 82) {
-                drawCircle(color = color.copy(alpha = visibleAlpha * 0.22f), radius = radius * 0.42f, center = center.polar(radius * 0.86f, rotation))
+            if (shape > 86) {
+                drawSnowCrystal(
+                    center = center,
+                    rotation = rotation,
+                    length = radius * 1.15f,
+                    color = color.copy(alpha = visibleAlpha * 0.58f),
+                    accentColor = accentColor.copy(alpha = visibleAlpha * 0.42f),
+                    strokeWidth = (radius * 0.14f).coerceAtLeast(0.5f),
+                    detailed = false,
+                )
             }
             drawCircle(color = color.copy(alpha = visibleAlpha), radius = radius * 0.9f, center = center)
+        }
+    }
+}
+
+private fun DrawScope.drawSnowCrystal(
+    center: Offset,
+    rotation: Float,
+    length: Float,
+    color: Color,
+    accentColor: Color,
+    strokeWidth: Float,
+    detailed: Boolean,
+) {
+    repeat(6) { arm ->
+        val angle = rotation + arm * PI_THIRD
+        drawLine(
+            color = color,
+            start = center,
+            end = center.polar(length, angle),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        if (detailed) {
+            val branch = center.polar(length * 0.58f, angle)
+            val branchLength = length * 0.3f
+            drawLine(
+                color = accentColor,
+                start = branch,
+                end = branch.polar(branchLength, angle + PI_THIRD * 0.56f),
+                strokeWidth = strokeWidth * 0.72f,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = accentColor,
+                start = branch,
+                end = branch.polar(branchLength, angle - PI_THIRD * 0.56f),
+                strokeWidth = strokeWidth * 0.72f,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }
@@ -370,3 +434,4 @@ private fun Random.nextRange(start: Float, end: Float): Float {
 private const val TWO_PI = (PI * 2.0).toFloat()
 private const val PI_HALF = (PI / 2.0).toFloat()
 private const val PI_QUARTER = (PI / 4.0).toFloat()
+private const val PI_THIRD = (PI / 3.0).toFloat()

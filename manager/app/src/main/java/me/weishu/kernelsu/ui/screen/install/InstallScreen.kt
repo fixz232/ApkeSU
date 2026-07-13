@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -399,7 +400,9 @@ fun InstallScreen() {
 private suspend fun <T> loadInstallState(defaultValue: T, block: suspend () -> T): T {
     return try {
         block()
-    } catch (_: Throwable) {
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
         defaultValue
     }
 }

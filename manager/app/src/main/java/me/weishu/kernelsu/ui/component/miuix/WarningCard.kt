@@ -29,9 +29,14 @@ fun WarningCard(
     onClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
+    val darkMode = isInDarkTheme()
     Card(
         modifier = modifier.globalLiquidGlassSurface(
-            surfaceColor = if (isLiquidGlassTheme()) Color(0xFFFFF2F2) else Color.White,
+            surfaceColor = if (isLiquidGlassTheme()) {
+                if (darkMode) Color(0xFF32191B) else Color(0xFFFFF2F2)
+            } else {
+                Color.Unspecified
+            },
             surfaceAlpha = 0.66f,
             blurRadius = 10.dp,
             refractionHeight = 14.dp,
@@ -44,7 +49,7 @@ fun WarningCard(
             } else {
                 color ?: when {
                     isDynamicColor -> colorScheme.errorContainer
-                    isInDarkTheme() -> Color(0XFF310808)
+                    darkMode -> Color(0XFF310808)
                     else -> Color(0xFFF8E2E2)
                 }
             }

@@ -56,11 +56,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.ui.component.liquid.InnerShadow
-import me.weishu.kernelsu.ui.component.liquid.LiquidGlassTokens
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.innerShadow
 import me.weishu.kernelsu.ui.component.liquid.lens
+import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
 import me.weishu.kernelsu.ui.component.liquid.rememberCombinedBackdrop
 import me.weishu.kernelsu.ui.component.liquid.vibrancy
 import me.weishu.kernelsu.ui.component.miuix.animation.DampedDragAnimation
@@ -193,7 +193,7 @@ fun FloatingBottomBar(
     val accentColor = MiuixTheme.colorScheme.primary
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val containerColor = when {
-        isLiquidGlass -> LiquidGlassTokens.Surface.copy(alpha = if (isBlurEnabled) 0.48f else 0.76f)
+        isLiquidGlass -> liquidGlassSurfaceColor().copy(alpha = if (isBlurEnabled) 0.48f else 0.76f)
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
@@ -356,7 +356,7 @@ fun FloatingBottomBar(
                         if (isLiquidGlass) {
                             Modifier.globalLiquidGlassSurface(
                                 shape = pillShape,
-                                surfaceColor = LiquidGlassTokens.Surface,
+                                surfaceColor = liquidGlassSurfaceColor(),
                                 surfaceAlpha = 0.76f,
                                 strokeAlpha = 0.62f,
                             )

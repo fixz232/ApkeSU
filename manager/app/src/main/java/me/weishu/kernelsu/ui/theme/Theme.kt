@@ -64,14 +64,6 @@ object ThemeController {
             InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
             else -> ThemePreset.CLEAN_TOOL
         }
-        if (uiMode == InterfaceStyle.LiquidGlass.value) {
-            return AppSettings(
-                defaultPreset.colorMode,
-                defaultPreset.keyColor,
-                defaultPreset.paletteStyle,
-                defaultPreset.colorSpec,
-            )
-        }
         val syncStrategy = ThemeSyncStrategy.fromValue(
             prefs.getString(THEME_SYNC_STRATEGY_KEY, ThemeSyncStrategy.SHARED.value)
         )
@@ -152,3 +144,7 @@ val LocalBlurIntensity = staticCompositionLocalOf { ThemeAppearanceDefaults.BLUR
 val LocalEnableFloatingBottomBar = staticCompositionLocalOf { false }
 
 val LocalEnableFloatingBottomBarBlur = staticCompositionLocalOf { false }
+
+val LocalAutoHideNavigationBar = staticCompositionLocalOf { false }
+
+val LocalScrollHideNavigationBar = staticCompositionLocalOf { false }

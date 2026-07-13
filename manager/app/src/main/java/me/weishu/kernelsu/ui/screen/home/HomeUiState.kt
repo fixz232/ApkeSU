@@ -23,15 +23,27 @@ enum class RootRuntimeState(@StringRes val labelRes: Int) {
             driverConnected: Boolean,
             managerRegistered: Boolean,
             daemonRootAvailable: Boolean,
-            versionMismatch: Boolean,
+            blockingVersionMismatch: Boolean,
         ): RootRuntimeState = when {
             !driverConnected -> DriverDisconnected
             !managerRegistered -> ManagerUnregistered
             !daemonRootAvailable -> DaemonError
-            versionMismatch -> VersionMismatch
+            blockingVersionMismatch -> VersionMismatch
             else -> Running
         }
     }
+}
+
+internal fun hasBlockingRootVersionMismatch(
+    managerVersionCode: Long,
+    driverVersion: Int?,
+    requiresNewKernel: Boolean,
+    uapiMismatch: Boolean,
+): Boolean {
+    val managerOlderThanDriver = driverVersion?.let {
+        it > 0 && managerVersionCode < it.toLong()
+    } == true
+    return requiresNewKernel || uapiMismatch || managerOlderThanDriver
 }
 
 enum class KernelHookType(@StringRes val labelRes: Int) {
@@ -76,6 +88,7 @@ data class HomeUiState(
     val uapiMismatch: Boolean,
     val isRootAvailable: Boolean,
     val rootRuntimeState: RootRuntimeState = RootRuntimeState.DriverDisconnected,
+    val daemonVersionMismatch: Boolean = false,
     val kernelHookTypes: List<KernelHookType> = emptyList(),
     val isSafeMode: Boolean,
     val isLateLoadMode: Boolean,
@@ -128,7 +141,10 @@ data class HomeUiState(
     val showVersionMismatchWarning: Boolean
         get() = showVersionMismatchWarningSetting &&
                 ksuVersion != null &&
-                currentManagerVersionCode < ksuVersion.toLong()
+                currentManagerVersionCode != ksuVersion.toLong()
+
+    val showDaemonVersionWarning: Boolean
+        get() = daemonVersionMismatch
 
     val ksuVersionLabel: String
         get() = ksuVersion?.let { version ->

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.theme.LocalBlurIntensity
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults as MiuixCardDefaults
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -36,6 +37,13 @@ object LiquidGlassTokens {
     val SubtleStroke = Color(0xFFD8E6F5)
     val PressedOverlay = Color(0xFFEEF6FF)
     val Shadow = Color(0xFF6E9EC5)
+    val DarkBackground = Color(0xFF080D13)
+    val DarkSurface = Color(0xFF17212C)
+    val DarkSurfaceTint = Color(0xFF21364A)
+    val DarkFrost = Color(0xFF29455D)
+    val DarkStroke = Color(0xFFB9D9F2)
+    val DarkSubtleStroke = Color(0xFF4B667C)
+    val DarkShadow = Color(0xFF02060A)
 }
 
 @Composable
@@ -47,7 +55,17 @@ fun isLiquidGlassTheme(): Boolean {
 @Composable
 @ReadOnlyComposable
 fun liquidGlassBackdropColor(): Color {
-    return if (isLiquidGlassTheme()) LiquidGlassTokens.Background else MiuixTheme.colorScheme.surface
+    return if (isLiquidGlassTheme()) {
+        if (isInDarkTheme()) LiquidGlassTokens.DarkBackground else LiquidGlassTokens.Background
+    } else {
+        MiuixTheme.colorScheme.surface
+    }
+}
+
+@Composable
+@ReadOnlyComposable
+fun liquidGlassSurfaceColor(): Color {
+    return if (isInDarkTheme()) LiquidGlassTokens.DarkSurface else LiquidGlassTokens.Surface
 }
 
 fun Modifier.liquidGlassSurface(
@@ -61,22 +79,28 @@ fun Modifier.liquidGlassSurface(
     refractionAmount: Dp = 10.dp,
     chromaticAberration: Float = 0.22f,
     strokeAlpha: Float = 0.70f,
+    darkMode: Boolean = false,
 ): Modifier {
     val boundedAlpha = surfaceAlpha.coerceIn(0f, 1f)
     val glassBase = surfaceColor.copy(alpha = boundedAlpha)
+    val sheen = if (darkMode) LiquidGlassTokens.DarkSurfaceTint else LiquidGlassTokens.SurfaceTint
+    val frost = if (darkMode) LiquidGlassTokens.DarkFrost else LiquidGlassTokens.Frost
+    val stroke = if (darkMode) LiquidGlassTokens.DarkStroke else LiquidGlassTokens.Stroke
+    val subtleStroke = if (darkMode) LiquidGlassTokens.DarkSubtleStroke else LiquidGlassTokens.SubtleStroke
+    val shadow = if (darkMode) LiquidGlassTokens.DarkShadow else LiquidGlassTokens.Shadow
     val glassSheen = Brush.verticalGradient(
         listOf(
-            Color.White.copy(alpha = 0.46f),
-            LiquidGlassTokens.SurfaceTint.copy(alpha = 0.20f),
-            Color.White.copy(alpha = 0.12f),
-            LiquidGlassTokens.Frost.copy(alpha = 0.28f),
+            stroke.copy(alpha = if (darkMode) 0.16f else 0.46f),
+            sheen.copy(alpha = if (darkMode) 0.34f else 0.20f),
+            stroke.copy(alpha = if (darkMode) 0.06f else 0.12f),
+            frost.copy(alpha = if (darkMode) 0.34f else 0.28f),
         )
     )
     val glassEdge = Brush.linearGradient(
         listOf(
-            Color.White.copy(alpha = 0.52f),
+            stroke.copy(alpha = if (darkMode) 0.28f else 0.52f),
             Color.Transparent,
-            LiquidGlassTokens.Frost.copy(alpha = 0.26f),
+            frost.copy(alpha = 0.26f),
         )
     )
     val material = if (backdrop != null) {
@@ -113,19 +137,19 @@ fun Modifier.liquidGlassSurface(
             elevation = 8.dp,
             shape = shape,
             clip = false,
-            ambientColor = LiquidGlassTokens.Shadow.copy(alpha = 0.08f),
-            spotColor = LiquidGlassTokens.Shadow.copy(alpha = 0.12f),
+            ambientColor = shadow.copy(alpha = if (darkMode) 0.22f else 0.08f),
+            spotColor = shadow.copy(alpha = if (darkMode) 0.30f else 0.12f),
         )
         .clip(shape)
         .then(material)
-        .border(1.dp, LiquidGlassTokens.SubtleStroke.copy(alpha = 0.34f), shape)
-        .border(1.dp, LiquidGlassTokens.Stroke.copy(alpha = strokeAlpha.coerceIn(0f, 1f)), shape)
+        .border(1.dp, subtleStroke.copy(alpha = 0.34f), shape)
+        .border(1.dp, stroke.copy(alpha = strokeAlpha.coerceIn(0f, 1f)), shape)
 }
 
 @Composable
 fun Modifier.globalLiquidGlassSurface(
     shape: Shape = RoundedCornerShape(20.dp),
-    surfaceColor: Color = LiquidGlassTokens.Surface,
+    surfaceColor: Color = Color.Unspecified,
     surfaceAlpha: Float = 0.62f,
     blurRadius: Dp = 10.dp,
     enableRefraction: Boolean = false,
@@ -136,10 +160,16 @@ fun Modifier.globalLiquidGlassSurface(
 ): Modifier {
     if (!isLiquidGlassTheme()) return this
     val blurIntensity = LocalBlurIntensity.current
+    val darkMode = isInDarkTheme()
+    val resolvedSurfaceColor = if (surfaceColor == Color.Unspecified) {
+        liquidGlassSurfaceColor()
+    } else {
+        surfaceColor
+    }
     return liquidGlassSurface(
         backdrop = LocalLiquidGlassBackdrop.current,
         shape = shape,
-        surfaceColor = surfaceColor,
+        surfaceColor = resolvedSurfaceColor,
         surfaceAlpha = surfaceAlpha,
         blurRadius = blurRadius * blurIntensity,
         enableRefraction = enableRefraction,
@@ -147,6 +177,7 @@ fun Modifier.globalLiquidGlassSurface(
         refractionAmount = refractionAmount,
         chromaticAberration = chromaticAberration,
         strokeAlpha = strokeAlpha,
+        darkMode = darkMode,
     )
 }
 
@@ -168,7 +199,6 @@ fun liquidGlassMaterialCardColors(
 fun Modifier.globalLiquidGlassButton(): Modifier {
     return globalLiquidGlassSurface(
         shape = CircleShape,
-        surfaceColor = LiquidGlassTokens.Surface,
         surfaceAlpha = 0.58f,
         blurRadius = 6.dp,
         strokeAlpha = 0.58f,

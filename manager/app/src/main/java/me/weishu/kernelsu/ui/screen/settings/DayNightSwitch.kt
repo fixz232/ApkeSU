@@ -36,7 +36,6 @@ internal fun DayNightSwitch(
             onCheckedChange = onCheckedChange,
             modifier = modifier,
             enabled = enabled,
-            checkedShowsNight = true,
             style = switchStyle,
         )
     }

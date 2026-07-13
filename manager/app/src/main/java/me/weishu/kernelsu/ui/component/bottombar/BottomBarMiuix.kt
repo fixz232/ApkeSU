@@ -41,8 +41,8 @@ import me.weishu.kernelsu.ui.LocalMainPagerState
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
 import me.weishu.kernelsu.ui.component.FloatingBottomBar
 import me.weishu.kernelsu.ui.component.FloatingBottomBarItem
-import me.weishu.kernelsu.ui.component.liquid.LiquidGlassTokens
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
+import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -75,7 +75,7 @@ fun BottomBarMiuix(
     val barColor = if (blurBackdrop != null) {
         Color.Transparent
     } else if (isLiquidGlass) {
-        LiquidGlassTokens.Surface.copy(alpha = 0.72f)
+        liquidGlassSurfaceColor().copy(alpha = 0.72f)
     } else {
         MiuixTheme.colorScheme.surface
     }

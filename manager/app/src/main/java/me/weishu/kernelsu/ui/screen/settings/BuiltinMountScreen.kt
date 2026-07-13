@@ -95,7 +95,7 @@ fun BuiltinMountScreen() {
                     IconButton(onClick = viewModel::refresh) {
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.cpu_spoof_refresh),
+                            contentDescription = stringResource(R.string.settings_builtin_mount_refresh),
                         )
                     }
                 },

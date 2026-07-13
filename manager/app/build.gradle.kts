@@ -19,6 +19,37 @@ val androidTargetCompatibility: JavaVersion by rootProject.extra
 val managerVersionCode: Int by rootProject.extra
 val managerVersionName: String by rootProject.extra
 
+val bundledKsudFiles = listOf(
+    file("src/main/jniLibs/arm64-v8a/libksud.so"),
+    file("src/main/jniLibs/x86_64/libksud.so"),
+)
+
+val verifyBundledKsudVersion by tasks.registering {
+    group = "verification"
+    description = "Verifies that bundled ksud binaries match the Manager version"
+    inputs.files(bundledKsudFiles)
+    inputs.property("managerVersionCode", managerVersionCode)
+    inputs.property("managerVersionName", managerVersionName)
+
+    doLast {
+        val expectedCode = managerVersionCode.toString()
+        for (ksudFile in bundledKsudFiles) {
+            check(ksudFile.isFile) {
+                "Missing ${ksudFile.path}; build ksud before building the Manager"
+            }
+            val binaryText = String(ksudFile.readBytes(), Charsets.ISO_8859_1)
+            check(expectedCode in binaryText && managerVersionName in binaryText) {
+                "${ksudFile.path} does not match Manager $managerVersionName ($managerVersionCode); " +
+                    "rebuild and copy ksud before building the Manager"
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(verifyBundledKsudVersion)
+}
+
 apksign {
     storeFileProperty = "KEYSTORE_FILE"
     storePasswordProperty = "KEYSTORE_PASSWORD"

@@ -60,6 +60,8 @@ import androidx.compose.material.icons.rounded.SyncAlt
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.BlurOn
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -300,6 +302,29 @@ fun ColorPaletteScreenMaterial(
                 ThemeSectionHeaderMaterial(
                     title = stringResource(R.string.theme_section_advanced_appearance),
                     summary = stringResource(R.string.theme_section_advanced_appearance_summary),
+                )
+
+                SegmentedColumn(
+                    content = listOf(
+                        {
+                            SegmentedSwitchItem(
+                                icon = Icons.Rounded.Timer,
+                                title = stringResource(R.string.settings_auto_hide_navigation_bar),
+                                summary = stringResource(R.string.settings_auto_hide_navigation_bar_summary),
+                                checked = uiState.autoHideNavigationBar,
+                                onCheckedChange = actions.onSetAutoHideNavigationBar,
+                            )
+                        },
+                        {
+                            SegmentedSwitchItem(
+                                icon = Icons.Rounded.SwapVert,
+                                title = stringResource(R.string.settings_scroll_hide_navigation_bar),
+                                summary = stringResource(R.string.settings_scroll_hide_navigation_bar_summary),
+                                checked = uiState.scrollHideNavigationBar,
+                                onCheckedChange = actions.onSetScrollHideNavigationBar,
+                            )
+                        },
+                    ),
                 )
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

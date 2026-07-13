@@ -89,6 +89,7 @@
     <string name="module_failed_to_enable">无法启用模块：%s</string>
     <string name="module_failed_to_disable">无法禁用模块：%s</string>
     <string name="module_empty">没有安装模块</string>
+    <string name="module_failed_to_load">模块列表加载失败</string>
     <string name="superuser_empty">未找到应用</string>
     <string name="superuser_failed_to_load">应用列表加载失败</string>
     <string name="superuser_dashboard_normal">Root 授权正常</string>
@@ -175,8 +176,6 @@
     <string name="settings_builtin_mount_mode_magic">Magic</string>
     <string name="settings_builtin_mount_variant">内置挂载包</string>
     <string name="settings_builtin_mount_variant_summary">选择轻量版，或完整 Hybrid Mount / Kasumi 实验版。</string>
-    <string name="settings_builtin_mount_variant_lite">Hybrid Mount 轻量版</string>
-    <string name="settings_builtin_mount_variant_full">完整 Hybrid Mount / Kasumi 实验版</string>
     <string name="settings_builtin_mount_variant_lite_short">轻量版</string>
     <string name="settings_builtin_mount_variant_full_short">完整实验版</string>
     <string name="settings_builtin_mount_webui">高级混合策略</string>
@@ -185,7 +184,6 @@
     <string name="settings_builtin_mount_reboot_required">重启后内置挂载改动生效。</string>
     <string name="settings_builtin_mount_failed">更新内置挂载失败。</string>
     <string name="settings_builtin_mount_details">Hybrid Mount 包详情</string>
-    <string name="settings_builtin_mount_details_summary">查看来源、SHA256、Kasumi KMI 支持范围和兼容性。</string>
     <string name="settings_builtin_mount_not_root_driver">这个包包含 %1$d 个用于挂载和隐藏能力的 Kasumi LKM，它们不是 ApkeSU Root 驱动。</string>
     <string name="settings_builtin_mount_source">开源来源</string>
     <string name="settings_builtin_mount_sha256">ZIP SHA256</string>
@@ -371,6 +369,7 @@
     <string name="settings_day_night_switch_summary">点击可在日间和夜间主题样式之间快速切换</string>
     <string name="settings_section_visual_effects">视觉特效</string>
     <string name="settings_visual_effects_summary">集中管理滑块样式、全局下雪、夜间背景穿透和滚动反馈。</string>
+    <string name="settings_visual_effects_dark_mode_only">仅在夜间模式下可用，切回夜间模式后会恢复当前设置。</string>
     <string name="settings_monet">启用 Monet 颜色</string>
     <string name="settings_key_color">强调色</string>
     <string name="settings_key_color_default">默认</string>
@@ -389,7 +388,6 @@
     <string name="studio_system_snapshot">设备信息</string>
     <string name="studio_attention">待处理项</string>
     <string name="studio_install_summary">安装或更新</string>
-    <string name="studio_diagnose_summary">检查运行状态</string>
     <string name="studio_jailbreak_summary">请求临时 Root 权限</string>
     <string name="interface_style_skrootpro">SKRoot 风格</string>
     <string name="interface_style_alpha">阿尔法风格</string>
@@ -440,6 +438,10 @@
     <string name="settings_enable_blur_summary">启用顶栏和底栏的模糊效果</string>
     <string name="settings_floating_bottom_bar">悬浮底栏</string>
     <string name="settings_floating_bottom_bar_summary">使用 Apple 风格的悬浮底栏</string>
+    <string name="settings_auto_hide_navigation_bar">自动隐藏导航栏（无操作 3 秒）</string>
+    <string name="settings_auto_hide_navigation_bar_summary">无操作 3 秒后隐藏导航栏，触摸任意位置即可重新显示。</string>
+    <string name="settings_scroll_hide_navigation_bar">滑动隐藏导航栏</string>
+    <string name="settings_scroll_hide_navigation_bar_summary">向下浏览时隐藏导航栏，向上浏览时重新显示。</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果</string>
     <string name="show_only_primary_user_apps">只显示主用户应用</string>
@@ -468,6 +470,7 @@
     <string name="settings_epkesu_hide">ApkeSU Hide</string>
     <string name="settings_epkesu_hide_summary">把Bootloader解锁状态藏起来</string>
     <string name="settings_epkesu_hide_failed">更新 ApkeSU Hide 失败。</string>
+    <string name="settings_builtin_mount_refresh">刷新挂载状态</string>
     <string name="menu_sort">排序</string>
     <string name="sort_by_name">应用名</string>
     <string name="sort_by_package_name">包名</string>
@@ -756,10 +759,7 @@
     <string name="home_card_reboot_menu">&#x91CD;&#x542F;&#x83DC;&#x5355;&#x5361;&#x7247;</string>
     <string name="theme_store_reboot_menu_card">&#x91CD;&#x542F;&#x83DC;&#x5355;&#x58C1;&#x7EB8;</string>
     <string name="home_kernel_hook">&#x94A9;&#x5B50;&#x7C7B;&#x578B;</string>
-    <string name="hook_type_syscall">&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x94A9;&#x5B50;</string>
     <string name="hook_type_tracepoint">Tracepoint &#x94A9;&#x5B50;</string>
-    <string name="hook_type_kretprobe">Kretprobe &#x94A9;&#x5B50;</string>
-    <string name="hook_type_lsm">LSM &#x94A9;&#x5B50;</string>
     <string name="settings_cpu_spoof">CPU 自定义伪装</string>
     <string name="settings_cpu_spoof_summary">读取并按需覆盖 ro.soc.model，重启后自动应用。</string>
     <string name="cpu_spoof_current_section">当前 CPU</string>

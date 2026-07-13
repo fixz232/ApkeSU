@@ -153,6 +153,17 @@ fun ModulePager(
     )
 
     when (LocalInterfaceStyle.current) {
+        InterfaceStyle.Studio.value -> {
+            ModulePagerStudio(
+                uiState = rawUiState,
+                confirmDialogState = rawUiState.confirmDialogState,
+                moduleEvent = viewModel.moduleEvent,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+            return
+        }
+
         InterfaceStyle.Skrootpro.value -> {
             ModulePagerSkrootpro(
                 uiState = rawUiState,

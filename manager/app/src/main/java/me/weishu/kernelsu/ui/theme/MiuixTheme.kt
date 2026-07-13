@@ -2,6 +2,8 @@ package me.weishu.kernelsu.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -27,17 +29,12 @@ fun MiuixKernelSUTheme(
     val context = LocalContext.current
     val systemDarkTheme = isSystemInDarkTheme()
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
-    val darkTheme = if (isLiquidGlass) {
-        false
-    } else {
-        appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
-    }
-    val colorStyle = appSettings.paletteStyle.takeUnless { isLiquidGlass }
-    val colorSpec = appSettings.colorSpec.takeUnless { isLiquidGlass }
+    val darkTheme = appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
+    val colorStyle = appSettings.paletteStyle
+    val colorSpec = appSettings.colorSpec
+    val materialColorScheme = rememberAppMaterialColorScheme(appSettings)
 
-    val miuixPaletteStyle = if (colorStyle == null) {
-        ThemePaletteStyle.TonalSpot
-    } else try {
+    val miuixPaletteStyle = try {
         ThemePaletteStyle.valueOf(colorStyle.name)
     } catch (_: Exception) {
         ThemePaletteStyle.TonalSpot
@@ -50,7 +47,7 @@ fun MiuixKernelSUTheme(
     }
 
     val controller = ThemeController(
-        if (isLiquidGlass) ColorSchemeMode.Light else when (appSettings.colorMode) {
+        when (appSettings.colorMode) {
             ColorMode.SYSTEM -> ColorSchemeMode.System
             ColorMode.LIGHT -> ColorSchemeMode.Light
             ColorMode.DARK, ColorMode.DARK_AMOLED -> ColorSchemeMode.Dark
@@ -79,10 +76,15 @@ fun MiuixKernelSUTheme(
                 }
             }
             MonetColorsProvider.UpdateCss()
-            CompositionLocalProvider(
-                LocalContentColor provides MiuixTheme.colorScheme.onBackground,
+            MaterialExpressiveTheme(
+                colorScheme = materialColorScheme,
+                motionScheme = MotionScheme.expressive(),
             ) {
-                content()
+                CompositionLocalProvider(
+                    LocalContentColor provides MiuixTheme.colorScheme.onBackground,
+                ) {
+                    content()
+                }
             }
         }
     )

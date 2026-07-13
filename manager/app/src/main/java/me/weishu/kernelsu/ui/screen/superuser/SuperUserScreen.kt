@@ -68,6 +68,15 @@ fun SuperUserPager(
     )
 
     when (LocalInterfaceStyle.current) {
+        InterfaceStyle.Studio.value -> {
+            SuperUserPagerStudio(
+                uiState = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+            return
+        }
+
         InterfaceStyle.Skrootpro.value -> {
             SuperUserPagerSkrootpro(
                 uiState = uiState,

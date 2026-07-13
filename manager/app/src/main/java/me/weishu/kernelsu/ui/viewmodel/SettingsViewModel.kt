@@ -72,6 +72,8 @@ class SettingsViewModel(
             val enableBlur = if (isLiquidGlassInterface) false else repo.enableBlur
             val enableFloatingBottomBar = repo.enableFloatingBottomBar
             val enableFloatingBottomBarBlur = if (isLiquidGlassInterface) false else repo.enableFloatingBottomBarBlur
+            val autoHideNavigationBar = repo.autoHideNavigationBar
+            val scrollHideNavigationBar = repo.scrollHideNavigationBar
             val pageScale = repo.pageScale
             val fontScale = repo.fontScale
             val blurIntensity = repo.blurIntensity
@@ -165,6 +167,8 @@ class SettingsViewModel(
                     enableBlur = enableBlur,
                     enableFloatingBottomBar = enableFloatingBottomBar,
                     enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
+                    autoHideNavigationBar = autoHideNavigationBar,
+                    scrollHideNavigationBar = scrollHideNavigationBar,
                     pageScale = pageScale,
                     fontScale = fontScale,
                     blurIntensity = blurIntensity,
@@ -254,37 +258,27 @@ class SettingsViewModel(
 
         when (mode) {
             InterfaceStyle.Studio.value -> {
-                repo.uiMode = mode
-                applyThemePreset(ThemePreset.STUDIO)
-                _uiState.update { it.copy(uiMode = mode) }
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.STUDIO)
                 return
             }
 
             InterfaceStyle.Skrootpro.value -> {
-                repo.uiMode = mode
-                applyThemePreset(ThemePreset.SKROOTPRO)
-                _uiState.update { it.copy(uiMode = mode) }
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.SKROOTPRO)
                 return
             }
 
             InterfaceStyle.Alpha.value -> {
-                repo.uiMode = mode
-                applyThemePreset(ThemePreset.ALPHA)
-                _uiState.update { it.copy(uiMode = mode) }
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.ALPHA)
                 return
             }
 
             InterfaceStyle.Delta.value -> {
-                repo.uiMode = mode
-                applyThemePreset(ThemePreset.DELTA)
-                _uiState.update { it.copy(uiMode = mode) }
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.DELTA)
                 return
             }
 
             InterfaceStyle.LiquidGlass.value -> {
-                repo.uiMode = mode
-                applyThemePreset(ThemePreset.LIQUID_GLASS)
-                _uiState.update { it.copy(uiMode = mode) }
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.LIQUID_GLASS)
                 return
             }
         }
@@ -298,8 +292,7 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.LiquidGlass.value
 
         if (isLeavingSpecialStyle && (mode == InterfaceStyle.Miuix.value || mode == InterfaceStyle.Material.value)) {
-            repo.uiMode = mode
-            applyThemePreset(ThemePreset.CLEAN_TOOL)
+            applyInterfacePresetPreservingColorMode(mode, ThemePreset.CLEAN_TOOL)
             return
         }
 
@@ -334,6 +327,14 @@ class SettingsViewModel(
                 themePreset = ThemePreset.CUSTOM.value
             )
         }
+    }
+
+    private fun applyInterfacePresetPreservingColorMode(mode: String, preset: ThemePreset) {
+        val colorMode = repo.themeMode
+        repo.uiMode = mode
+        repo.applyThemePreset(preset)
+        repo.themeMode = colorMode
+        refresh()
     }
 
     fun setCheckModuleUpdate(enabled: Boolean) {
@@ -709,6 +710,16 @@ class SettingsViewModel(
         if (_uiState.value.uiMode == InterfaceStyle.LiquidGlass.value && enabled) return
         repo.enableFloatingBottomBarBlur = enabled
         _uiState.update { it.copy(enableFloatingBottomBarBlur = enabled, themePreset = ThemePreset.CUSTOM.value) }
+    }
+
+    fun setAutoHideNavigationBar(enabled: Boolean) {
+        repo.autoHideNavigationBar = enabled
+        _uiState.update { it.copy(autoHideNavigationBar = enabled) }
+    }
+
+    fun setScrollHideNavigationBar(enabled: Boolean) {
+        repo.scrollHideNavigationBar = enabled
+        _uiState.update { it.copy(scrollHideNavigationBar = enabled) }
     }
 
     fun setPageScale(scale: Float) {

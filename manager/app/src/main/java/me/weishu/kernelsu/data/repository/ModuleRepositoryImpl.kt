@@ -73,14 +73,10 @@ class ModuleRepositoryImpl : ModuleRepository {
             }
 
             val url = module.updateJson
-            val response = ksuApp.okhttpClient.newCall(
+            val result = ksuApp.okhttpClient.newCall(
                 Request.Builder().url(url).build()
-            ).execute()
-
-            val result = if (response.isSuccessful) {
-                response.body.string()
-            } else {
-                ""
+            ).execute().use { response ->
+                if (response.isSuccessful) response.body.string() else ""
             }
 
             if (result.isEmpty()) {

@@ -55,10 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
 import me.weishu.kernelsu.ui.theme.LocalDeltaColorVariant
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 
 private data class DeltaPalette(
     val background: Color,
@@ -101,6 +103,34 @@ object DeltaColors {
         disabled = Color(0xFF9A8C8A),
         divider = Color(0xFFE4D5D2),
         danger = Color(0xFFB3261E),
+    )
+
+    private val GreenDarkPalette = DeltaPalette(
+        background = Color(0xFF101511),
+        surface = Color(0xFF1B231D),
+        surfaceDeep = Color(0xFF263129),
+        accent = Color(0xFF69D67B),
+        accentSoft = Color(0xFF24502E),
+        accentMuted = Color(0xFF1B3922),
+        ink = Color(0xFFE8F2E9),
+        muted = Color(0xFFA8B6AA),
+        disabled = Color(0xFF68766A),
+        divider = Color(0xFF354438),
+        danger = Color(0xFFFF8A84),
+    )
+
+    private val RedDarkPalette = DeltaPalette(
+        background = Color(0xFF171111),
+        surface = Color(0xFF251B1B),
+        surfaceDeep = Color(0xFF342525),
+        accent = Color(0xFFFF827B),
+        accentSoft = Color(0xFF5A2A28),
+        accentMuted = Color(0xFF41201F),
+        ink = Color(0xFFF5E8E7),
+        muted = Color(0xFFC0AAA8),
+        disabled = Color(0xFF7D6968),
+        divider = Color(0xFF4B3635),
+        danger = Color(0xFFFF9A94),
     )
 
     val Background: Color
@@ -162,8 +192,8 @@ object DeltaColors {
         @Composable
         @ReadOnlyComposable
         get() = when (DeltaColorVariant.fromValue(LocalDeltaColorVariant.current)) {
-            DeltaColorVariant.Red -> RedPalette
-            DeltaColorVariant.Green -> GreenPalette
+            DeltaColorVariant.Red -> if (isInDarkTheme()) RedDarkPalette else RedPalette
+            DeltaColorVariant.Green -> if (isInDarkTheme()) GreenDarkPalette else GreenPalette
         }
 }
 
@@ -188,10 +218,15 @@ fun DeltaScreen(
     bottomInnerPadding: Dp,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val background = if (LocalNightBackgroundEffectActive.current) {
+        DeltaColors.Background.copy(alpha = 0.84f)
+    } else {
+        DeltaColors.Background
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DeltaColors.Background),
+            .background(background),
     ) {
         DeltaTopBar(title = title, icon = icon)
         Box(modifier = Modifier.weight(1f)) {
@@ -347,7 +382,7 @@ fun DeltaSwitch(
                 checkedThumbColor = DeltaColors.Accent,
                 checkedTrackColor = DeltaColors.AccentSoft,
                 checkedBorderColor = DeltaColors.Accent.copy(alpha = 0.6f),
-                uncheckedThumbColor = Color.White,
+                uncheckedThumbColor = DeltaColors.Ink,
                 uncheckedTrackColor = DeltaColors.SurfaceDeep,
                 uncheckedBorderColor = DeltaColors.Disabled.copy(alpha = 0.55f),
                 disabledCheckedThumbColor = DeltaColors.Disabled,

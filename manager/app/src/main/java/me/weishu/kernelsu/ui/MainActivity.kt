@@ -81,12 +81,17 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.BuildConfig
+import me.weishu.kernelsu.ui.component.AutoHidingNavigationBar
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
 import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
+import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffectOverlay
+import me.weishu.kernelsu.ui.component.navigationBarVisibilityController
+import me.weishu.kernelsu.ui.component.rememberNavigationBarVisibilityState
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.bottombar.BottomBar
@@ -133,14 +138,16 @@ import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.templateeditor.TemplateEditorScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreScreen
+import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
-import me.weishu.kernelsu.ui.theme.ColorMode
+import me.weishu.kernelsu.ui.theme.LocalAutoHideNavigationBar
 import me.weishu.kernelsu.ui.theme.LocalBlurIntensity
 import me.weishu.kernelsu.ui.theme.LocalColorMode
 import me.weishu.kernelsu.ui.theme.LocalDeltaColorVariant
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
+import me.weishu.kernelsu.ui.theme.LocalScrollHideNavigationBar
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
 import me.weishu.kernelsu.ui.util.KernelStatusEvents
@@ -151,7 +158,6 @@ import me.weishu.kernelsu.ui.util.ManagerUpdateChecker
 import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getFileName
-import me.weishu.kernelsu.ui.util.getInstalledKsudStatus
 import me.weishu.kernelsu.ui.util.install
 import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
@@ -172,29 +178,25 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 class MainActivity : ComponentActivity() {
 
     private val intentState = MutableStateFlow(0)
+    private val managerReadyState = MutableStateFlow(false)
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        runCatching { Natives.refreshInfo() }
-            .onFailure { Log.e(TAG, "refresh native info failed", it) }
-        val isManager = runCatching { Natives.isManager }.getOrDefault(false)
-        val ksuVersion = runCatching { Natives.version }.getOrDefault(0)
-        val requiresNewKernel = runCatching { Natives.requireNewKernel() }.getOrDefault(true)
-        if ((isManager && !requiresNewKernel) || ksuVersion > 0) {
-            lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val managerReady = runCatching {
+                Natives.refreshInfo()
+                Natives.isManager || ensureManagerRegistered()
+            }.onFailure {
+                Log.e(TAG, "refresh manager identity failed", it)
+            }.getOrDefault(false)
+            managerReadyState.value = managerReady
+            val kernelCompatible = runCatching { !Natives.requireNewKernel() }.getOrDefault(false)
+            if (managerReady && kernelCompatible) {
                 runCatching { check(install()) { "ksud install command failed" } }
                     .onSuccess { KernelStatusEvents.requestRefresh() }
                     .onFailure { Log.e(TAG, "install ksud failed", it) }
-            }
-        } else {
-            lifecycleScope.launch(Dispatchers.IO) {
-                if (ensureManagerRegistered()) {
-                    runCatching { check(install()) { "ksud install command failed" } }
-                        .onSuccess { KernelStatusEvents.requestRefresh() }
-                        .onFailure { Log.e(TAG, "install ksud failed", it) }
-                }
             }
         }
 
@@ -202,6 +204,7 @@ class MainActivity : ComponentActivity() {
             val viewModel = viewModel<MainActivityViewModel>()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val selectedMainPage by viewModel.selectedMainPage.collectAsStateWithLifecycle()
+            val managerReady by managerReadyState.collectAsStateWithLifecycle()
             val appSettings = uiState.appSettings
             val uiMode = uiState.uiMode
             val isLiquidGlassInterface = uiState.interfaceStyle == InterfaceStyle.LiquidGlass.value
@@ -221,11 +224,8 @@ class MainActivity : ComponentActivity() {
             } else {
                 uiState.enableFloatingBottomBarBlur
             }
-            val darkMode = if (isLiquidGlassInterface) {
-                false
-            } else {
-                appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && isSystemInDarkTheme())
-            }
+            val darkMode = appSettings.colorMode.isDark ||
+                (appSettings.colorMode.isSystem && isSystemInDarkTheme())
 
             DisposableEffect(darkMode) {
                 enableEdgeToEdge(
@@ -268,23 +268,30 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalNavigator provides navigator,
                 LocalDensity provides density,
-                LocalColorMode provides if (isLiquidGlassInterface) ColorMode.LIGHT.value else appSettings.colorMode.value,
+                LocalColorMode provides appSettings.colorMode.value,
                 LocalEnableBlur provides effectiveEnableBlur,
                 LocalBlurIntensity provides uiState.blurIntensity,
                 LocalEnableFloatingBottomBar provides uiState.enableFloatingBottomBar,
                 LocalEnableFloatingBottomBarBlur provides effectiveEnableFloatingBottomBarBlur,
+                LocalAutoHideNavigationBar provides uiState.autoHideNavigationBar,
+                LocalScrollHideNavigationBar provides uiState.scrollHideNavigationBar,
                 LocalUiMode provides uiMode,
                 LocalInterfaceStyle provides uiState.interfaceStyle,
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
+                LocalNightBackgroundEffectActive provides (
+                    darkMode &&
+                        !uiState.nightBackgroundPassthrough &&
+                        NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect) != NightBackgroundEffect.Off
+                    ),
                 LocalScrollAnimation provides uiState.globalScrollEffectEnabled,
                 LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(uiState.globalScrollEffect),
             ) {
                 KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
                     HandleDeepLink(intentState = intentState.collectAsStateWithLifecycle())
                     ManagerUpdatePrompt()
-                    ZipFileIntentHandler(intentState = intentState, isManager = isManager)
+                    ZipFileIntentHandler(intentState = intentState, isManager = managerReady)
                     ShortcutIntentHandler(intentState = intentState)
                     val mainScreenEntry = @Composable {
                         MainScreen(
@@ -435,7 +442,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         GlobalSnowEffectOverlay(
-                            enabled = uiState.globalSnowEnabled,
+                            enabled = darkMode && uiState.globalSnowEnabled,
                             effectValue = uiState.globalSnowEffect,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -653,6 +660,8 @@ fun MainScreen(
     val enableBlur = LocalEnableBlur.current
     val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
+    val autoHideNavigationBar = LocalAutoHideNavigationBar.current
+    val scrollHideNavigationBar = LocalScrollHideNavigationBar.current
     val refreshTick by KernelStatusEvents.refreshTick.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { MainPagerConfig.PAGE_COUNT })
     val mainPagerState = rememberMainPagerState(pagerState)
@@ -662,18 +671,19 @@ fun MainScreen(
             val managerRegistered = runCatching {
                 Natives.isManager || ensureManagerRegistered()
             }.getOrDefault(false)
-            val installedKsud = if (managerRegistered) {
-                runCatching { getInstalledKsudStatus() }.getOrNull()
-            } else {
-                null
-            }
             runCatching {
+                val driverVersion = Natives.version.takeIf { it > 0 }
+                val requiresNewKernel = Natives.requireNewKernel()
+                val uapiMismatch = Natives.checkUAPIMismatch()
                 managerRegistered &&
-                    Natives.version > 0 &&
-                    !Natives.requireNewKernel() &&
+                    driverVersion != null &&
                     ksuRootAvailable() &&
-                    installedKsud?.present == true &&
-                    installedKsud.versionCode == BuildConfig.VERSION_CODE
+                    !hasBlockingRootVersionMismatch(
+                        managerVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                        driverVersion = driverVersion,
+                        requiresNewKernel = requiresNewKernel,
+                        uapiMismatch = uapiMismatch,
+                    )
             }.getOrDefault(false)
         }
         value = fullFeatured
@@ -712,6 +722,17 @@ fun MainScreen(
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val useNavigationRail = isLandscape && !(uiMode == UiMode.Miuix && enableFloatingBottomBar)
+    val navigationBarVisibilityState = rememberNavigationBarVisibilityState(
+        enabled = !useNavigationRail && (autoHideNavigationBar || scrollHideNavigationBar),
+        autoHideAfterInactivity = autoHideNavigationBar,
+        hideOnScroll = scrollHideNavigationBar,
+    )
+
+    LaunchedEffect(isFullFeatured) {
+        if (isFullFeatured) {
+            navigationBarVisibilityState.reveal(resetIdleTimer = true)
+        }
+    }
 
     CompositionLocalProvider(
         LocalMainPagerState provides mainPagerState,
@@ -738,6 +759,11 @@ fun MainScreen(
             }
         }
 
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarVisibilityController(navigationBarVisibilityState),
+        ) {
         if (useNavigationRail) {
             val startInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
                 .only(WindowInsetsSides.Start)
@@ -776,14 +802,17 @@ fun MainScreen(
             }
         } else {
             val bottomBar = @Composable {
-                Box(
-                    modifier = Modifier.fillMaxWidth()
+                AutoHidingNavigationBar(
+                    visible = navigationBarVisibilityState.visible,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    BottomBar(
-                        blurBackdrop = blurBackdrop,
-                        backdrop = floatingBarBackdrop,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        BottomBar(
+                            blurBackdrop = blurBackdrop,
+                            backdrop = floatingBarBackdrop,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
                 }
             }
 
@@ -802,6 +831,7 @@ fun MainScreen(
                     pagerContent(innerPadding.calculateBottomPadding())
                 }
             }
+        }
         }
     }
 }
@@ -871,7 +901,7 @@ private fun ZipFileIntentHandler(
     }
 
     val intentStateValue by intentState.collectAsStateWithLifecycle()
-    LaunchedEffect(intentStateValue) {
+    LaunchedEffect(intentStateValue, isManager) {
         val currentIntent = activity.intent
         val uri = currentIntent?.data ?: return@LaunchedEffect
 

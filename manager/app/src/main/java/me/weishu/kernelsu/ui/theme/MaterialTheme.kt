@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -22,35 +23,7 @@ fun MaterialKernelSUTheme(
     val context = LocalContext.current
     val systemDarkTheme = isSystemInDarkTheme()
     val darkTheme = appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
-    val amoledMode = appSettings.colorMode.isAmoled
-    val dynamicColor = appSettings.keyColor == 0
-    val colorStyle = appSettings.paletteStyle
-    val colorSpec = appSettings.colorSpec
-
-    val colorScheme = if (dynamicColor) {
-        val baseScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        rememberDynamicColorScheme(
-            seedColor = Color.Unspecified,
-            isDark = darkTheme,
-            isAmoled = amoledMode,
-            style = colorStyle,
-            specVersion = colorSpec,
-            primary = baseScheme.primary,
-            secondary = baseScheme.secondary,
-            tertiary = baseScheme.tertiary,
-            neutral = baseScheme.surface,
-            neutralVariant = baseScheme.surfaceVariant,
-            error = baseScheme.error
-        )
-    } else {
-        rememberDynamicColorScheme(
-            seedColor = Color(appSettings.keyColor),
-            isDark = darkTheme,
-            isAmoled = amoledMode,
-            style = colorStyle,
-            specVersion = colorSpec,
-        )
-    }
+    val colorScheme = rememberAppMaterialColorScheme(appSettings)
 
     LaunchedEffect(darkTheme) {
         val window = (context as? Activity)?.window ?: return@LaunchedEffect
@@ -68,4 +41,38 @@ fun MaterialKernelSUTheme(
             content()
         }
     )
+}
+
+@Composable
+internal fun rememberAppMaterialColorScheme(appSettings: AppSettings): ColorScheme {
+    val context = LocalContext.current
+    val systemDarkTheme = isSystemInDarkTheme()
+    val darkTheme = appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
+    val colorStyle = appSettings.paletteStyle
+    val colorSpec = appSettings.colorSpec
+
+    return if (appSettings.keyColor == 0) {
+        val baseScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        rememberDynamicColorScheme(
+            seedColor = Color.Unspecified,
+            isDark = darkTheme,
+            isAmoled = appSettings.colorMode.isAmoled,
+            style = colorStyle,
+            specVersion = colorSpec,
+            primary = baseScheme.primary,
+            secondary = baseScheme.secondary,
+            tertiary = baseScheme.tertiary,
+            neutral = baseScheme.surface,
+            neutralVariant = baseScheme.surfaceVariant,
+            error = baseScheme.error,
+        )
+    } else {
+        rememberDynamicColorScheme(
+            seedColor = Color(appSettings.keyColor),
+            isDark = darkTheme,
+            isAmoled = appSettings.colorMode.isAmoled,
+            style = colorStyle,
+            specVersion = colorSpec,
+        )
+    }
 }

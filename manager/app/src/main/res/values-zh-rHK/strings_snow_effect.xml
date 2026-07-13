@@ -9,4 +9,5 @@
     <string name="settings_global_snow_effect_starlight">星雪</string>
     <string name="settings_global_snow_effect_pink">粉雪</string>
     <string name="settings_global_snow_effect_crystal">冰晶</string>
+    <string name="settings_visual_effects_dark_mode_only">僅在夜間模式下可用，切回夜間模式後會恢復目前設定。</string>
 </resources>

@@ -1303,7 +1303,7 @@ private fun WarningSummaryCard(
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(
-                surfaceColor = Color(0xFFFFF2F2),
+                surfaceColor = if (isInDarkTheme()) Color(0xFF32191B) else Color(0xFFFFF2F2),
                 surfaceAlpha = 0.66f,
             ),
         colors = liquidGlassMiuixCardColors(warningContainer)
@@ -2080,7 +2080,7 @@ private fun seccompDotColorMiuix(status: Int): Color {
 @Composable
 private fun Modifier.homeLiquidGlassSurface(
     enabled: Boolean = true,
-    surfaceColor: Color = Color.White,
+    surfaceColor: Color = Color.Unspecified,
     surfaceAlpha: Float = 0.58f,
 ): Modifier {
     if (!enabled) return this

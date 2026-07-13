@@ -148,10 +148,9 @@ void __init ksu_syscall_hook_manager_init(void)
     ksu_register_syscall_hook(__NR_execve, ksu_hook_execve);
     ksu_register_syscall_hook(__NR_newfstatat, ksu_hook_newfstatat);
     ksu_register_syscall_hook(__NR_faccessat, ksu_hook_faccessat);
-    WRITE_ONCE(
-        ksu_hook_manager_syscall_handlers,
-        ksu_has_syscall_hook(__NR_setresuid) && ksu_has_syscall_hook(__NR_execve) &&
-            ksu_has_syscall_hook(__NR_newfstatat) && ksu_has_syscall_hook(__NR_faccessat));
+    WRITE_ONCE(ksu_hook_manager_syscall_handlers,
+               ksu_has_syscall_hook(__NR_setresuid) && ksu_has_syscall_hook(__NR_execve) &&
+                   ksu_has_syscall_hook(__NR_newfstatat) && ksu_has_syscall_hook(__NR_faccessat));
 
     if (!READ_ONCE(ksu_hook_manager_syscall_handlers))
         pr_err("hook_manager: not all syscall handlers were registered\n");

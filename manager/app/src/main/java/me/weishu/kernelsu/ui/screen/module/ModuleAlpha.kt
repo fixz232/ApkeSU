@@ -56,7 +56,9 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaOutlinedButton
 import me.weishu.kernelsu.ui.component.alpha.AlphaShapes
 import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
 import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
+import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
+import me.weishu.kernelsu.ui.component.alpha.isStudioStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 
 @Composable
@@ -118,6 +120,7 @@ fun ModulePagerAlpha(
 
     val searchText = uiState.searchStatus.searchText
     val modules = if (searchText.isBlank()) uiState.moduleList else uiState.searchResults
+    val studioStyle = isStudioStyle()
 
     AlphaScreen(
         title = stringResource(R.string.module),
@@ -140,6 +143,14 @@ fun ModulePagerAlpha(
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (studioStyle) {
+                item {
+                    StudioModuleOverview(
+                        modules = uiState.moduleList,
+                        updateCount = uiState.updateInfo.size,
+                    )
+                }
+            }
             item {
                 AlphaModuleSearch(
                     searchText = searchText,
@@ -154,7 +165,12 @@ fun ModulePagerAlpha(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (modules.isEmpty()) {
+            if (uiState.loadError != null) {
+                item {
+                    AlphaModuleLoadError(onRetry = actions.onRefresh)
+                }
+            }
+            if (modules.isEmpty() && uiState.loadError == null) {
                 item {
                     AlphaCard {
                         Box(
@@ -186,6 +202,98 @@ fun ModulePagerAlpha(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AlphaModuleLoadError(onRetry: () -> Unit) {
+    AlphaCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.module_failed_to_load),
+                color = AlphaColors.Muted,
+                fontSize = alphaSp(14f),
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            AlphaOutlinedButton(
+                text = stringResource(R.string.network_retry),
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+fun ModulePagerStudio(
+    uiState: ModuleUiState,
+    confirmDialogState: ModuleConfirmDialogState?,
+    moduleEvent: Flow<ModuleEffect>,
+    actions: ModuleActions,
+    bottomInnerPadding: Dp,
+) {
+    ModulePagerAlpha(
+        uiState = uiState,
+        confirmDialogState = confirmDialogState,
+        moduleEvent = moduleEvent,
+        actions = actions,
+        bottomInnerPadding = bottomInnerPadding,
+    )
+}
+
+@Composable
+private fun StudioModuleOverview(
+    modules: List<Module>,
+    updateCount: Int,
+) {
+    AlphaCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StudioModuleMetric(
+                value = modules.size,
+                label = stringResource(R.string.module),
+                modifier = Modifier.weight(1f),
+            )
+            StudioModuleMetric(
+                value = modules.count { it.enabled && !it.remove },
+                label = stringResource(R.string.skrootpro_running),
+                modifier = Modifier.weight(1f),
+            )
+            StudioModuleMetric(
+                value = updateCount,
+                label = stringResource(R.string.module_update),
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioModuleMetric(
+    value: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = value.toString(),
+            color = AlphaColors.Accent,
+            fontSize = alphaSp(18f, maxScale = 1.0f),
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = label,
+            color = AlphaColors.Muted,
+            fontSize = alphaSp(11f, maxScale = 1.0f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -286,7 +394,7 @@ private fun AlphaModuleCard(
                             color = AlphaColors.Text,
                             fontSize = alphaSp(17.5f),
                             lineHeight = alphaSp(21f),
-                            fontWeight = FontWeight.Black,
+                            fontWeight = alphaStrongWeight(),
                             textDecoration = textDecoration,
                             modifier = Modifier.weight(1f, fill = false),
                             maxLines = 1,
@@ -297,7 +405,7 @@ private fun AlphaModuleCard(
                                 text = "META",
                                 color = AlphaColors.Accent,
                                 fontSize = alphaSp(9.5f, maxScale = 1.0f),
-                                fontWeight = FontWeight.Black,
+                                fontWeight = alphaStrongWeight(),
                                 modifier = Modifier
                                     .padding(start = 6.dp)
                                     .clip(AlphaShapes.Control)

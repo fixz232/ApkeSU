@@ -10,10 +10,10 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.theme.LocalBlurIntensity
-import me.weishu.kernelsu.ui.component.liquid.LiquidGlassTokens
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.lens
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
+import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
 import me.weishu.kernelsu.ui.component.liquid.vibrancy
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
@@ -44,7 +44,7 @@ fun BlurredBar(
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
     val blurIntensity = LocalBlurIntensity.current
     val liquidShape = remember { RoundedCornerShape(0.dp) }
-    val surfaceColor = if (isLiquidGlass) LiquidGlassTokens.Surface else MiuixTheme.colorScheme.surface
+    val surfaceColor = if (isLiquidGlass) liquidGlassSurfaceColor() else MiuixTheme.colorScheme.surface
     Box(
         modifier = when {
             blurActive && backdrop != null && isLiquidGlass -> {

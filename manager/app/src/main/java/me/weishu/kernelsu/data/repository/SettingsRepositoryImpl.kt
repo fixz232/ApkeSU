@@ -13,6 +13,7 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
@@ -22,6 +23,7 @@ import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_KEY
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
+import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
@@ -194,6 +196,14 @@ class SettingsRepositoryImpl : SettingsRepository {
             putBoolean(themeKey("enable_floating_bottom_bar_blur"), value)
             putString(themeKey("theme_preset"), ThemePreset.CUSTOM.value)
         }
+
+    override var autoHideNavigationBar: Boolean
+        get() = prefs.getBoolean(AUTO_HIDE_NAVIGATION_BAR_KEY, false)
+        set(value) = prefs.edit { putBoolean(AUTO_HIDE_NAVIGATION_BAR_KEY, value) }
+
+    override var scrollHideNavigationBar: Boolean
+        get() = prefs.getBoolean(SCROLL_HIDE_NAVIGATION_BAR_KEY, false)
+        set(value) = prefs.edit { putBoolean(SCROLL_HIDE_NAVIGATION_BAR_KEY, value) }
 
     override var pageScale: Float
         get() = sanitizeScale(
@@ -661,7 +671,7 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override fun setKPatchNextEnabled(enabled: Boolean): Boolean = writeKPatchNextEnabled(enabled)
 
-    override suspend fun getEpkesuHideStatus(): Boolean = readEpkesuHideStatus().enabled
+    override suspend fun getEpkesuHideStatus(): Boolean = readEpkesuHideStatus().configured
 
     override fun setEpkesuHideEnabled(enabled: Boolean): Boolean = writeEpkesuHideEnabled(enabled)
 

@@ -74,6 +74,7 @@ import me.weishu.kernelsu.ui.component.delta.DeltaShapes
 import me.weishu.kernelsu.ui.component.delta.DeltaSwitch
 import me.weishu.kernelsu.ui.component.delta.deltaSp
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -345,6 +346,7 @@ private fun DeltaColorVariantPicker(
     selectedVariant: String,
     onVariantSelected: (String) -> Unit,
 ) {
+    val darkMode = isInDarkTheme()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -372,16 +374,16 @@ private fun DeltaColorVariantPicker(
             DeltaColorOption(
                 text = stringResource(R.string.color_green),
                 selected = DeltaColorVariant.fromValue(selectedVariant) == DeltaColorVariant.Green,
-                selectedBackground = Color(0xFFA9DFAE),
-                selectedForeground = Color(0xFF151915),
+                selectedBackground = if (darkMode) Color(0xFF24502E) else Color(0xFFA9DFAE),
+                selectedForeground = if (darkMode) Color(0xFFE8F2E9) else Color(0xFF151915),
                 onClick = { onVariantSelected(DeltaColorVariant.Green.value) },
                 modifier = Modifier.weight(1f),
             )
             DeltaColorOption(
                 text = stringResource(R.string.color_red),
                 selected = DeltaColorVariant.fromValue(selectedVariant) == DeltaColorVariant.Red,
-                selectedBackground = Color(0xFFF4B6B2),
-                selectedForeground = Color(0xFF1A1515),
+                selectedBackground = if (darkMode) Color(0xFF5A2A28) else Color(0xFFF4B6B2),
+                selectedForeground = if (darkMode) Color(0xFFF5E8E7) else Color(0xFF1A1515),
                 onClick = { onVariantSelected(DeltaColorVariant.Red.value) },
                 modifier = Modifier.weight(1f),
             )

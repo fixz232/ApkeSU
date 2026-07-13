@@ -48,8 +48,10 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
+import me.weishu.kernelsu.ui.component.skrootpro.SkrootproButton
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 
 @Composable
 fun SuperUserPagerSkrootpro(
@@ -95,7 +97,12 @@ fun SuperUserPagerSkrootpro(
                     onSelected = { selectedFilter = it },
                 )
             }
-            if (apps.isEmpty()) {
+            if (uiState.error != null) {
+                item {
+                    SkrootproGrantLoadError(onRetry = actions.onRefresh)
+                }
+            }
+            if (apps.isEmpty() && uiState.error == null) {
                 item {
                     SkrootproGrantEmpty(
                         text = if (searchText.isBlank() && selectedFilter == SkrootproGrantFilter.All) {
@@ -116,7 +123,7 @@ fun SuperUserPagerSkrootpro(
 
 @Composable
 private fun SkrootproGrantRow(group: GroupedApps, onClick: () -> Unit) {
-    val tags = group.statusTags()
+    val tags = group.statusTags(isInDarkTheme())
     val title = group.ownerName ?: group.primary.label
     val summary = if (group.apps.size > 1) {
         stringResource(R.string.group_contains_apps, group.apps.size)
@@ -128,7 +135,7 @@ private fun SkrootproGrantRow(group: GroupedApps, onClick: () -> Unit) {
             .fillMaxWidth()
             .defaultMinSize(minHeight = 82.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White)
+            .background(SkrootproColors.Surface)
             .clickable(onClick = onClick)
             .padding(start = 14.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -171,7 +178,7 @@ private fun SkrootproGrantRow(group: GroupedApps, onClick: () -> Unit) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = null,
-            tint = Color(0xFF9A9A9A),
+            tint = SkrootproColors.Muted,
             modifier = Modifier
                 .padding(start = 6.dp)
                 .size(26.dp),
@@ -188,7 +195,7 @@ private fun SkrootproGrantOverview(groups: List<GroupedApps>) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White)
+            .background(SkrootproColors.Surface)
             .padding(18.dp),
     ) {
         Text(
@@ -244,7 +251,7 @@ private fun SkrootproGrantStat(
         modifier = modifier
             .heightIn(min = 58.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFF5F6F8))
+            .background(SkrootproColors.SurfaceStrong)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -277,14 +284,14 @@ private fun SkrootproGrantSearch(
             .fillMaxWidth()
             .height(52.dp)
             .clip(RoundedCornerShape(26.dp))
-            .background(Color(0xFFEDEDEF))
+            .background(SkrootproColors.SurfaceStrong)
             .padding(start = 18.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Rounded.Search,
             contentDescription = null,
-            tint = Color(0xFF939397),
+            tint = SkrootproColors.Muted,
             modifier = Modifier.size(23.dp),
         )
         Spacer(Modifier.width(10.dp))
@@ -304,7 +311,7 @@ private fun SkrootproGrantSearch(
                     if (searchText.isBlank()) {
                         Text(
                             text = stringResource(R.string.superuser_search_hint),
-                            color = Color(0xFF9C9CA0),
+                            color = SkrootproColors.Muted,
                             fontSize = skrootproSp(15f, maxScale = 1.05f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -325,7 +332,7 @@ private fun SkrootproGrantSearch(
                 Icon(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = null,
-                    tint = Color(0xFF77777B),
+                    tint = SkrootproColors.Muted,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -366,10 +373,10 @@ private fun SkrootproGrantFilterChip(
             .height(36.dp)
             .widthIn(min = 58.dp)
             .clip(shape)
-            .background(if (selected) SkrootproColors.Purple else Color.White)
+            .background(if (selected) SkrootproColors.Purple else SkrootproColors.Surface)
             .border(
                 width = 1.dp,
-                color = if (selected) SkrootproColors.Purple else Color(0xFFE4E4E6),
+                color = if (selected) SkrootproColors.Purple else SkrootproColors.Disabled,
                 shape = shape,
             )
             .clickable(onClick = onClick)
@@ -378,7 +385,7 @@ private fun SkrootproGrantFilterChip(
     ) {
         Text(
             text = label,
-            color = if (selected) Color.White else Color(0xFF66666A),
+            color = if (selected) Color.White else SkrootproColors.Muted,
             fontSize = skrootproSp(12.5f, maxScale = 1.0f),
             fontWeight = FontWeight.Bold,
             maxLines = 1,
@@ -393,7 +400,7 @@ private fun SkrootproGrantEmpty(text: String) {
             .fillMaxWidth()
             .height(156.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White),
+            .background(SkrootproColors.Surface),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -425,14 +432,39 @@ private fun SkrootproStatusTag(tag: StatusMeta) {
     }
 }
 
-private fun GroupedApps.statusTags(): List<StatusMeta> {
+private fun GroupedApps.statusTags(darkMode: Boolean): List<StatusMeta> {
     val userId = uid / 100000
     return buildList {
-        if (anyAllowSu) add(StatusMeta("ROOT", Color(0xFFEAF3FF), Color(0xFF2474C8)))
-        if (shouldUmount) add(StatusMeta("UMOUNT", Color(0xFFE9E9EC), Color(0xFF66666A)))
-        if (anyCustom) add(StatusMeta("CUSTOM", Color(0xFFF0E8FF), Color(0xFF6F38C5)))
-        if (userId != 0) add(StatusMeta("USER $userId", Color(0xFFEAF6F1), Color(0xFF2B7A59)))
-        if (isEmpty()) add(StatusMeta("OFF", Color(0xFFF1F1F2), Color(0xFF8A8A8A)))
+        if (anyAllowSu) add(StatusMeta("ROOT", if (darkMode) Color(0xFF17324E) else Color(0xFFEAF3FF), if (darkMode) Color(0xFF8DC8FF) else Color(0xFF2474C8)))
+        if (shouldUmount) add(StatusMeta("UMOUNT", if (darkMode) Color(0xFF303138) else Color(0xFFE9E9EC), if (darkMode) Color(0xFFC2C3CA) else Color(0xFF66666A)))
+        if (anyCustom) add(StatusMeta("CUSTOM", if (darkMode) Color(0xFF34264B) else Color(0xFFF0E8FF), if (darkMode) Color(0xFFD0ADFF) else Color(0xFF6F38C5)))
+        if (userId != 0) add(StatusMeta("USER $userId", if (darkMode) Color(0xFF19382D) else Color(0xFFEAF6F1), if (darkMode) Color(0xFF8EDDBA) else Color(0xFF2B7A59)))
+        if (isEmpty()) add(StatusMeta("OFF", if (darkMode) Color(0xFF2A2B31) else Color(0xFFF1F1F2), if (darkMode) Color(0xFFB8B9C0) else Color(0xFF8A8A8A)))
+    }
+}
+
+@Composable
+private fun SkrootproGrantLoadError(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(SkrootproColors.Surface)
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.superuser_failed_to_load),
+            color = SkrootproColors.Muted,
+            fontSize = skrootproSp(14f, maxScale = 1.05f),
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SkrootproButton(
+            text = stringResource(R.string.network_retry),
+            onClick = onRetry,
+            modifier = Modifier.width(120.dp),
+        )
     }
 }
 

@@ -8,19 +8,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,11 +34,10 @@ import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.delta.DeltaCard
 import me.weishu.kernelsu.ui.component.delta.DeltaColors
 import me.weishu.kernelsu.ui.component.delta.DeltaEmptyCard
+import me.weishu.kernelsu.ui.component.delta.DeltaPillButton
 import me.weishu.kernelsu.ui.component.delta.DeltaScreen
 import me.weishu.kernelsu.ui.component.delta.DeltaSearchField
-import me.weishu.kernelsu.ui.component.delta.DeltaSectionTitle
 import me.weishu.kernelsu.ui.component.delta.DeltaShapes
-import me.weishu.kernelsu.ui.component.delta.DeltaSwitch
 import me.weishu.kernelsu.ui.component.delta.deltaSp
 
 @Composable
@@ -68,22 +64,18 @@ fun SuperUserPagerDelta(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                DeltaGrantModeSelector()
-            }
-            item {
-                DeltaGrantActionBar()
-            }
-            item {
                 DeltaSearchField(
                     searchText = searchText,
                     onSearchTextChange = actions.onSearchTextChange,
                     onClearSearch = actions.onClearSearch,
                 )
             }
-            item {
-                DeltaSectionTitle(text = "Root Permissions")
+            if (uiState.error != null) {
+                item {
+                    DeltaGrantLoadError(onRetry = actions.onRefresh)
+                }
             }
-            if (apps.isEmpty()) {
+            if (apps.isEmpty() && uiState.error == null) {
                 item {
                     DeltaEmptyCard(
                         text = if (uiState.hasLoaded) {
@@ -102,138 +94,6 @@ fun SuperUserPagerDelta(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DeltaGrantModeSelector() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(78.dp)
-            .clip(DeltaShapes.Control)
-            .background(DeltaColors.Surface)
-            .padding(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clip(DeltaShapes.Control)
-                .background(DeltaColors.AccentSoft)
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.VisibilityOff,
-                contentDescription = null,
-                tint = DeltaColors.Ink,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(9.dp))
-            Column {
-                Text(
-                    text = "黑名单",
-                    color = DeltaColors.Ink,
-                    fontSize = deltaSp(16f, maxScale = 1.0f),
-                    lineHeight = deltaSp(19f, maxScale = 1.0f),
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    text = "(DenyList)",
-                    color = DeltaColors.Ink,
-                    fontSize = deltaSp(16f, maxScale = 1.0f),
-                    lineHeight = deltaSp(19f, maxScale = 1.0f),
-                    fontWeight = FontWeight.Black,
-                )
-            }
-        }
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Security,
-                contentDescription = null,
-                tint = DeltaColors.Muted,
-                modifier = Modifier.size(23.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "白名单 (SuList)",
-                color = DeltaColors.Muted,
-                fontSize = deltaSp(17f, maxScale = 1.0f),
-                lineHeight = deltaSp(21f, maxScale = 1.0f),
-                fontWeight = FontWeight.Black,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun DeltaGrantActionBar() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(CircleShape)
-            .background(DeltaColors.AccentSoft)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DeltaActionSegment(
-            icon = Icons.Rounded.Security,
-            label = "Grant",
-            modifier = Modifier.weight(1f),
-        )
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .height(30.dp)
-                .background(DeltaColors.Accent.copy(alpha = 0.28f)),
-        )
-        DeltaActionSegment(
-            icon = Icons.Rounded.VisibilityOff,
-            label = "Hide",
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun DeltaActionSegment(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxHeight(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = DeltaColors.Ink,
-            modifier = Modifier.size(22.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            color = DeltaColors.Ink,
-            fontSize = deltaSp(18f, maxScale = 1.0f),
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -291,17 +151,58 @@ private fun DeltaGrantRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            DeltaSwitch(
-                checked = group.anyAllowSu,
-                onCheckedChange = { onClick() },
+            DeltaGrantStatusBadge(
+                granted = group.anyAllowSu,
             )
             Icon(
-                imageVector = Icons.Rounded.Delete,
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
-                tint = DeltaColors.Danger,
+                tint = DeltaColors.Muted,
                 modifier = Modifier
                     .padding(start = 8.dp)
-                    .size(28.dp),
+                    .size(24.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeltaGrantStatusBadge(granted: Boolean) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (granted) DeltaColors.AccentSoft else DeltaColors.SurfaceDeep)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (granted) "ROOT" else "OFF",
+            color = if (granted) DeltaColors.Ink else DeltaColors.Muted,
+            fontSize = deltaSp(11f, maxScale = 1.0f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun DeltaGrantLoadError(onRetry: () -> Unit) {
+    DeltaCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.superuser_failed_to_load),
+                color = DeltaColors.Muted,
+                fontSize = deltaSp(14f),
+                fontWeight = FontWeight.Bold,
+            )
+            DeltaPillButton(
+                text = stringResource(R.string.network_retry),
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

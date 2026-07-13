@@ -80,14 +80,15 @@ fn is_applied() -> bool {
 pub fn print_status() {
     let configured = is_enabled();
     let applied = configured && is_applied();
-    println!(
-        "{}",
-        json!({
-            "enabled": configured && applied,
-            "configured": configured,
-            "applied": applied,
-        })
-    );
+    println!("{}", status_json(configured, applied));
+}
+
+fn status_json(configured: bool, applied: bool) -> serde_json::Value {
+    json!({
+        "enabled": configured,
+        "configured": configured,
+        "applied": applied,
+    })
 }
 
 pub fn enable() -> Result<()> {
@@ -373,4 +374,18 @@ fn write_atomic(path: &str, content: &str) -> Result<()> {
         return Err(err).with_context(|| format!("failed to replace {path}"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::status_json;
+
+    #[test]
+    fn configured_state_does_not_depend_on_runtime_backup() {
+        let status = status_json(true, false);
+
+        assert_eq!(status["enabled"], true);
+        assert_eq!(status["configured"], true);
+        assert_eq!(status["applied"], false);
+    }
 }

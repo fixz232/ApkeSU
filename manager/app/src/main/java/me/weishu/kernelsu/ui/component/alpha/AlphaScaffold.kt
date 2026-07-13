@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -53,8 +54,11 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 private data class AlphaPalette(
     val background: Color,
@@ -62,6 +66,7 @@ private data class AlphaPalette(
     val surface: Color,
     val surfaceStrong: Color,
     val accent: Color,
+    val onAccent: Color,
     val accentSoft: Color,
     val text: Color,
     val muted: Color,
@@ -76,6 +81,7 @@ object AlphaColors {
         surface = Color(0xFFEFEFEF),
         surfaceStrong = Color(0xFFE9E9E9),
         accent = Color(0xFF3E86BE),
+        onAccent = Color.White,
         accentSoft = Color(0xFFC8E2F3),
         text = Color(0xFF303236),
         muted = Color(0xFF666A70),
@@ -89,11 +95,40 @@ object AlphaColors {
         surface = Color(0xFFF0F3EE),
         surfaceStrong = Color(0xFFDDEADD),
         accent = Color(0xFF2E8B3F),
+        onAccent = Color.White,
         accentSoft = Color(0xFFA9DFAE),
         text = Color(0xFF171A17),
         muted = Color(0xFF4D574D),
         disabled = Color(0xFF9AA49A),
         divider = Color(0xFFD7E1D6),
+    )
+
+    private val AlphaDark = AlphaPalette(
+        background = Color(0xFF111315),
+        topBar = Color(0xFF171A1E),
+        surface = Color(0xFF20242A),
+        surfaceStrong = Color(0xFF2A2F36),
+        accent = Color(0xFF72B9E9),
+        onAccent = Color(0xFF07131A),
+        accentSoft = Color(0xFF24475D),
+        text = Color(0xFFE9EDF1),
+        muted = Color(0xFFABB4BE),
+        disabled = Color(0xFF66717D),
+        divider = Color(0xFF343B43),
+    )
+
+    private val DeltaDark = AlphaPalette(
+        background = Color(0xFF101511),
+        topBar = Color(0xFF151B16),
+        surface = Color(0xFF1C241E),
+        surfaceStrong = Color(0xFF273229),
+        accent = Color(0xFF67D47A),
+        onAccent = Color(0xFF061509),
+        accentSoft = Color(0xFF23492C),
+        text = Color(0xFFE8F1E9),
+        muted = Color(0xFFA8B5AA),
+        disabled = Color(0xFF68756A),
+        divider = Color(0xFF354238),
     )
 
     val Background: Color
@@ -120,6 +155,11 @@ object AlphaColors {
         @Composable
         @ReadOnlyComposable
         get() = current.accent
+
+    val OnAccent: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = current.onAccent
 
     val AccentSoft: Color
         @Composable
@@ -149,7 +189,27 @@ object AlphaColors {
     private val current: AlphaPalette
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) Delta else Alpha
+        get() = when {
+            isStudioStyle() -> AlphaPalette(
+                background = colorScheme.surface,
+                topBar = colorScheme.surface,
+                surface = colorScheme.surfaceContainer,
+                surfaceStrong = colorScheme.primary.copy(alpha = 0.10f)
+                    .compositeOver(colorScheme.surfaceContainer),
+                accent = colorScheme.primary,
+                onAccent = colorScheme.onPrimary,
+                accentSoft = colorScheme.primary.copy(alpha = 0.14f)
+                    .compositeOver(colorScheme.surfaceContainer),
+                text = colorScheme.onSurface,
+                muted = colorScheme.onSurfaceVariantSummary,
+                disabled = colorScheme.onSurface.copy(alpha = 0.38f),
+                divider = colorScheme.outline.copy(alpha = 0.18f),
+            )
+            isDeltaStyle() && isInDarkTheme() -> DeltaDark
+            isDeltaStyle() -> Delta
+            isInDarkTheme() -> AlphaDark
+            else -> Alpha
+        }
 }
 
 object AlphaShapes {
@@ -186,6 +246,18 @@ fun isDeltaStyle(): Boolean {
 }
 
 @Composable
+@ReadOnlyComposable
+fun isStudioStyle(): Boolean {
+    return LocalInterfaceStyle.current == InterfaceStyle.Studio.value
+}
+
+@Composable
+@ReadOnlyComposable
+fun alphaStrongWeight(): FontWeight {
+    return if (isStudioStyle()) FontWeight.SemiBold else FontWeight.Black
+}
+
+@Composable
 fun alphaSp(value: Float, maxScale: Float = 1.12f): TextUnit {
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(0.85f)
     val cappedScale = fontScale.coerceAtMost(maxScale)
@@ -200,10 +272,15 @@ fun AlphaScreen(
     onTopActionClick: () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val background = if (LocalNightBackgroundEffectActive.current) {
+        AlphaColors.Background.copy(alpha = 0.84f)
+    } else {
+        AlphaColors.Background
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AlphaColors.Background)
+            .background(background)
     ) {
         AlphaTopBar(
             title = title,
@@ -222,6 +299,51 @@ fun AlphaTopBar(
     actionIcon: ImageVector? = null,
     onActionClick: () -> Unit = {},
 ) {
+    if (isStudioStyle()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AlphaColors.TopBar)
+                .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .padding(start = 16.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    color = AlphaColors.Text,
+                    fontSize = alphaSp(20f, maxScale = 1.04f),
+                    lineHeight = alphaSp(24f, maxScale = 1.04f),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (actionIcon != null) {
+                    IconButton(onClick = onActionClick) {
+                        Icon(
+                            imageVector = actionIcon,
+                            contentDescription = null,
+                            tint = AlphaColors.Muted,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(AlphaColors.Divider),
+            )
+        }
+        return
+    }
+
     if (isDeltaStyle()) {
         Column(
             modifier = Modifier
@@ -354,16 +476,16 @@ fun AlphaButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
+                tint = AlphaColors.OnAccent,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(6.dp))
         }
         Text(
             text = text,
-            color = Color.White,
+            color = AlphaColors.OnAccent,
             fontSize = alphaSp(14f, maxScale = 1.04f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -381,7 +503,13 @@ fun AlphaOutlinedButton(
         modifier = modifier
             .height(40.dp)
             .clip(AlphaShapes.Button)
-            .background(if (isDeltaStyle()) AlphaColors.AccentSoft else AlphaColors.Background)
+            .background(
+                when {
+                    isDeltaStyle() -> AlphaColors.AccentSoft
+                    isStudioStyle() -> AlphaColors.SurfaceStrong
+                    else -> AlphaColors.Background
+                }
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -400,7 +528,7 @@ fun AlphaOutlinedButton(
             text = text,
             color = if (isDeltaStyle()) AlphaColors.Text else AlphaColors.Accent,
             fontSize = alphaSp(14f, maxScale = 1.04f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -424,8 +552,8 @@ fun AlphaSwitch(
             colors = SwitchDefaults.colors(
                 checkedThumbColor = AlphaColors.Accent,
                 checkedTrackColor = AlphaColors.AccentSoft,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFD8D8D8),
+                uncheckedThumbColor = AlphaColors.Text,
+                uncheckedTrackColor = AlphaColors.SurfaceStrong,
             ),
         )
     } else {

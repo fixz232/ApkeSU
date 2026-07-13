@@ -3,8 +3,8 @@
     <string name="settings_switch_style">滑块样式</string>
     <string name="settings_switch_style_summary">选择所有开关使用的全局滑块样式。</string>
     <string name="settings_switch_style_original">原滑块</string>
-    <string name="settings_switch_style_sun_moon">日月</string>
     <string name="settings_switch_style_capsule">胶囊</string>
-    <string name="settings_switch_style_minimal">极简</string>
-    <string name="settings_switch_style_neon">霓虹</string>
+    <string name="settings_switch_style_cloud_star">云海星夜</string>
+    <string name="settings_switch_style_bb8">BB-8 机器人</string>
+    <string name="settings_switch_style_sparkle">星芒能量</string>
 </resources>

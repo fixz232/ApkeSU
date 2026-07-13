@@ -47,6 +47,8 @@ import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.SyncAlt
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WaterDrop
@@ -123,8 +125,7 @@ fun ColorPaletteScreenMiuix(
     val currentColorMode = state.currentColorMode
     var showSavePresetDialog by remember { mutableStateOf(false) }
     var renamePreset by remember { mutableStateOf<CustomThemePreset?>(null) }
-    val isDark = !isLiquidGlassInterface &&
-        (currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme())
+    val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -175,7 +176,7 @@ fun ColorPaletteScreenMiuix(
                     ThemePreviewCardMiuix(
                         keyColor = uiState.keyColor,
                         isDark = isDark,
-                        miuixMonet = if (isLiquidGlassInterface) false else uiState.miuixMonet,
+                        miuixMonet = uiState.miuixMonet,
                         enableFloatingBottomBar = uiState.enableFloatingBottomBar,
                         enableFloatingBottomBarBlur = if (isLiquidGlassInterface) {
                             false
@@ -197,7 +198,7 @@ fun ColorPaletteScreenMiuix(
                         onApplyThemePreset = actions.onApplyThemePreset,
                     )
 
-                    if (!isLiquidGlassInterface) {
+                    run {
                         val themeItems = listOf(
                             stringResource(id = R.string.settings_theme_mode_system),
                             stringResource(id = R.string.settings_theme_mode_light),
@@ -361,6 +362,38 @@ fun ColorPaletteScreenMiuix(
                             onCheckedChange = {
                                 actions.onSetEnableFloatingBottomBar(it)
                             }
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_auto_hide_navigation_bar),
+                            summary = stringResource(id = R.string.settings_auto_hide_navigation_bar_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Timer,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(
+                                        id = R.string.settings_auto_hide_navigation_bar
+                                    ),
+                                    tint = colorScheme.onBackground,
+                                )
+                            },
+                            checked = uiState.autoHideNavigationBar,
+                            onCheckedChange = actions.onSetAutoHideNavigationBar,
+                        )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_scroll_hide_navigation_bar),
+                            summary = stringResource(id = R.string.settings_scroll_hide_navigation_bar_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.SwapVert,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(
+                                        id = R.string.settings_scroll_hide_navigation_bar
+                                    ),
+                                    tint = colorScheme.onBackground,
+                                )
+                            },
+                            checked = uiState.scrollHideNavigationBar,
+                            onCheckedChange = actions.onSetScrollHideNavigationBar,
                         )
                         AnimatedVisibility(
                             visible = !isLiquidGlassInterface &&
