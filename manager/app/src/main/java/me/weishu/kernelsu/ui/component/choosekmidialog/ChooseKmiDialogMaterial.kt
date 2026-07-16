@@ -36,14 +36,7 @@ fun ChooseKmiDialogMaterial(
         value = getCurrentKmi()
     }
 
-    val displayKmis = remember(supportedKMIs, currentKmi) {
-        buildList {
-            addAll(supportedKMIs)
-            if (currentKmi.isNotBlank() && currentKmi !in this) {
-                add(currentKmi)
-            }
-        }
-    }
+    val displayKmis = remember(supportedKMIs) { supportedKMIs.distinct() }
     val defaultKmi = remember(displayKmis, currentKmi) {
         currentKmi.takeIf { it in displayKmis } ?: displayKmis.firstOrNull().orEmpty()
     }

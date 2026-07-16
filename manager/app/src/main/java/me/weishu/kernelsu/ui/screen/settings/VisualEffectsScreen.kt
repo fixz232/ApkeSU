@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -225,7 +226,7 @@ private fun VisualEffectsContent(
 
         VisualEffectCard(
             title = stringResource(R.string.settings_global_snow),
-            icon = Icons.Rounded.Visibility,
+            icon = Icons.Rounded.Star,
             enabled = darkMode,
             disabledMessage = stringResource(R.string.settings_visual_effects_dark_mode_only),
         ) {

@@ -82,6 +82,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object UiDecorationLibrary : Route
+
+    @Parcelize
+    @Serializable
     data object HiddenPathConfig : Route
 
     @Parcelize
@@ -90,11 +94,19 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object AiModuleStudio : Route
+
+    @Parcelize
+    @Serializable
     data object RescueProtection : Route
 
     @Parcelize
     @Serializable
     data object CpuSpoof : Route
+
+    @Parcelize
+    @Serializable
+    data object GraphicsRenderer : Route
 
     @Parcelize
     @Serializable

@@ -99,8 +99,17 @@ import me.weishu.kernelsu.ui.component.bottombar.MainPagerState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
+import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationScope
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationBackdrop
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationChromeOverlay
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
+import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
+import me.weishu.kernelsu.ui.component.snow.SeasonAmbientOverlay
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.snow.SeasonStyleWallpaper
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.navigation3.HandleDeepLink
@@ -123,8 +132,10 @@ import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
+import me.weishu.kernelsu.ui.screen.settings.AiModuleStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
 import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
+import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
@@ -132,6 +143,7 @@ import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
 import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
+import me.weishu.kernelsu.ui.screen.settings.UiDecorationLibraryScreen
 import me.weishu.kernelsu.ui.screen.settings.VisualEffectsScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
@@ -147,6 +159,7 @@ import me.weishu.kernelsu.ui.theme.LocalDeltaColorVariant
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
+import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.theme.LocalScrollHideNavigationBar
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
@@ -257,6 +270,8 @@ class MainActivity : ComponentActivity() {
             }
 
             val navigator = rememberNavigator(Route.Main)
+            val currentRoute = navigator.current() as? Route
+            val uiDecorationScope = resolveUiDecorationScope(currentRoute, selectedMainPage)
             val systemDensity = LocalDensity.current
             val density = remember(systemDensity, uiState.pageScale, uiState.fontScale) {
                 Density(
@@ -267,6 +282,8 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(
                 LocalNavigator provides navigator,
+                LocalUiDecorationConfig provides uiState.uiDecorationConfig,
+                LocalUiDecorationScope provides uiDecorationScope,
                 LocalDensity provides density,
                 LocalColorMode provides appSettings.colorMode.value,
                 LocalEnableBlur provides effectiveEnableBlur,
@@ -277,6 +294,7 @@ class MainActivity : ComponentActivity() {
                 LocalScrollHideNavigationBar provides uiState.scrollHideNavigationBar,
                 LocalUiMode provides uiMode,
                 LocalInterfaceStyle provides uiState.interfaceStyle,
+                LocalSeasonStyle provides SeasonStyle.fromValue(uiState.seasonStyle),
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
@@ -334,10 +352,13 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
                                 entry<Route.PreInstallStyleSettings> { PreInstallStyleSettingsScreen() }
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
+                                entry<Route.UiDecorationLibrary> { UiDecorationLibraryScreen() }
                                 entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
+                                entry<Route.AiModuleStudio> { AiModuleStudioScreen() }
                                 entry<Route.RescueProtection> { RescueProtectionScreen() }
                                 entry<Route.CpuSpoof> { CpuSpoofScreen() }
+                                entry<Route.GraphicsRenderer> { GraphicsRendererScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
@@ -365,7 +386,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     val globalGlassBackdrop = rememberBlurBackdrop(effectiveEnableBlur)
-                    val currentRoute = navigator.current() as? Route
                     var routeInitialized by remember { mutableStateOf(false) }
                     var navigationTransitionActive by remember { mutableStateOf(false) }
                     LaunchedEffect(currentRoute) {
@@ -378,6 +398,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
+                    val seasonalStyleActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
+                    val hasCustomBackground =
+                        !effectiveBackground.wallpaperUriString.isNullOrBlank() ||
+                            !effectiveBackground.videoUriString.isNullOrBlank()
+                    val immersiveBackgroundActive =
+                        seasonalStyleActive ||
+                            hasCustomBackground ||
+                            (
+                                darkMode &&
+                                    NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect) !=
+                                    NightBackgroundEffect.Off
+                                )
                     val globalScrollEffectState = rememberGlobalScrollEffectState(
                         enabled = uiState.globalScrollEffectEnabled && !navigationTransitionActive,
                         effectValue = uiState.globalScrollEffect,
@@ -397,39 +429,50 @@ class MainActivity : ComponentActivity() {
                             passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
                         ) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                if (!uiState.nightBackgroundPassthrough) {
-                                    NightBackgroundEffectOverlay(
-                                        enabled = darkMode,
-                                        effectValue = uiState.nightBackgroundEffect,
-                                        passthrough = false,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                                CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .customClickSound(clickSoundUri, clickSoundVolume)
-                                            .then(
-                                                if (globalGlassBackdrop != null) {
-                                                    Modifier.layerBackdrop(globalGlassBackdrop)
-                                                } else {
-                                                    Modifier
-                                                }
-                                            )
-                                    ) {
-                                        when (uiMode) {
-                                            UiMode.Material -> androidx.compose.material3.Scaffold(
-                                                containerColor = Color.Transparent
-                                            ) { navDisplay() }
+                            CompositionLocalProvider(
+                                LocalImmersiveBackgroundActive provides immersiveBackgroundActive,
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    if (seasonalStyleActive && !hasCustomBackground) {
+                                        SeasonStyleWallpaper(modifier = Modifier.fillMaxSize())
+                                        SeasonAmbientOverlay(modifier = Modifier.fillMaxSize())
+                                    }
+                                    if (!uiState.nightBackgroundPassthrough) {
+                                        NightBackgroundEffectOverlay(
+                                            enabled = darkMode,
+                                            effectValue = uiState.nightBackgroundEffect,
+                                            passthrough = false,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                    UiDecorationBackdrop(modifier = Modifier.fillMaxSize())
+                                    CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .customClickSound(clickSoundUri, clickSoundVolume)
+                                                .then(
+                                                    if (globalGlassBackdrop != null) {
+                                                        Modifier.layerBackdrop(globalGlassBackdrop)
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                        ) {
+                                            when (uiMode) {
+                                                UiMode.Material -> androidx.compose.material3.Scaffold(
+                                                    containerColor = Color.Transparent
+                                                ) { navDisplay() }
 
-                                            UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { navDisplay() }
+                                                UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { navDisplay() }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+
+                        UiDecorationChromeOverlay(modifier = Modifier.fillMaxSize())
 
                         if (uiState.nightBackgroundPassthrough) {
                             NightBackgroundEffectOverlay(
@@ -649,6 +692,23 @@ private fun stableNavPopTransitionContentTransform(): ContentTransform {
 }
 
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> { error("LocalMainPagerState not provided") }
+
+private fun resolveUiDecorationScope(route: Route?, selectedMainPage: Int): UiDecorationScope {
+    return when (route) {
+        Route.Home -> UiDecorationScope.Home
+        Route.SuperUser -> UiDecorationScope.SuperUser
+        Route.Module -> UiDecorationScope.Modules
+        Route.Settings -> UiDecorationScope.Settings
+        Route.Main -> when (selectedMainPage) {
+            0 -> UiDecorationScope.Home
+            1 -> UiDecorationScope.SuperUser
+            2 -> UiDecorationScope.Modules
+            3 -> UiDecorationScope.Settings
+            else -> UiDecorationScope.Secondary
+        }
+        else -> UiDecorationScope.Secondary
+    }
+}
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable

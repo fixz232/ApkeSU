@@ -135,6 +135,12 @@ fun SettingPagerSkrootpro(
                     onClick = actions.onOpenVisualEffects,
                 )
                 SkrootproActionRow(
+                    title = stringResource(R.string.settings_ui_decoration_library),
+                    summary = stringResource(R.string.settings_ui_decoration_library_summary),
+                    leadingIcon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenUiDecorationLibrary,
+                )
+                SkrootproActionRow(
                     title = stringResource(R.string.settings_theme),
                     summary = stringResource(R.string.settings_theme_summary),
                     onClick = actions.onOpenTheme,
@@ -367,6 +373,20 @@ fun SettingPagerSkrootpro(
                     leadingIcon = Icons.Rounded.DeveloperMode,
                     onClick = actions.onOpenCpuSpoof,
                 )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_graphics_renderer_tool),
+                    summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
+                    checked = uiState.graphicsRendererFeatureEnabled,
+                    onCheckedChange = actions.onSetGraphicsRendererFeatureEnabled,
+                )
+                if (uiState.graphicsRendererFeatureEnabled) {
+                    SkrootproActionRow(
+                        title = stringResource(R.string.settings_graphics_renderer),
+                        summary = stringResource(R.string.settings_graphics_renderer_summary),
+                        leadingIcon = Icons.Rounded.DeveloperMode,
+                        onClick = actions.onOpenGraphicsRenderer,
+                    )
+                }
                 SkrootproActionRow(
                     title = stringResource(R.string.rescue_protection),
                     summary = stringResource(R.string.rescue_protection_summary),

@@ -107,7 +107,7 @@ fun flashModulesSequentially(
     return FlashResult(0, "", true)
 }
 
-fun flashIt(
+suspend fun flashIt(
     flashIt: FlashIt,
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit

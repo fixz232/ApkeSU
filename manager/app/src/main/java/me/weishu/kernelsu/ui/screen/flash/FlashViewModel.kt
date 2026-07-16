@@ -68,7 +68,9 @@ class FlashViewModel : ViewModel() {
             }
 
             if (result.code != 0) {
-                visibleLog.append("$flashErrorCode: ${result.code}.\n ${result.err} $flashCheckLog\n")
+                val failure = "$flashErrorCode: ${result.code}.\n ${result.err} $flashCheckLog\n"
+                visibleLog.append(failure)
+                fullLog.append(failure)
             }
             if (result.showReboot) {
                 visibleLog.append("\n\n\n")

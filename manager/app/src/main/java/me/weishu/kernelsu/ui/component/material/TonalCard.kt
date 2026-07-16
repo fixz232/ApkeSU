@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMaterialCardColors
 
@@ -22,7 +23,9 @@ fun TonalCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.globalLiquidGlassSurface(shape = shape),
+        modifier = modifier
+            .globalLiquidGlassSurface(shape = shape)
+            .uiDecoratedCard(shape = shape, enabled = enabled),
         enabled = enabled,
         colors = liquidGlassMaterialCardColors(containerColor = containerColor),
         shape = shape
@@ -39,7 +42,9 @@ fun TonalCard(
     content: @Composable () -> Unit
 ) {
     Card(
-        modifier = modifier.globalLiquidGlassSurface(shape = shape),
+        modifier = modifier
+            .globalLiquidGlassSurface(shape = shape)
+            .uiDecoratedCard(shape = shape),
         colors = liquidGlassMaterialCardColors(containerColor = containerColor),
         shape = shape
     ) {

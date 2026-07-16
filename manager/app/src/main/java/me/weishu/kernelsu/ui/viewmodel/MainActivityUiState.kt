@@ -7,6 +7,8 @@ import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.theme.AppSettings
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
@@ -24,6 +26,8 @@ data class MainActivityUiState(
     val autoHideNavigationBar: Boolean,
     val scrollHideNavigationBar: Boolean,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
+    val seasonStyle: String = SeasonStyle.DEFAULT_VALUE,
+    val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,

@@ -89,6 +89,7 @@ import me.weishu.kernelsu.ui.component.material.SegmentedSwitchItem
 import me.weishu.kernelsu.ui.component.material.SendLogBottomSheet
 import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
@@ -248,6 +249,20 @@ private fun SettingsMaterialContent(
                     headlineContent = { Text(stringResource(id = R.string.settings_section_visual_effects)) },
                     supportingContent = { Text(stringResource(id = R.string.settings_visual_effects_summary)) },
                     leadingContent = { Icon(Icons.Filled.Visibility, stringResource(id = R.string.settings_section_visual_effects)) },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            null
+                        )
+                    }
+                )
+            }
+            add {
+                SegmentedListItem(
+                    onClick = actions.onOpenUiDecorationLibrary,
+                    headlineContent = { Text(stringResource(id = R.string.settings_ui_decoration_library)) },
+                    supportingContent = { Text(stringResource(id = R.string.settings_ui_decoration_library_summary)) },
+                    leadingContent = { Icon(Icons.Filled.AutoFixHigh, stringResource(id = R.string.settings_ui_decoration_library)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -561,7 +576,7 @@ private fun SettingsMaterialContent(
             title = stringResource(R.string.settings_section_advanced),
             expanded = advancedExpanded,
             onExpandedChange = { advancedExpanded = it },
-            content = listOf(
+            content = listOf<@Composable () -> Unit>(
                 {
                     SegmentedSwitchItem(
                         icon = Icons.Filled.FolderDelete,
@@ -705,7 +720,7 @@ private fun SettingsMaterialContent(
                         onCheckedChange = actions.onSetAutoJailbreak
                     )
                 }
-            )
+            ) + graphicsRendererMaterialItems(uiState, actions)
         )
     }
 
@@ -754,6 +769,34 @@ private fun SettingsMaterialContent(
     )
     Spacer(modifier = Modifier.height(8.dp))
     Spacer(modifier = Modifier.height(bottomInnerPadding))
+}
+
+private fun graphicsRendererMaterialItems(
+    uiState: SettingsUiState,
+    actions: SettingsScreenActions,
+): List<@Composable () -> Unit> = buildList {
+    add {
+        SegmentedSwitchItem(
+            icon = Icons.Filled.DeveloperMode,
+            title = stringResource(R.string.settings_graphics_renderer_tool),
+            summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
+            checked = uiState.graphicsRendererFeatureEnabled,
+            onCheckedChange = actions.onSetGraphicsRendererFeatureEnabled,
+        )
+    }
+    if (uiState.graphicsRendererFeatureEnabled) {
+        add {
+            SegmentedListItem(
+                onClick = actions.onOpenGraphicsRenderer,
+                headlineContent = { Text(stringResource(R.string.settings_graphics_renderer)) },
+                supportingContent = { Text(stringResource(R.string.settings_graphics_renderer_summary)) },
+                leadingContent = { Icon(Icons.Filled.DeveloperMode, contentDescription = null) },
+                trailingContent = {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -956,11 +999,12 @@ private fun backgroundSummary(
 private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
+    val containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.surface)
     LargeFlexibleTopAppBar(
         title = { Text(stringResource(R.string.settings)) },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrolledContainerColor = MaterialTheme.colorScheme.surface
+            containerColor = containerColor,
+            scrolledContainerColor = containerColor,
         ),
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior

@@ -28,6 +28,10 @@ import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.theme.AppSettings
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -100,6 +104,8 @@ class MainActivityViewModel(
             autoHideNavigationBar = settingRepo.autoHideNavigationBar,
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
+            seasonStyle = settingRepo.seasonStyle,
+            uiDecorationConfig = settingRepo.uiDecorationConfig,
             globalSnowEnabled = settingRepo.globalSnowEnabled,
             globalSnowEffect = settingRepo.globalSnowEffect,
             nightBackgroundEffect = settingRepo.nightBackgroundEffect,
@@ -146,6 +152,8 @@ class MainActivityViewModel(
             autoHideNavigationBar = false,
             scrollHideNavigationBar = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
+            seasonStyle = SeasonStyle.DEFAULT_VALUE,
+            uiDecorationConfig = UiDecorationConfig(),
             globalSnowEnabled = false,
             globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
             nightBackgroundEffect = NightBackgroundEffect.DEFAULT_VALUE,
@@ -189,6 +197,8 @@ class MainActivityViewModel(
                 listOf(
             "ui_mode",
             SWITCH_STYLE_KEY,
+            SEASON_STYLE_KEY,
+            UI_DECORATION_CONFIG_KEY,
             GLOBAL_SNOW_ENABLED_KEY,
             GLOBAL_SNOW_EFFECT_KEY,
             NIGHT_BACKGROUND_EFFECT_KEY,

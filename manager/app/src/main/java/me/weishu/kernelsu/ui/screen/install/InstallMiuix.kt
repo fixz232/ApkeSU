@@ -163,7 +163,6 @@ private fun InstallInputPanel(
             state = state,
             onSelected = actions.onSelectMethod,
             onSelectBootImage = actions.onSelectBootImage,
-            onSelectHiddenPathLkmBootImage = actions.onSelectHiddenPathLkmBootImage,
             onSelectAnyKernel = actions.onSelectAnyKernel,
         )
         OptionalSettingsCard(state = state, actions = actions)
@@ -186,37 +185,23 @@ private fun InstallMethodOptionsCard(
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
             options.forEach { option ->
-                val interactionSource = remember { MutableInteractionSource() }
                 val selected = option.javaClass == state.installMethod?.javaClass
                 val requiresRoot = option == InstallMethod.DirectInstall ||
-                        option == InstallMethod.DirectInstallToInactiveSlot
+                        option == InstallMethod.DirectInstallToInactiveSlot ||
+                        option is InstallMethod.AnyKernel
                 val available = !requiresRoot || state.rootAvailable
                 val summary = if (available) {
                     if (selected) state.installMethod.summary ?: option.summary else option.summary
                 } else {
                     stringResource(R.string.direct_install_root_required)
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = selected,
-                            enabled = available,
-                            onValueChange = { onClick(option) },
-                            role = Role.RadioButton,
-                            indication = LocalIndication.current,
-                            interactionSource = interactionSource
-                        )
-                ) {
-                    CheckboxPreference(
-                        title = stringResource(id = option.label),
-                        summary = summary,
-                        checked = selected,
-                        enabled = available,
-                        onCheckedChange = { onClick(option) },
-                    )
-                }
+                CheckboxPreference(
+                    title = stringResource(id = option.label),
+                    summary = summary,
+                    checked = selected,
+                    enabled = available,
+                    onCheckedChange = { onClick(option) },
+                )
             }
         }
     }
@@ -227,6 +212,8 @@ private fun OptionalSettingsCard(
     state: InstallUiState,
     actions: InstallScreenActions,
 ) {
+    if (state.installMethod is InstallMethod.AnyKernel) return
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -246,7 +233,15 @@ private fun OptionalSettingsCard(
                     onSelectPartition = actions.onSelectPartition,
                 )
             }
-            if (state.installMethod is InstallMethod.HiddenPathLkmPatch) {
+            if (state.installMethod is InstallMethod.SelectFile) {
+                CheckboxPreference(
+                    title = stringResource(R.string.hidden_path_lkm_patch),
+                    summary = stringResource(R.string.hidden_path_lkm_patch_summary),
+                    checked = state.hiddenPathLkmEnabled,
+                    onCheckedChange = actions.onSetHiddenPathLkmEnabled,
+                )
+            }
+            if (state.installMethod is InstallMethod.SelectFile && state.hiddenPathLkmEnabled) {
                 HiddenPathLkmInfoRow(
                     lkmSelection = state.lkmSelection,
                     onSelectKmi = actions.onSelectHiddenPathKmi,
@@ -439,7 +434,6 @@ private fun SelectInstallMethod(
     state: InstallUiState,
     onSelected: (InstallMethod) -> Unit,
     onSelectBootImage: () -> Unit,
-    onSelectHiddenPathLkmBootImage: () -> Unit,
     onSelectAnyKernel: () -> Unit,
 ) {
     val confirmDialog = rememberConfirmDialog(
@@ -453,7 +447,6 @@ private fun SelectInstallMethod(
     val onClick = { option: InstallMethod ->
         when (option) {
             is InstallMethod.SelectFile -> onSelectBootImage()
-            is InstallMethod.HiddenPathLkmPatch -> onSelectHiddenPathLkmBootImage()
             is InstallMethod.DirectInstall -> onSelected(option)
             is InstallMethod.DirectInstallToInactiveSlot -> confirmDialog.showConfirm(dialogTitle, dialogContent)
             is InstallMethod.AnyKernel -> onSelectAnyKernel()

@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.util
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -10,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.theme.LocalBlurIntensity
-import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
+import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.component.liquid.lens
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
@@ -42,11 +43,14 @@ fun BlurredBar(
     content: @Composable () -> Unit,
 ) {
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
     val blurIntensity = LocalBlurIntensity.current
     val liquidShape = remember { RoundedCornerShape(0.dp) }
     val surfaceColor = if (isLiquidGlass) liquidGlassSurfaceColor() else MiuixTheme.colorScheme.surface
     Box(
         modifier = when {
+            immersiveBackgroundActive -> Modifier
+
             blurActive && backdrop != null && isLiquidGlass -> {
                 Modifier.drawBackdrop(
                     backdrop = backdrop,
@@ -80,12 +84,11 @@ fun BlurredBar(
                 )
             }
 
-            isLiquidGlass -> Modifier.globalLiquidGlassSurface(
+            isLiquidGlass && !blurActive -> Modifier
+
+            isLiquidGlass -> Modifier.background(
+                color = surfaceColor.copy(alpha = LIQUID_GLASS_TOP_BAR_FALLBACK_ALPHA),
                 shape = liquidShape,
-                surfaceColor = surfaceColor,
-                surfaceAlpha = 0.74f,
-                blurRadius = 0.dp,
-                strokeAlpha = 0.52f,
             )
 
             else -> Modifier
@@ -94,3 +97,5 @@ fun BlurredBar(
         content()
     }
 }
+
+private const val LIQUID_GLASS_TOP_BAR_FALLBACK_ALPHA = 0.52f

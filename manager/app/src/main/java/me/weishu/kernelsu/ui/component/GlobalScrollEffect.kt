@@ -13,10 +13,10 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +36,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import java.util.ArrayDeque
+import kotlinx.coroutines.flow.collectLatest
 import me.weishu.kernelsu.R
 import kotlin.math.PI
 import kotlin.math.abs
@@ -43,7 +45,6 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
-import kotlin.random.Random
 
 const val GLOBAL_SCROLL_EFFECT_ENABLED_KEY = "global_scroll_effect_enabled"
 const val GLOBAL_SCROLL_EFFECT_KEY = "global_scroll_effect"
@@ -88,18 +89,25 @@ fun rememberGlobalScrollEffectState(
         state.updateConfig(enabled = enabled, effect = effect)
     }
 
-    LaunchedEffect(state.enabled, state.effect, state.spawnVersion) {
-        while (state.enabled && state.hasPulses()) {
-            val frame = withFrameMillis { it }
-            state.frameMillis = frame
-            state.pruneExpired(frame)
+    LaunchedEffect(state, state.enabled) {
+        if (!state.enabled) return@LaunchedEffect
+
+        snapshotFlow(state::hasPulses).collectLatest { hasPulses ->
+            if (!hasPulses) return@collectLatest
+
+            while (state.enabled && state.hasPulses()) {
+                state.advanceFrame(withFrameMillis { it })
+            }
         }
     }
 
     return state
 }
 
-fun Modifier.globalScrollEffectController(state: GlobalScrollEffectState): Modifier {
+fun Modifier.globalScrollEffectController(
+    state: GlobalScrollEffectState,
+    pointerFallbackEnabled: Boolean = false,
+): Modifier {
     if (!state.enabled) return this
 
     return this
@@ -107,14 +115,16 @@ fun Modifier.globalScrollEffectController(state: GlobalScrollEffectState): Modif
         .pointerInput(state) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                state.updatePointer(down.position)
+                state.beginPointer(down.position)
                 var previousPosition = down.position
                 do {
                     val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                     val current = event.changes.firstOrNull { it.pressed }
                     if (current != null) {
                         state.updatePointer(current.position)
-                        state.emitFromPointerDrag(current.position - previousPosition)
+                        if (pointerFallbackEnabled) {
+                            state.emitFromPointerDrag(current.position - previousPosition)
+                        }
                         previousPosition = current.position
                     }
                 } while (event.changes.any { it.pressed })
@@ -136,16 +146,16 @@ fun GlobalScrollEffectOverlay(
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val frameMillis = state.frameMillis.takeIf { it > 0L } ?: SystemClock.uptimeMillis()
-        state.pulsesSnapshot().forEach { pulse ->
+        state.activePulses.forEach { pulse ->
             val rawProgress = (frameMillis - pulse.startedAtMillis).toFloat() / pulse.durationMillis
+            if (rawProgress < 0f || rawProgress > 1f) return@forEach
+
             val progress = rawProgress.coerceIn(0f, 1f)
-            val eased = easeOutQuart(progress)
-            val alpha = (1f - progress).coerceIn(0f, 1f)
             drawScrollPulse(
                 effect = state.effect,
                 pulse = pulse,
-                progress = eased,
-                alpha = alpha,
+                progress = easeOutCubic(progress),
+                alpha = pulseAlpha(progress),
                 primary = primary,
                 secondary = secondary,
                 tertiary = tertiary,
@@ -164,17 +174,29 @@ class GlobalScrollEffectState {
     var frameMillis by mutableLongStateOf(0L)
         internal set
 
-    var spawnVersion by mutableIntStateOf(0)
-        private set
+    private var activePulseCount by mutableIntStateOf(0)
+    private var viewportSize = IntSize.Zero
+    private var lastPointer: Offset? = null
+    private var lastPointerMillis = 0L
+    private var pointerGestureStartedMillis = 0L
+    private var lastSpawnMillis = 0L
+    private var lastNestedScrollMillis = 0L
+    private var pendingPointerDelta = Offset.Zero
+    private var pendingScrollDelta = Offset.Zero
+    private val pulses = ArrayDeque<ScrollPulse>()
 
-    private var viewportSize by mutableStateOf(IntSize.Zero)
-    private var lastPointer by mutableStateOf<Offset?>(null)
-    private var lastSpawnMillis by mutableLongStateOf(0L)
-    private val pulses = mutableStateListOf<ScrollPulse>()
+    internal val activePulses: Iterable<ScrollPulse>
+        get() = pulses
 
     val nestedScrollConnection = object : NestedScrollConnection {
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            emitFromScroll(consumed)
+            val delta = if (consumed != Offset.Zero) consumed else available
+            if (delta != Offset.Zero) {
+                val nowMillis = SystemClock.uptimeMillis()
+                lastNestedScrollMillis = nowMillis
+                pendingPointerDelta = Offset.Zero
+                emitFromScroll(delta, nowMillis)
+            }
             return Offset.Zero
         }
 
@@ -183,7 +205,12 @@ class GlobalScrollEffectState {
             val y = consumed.y + available.y
             val magnitude = hypot(x.toDouble(), y.toDouble()).toFloat()
             if (magnitude > FLING_THRESHOLD) {
-                emit(delta = Offset(x.signValue(), y.signValue()) * FLING_DELTA, strength = 1.35f)
+                pendingPointerDelta = Offset.Zero
+                pendingScrollDelta = Offset.Zero
+                emit(
+                    delta = Offset(x.signValue(), y.signValue()) * FLING_DELTA,
+                    strength = 1.3f,
+                )
             }
             return Velocity.Zero
         }
@@ -193,54 +220,89 @@ class GlobalScrollEffectState {
         if (this.enabled != enabled) {
             this.enabled = enabled
             if (!enabled) {
-                pulses.clear()
+                resetInputState()
+                clearPulses()
             }
         }
         if (this.effect != effect) {
             this.effect = effect
-            pulses.clear()
-            spawnVersion++
+            resetInputState()
+            clearPulses()
         }
     }
 
     fun updateSize(size: IntSize) {
+        if (viewportSize != size) {
+            clearPulses()
+        }
         viewportSize = size
+    }
+
+    fun beginPointer(position: Offset) {
+        val nowMillis = SystemClock.uptimeMillis()
+        pendingPointerDelta = Offset.Zero
+        lastPointer = position
+        lastPointerMillis = nowMillis
+        pointerGestureStartedMillis = nowMillis
     }
 
     fun updatePointer(position: Offset) {
         lastPointer = position
+        lastPointerMillis = SystemClock.uptimeMillis()
     }
 
     fun emitFromPointerDrag(delta: Offset) {
-        val magnitude = hypot(delta.x.toDouble(), delta.y.toDouble()).toFloat()
-        if (magnitude < POINTER_DRAG_THRESHOLD) return
+        val nowMillis = SystemClock.uptimeMillis()
+        if (
+            lastNestedScrollMillis > 0L &&
+            nowMillis - lastNestedScrollMillis <= NESTED_SCROLL_SUPPRESSION_MILLIS
+        ) {
+            pendingPointerDelta = Offset.Zero
+            return
+        }
+
+        pendingPointerDelta += delta
+        if (nowMillis - pointerGestureStartedMillis < POINTER_FALLBACK_DELAY_MILLIS) return
+
+        val magnitude = pendingPointerDelta.magnitude()
+        if (magnitude < POINTER_DRAG_THRESHOLD || !canSpawn(nowMillis)) return
 
         emit(
-            delta = delta,
-            strength = (magnitude / 42f).coerceIn(0.5f, 1.15f),
+            delta = pendingPointerDelta,
+            strength = (magnitude / 54f).coerceIn(0.5f, 1.15f),
+            nowMillis = nowMillis,
         )
+        pendingPointerDelta = Offset.Zero
     }
 
     fun hasPulses(): Boolean {
-        return pulses.isNotEmpty()
+        return activePulseCount > 0
     }
 
-    internal fun pulsesSnapshot(): List<ScrollPulse> {
-        return pulses.toList()
+    internal fun advanceFrame(nowMillis: Long) {
+        frameMillis = nowMillis
+        var changed = false
+        while (pulses.isNotEmpty()) {
+            val pulse = pulses.first()
+            if (nowMillis - pulse.startedAtMillis <= pulse.durationMillis) break
+            pulses.removeFirst()
+            changed = true
+        }
+        if (changed) syncPulseCount()
     }
 
-    internal fun pruneExpired(nowMillis: Long) {
-        pulses.removeAll { nowMillis - it.startedAtMillis > it.durationMillis }
-    }
-
-    private fun emitFromScroll(delta: Offset) {
-        val magnitude = hypot(delta.x.toDouble(), delta.y.toDouble()).toFloat()
+    private fun emitFromScroll(delta: Offset, nowMillis: Long) {
+        pendingScrollDelta += delta
+        val magnitude = pendingScrollDelta.magnitude()
         if (magnitude < SCROLL_THRESHOLD) return
+        if (!canSpawn(nowMillis)) return
 
-        val now = SystemClock.uptimeMillis()
-        if (now - lastSpawnMillis < MIN_SPAWN_INTERVAL_MILLIS) return
-
-        emit(delta = delta, strength = (magnitude / 64f).coerceIn(0.55f, 1.2f), nowMillis = now)
+        emit(
+            delta = pendingScrollDelta,
+            strength = (magnitude / 72f).coerceIn(0.55f, 1.2f),
+            nowMillis = nowMillis,
+        )
+        pendingScrollDelta = Offset.Zero
     }
 
     private fun emit(
@@ -253,27 +315,58 @@ class GlobalScrollEffectState {
         lastSpawnMillis = nowMillis
         val fallback = Offset(viewportSize.width * 0.5f, viewportSize.height * 0.5f)
         val pointer = lastPointer?.takeIf {
+            nowMillis - lastPointerMillis <= POINTER_RECENCY_MILLIS &&
             it.x in 0f..viewportSize.width.toFloat() && it.y in 0f..viewportSize.height.toFloat()
         } ?: fallback
+        val direction = delta.normalized()
+        val inputDistance = delta.magnitude().coerceAtMost(MAX_ORIGIN_OFFSET_INPUT)
         val center = Offset(
-            x = (pointer.x + -delta.x * 0.45f).coerceIn(0f, viewportSize.width.toFloat()),
-            y = (pointer.y + -delta.y * 0.45f).coerceIn(0f, viewportSize.height.toFloat()),
+            x = (pointer.x - direction.x * inputDistance * 0.32f)
+                .coerceIn(0f, viewportSize.width.toFloat()),
+            y = (pointer.y - direction.y * inputDistance * 0.32f)
+                .coerceIn(0f, viewportSize.height.toFloat()),
         )
 
-        while (pulses.size >= MAX_PULSES) {
-            pulses.removeAt(0)
+        while (pulses.size >= maxPulsesFor(effect)) {
+            pulses.removeFirst()
         }
 
-        pulses += ScrollPulse(
-            center = center,
-            delta = delta,
-            strength = strength.coerceIn(0.45f, 1.55f),
-            startedAtMillis = nowMillis,
-            durationMillis = durationFor(effect),
-            seed = (nowMillis xor (center.x.toLong() shl 12) xor center.y.toLong()).toInt(),
+        pulses.addLast(
+            ScrollPulse(
+                center = center,
+                delta = delta,
+                strength = strength.coerceIn(0.45f, 1.55f),
+                startedAtMillis = nowMillis,
+                durationMillis = durationFor(effect),
+                seed = (nowMillis xor (center.x.toLong() shl 12) xor center.y.toLong()).toInt(),
+            )
         )
         frameMillis = nowMillis
-        spawnVersion++
+        syncPulseCount()
+    }
+
+    private fun canSpawn(nowMillis: Long): Boolean {
+        return nowMillis - lastSpawnMillis >= spawnIntervalFor(effect)
+    }
+
+    private fun clearPulses() {
+        if (pulses.isEmpty()) return
+        pulses.clear()
+        syncPulseCount()
+    }
+
+    private fun syncPulseCount() {
+        activePulseCount = pulses.size
+    }
+
+    private fun resetInputState() {
+        pendingPointerDelta = Offset.Zero
+        pendingScrollDelta = Offset.Zero
+        lastPointer = null
+        lastPointerMillis = 0L
+        pointerGestureStartedMillis = 0L
+        lastSpawnMillis = 0L
+        lastNestedScrollMillis = 0L
     }
 }
 
@@ -313,20 +406,25 @@ private fun DrawScope.drawTrailPulse(
 ) {
     val direction = pulse.delta.normalized()
     val normal = Offset(-direction.y, direction.x)
-    val length = (44.dp.toPx() + 46.dp.toPx() * pulse.strength) * (1f + progress * 0.2f)
-    val width = (2.2.dp.toPx() + 1.5.dp.toPx() * pulse.strength) * alpha
-    val color = primary.copy(alpha = 0.42f * alpha)
-    val accent = secondary.copy(alpha = 0.28f * alpha)
+    val baseLength = (42.dp.toPx() + 40.dp.toPx() * pulse.strength) * (1f + progress * 0.14f)
+    val baseWidth = 1.4.dp.toPx() + 1.2.dp.toPx() * pulse.strength
+    val laneGap = 8.dp.toPx()
+    val minWidth = 0.35.dp.toPx()
 
-    repeat(5) { index ->
-        val lane = index - 2
-        val start = pulse.center + normal * (lane * 10.dp.toPx()) - direction * (length * progress)
-        val end = start - direction * length
+    repeat(3) { index ->
+        val lane = index - 1
+        val laneWeight = if (lane == 0) 1f else 0.64f
+        val length = baseLength * (1f - abs(lane) * 0.12f)
+        val head = pulse.center + normal * (lane * laneGap) - direction * (baseLength * progress)
         drawLine(
-            color = if (index % 2 == 0) color else accent,
-            start = start,
-            end = end,
-            strokeWidth = width.coerceAtLeast(0.4.dp.toPx()),
+            color = if (lane == 0) {
+                primary.copy(alpha = 0.4f * alpha)
+            } else {
+                secondary.copy(alpha = 0.24f * alpha)
+            },
+            start = head,
+            end = head - direction * length,
+            strokeWidth = (baseWidth * alpha * laneWeight).coerceAtLeast(minWidth),
             cap = StrokeCap.Round,
         )
     }
@@ -339,16 +437,29 @@ private fun DrawScope.drawRipplePulse(
     primary: Color,
     secondary: Color,
 ) {
-    val radius = (24.dp.toPx() + 96.dp.toPx() * progress) * pulse.strength
+    val radius = (20.dp.toPx() + 88.dp.toPx() * progress) * pulse.strength
+    val strokeWidth = (1.8.dp.toPx() * (0.7f + pulse.strength * 0.3f))
+        .coerceAtLeast(0.5.dp.toPx())
     drawCircle(
-        color = primary.copy(alpha = 0.24f * alpha),
+        color = primary.copy(alpha = 0.3f * alpha),
         radius = radius,
         center = pulse.center,
-        style = Stroke(width = (2.2.dp.toPx() * alpha).coerceAtLeast(0.5.dp.toPx())),
+        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
     )
+
+    val innerProgress = ((progress - 0.14f) / 0.86f).coerceIn(0f, 1f)
+    if (innerProgress > 0f) {
+        drawCircle(
+            color = secondary.copy(alpha = 0.2f * alpha),
+            radius = (14.dp.toPx() + 54.dp.toPx() * innerProgress) * pulse.strength,
+            center = pulse.center,
+            style = Stroke(width = strokeWidth * 0.72f, cap = StrokeCap.Round),
+        )
+    }
+
     drawCircle(
-        color = secondary.copy(alpha = 0.12f * alpha),
-        radius = radius * 0.62f,
+        color = primary.copy(alpha = 0.12f * alpha * (1f - progress)),
+        radius = (3.dp.toPx() + 4.dp.toPx() * pulse.strength) * (1f - progress * 0.4f),
         center = pulse.center,
     )
 }
@@ -362,17 +473,18 @@ private fun DrawScope.drawWavePulse(
 ) {
     val direction = pulse.delta.normalized()
     val normal = Offset(-direction.y, direction.x)
-    val amplitude = (8.dp.toPx() + 12.dp.toPx() * pulse.strength) * alpha
-    val length = 152.dp.toPx() * pulse.strength
-    val center = pulse.center - direction * (progress * 44.dp.toPx())
+    val amplitude = (6.dp.toPx() + 9.dp.toPx() * pulse.strength) * alpha
+    val length = 136.dp.toPx() * pulse.strength
+    val center = pulse.center - direction * (progress * 36.dp.toPx())
     val path = Path()
 
-    repeat(18) { index ->
-        val ratio = index / 17f
-        val phase = ratio * TWO_PI * 1.35f + progress * TWO_PI
+    repeat(WAVE_POINT_COUNT) { index ->
+        val ratio = index / (WAVE_POINT_COUNT - 1f)
+        val envelope = sin(PI.toFloat() * ratio)
+        val phase = ratio * TWO_PI * 1.2f + progress * TWO_PI
         val point = center +
             direction * ((ratio - 0.5f) * length) +
-            normal * (sin(phase) * amplitude)
+            normal * (sin(phase) * amplitude * envelope)
         if (index == 0) {
             path.moveTo(point.x, point.y)
         } else {
@@ -382,13 +494,13 @@ private fun DrawScope.drawWavePulse(
 
     drawPath(
         path = path,
-        color = primary.copy(alpha = 0.38f * alpha),
-        style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round),
+        color = tertiary.copy(alpha = 0.1f * alpha),
+        style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
     )
-    drawCircle(
-        color = tertiary.copy(alpha = 0.13f * alpha),
-        radius = (30.dp.toPx() + 30.dp.toPx() * progress) * pulse.strength,
-        center = pulse.center,
+    drawPath(
+        path = path,
+        color = primary.copy(alpha = 0.38f * alpha),
+        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
     )
 }
 
@@ -399,16 +511,25 @@ private fun DrawScope.drawBurstPulse(
     primary: Color,
     secondary: Color,
 ) {
-    val random = Random(pulse.seed)
-    repeat(12) { index ->
-        val angle = random.nextFloat() * TWO_PI
-        val distance = (12.dp.toPx() + random.nextFloat() * 56.dp.toPx()) * progress * pulse.strength
-        val center = pulse.center + Offset(cos(angle), sin(angle)) * distance
-        val radius = (2.dp.toPx() + random.nextFloat() * 3.4.dp.toPx()) * (1f - progress * 0.35f)
-        drawCircle(
-            color = if (index % 2 == 0) primary.copy(alpha = 0.36f * alpha) else secondary.copy(alpha = 0.28f * alpha),
-            radius = radius,
-            center = center,
+    val travelDirection = pulse.delta.normalized() * -1f
+    repeat(BURST_PARTICLE_COUNT) { index ->
+        val spread = (seededUnit(pulse.seed, index * 3) - 0.5f) * 1.45f
+        val speed = 0.56f + seededUnit(pulse.seed, index * 3 + 1) * 0.72f
+        val width = 0.8.dp.toPx() + seededUnit(pulse.seed, index * 3 + 2) * 1.2.dp.toPx()
+        val particleDirection = travelDirection.rotated(spread)
+        val distance = (10.dp.toPx() + 52.dp.toPx() * speed) * progress * pulse.strength
+        val head = pulse.center + particleDirection * distance
+        val tailLength = (4.dp.toPx() + 8.dp.toPx() * speed) * (1f - progress)
+        drawLine(
+            color = if (index % 2 == 0) {
+                primary.copy(alpha = 0.36f * alpha)
+            } else {
+                secondary.copy(alpha = 0.26f * alpha)
+            },
+            start = head,
+            end = head - particleDirection * tailLength,
+            strokeWidth = width,
+            cap = StrokeCap.Round,
         )
     }
 }
@@ -424,43 +545,76 @@ private fun DrawScope.drawAuroraPulse(
     val direction = pulse.delta.normalized()
     val angle = atan2(direction.y, direction.x)
     val glowSize = Size(
-        width = (118.dp.toPx() + 90.dp.toPx() * progress) * pulse.strength,
-        height = (34.dp.toPx() + 34.dp.toPx() * progress) * pulse.strength,
+        width = (104.dp.toPx() + 76.dp.toPx() * progress) * pulse.strength,
+        height = (24.dp.toPx() + 24.dp.toPx() * progress) * pulse.strength,
     )
-    val center = pulse.center - direction * (progress * 42.dp.toPx())
+    val center = pulse.center - direction * (progress * 38.dp.toPx())
     rotate(degrees = angle * RAD_TO_DEG, pivot = center) {
         drawOval(
-            color = primary.copy(alpha = 0.14f * alpha),
+            color = tertiary.copy(alpha = 0.055f * alpha),
+            topLeft = center - Offset(glowSize.width * 0.56f, glowSize.height * 0.9f),
+            size = Size(glowSize.width * 1.12f, glowSize.height * 1.8f),
+        )
+        drawOval(
+            color = primary.copy(alpha = 0.13f * alpha),
             topLeft = center - Offset(glowSize.width / 2f, glowSize.height / 2f),
             size = glowSize,
         )
         drawOval(
-            color = secondary.copy(alpha = 0.11f * alpha),
-            topLeft = center - Offset(glowSize.width * 0.3f, glowSize.height * 0.66f),
-            size = Size(glowSize.width * 0.72f, glowSize.height * 1.16f),
-        )
-        drawCircle(
-            color = tertiary.copy(alpha = 0.08f * alpha),
-            radius = glowSize.height * 0.72f,
-            center = center,
+            color = secondary.copy(alpha = 0.1f * alpha),
+            topLeft = center - Offset(glowSize.width * 0.28f, glowSize.height * 0.7f),
+            size = Size(glowSize.width * 0.68f, glowSize.height * 1.24f),
         )
     }
 }
 
 private fun durationFor(effect: GlobalScrollEffect): Int {
     return when (effect) {
-        GlobalScrollEffect.Trail -> 460
-        GlobalScrollEffect.Ripple -> 620
-        GlobalScrollEffect.Wave -> 560
-        GlobalScrollEffect.Burst -> 520
-        GlobalScrollEffect.Aurora -> 680
+        GlobalScrollEffect.Trail -> 360
+        GlobalScrollEffect.Ripple -> 460
+        GlobalScrollEffect.Wave -> 420
+        GlobalScrollEffect.Burst -> 380
+        GlobalScrollEffect.Aurora -> 500
+    }
+}
+
+private fun spawnIntervalFor(effect: GlobalScrollEffect): Long {
+    return when (effect) {
+        GlobalScrollEffect.Trail -> 48L
+        GlobalScrollEffect.Ripple -> 72L
+        GlobalScrollEffect.Wave -> 64L
+        GlobalScrollEffect.Burst -> 72L
+        GlobalScrollEffect.Aurora -> 84L
+    }
+}
+
+private fun maxPulsesFor(effect: GlobalScrollEffect): Int {
+    return when (effect) {
+        GlobalScrollEffect.Trail -> 10
+        GlobalScrollEffect.Ripple -> 8
+        GlobalScrollEffect.Wave -> 8
+        GlobalScrollEffect.Burst -> 7
+        GlobalScrollEffect.Aurora -> 6
     }
 }
 
 private fun Offset.normalized(): Offset {
-    val distance = hypot(x.toDouble(), y.toDouble()).toFloat()
+    val distance = magnitude()
     if (distance <= 0.01f) return Offset(0f, 1f)
     return Offset(x / distance, y / distance)
+}
+
+private fun Offset.magnitude(): Float {
+    return hypot(x.toDouble(), y.toDouble()).toFloat()
+}
+
+private fun Offset.rotated(radians: Float): Offset {
+    val cosine = cos(radians)
+    val sine = sin(radians)
+    return Offset(
+        x = x * cosine - y * sine,
+        y = x * sine + y * cosine,
+    )
 }
 
 private fun Float.signValue(): Float {
@@ -471,16 +625,38 @@ private fun Float.signValue(): Float {
     }
 }
 
-private fun easeOutQuart(value: Float): Float {
+private fun easeOutCubic(value: Float): Float {
     val inverse = 1f - value
-    return 1f - inverse * inverse * inverse * inverse
+    return 1f - inverse * inverse * inverse
 }
 
-private const val MAX_PULSES = 32
-private const val SCROLL_THRESHOLD = 4f
-private const val POINTER_DRAG_THRESHOLD = 7f
+private fun pulseAlpha(progress: Float): Float {
+    val fadeIn = smoothStep((progress / 0.1f).coerceIn(0f, 1f))
+    val fadeOut = 1f - smoothStep(((progress - 0.18f) / 0.82f).coerceIn(0f, 1f))
+    return fadeIn * fadeOut
+}
+
+private fun smoothStep(value: Float): Float {
+    return value * value * (3f - 2f * value)
+}
+
+private fun seededUnit(seed: Int, index: Int): Float {
+    var value = seed + index * -1640531527
+    value = (value xor (value ushr 16)) * -2048144789
+    value = (value xor (value ushr 13)) * -1028477387
+    value = value xor (value ushr 16)
+    return (value ushr 8) / 16777215f
+}
+
+private const val SCROLL_THRESHOLD = 8f
+private const val POINTER_DRAG_THRESHOLD = 9f
 private const val FLING_THRESHOLD = 900f
-private const val FLING_DELTA = 42f
-private const val MIN_SPAWN_INTERVAL_MILLIS = 34L
+private const val FLING_DELTA = 44f
+private const val MAX_ORIGIN_OFFSET_INPUT = 56f
+private const val POINTER_RECENCY_MILLIS = 1_200L
+private const val POINTER_FALLBACK_DELAY_MILLIS = 32L
+private const val NESTED_SCROLL_SUPPRESSION_MILLIS = 90L
+private const val WAVE_POINT_COUNT = 15
+private const val BURST_PARTICLE_COUNT = 9
 private const val TWO_PI = (PI * 2.0).toFloat()
 private const val RAD_TO_DEG = (180.0 / PI).toFloat()

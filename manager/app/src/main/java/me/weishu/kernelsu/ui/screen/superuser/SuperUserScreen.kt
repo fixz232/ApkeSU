@@ -103,6 +103,15 @@ fun SuperUserPager(
             )
             return
         }
+
+        InterfaceStyle.Snow.value -> {
+            SuperUserPagerMiuix(
+                uiState = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+            return
+        }
     }
 
     when (LocalUiMode.current) {

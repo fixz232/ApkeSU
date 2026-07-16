@@ -40,6 +40,7 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaCard
 import me.weishu.kernelsu.ui.component.alpha.AlphaColors
 import me.weishu.kernelsu.ui.component.alpha.AlphaOutlinedButton
 import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
+import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
 
 @Composable
@@ -107,7 +108,7 @@ private fun AlphaStatusCard(
                     color = AlphaColors.Accent,
                     fontSize = alphaSp(22f, maxScale = 1.02f),
                     lineHeight = alphaSp(26f, maxScale = 1.02f),
-                    fontWeight = FontWeight.Black,
+                    fontWeight = alphaStrongWeight(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -176,7 +177,7 @@ private fun AlphaManagerCard(state: HomeUiState) {
                     color = AlphaColors.Accent,
                     fontSize = alphaSp(22f, maxScale = 1.02f),
                     lineHeight = alphaSp(26f, maxScale = 1.02f),
-                    fontWeight = FontWeight.Black,
+                    fontWeight = alphaStrongWeight(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 12.dp),
@@ -218,7 +219,7 @@ private fun AlphaWarningsCard(warnings: List<String>) {
                     text = stringResource(R.string.home_warning_title),
                     color = AlphaColors.Text,
                     fontSize = alphaSp(18f, maxScale = 1.03f),
-                    fontWeight = FontWeight.Black,
+                    fontWeight = alphaStrongWeight(),
                     modifier = Modifier.padding(start = 10.dp),
                 )
             }
@@ -243,7 +244,7 @@ private fun AlphaSupportCard(actions: HomeActions) {
                 text = stringResource(R.string.home_support_title),
                 color = AlphaColors.Text,
                 fontSize = alphaSp(20f, maxScale = 1.03f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
             )
             Text(
                 text = stringResource(R.string.home_support_content),
@@ -279,7 +280,7 @@ private fun AlphaFollowCard(actions: HomeActions) {
                 text = stringResource(R.string.alpha_follow_us),
                 color = AlphaColors.Text,
                 fontSize = alphaSp(20f, maxScale = 1.03f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
             )
             AlphaFollowRow(
                 name = "@KernelSU",
@@ -309,7 +310,7 @@ private fun AlphaFollowRow(
             text = name,
             color = AlphaColors.Text,
             fontSize = alphaSp(14f),
-            fontWeight = FontWeight.Black,
+            fontWeight = alphaStrongWeight(),
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -400,7 +401,7 @@ private fun AlphaInfoLine(
             color = AlphaColors.Text,
             fontSize = alphaSp(13.5f),
             lineHeight = alphaSp(17f),
-            fontWeight = if (strong) FontWeight.Black else FontWeight.Bold,
+            fontWeight = if (strong) alphaStrongWeight() else FontWeight.Bold,
             modifier = Modifier.weight(1f),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

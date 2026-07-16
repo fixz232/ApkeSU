@@ -118,7 +118,8 @@ import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
-import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.miuix.SearchBarFake
 import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
@@ -890,7 +891,7 @@ fun ModuleItem(
                         refractionHeight = 14.dp,
                         refractionAmount = 9.dp,
                         strokeAlpha = 0.66f,
-                    )
+                    ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
                 } else {
                     Modifier
                 }
@@ -898,7 +899,7 @@ fun ModuleItem(
         colors = if (hasWallpaper) {
             top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors()
         } else {
-            liquidGlassMiuixCardColors()
+            snowMiuixCardColors()
         },
         insideMargin = PaddingValues(0.dp),
         onClick = {

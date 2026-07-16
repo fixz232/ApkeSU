@@ -24,6 +24,8 @@ import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.theme.ColorMode
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -63,6 +65,7 @@ class SettingsViewModel(
             val showGkiWarning = repo.showGkiWarning
             val showHomeSupportCard = repo.showHomeSupportCard
             val showHomeLearnCard = repo.showHomeLearnCard
+            val graphicsRendererFeatureEnabled = repo.graphicsRendererFeatureEnabled
             val themeMode = repo.themeMode
             val miuixMonet = repo.miuixMonet
             val keyColor = repo.keyColor
@@ -78,6 +81,8 @@ class SettingsViewModel(
             val fontScale = repo.fontScale
             val blurIntensity = repo.blurIntensity
             val switchStyle = repo.switchStyle
+            val seasonStyle = repo.seasonStyle
+            val uiDecorationConfig = repo.uiDecorationConfig
             val globalSnowEnabled = repo.globalSnowEnabled
             val globalSnowEffect = repo.globalSnowEffect
             val nightBackgroundEffect = repo.nightBackgroundEffect
@@ -159,6 +164,7 @@ class SettingsViewModel(
                     showGkiWarning = showGkiWarning,
                     showHomeSupportCard = showHomeSupportCard,
                     showHomeLearnCard = showHomeLearnCard,
+                    graphicsRendererFeatureEnabled = graphicsRendererFeatureEnabled,
                     themeMode = themeMode,
                     miuixMonet = miuixMonet,
                     keyColor = keyColor,
@@ -173,6 +179,8 @@ class SettingsViewModel(
                     fontScale = fontScale,
                     blurIntensity = blurIntensity,
                     switchStyle = switchStyle,
+                    seasonStyle = seasonStyle,
+                    uiDecorationConfig = uiDecorationConfig,
                     globalSnowEnabled = globalSnowEnabled,
                     globalSnowEffect = globalSnowEffect,
                     nightBackgroundEffect = nightBackgroundEffect,
@@ -281,6 +289,11 @@ class SettingsViewModel(
                 applyInterfacePresetPreservingColorMode(mode, ThemePreset.LIQUID_GLASS)
                 return
             }
+
+            InterfaceStyle.Snow.value -> {
+                applyInterfacePresetPreservingColorMode(mode, ThemePreset.SNOW)
+                return
+            }
         }
 
         val oldMode = repo.uiMode
@@ -289,7 +302,8 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.Skrootpro.value ||
             oldMode == InterfaceStyle.Alpha.value ||
             oldMode == InterfaceStyle.Delta.value ||
-            oldMode == InterfaceStyle.LiquidGlass.value
+            oldMode == InterfaceStyle.LiquidGlass.value ||
+            oldMode == InterfaceStyle.Snow.value
 
         if (isLeavingSpecialStyle && (mode == InterfaceStyle.Miuix.value || mode == InterfaceStyle.Material.value)) {
             applyInterfacePresetPreservingColorMode(mode, ThemePreset.CLEAN_TOOL)
@@ -331,9 +345,15 @@ class SettingsViewModel(
 
     private fun applyInterfacePresetPreservingColorMode(mode: String, preset: ThemePreset) {
         val colorMode = repo.themeMode
+        val selectedSeason = if (mode == InterfaceStyle.Snow.value) {
+            SeasonStyle.fromValue(repo.seasonStyle)
+        } else {
+            null
+        }
         repo.uiMode = mode
         repo.applyThemePreset(preset)
         repo.themeMode = colorMode
+        selectedSeason?.let { repo.seasonStyle = it.value }
         refresh()
     }
 
@@ -362,9 +382,32 @@ class SettingsViewModel(
         _uiState.update { it.copy(showHomeLearnCard = enabled) }
     }
 
+    fun setGraphicsRendererFeatureEnabled(enabled: Boolean) {
+        repo.graphicsRendererFeatureEnabled = enabled
+        _uiState.update { it.copy(graphicsRendererFeatureEnabled = enabled) }
+    }
+
     fun setGlobalSnowEnabled(enabled: Boolean) {
         repo.globalSnowEnabled = enabled
         _uiState.update { it.copy(globalSnowEnabled = enabled) }
+    }
+
+    fun setUiDecorationConfig(config: UiDecorationConfig) {
+        val normalized = config.normalized()
+        repo.uiDecorationConfig = normalized
+        _uiState.update { it.copy(uiDecorationConfig = normalized) }
+    }
+
+    fun setSeasonStyleIndex(index: Int) {
+        val season = SeasonStyle.fromIndex(index)
+        repo.seasonStyle = season.value
+        _uiState.update {
+            it.copy(
+                seasonStyle = season.value,
+                keyColor = season.keyColor,
+                themePreset = ThemePreset.SNOW.value,
+            )
+        }
     }
 
     fun setGlobalSnowEffectIndex(index: Int) {

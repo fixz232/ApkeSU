@@ -27,6 +27,10 @@ import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
+import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -130,6 +134,10 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var showHomeLearnCard: Boolean
         get() = prefs.getBoolean(SHOW_HOME_LEARN_CARD_KEY, true)
         set(value) = prefs.edit { putBoolean(SHOW_HOME_LEARN_CARD_KEY, value) }
+
+    override var graphicsRendererFeatureEnabled: Boolean
+        get() = prefs.getBoolean(GRAPHICS_RENDERER_FEATURE_ENABLED_KEY, false)
+        set(value) = prefs.edit { putBoolean(GRAPHICS_RENDERER_FEATURE_ENABLED_KEY, value) }
 
     override var themeMode: Int
         get() = prefs.getInt(themeKey("color_mode"), defaultThemePreset.colorMode.value)
@@ -247,6 +255,21 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var switchStyle: String
         get() = SwitchStyle.fromValue(prefs.getString(SWITCH_STYLE_KEY, SwitchStyle.DEFAULT_VALUE)).value
         set(value) = prefs.edit { putString(SWITCH_STYLE_KEY, SwitchStyle.fromValue(value).value) }
+
+    override var seasonStyle: String
+        get() = SeasonStyle.fromValue(prefs.getString(SEASON_STYLE_KEY, SeasonStyle.DEFAULT_VALUE)).value
+        set(value) {
+            val season = SeasonStyle.fromValue(value)
+            prefs.edit {
+                putString(SEASON_STYLE_KEY, season.value)
+                putInt(themeKey("key_color"), season.keyColor)
+                putString(themeKey("theme_preset"), ThemePreset.SNOW.value)
+            }
+        }
+
+    override var uiDecorationConfig: UiDecorationConfig
+        get() = UiDecorationConfig.fromJsonString(prefs.getString(UI_DECORATION_CONFIG_KEY, null))
+        set(value) = prefs.edit { putString(UI_DECORATION_CONFIG_KEY, value.normalized().toJsonString()) }
 
     override var globalSnowEnabled: Boolean
         get() = prefs.getBoolean(GLOBAL_SNOW_ENABLED_KEY, false)

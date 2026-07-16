@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
+import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 
 private data class SkrootproPalette(
@@ -168,23 +170,27 @@ fun SkrootproTopBar(
     showAdd: Boolean = false,
     onAddClick: () -> Unit = {},
 ) {
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
+    val statusBarColor = immersiveTopBarColor(SkrootproColors.PurpleDark)
+    val appBarColor = immersiveTopBarColor(SkrootproColors.Purple)
+    val contentColor = if (immersiveBackgroundActive) SkrootproColors.Text else Color.White
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(SkrootproColors.PurpleDark)
+            .background(statusBarColor)
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(42.dp)
-                .background(SkrootproColors.Purple)
+                .background(appBarColor)
                 .padding(horizontal = 22.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
-                color = Color.White,
+                color = contentColor,
                 fontSize = skrootproSp(20f, maxScale = 1.0f),
                 lineHeight = skrootproSp(24f, maxScale = 1.0f),
                 fontWeight = FontWeight.Normal,
@@ -196,7 +202,7 @@ fun SkrootproTopBar(
                 Icon(
                     imageVector = Icons.Rounded.Add,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = contentColor,
                     modifier = Modifier
                         .size(32.dp)
                         .clickable(onClick = onAddClick),

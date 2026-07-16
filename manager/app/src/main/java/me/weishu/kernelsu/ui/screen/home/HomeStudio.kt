@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -121,10 +122,11 @@ fun HomePagerStudio(
 
 @Composable
 private fun StudioTopBar(onDiagnoseClick: () -> Unit) {
+    val topBarColor = immersiveTopBarColor(colorScheme.surface)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colorScheme.surface)
+            .background(topBarColor)
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
             .height(64.dp)
             .padding(horizontal = 16.dp),

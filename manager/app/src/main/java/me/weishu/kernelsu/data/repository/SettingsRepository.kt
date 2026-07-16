@@ -4,6 +4,7 @@ import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.util.BuiltinMountStatus
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
@@ -16,6 +17,7 @@ const val SHOW_VERSION_MISMATCH_WARNING_KEY = "show_version_mismatch_warning"
 const val SHOW_GKI_WARNING_KEY = "show_gki_warning"
 const val SHOW_HOME_SUPPORT_CARD_KEY = "show_home_support_card"
 const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
+const val GRAPHICS_RENDERER_FEATURE_ENABLED_KEY = "graphics_renderer_feature_enabled"
 
 interface SettingsRepository {
     var uiMode: String
@@ -24,6 +26,7 @@ interface SettingsRepository {
     var showGkiWarning: Boolean
     var showHomeSupportCard: Boolean
     var showHomeLearnCard: Boolean
+    var graphicsRendererFeatureEnabled: Boolean
     var themeMode: Int
     var miuixMonet: Boolean
     var keyColor: Int
@@ -40,6 +43,8 @@ interface SettingsRepository {
     var fontScale: Float
     var blurIntensity: Float
     var switchStyle: String
+    var seasonStyle: String
+    var uiDecorationConfig: UiDecorationConfig
     var globalSnowEnabled: Boolean
     var globalSnowEffect: String
     var nightBackgroundEffect: String

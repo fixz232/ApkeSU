@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_global_snow">全局下雪</string>
-    <string name="settings_global_snow_summary">在整個應用界面顯示下雪特效。</string>
-    <string name="settings_global_snow_effect">下雪特效</string>
-    <string name="settings_global_snow_effect_summary">選擇全局下雪動畫樣式。</string>
-    <string name="settings_global_snow_effect_gentle">柔雪</string>
-    <string name="settings_global_snow_effect_blizzard">暴雪</string>
-    <string name="settings_global_snow_effect_starlight">星雪</string>
-    <string name="settings_global_snow_effect_pink">粉雪</string>
-    <string name="settings_global_snow_effect_crystal">冰晶</string>
+    <string name="settings_global_snow">全局粒子特效</string>
+    <string name="settings_global_snow_summary">在所有介面顯示有遠近層次的雪花或閃爍星海。</string>
+    <string name="settings_global_snow_effect">粒子特效樣式</string>
+    <string name="settings_global_snow_effect_summary">選擇一種下雪或星星動畫樣式。</string>
+    <string name="settings_global_snow_effect_gentle">輕柔飄雪</string>
+    <string name="settings_global_snow_effect_blizzard">風雪</string>
+    <string name="settings_global_snow_effect_starlight">星光雪</string>
+    <string name="settings_global_snow_effect_pink">粉色雪</string>
+    <string name="settings_global_snow_effect_crystal">冰晶雪</string>
+    <string name="settings_global_snow_effect_starfield">星海</string>
     <string name="settings_visual_effects_dark_mode_only">僅在夜間模式下可用，切回夜間模式後會恢復目前設定。</string>
 </resources>

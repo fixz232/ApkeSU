@@ -181,6 +181,13 @@ fun HomePager(
                 bottomInnerPadding = bottomInnerPadding,
             )
 
+            InterfaceStyle.Snow.value -> HomePagerMiuix(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+                installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
+            )
+
             else -> when (LocalUiMode.current) {
                 UiMode.Miuix -> HomePagerMiuix(
                     state = uiState,

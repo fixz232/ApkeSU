@@ -65,6 +65,7 @@ import me.weishu.kernelsu.ui.component.liquid.rememberCombinedBackdrop
 import me.weishu.kernelsu.ui.component.liquid.vibrancy
 import me.weishu.kernelsu.ui.component.miuix.animation.DampedDragAnimation
 import me.weishu.kernelsu.ui.component.miuix.animation.InteractiveHighlight
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -189,11 +190,13 @@ fun FloatingBottomBar(
 ) {
     val isInDark = isInDarkTheme()
     val isLiquidGlass = isLiquidGlassTheme()
+    val isSnowStyle = isSnowInterfaceStyle()
     val pillShape = remember { CircleShape }
     val accentColor = MiuixTheme.colorScheme.primary
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val containerColor = when {
         isLiquidGlass -> liquidGlassSurfaceColor().copy(alpha = if (isBlurEnabled) 0.48f else 0.76f)
+        isSnowStyle -> surfaceContainer.copy(alpha = if (isInDark) 0.72f else 0.82f)
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
@@ -465,6 +468,11 @@ fun FloatingBottomBar(
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
+                            val velocity = dampedDragAnimation.velocity / 10f
+                            scaleX = dampedDragAnimation.scaleX /
+                                (1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f))
+                            scaleY = dampedDragAnimation.scaleY *
+                                (1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f))
                         }
                         .then(dampedDragAnimation.modifier)
                         .clip(pillShape)

@@ -81,10 +81,12 @@ fun SettingPager(
         onSetShowGkiWarning = viewModel::setShowGkiWarning,
         onSetShowHomeSupportCard = viewModel::setShowHomeSupportCard,
         onSetShowHomeLearnCard = viewModel::setShowHomeLearnCard,
+        onSetGraphicsRendererFeatureEnabled = viewModel::setGraphicsRendererFeatureEnabled,
         onOpenTheme = { navigator.push(Route.ColorPalette) },
         onOpenThemeStore = { navigator.push(Route.ThemeStore) },
         onSetDayNightMode = viewModel::setDayNightMode,
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
+        onSetSeasonStyleIndex = viewModel::setSeasonStyleIndex,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
         onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
         onSetNightBackgroundEffectIndex = viewModel::setNightBackgroundEffectIndex,
@@ -99,6 +101,7 @@ fun SettingPager(
         onOpenNavigationIcons = { navigator.push(Route.NavigationIcons) },
         onOpenHomeCardWallpapers = { navigator.push(Route.HomeCardWallpapers) },
         onOpenVisualEffects = { navigator.push(Route.VisualEffects) },
+        onOpenUiDecorationLibrary = { navigator.push(Route.UiDecorationLibrary) },
         onOpenBackgrounds = { navigator.push(Route.Backgrounds) },
         onOpenSoundEffects = { navigator.push(Route.SoundEffects) },
         onPickWallpaper = { wallpaperLauncher.launch(CUSTOM_BACKGROUND_MIME_TYPES) },
@@ -162,6 +165,7 @@ fun SettingPager(
         onOpenAiChat = { navigator.push(Route.AiChat) },
         onOpenRescueProtection = { navigator.push(Route.RescueProtection) },
         onOpenCpuSpoof = { navigator.push(Route.CpuSpoof) },
+        onOpenGraphicsRenderer = { navigator.push(Route.GraphicsRenderer) },
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,
         onSetAutoJailbreak = viewModel::setAutoJailbreak,
@@ -178,6 +182,7 @@ fun SettingPager(
         InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
+        InterfaceStyle.Snow.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
         else -> {
             when (LocalUiMode.current) {
                 UiMode.Miuix -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)

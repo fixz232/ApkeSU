@@ -103,6 +103,7 @@ import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopup
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
 import me.weishu.kernelsu.ui.screen.settings.SettingsWallpaperCropDialog
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 
@@ -477,12 +478,13 @@ private fun SummaryStatusTile(
 private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
+    val containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.surface)
     LargeFlexibleTopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
         actions = { RebootListPopup() },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrolledContainerColor = MaterialTheme.colorScheme.surface
+            containerColor = containerColor,
+            scrolledContainerColor = containerColor,
         ),
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior

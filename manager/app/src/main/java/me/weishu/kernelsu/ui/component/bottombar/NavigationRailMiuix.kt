@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.ui.LocalMainPagerState
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
@@ -41,6 +42,11 @@ fun NavigationRailMiuix(
 ) {
     val mainState = LocalMainPagerState.current
     val customIcons = LocalCustomNavigationIcons.current
+    val railColor = when {
+        blurBackdrop != null -> Color.Transparent
+        isSnowInterfaceStyle() -> MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
+        else -> MiuixTheme.colorScheme.surface
+    }
 
     BlurredBar(blurBackdrop) {
         if (customIcons.hasSelected) {
@@ -57,7 +63,7 @@ fun NavigationRailMiuix(
             NavigationRail(
                 modifier = modifier
                     .fillMaxHeight(),
-                color = if (blurBackdrop != null) Color.Transparent else MiuixTheme.colorScheme.surface,
+                color = railColor,
             ) {
                 Spacer(modifier = Modifier.weight(1f))
                 items.forEachIndexed { index, (label, icon) ->
@@ -85,11 +91,16 @@ private fun MiuixCustomNavigationRail(
     onSelected: (Int) -> Unit,
 ) {
     val customIcons = LocalCustomNavigationIcons.current
+    val railColor = when {
+        blurBackdrop != null -> Color.Transparent
+        isSnowInterfaceStyle() -> MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
+        else -> MiuixTheme.colorScheme.surface
+    }
     Column(
         modifier = modifier
             .fillMaxHeight()
             .width(82.dp)
-            .background(if (blurBackdrop != null) Color.Transparent else MiuixTheme.colorScheme.surface)
+            .background(railColor)
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

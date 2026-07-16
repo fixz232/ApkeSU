@@ -399,42 +399,113 @@ mod android {
         }
     }
 
+    const fn bootctl_commands() -> [&'static str; 4] {
+        [
+            crate::assets::BOOTCTL_PATH,
+            "/system/bin/bootctl",
+            "/system_ext/bin/bootctl",
+            "bootctl",
+        ]
+    }
+
+    fn command_failure(program: &str, args: &[&str], output: &std::process::Output) -> String {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let detail = stderr.trim();
+        if detail.is_empty() {
+            format!("{program} {} exited with {}", args.join(" "), output.status)
+        } else {
+            format!(
+                "{program} {} exited with {}: {detail}",
+                args.join(" "),
+                output.status
+            )
+        }
+    }
+
+    fn set_active_slot_with_bootctl(target_slot: &str) -> Result<String> {
+        let args = ["set-active-boot-slot", target_slot];
+        let mut errors = Vec::new();
+
+        // BootControl can be briefly unavailable while an OTA service is finishing.
+        for attempt in 1..=3 {
+            for program in bootctl_commands() {
+                match Command::new(program).args(args).output() {
+                    Ok(output) if output.status.success() => return Ok(program.to_string()),
+                    Ok(output) => errors.push(command_failure(program, &args, &output)),
+                    Err(err) => errors.push(format!("{program} failed: {err}")),
+                }
+            }
+            if attempt < 3 {
+                std::thread::sleep(std::time::Duration::from_millis(250 * attempt));
+            }
+        }
+
+        bail!("{}", errors.join("; "))
+    }
+
+    fn set_active_slot_with_update_engine() -> Result<String> {
+        const PROGRAMS: [&str; 2] = ["/system/bin/update_engine_client", "update_engine_client"];
+        const ACTIONS: [&[&str]; 2] = [&["--switch_slot=true"], &["--oplus_switch_slot"]];
+        let mut errors = Vec::new();
+
+        for program in PROGRAMS {
+            for args in ACTIONS {
+                match Command::new(program).args(args).output() {
+                    Ok(output) if output.status.success() => {
+                        return Ok(format!("{program} {}", args.join(" ")));
+                    }
+                    Ok(output) => errors.push(command_failure(program, args, &output)),
+                    Err(err) => errors.push(format!("{program} failed: {err}")),
+                }
+            }
+        }
+
+        bail!("{}", errors.join("; "))
+    }
+
     pub(super) fn post_ota() -> Result<()> {
         use crate::assets::BOOTCTL_PATH;
         use crate::defs::ADB_DIR;
-        let status = Command::new(BOOTCTL_PATH).arg("hal-info").status()?;
-        ensure!(status.success(), "bootctl HAL is unavailable: {status}");
 
-        let current_slot = Command::new(BOOTCTL_PATH)
-            .arg("get-current-slot")
-            .output()?
-            .stdout;
-        let current_slot = String::from_utf8(current_slot)?;
-        let current_slot = current_slot.trim();
-        let target_slot = match current_slot {
-            "0" => "1",
-            "1" => "0",
-            value => bail!("invalid current boot slot: {value}"),
+        let target_suffix = get_slot_suffix(true)?;
+        let target_slot = match target_suffix.as_str() {
+            "_a" => "0",
+            "_b" => "1",
+            value => bail!("invalid target boot slot: {value}"),
         };
 
-        let status = Command::new(BOOTCTL_PATH)
-            .arg("set-active-boot-slot")
-            .arg(target_slot)
-            .status()?;
-        ensure!(
-            status.success(),
-            "failed to activate boot slot {target_slot}: {status}"
-        );
+        println!("- Activating target boot slot {target_suffix}");
+        match set_active_slot_with_bootctl(target_slot) {
+            Ok(program) => println!("- Activated {target_suffix} via {program}"),
+            Err(bootctl_err) => {
+                println!("- bootctl unavailable, trying OTA slot switch service");
+                match set_active_slot_with_update_engine() {
+                    Ok(program) => println!("- Requested {target_suffix} via {program}"),
+                    Err(update_engine_err) => {
+                        // The OTA updater normally marks its target active before this command.
+                        // Keep the successful inactive-slot flash instead of reporting it as lost.
+                        println!("- Warning: unable to force {target_suffix} active");
+                        println!("- bootctl: {bootctl_err:#}");
+                        println!("- update_engine: {update_engine_err:#}");
+                        println!(
+                            "- Patched image is installed in {target_suffix}; verify the OTA selected this slot before reboot"
+                        );
+                    }
+                }
+            }
+        }
 
         let post_fs_data = Path::new(ADB_DIR).join("post-fs-data.d");
         utils::ensure_dir_exists(&post_fs_data)?;
         let post_ota_sh = post_fs_data.join("post_ota.sh");
 
         let sh_content = format!(
-            r"
-{BOOTCTL_PATH} mark-boot-successful
+            r#"
+for bootctl in {BOOTCTL_PATH} /system/bin/bootctl /system_ext/bin/bootctl bootctl; do
+  "$bootctl" mark-boot-successful >/dev/null 2>&1 && break
+done
 rm -f /data/adb/post-fs-data.d/post_ota.sh
-"
+"#
         );
 
         std::fs::write(&post_ota_sh, sh_content)?;

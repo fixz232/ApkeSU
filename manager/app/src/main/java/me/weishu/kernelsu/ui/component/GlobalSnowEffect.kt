@@ -36,7 +36,8 @@ enum class GlobalSnowEffect(
     Blizzard("blizzard", R.string.settings_global_snow_effect_blizzard),
     Starlight("starlight", R.string.settings_global_snow_effect_starlight),
     Pink("pink", R.string.settings_global_snow_effect_pink),
-    Crystal("crystal", R.string.settings_global_snow_effect_crystal);
+    Crystal("crystal", R.string.settings_global_snow_effect_crystal),
+    Starfield("starfield", R.string.settings_global_snow_effect_starfield);
 
     companion object {
         val Default = Gentle
@@ -66,6 +67,10 @@ fun GlobalSnowEffectOverlay(
 
     val effect = GlobalSnowEffect.fromValue(effectValue)
     val spec = remember(effect) { SnowSpec.forEffect(effect) }
+    if (spec == null) {
+        GlobalStarfieldEffect(modifier = modifier)
+        return
+    }
     val flakes = remember(effect) {
         List(spec.count) { index -> SnowFlake.create(index, spec, effect.value.hashCode()) }
     }
@@ -89,15 +94,18 @@ fun GlobalSnowEffectOverlay(
         val travelHeight = size.height + margin * 2f
         val wind = sin(progress * TWO_PI) * spec.gustStrength
         flakes.forEach { flake ->
-            val yProgress = (flake.baseY + progress * flake.speed) % 1f
-            val localSway = sin((yProgress + flake.phase) * TWO_PI) * flake.drift +
-                sin((yProgress * 2f + flake.phase * 0.73f) * TWO_PI) * flake.drift * 0.24f
+            val yProgress = (flake.baseY + progress * flake.fallCycles) % 1f
+            val localSway = sin((progress * flake.swayCycles + flake.phase) * TWO_PI) * flake.drift +
+                sin((yProgress * 1.7f + flake.phase * 0.73f) * TWO_PI) * flake.drift * 0.28f
             val gustSway = sin((progress + flake.phase * 0.37f) * TWO_PI) *
                 spec.gustStrength * flake.depth
             val rawX = (flake.baseX + localSway + gustSway + spec.windBias * progress + wind) *
                 size.width
             val x = (((rawX + margin) % wrapWidth) + wrapWidth) % wrapWidth - margin
-            val y = yProgress * travelHeight - margin
+            val radius = flake.radiusDp.dp.toPx()
+            val flutter = cos((progress * flake.swayCycles + flake.phase * 0.72f) * TWO_PI) *
+                radius * (0.24f + flake.depth * 0.46f)
+            val y = yProgress * travelHeight - margin + flutter
             val edgeAlpha = minOf(
                 ((y + margin) / fadeDistance).coerceIn(0f, 1f),
                 ((size.height + margin - y) / fadeDistance).coerceIn(0f, 1f),
@@ -106,7 +114,7 @@ fun GlobalSnowEffectOverlay(
             drawFlake(
                 effect = effect,
                 center = Offset(x, y),
-                radius = flake.radius,
+                radius = radius,
                 alpha = flake.alpha * edgeAlpha,
                 twinkle = flake.twinkle(progress, spec.shimmer),
                 rotation = flake.rotation(progress),
@@ -120,6 +128,148 @@ fun GlobalSnowEffectOverlay(
     }
 }
 
+@Composable
+private fun GlobalStarfieldEffect(modifier: Modifier) {
+    val stars = remember {
+        List(STAR_COUNT) { index -> GlobalStar.create(index) }
+    }
+    val transition = rememberInfiniteTransition(label = "globalStarfield")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = STAR_CYCLE_MILLIS, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "globalStarfieldProgress",
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        if (size.width <= 1f || size.height <= 1f) return@Canvas
+        stars.forEach { star -> drawGlobalStar(star, progress) }
+        drawShootingStar(progress)
+    }
+}
+
+private data class GlobalStar(
+    val x: Float,
+    val y: Float,
+    val radiusDp: Float,
+    val alpha: Float,
+    val phase: Float,
+    val twinkleCycles: Int,
+    val driftDp: Float,
+    val depth: Float,
+    val tintIndex: Int,
+    val sparkle: Boolean,
+) {
+    companion object {
+        fun create(index: Int): GlobalStar {
+            val random = Random(STARFIELD_SEED + index * 7919)
+            val depth = random.nextRange(0.25f, 1f)
+            return GlobalStar(
+                x = random.nextFloat(),
+                y = random.nextFloat(),
+                radiusDp = random.nextRange(0.48f, 1.65f) * (0.72f + depth * 0.38f),
+                alpha = random.nextRange(0.24f, 0.74f) * (0.72f + depth * 0.28f),
+                phase = random.nextFloat(),
+                twinkleCycles = random.nextInt(1, 4),
+                driftDp = random.nextRange(0.5f, 2.4f) * depth,
+                depth = depth,
+                tintIndex = random.nextInt(4),
+                sparkle = random.nextInt(100) > 76,
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawGlobalStar(star: GlobalStar, progress: Float) {
+    val wave = 0.5f + 0.5f * sin((progress * star.twinkleCycles + star.phase) * TWO_PI)
+    val drift = star.driftDp.dp.toPx()
+    val center = Offset(
+        x = star.x * size.width + sin((progress + star.phase) * TWO_PI) * drift,
+        y = star.y * size.height + cos((progress + star.phase * 0.73f) * TWO_PI) * drift * 0.42f,
+    )
+    val tint = when (star.tintIndex) {
+        1 -> Color(0xFFCDEBFF)
+        2 -> Color(0xFFFFEDC2)
+        3 -> Color(0xFFD7FFF3)
+        else -> Color.White
+    }
+    val radius = star.radiusDp.dp.toPx() * (0.86f + wave * 0.18f)
+    val visibleAlpha = (star.alpha * (0.48f + wave * 0.52f)).coerceIn(0.08f, 0.78f)
+
+    if (star.depth > 0.62f) {
+        drawCircle(
+            color = tint.copy(alpha = visibleAlpha * 0.10f),
+            radius = radius * 3.2f,
+            center = center,
+        )
+    }
+    if (star.sparkle && wave > 0.58f) {
+        val sparkleAlpha = visibleAlpha * ((wave - 0.58f) / 0.42f).coerceIn(0f, 1f)
+        drawSpoke(
+            center = center,
+            angle = 0f,
+            length = radius * 2.1f,
+            color = tint.copy(alpha = sparkleAlpha * 0.52f),
+            strokeWidth = 0.55.dp.toPx(),
+        )
+        drawSpoke(
+            center = center,
+            angle = PI_HALF,
+            length = radius * 1.75f,
+            color = tint.copy(alpha = sparkleAlpha * 0.44f),
+            strokeWidth = 0.5.dp.toPx(),
+        )
+    }
+    drawCircle(
+        color = tint.copy(alpha = visibleAlpha),
+        radius = radius,
+        center = center,
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = visibleAlpha * 0.72f),
+        radius = radius * 0.34f,
+        center = center,
+    )
+}
+
+private fun DrawScope.drawShootingStar(progress: Float) {
+    val phase = (progress + 0.35f) % 1f
+    if (phase >= 0.13f) return
+
+    val localProgress = phase / 0.13f
+    val visibleAlpha = sin(localProgress * PI.toFloat()).coerceIn(0f, 1f) * 0.72f
+    val head = Offset(
+        x = size.width * (0.92f - localProgress * 0.56f),
+        y = size.height * (0.13f + localProgress * 0.18f),
+    )
+    val tail = Offset(
+        x = head.x + 48.dp.toPx(),
+        y = head.y - 20.dp.toPx(),
+    )
+    drawLine(
+        color = Color(0xFFBFE9FF).copy(alpha = visibleAlpha * 0.22f),
+        start = tail,
+        end = head,
+        strokeWidth = 3.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
+    drawLine(
+        color = Color.White.copy(alpha = visibleAlpha),
+        start = tail,
+        end = head,
+        strokeWidth = 0.75.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = visibleAlpha),
+        radius = 1.25.dp.toPx(),
+        center = head,
+    )
+}
+
 private data class SnowSpec(
     val count: Int,
     val cycleMillis: Int,
@@ -127,8 +277,8 @@ private data class SnowSpec(
     val maxRadius: Float,
     val minAlpha: Float,
     val maxAlpha: Float,
-    val minSpeed: Float,
-    val maxSpeed: Float,
+    val minFallCycles: Int,
+    val maxFallCycles: Int,
     val maxDrift: Float,
     val windBias: Float,
     val gustStrength: Float,
@@ -138,20 +288,20 @@ private data class SnowSpec(
     val accentColor: Color,
 ) {
     companion object {
-        fun forEffect(effect: GlobalSnowEffect): SnowSpec {
+        fun forEffect(effect: GlobalSnowEffect): SnowSpec? {
             return when (effect) {
                 GlobalSnowEffect.Gentle -> SnowSpec(
-                    count = 64,
-                    cycleMillis = 24000,
-                    minRadius = 1.2f,
-                    maxRadius = 5.4f,
-                    minAlpha = 0.18f,
-                    maxAlpha = 0.74f,
-                    minSpeed = 0.36f,
-                    maxSpeed = 0.9f,
-                    maxDrift = 0.055f,
-                    windBias = 0.018f,
-                    gustStrength = 0.02f,
+                    count = 68,
+                    cycleMillis = 26000,
+                    minRadius = 0.55f,
+                    maxRadius = 2.7f,
+                    minAlpha = 0.16f,
+                    maxAlpha = 0.72f,
+                    minFallCycles = 1,
+                    maxFallCycles = 2,
+                    maxDrift = 0.048f,
+                    windBias = 0.014f,
+                    gustStrength = 0.016f,
                     trailAlpha = 0f,
                     shimmer = 0.12f,
                     color = Color.White,
@@ -159,35 +309,35 @@ private data class SnowSpec(
                 )
 
                 GlobalSnowEffect.Blizzard -> SnowSpec(
-                    count = 82,
-                    cycleMillis = 15000,
-                    minRadius = 0.9f,
-                    maxRadius = 3.0f,
-                    minAlpha = 0.13f,
-                    maxAlpha = 0.54f,
-                    minSpeed = 1.0f,
-                    maxSpeed = 1.85f,
-                    maxDrift = 0.085f,
-                    windBias = 0.09f,
-                    gustStrength = 0.045f,
-                    trailAlpha = 0.62f,
+                    count = 88,
+                    cycleMillis = 16500,
+                    minRadius = 0.42f,
+                    maxRadius = 1.75f,
+                    minAlpha = 0.12f,
+                    maxAlpha = 0.52f,
+                    minFallCycles = 2,
+                    maxFallCycles = 4,
+                    maxDrift = 0.075f,
+                    windBias = 0.075f,
+                    gustStrength = 0.038f,
+                    trailAlpha = 0.56f,
                     shimmer = 0.08f,
                     color = Color.White,
                     accentColor = Color(0xFFDCEBFF),
                 )
 
                 GlobalSnowEffect.Starlight -> SnowSpec(
-                    count = 48,
-                    cycleMillis = 19000,
-                    minRadius = 1.5f,
-                    maxRadius = 4.7f,
+                    count = 50,
+                    cycleMillis = 22000,
+                    minRadius = 0.65f,
+                    maxRadius = 2.35f,
                     minAlpha = 0.24f,
                     maxAlpha = 0.78f,
-                    minSpeed = 0.38f,
-                    maxSpeed = 0.92f,
-                    maxDrift = 0.052f,
-                    windBias = 0.014f,
-                    gustStrength = 0.02f,
+                    minFallCycles = 1,
+                    maxFallCycles = 2,
+                    maxDrift = 0.046f,
+                    windBias = 0.012f,
+                    gustStrength = 0.016f,
                     trailAlpha = 0f,
                     shimmer = 0.34f,
                     color = Color.White,
@@ -195,17 +345,17 @@ private data class SnowSpec(
                 )
 
                 GlobalSnowEffect.Pink -> SnowSpec(
-                    count = 56,
-                    cycleMillis = 20500,
-                    minRadius = 1.5f,
-                    maxRadius = 5.0f,
+                    count = 58,
+                    cycleMillis = 23000,
+                    minRadius = 0.62f,
+                    maxRadius = 2.5f,
                     minAlpha = 0.22f,
                     maxAlpha = 0.66f,
-                    minSpeed = 0.42f,
-                    maxSpeed = 1.02f,
-                    maxDrift = 0.06f,
-                    windBias = 0.02f,
-                    gustStrength = 0.024f,
+                    minFallCycles = 1,
+                    maxFallCycles = 2,
+                    maxDrift = 0.052f,
+                    windBias = 0.016f,
+                    gustStrength = 0.019f,
                     trailAlpha = 0f,
                     shimmer = 0.18f,
                     color = Color(0xFFFFF4FA),
@@ -213,22 +363,24 @@ private data class SnowSpec(
                 )
 
                 GlobalSnowEffect.Crystal -> SnowSpec(
-                    count = 36,
-                    cycleMillis = 26000,
-                    minRadius = 1.8f,
-                    maxRadius = 6.2f,
+                    count = 34,
+                    cycleMillis = 28000,
+                    minRadius = 0.78f,
+                    maxRadius = 3.1f,
                     minAlpha = 0.22f,
                     maxAlpha = 0.78f,
-                    minSpeed = 0.34f,
-                    maxSpeed = 0.82f,
-                    maxDrift = 0.042f,
-                    windBias = 0.016f,
-                    gustStrength = 0.022f,
+                    minFallCycles = 1,
+                    maxFallCycles = 2,
+                    maxDrift = 0.038f,
+                    windBias = 0.012f,
+                    gustStrength = 0.016f,
                     trailAlpha = 0f,
                     shimmer = 0.22f,
                     color = Color(0xFFF8FCFF),
                     accentColor = Color(0xFFBDEBFF),
                 )
+
+                GlobalSnowEffect.Starfield -> null
             }
         }
     }
@@ -237,23 +389,23 @@ private data class SnowSpec(
 private data class SnowFlake(
     val baseX: Float,
     val baseY: Float,
-    val speed: Float,
-    val swaySpeed: Float,
+    val fallCycles: Int,
+    val swayCycles: Int,
     val drift: Float,
-    val radius: Float,
+    val radiusDp: Float,
     val alpha: Float,
     val phase: Float,
     val depth: Float,
     val rotation: Float,
-    val spinSpeed: Float,
+    val spinCycles: Int,
     val shape: Int,
 ) {
     fun twinkle(progress: Float, shimmer: Float): Float {
-        return 1f + sin((progress * swaySpeed + phase) * TWO_PI) * shimmer
+        return 1f + sin((progress * swayCycles + phase) * TWO_PI) * shimmer
     }
 
     fun rotation(progress: Float): Float {
-        return rotation + progress * spinSpeed * TWO_PI
+        return rotation + progress * spinCycles * TWO_PI
     }
 
     companion object {
@@ -264,15 +416,15 @@ private data class SnowFlake(
             return SnowFlake(
                 baseX = random.nextFloat(),
                 baseY = random.nextFloat(),
-                speed = random.nextRange(spec.minSpeed, spec.maxSpeed) * (0.72f + depth * 0.58f),
-                swaySpeed = random.nextRange(0.34f, 1.34f),
+                fallCycles = random.nextInt(spec.minFallCycles, spec.maxFallCycles + 1),
+                swayCycles = random.nextInt(1, 4),
                 drift = random.nextRange(spec.maxDrift * 0.16f, spec.maxDrift) * (0.65f + depth * 0.45f),
-                radius = random.nextRange(spec.minRadius, spec.maxRadius) * depthScale,
+                radiusDp = random.nextRange(spec.minRadius, spec.maxRadius) * depthScale,
                 alpha = random.nextRange(spec.minAlpha, spec.maxAlpha) * (0.66f + depth * 0.34f),
                 phase = random.nextFloat(),
                 depth = depth,
                 rotation = random.nextRange(-0.45f, 0.45f),
-                spinSpeed = if (random.nextBoolean()) 1f else -1f,
+                spinCycles = random.nextInt(1, 3) * if (random.nextBoolean()) 1 else -1,
                 shape = random.nextInt(100),
             )
         }
@@ -293,6 +445,13 @@ private fun DrawScope.drawFlake(
     trailAlpha: Float,
 ) {
     val visibleAlpha = (alpha * twinkle).coerceIn(0.08f, 0.86f)
+    if (depth > 0.72f && effect != GlobalSnowEffect.Blizzard) {
+        drawCircle(
+            color = accentColor.copy(alpha = visibleAlpha * 0.07f),
+            radius = radius * (2.2f + depth * 0.8f),
+            center = center,
+        )
+    }
     when (effect) {
         GlobalSnowEffect.Blizzard -> {
             val trailLength = radius * (5.4f + depth * 5.2f)
@@ -362,6 +521,8 @@ private fun DrawScope.drawFlake(
             }
             drawCircle(color = color.copy(alpha = visibleAlpha), radius = radius * 0.9f, center = center)
         }
+
+        GlobalSnowEffect.Starfield -> Unit
     }
 }
 
@@ -435,3 +596,6 @@ private const val TWO_PI = (PI * 2.0).toFloat()
 private const val PI_HALF = (PI / 2.0).toFloat()
 private const val PI_QUARTER = (PI / 4.0).toFloat()
 private const val PI_THIRD = (PI / 3.0).toFloat()
+private const val STAR_COUNT = 72
+private const val STAR_CYCLE_MILLIS = 24000
+private const val STARFIELD_SEED = 0x4A17

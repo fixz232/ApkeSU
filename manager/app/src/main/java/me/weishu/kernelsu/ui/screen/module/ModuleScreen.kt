@@ -196,6 +196,17 @@ fun ModulePager(
             )
             return
         }
+
+        InterfaceStyle.Snow.value -> {
+            ModulePagerMiuix(
+                uiState = rawUiState,
+                confirmDialogState = rawUiState.confirmDialogState,
+                moduleEvent = viewModel.moduleEvent,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+            return
+        }
     }
 
     when (uiMode) {

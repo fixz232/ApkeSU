@@ -14,6 +14,8 @@ import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -36,6 +38,7 @@ data class SettingsUiState(
     val showGkiWarning: Boolean = true,
     val showHomeSupportCard: Boolean = true,
     val showHomeLearnCard: Boolean = true,
+    val graphicsRendererFeatureEnabled: Boolean = false,
     val themeMode: Int = 0,
     val miuixMonet: Boolean = false,
     val keyColor: Int = 0,
@@ -52,6 +55,8 @@ data class SettingsUiState(
     val fontScale: Float = ThemeAppearanceDefaults.FONT_SCALE,
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
+    val seasonStyle: String = SeasonStyle.DEFAULT_VALUE,
+    val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,
@@ -153,10 +158,12 @@ data class SettingsScreenActions(
     val onSetShowGkiWarning: (Boolean) -> Unit,
     val onSetShowHomeSupportCard: (Boolean) -> Unit,
     val onSetShowHomeLearnCard: (Boolean) -> Unit,
+    val onSetGraphicsRendererFeatureEnabled: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,
     val onOpenThemeStore: () -> Unit,
     val onSetDayNightMode: (Boolean) -> Unit,
     val onSetSwitchStyleIndex: (Int) -> Unit,
+    val onSetSeasonStyleIndex: (Int) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,
     val onSetNightBackgroundEffectIndex: (Int) -> Unit,
@@ -169,6 +176,7 @@ data class SettingsScreenActions(
     val onOpenNavigationIcons: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
     val onOpenVisualEffects: () -> Unit,
+    val onOpenUiDecorationLibrary: () -> Unit,
     val onOpenBackgrounds: () -> Unit,
     val onOpenSoundEffects: () -> Unit,
     val onPickWallpaper: () -> Unit,
@@ -211,6 +219,7 @@ data class SettingsScreenActions(
     val onOpenAiChat: () -> Unit,
     val onOpenRescueProtection: () -> Unit,
     val onOpenCpuSpoof: () -> Unit,
+    val onOpenGraphicsRenderer: () -> Unit,
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,
     val onSetAutoJailbreak: (Boolean) -> Unit,

@@ -33,12 +33,6 @@ internal sealed class InstallMethod : Parcelable {
         override val summary: String? = null
     ) : InstallMethod()
 
-    data class HiddenPathLkmPatch(
-        val uri: Uri? = null,
-        @get:StringRes override val label: Int = R.string.hidden_path_lkm_patch,
-        override val summary: String? = null
-    ) : InstallMethod()
-
     abstract val label: Int
 
     @IgnoredOnParcel

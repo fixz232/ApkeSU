@@ -69,7 +69,9 @@ import me.weishu.kernelsu.ui.component.ListPopupDefaults
 import me.weishu.kernelsu.ui.component.ScrollToTopOnChange
 import me.weishu.kernelsu.ui.component.SearchStatus
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
-import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.miuix.SearchBarFake
 import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
@@ -573,8 +575,9 @@ private fun SimpleAppItem(
                     refractionHeight = 12.dp,
                     refractionAmount = 8.dp,
                     strokeAlpha = 0.60f,
-                ),
-            colors = liquidGlassMiuixCardColors(),
+                )
+                .snowMiuixCardSurface(shape = RoundedCornerShape(18.dp)),
+            colors = snowMiuixCardColors(),
         ) {
             BasicComponent(
                 title = app.label,
@@ -588,7 +591,12 @@ private fun SimpleAppItem(
                             .size(40.dp)
                     )
                 },
-                insideMargin = PaddingValues(horizontal = 9.dp)
+                insideMargin = PaddingValues(
+                    start = 9.dp,
+                    top = if (isSnowInterfaceStyle()) 7.dp else 0.dp,
+                    end = 9.dp,
+                    bottom = 0.dp,
+                )
             )
         }
     }
@@ -643,12 +651,18 @@ private fun GroupItem(
                 refractionAmount = 9.dp,
                 strokeAlpha = 0.66f,
             )
+            .snowMiuixCardSurface(shape = cardShape)
             .border(width = 1.dp, color = cardBorder, shape = cardShape),
-        colors = liquidGlassMiuixCardColors(),
+        colors = snowMiuixCardColors(),
         onClick = onClickPrimary,
         onLongPress = if (group.apps.size > 1) onToggleExpand else null,
         showIndication = true,
-        insideMargin = PaddingValues(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+        insideMargin = PaddingValues(
+            start = 10.dp,
+            end = 12.dp,
+            top = if (isSnowInterfaceStyle()) 14.dp else 6.dp,
+            bottom = 6.dp,
+        )
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically

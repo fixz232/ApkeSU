@@ -24,6 +24,7 @@ enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
     Material(UiMode.Material.value, R.string.interface_style_material),
     Studio("studio", R.string.interface_style_studio),
     LiquidGlass("liquid_glass", R.string.interface_style_liquid_glass),
+    Snow("snow", R.string.interface_style_snow),
     Skrootpro("skrootpro", R.string.interface_style_skrootpro),
     Alpha("alpha", R.string.interface_style_alpha),
     Delta("delta", R.string.interface_style_delta);

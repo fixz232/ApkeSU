@@ -93,7 +93,8 @@ import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
-import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.miuix.DropdownItem
 import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
 import me.weishu.kernelsu.ui.component.statustag.StatusTagMiuix
@@ -813,7 +814,7 @@ private fun InstallStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(containerColor),
+        colors = snowMiuixCardColors(containerColor),
         onClick = {
             if (!state.isLateLoadMode && !installFeedbackActive) {
                 actions.onInstallClick()
@@ -1016,7 +1017,7 @@ private fun UnsupportedStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(
+        colors = snowMiuixCardColors(
             if (isDynamicColor) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainer
         ),
         onClick = {
@@ -1306,7 +1307,7 @@ private fun WarningSummaryCard(
                 surfaceColor = if (isInDarkTheme()) Color(0xFF32191B) else Color(0xFFFFF2F2),
                 surfaceAlpha = 0.66f,
             ),
-        colors = liquidGlassMiuixCardColors(warningContainer)
+        colors = snowMiuixCardColors(warningContainer)
     ) {
         Column(
             modifier = Modifier
@@ -1392,7 +1393,7 @@ private fun SecondaryLinksCard(
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(),
+        colors = snowMiuixCardColors(),
     ) {
         if (showSupport) {
             BasicComponent(
@@ -1492,7 +1493,7 @@ private fun InfoCard(
 
     Card(
         modifier = Modifier.homeLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(),
+        colors = snowMiuixCardColors(),
     ) {
         Column(
             modifier = Modifier
@@ -2092,7 +2093,7 @@ private fun Modifier.homeLiquidGlassSurface(
         refractionHeight = 14.dp,
         refractionAmount = 9.dp,
         strokeAlpha = 0.66f,
-    )
+    ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
 }
 
 @Composable
@@ -2100,7 +2101,7 @@ private fun homeLiquidGlassCardColors(
     color: Color = colorScheme.surfaceContainer,
     enabled: Boolean = true,
 ) = if (enabled) {
-    liquidGlassMiuixCardColors(color)
+    snowMiuixCardColors(color)
 } else {
     CardDefaults.defaultColors(color = color)
 }

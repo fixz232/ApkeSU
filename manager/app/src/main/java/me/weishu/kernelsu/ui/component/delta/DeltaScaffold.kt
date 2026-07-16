@@ -60,6 +60,7 @@ import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
 import me.weishu.kernelsu.ui.theme.LocalDeltaColorVariant
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 
 private data class DeltaPalette(
@@ -244,7 +245,7 @@ fun DeltaTopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(DeltaColors.Background)
+            .background(immersiveTopBarColor(DeltaColors.Background))
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
             .padding(bottom = 12.dp),
     ) {

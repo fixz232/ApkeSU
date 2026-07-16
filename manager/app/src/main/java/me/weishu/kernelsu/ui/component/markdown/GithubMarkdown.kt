@@ -61,6 +61,8 @@ fun GithubMarkdown(
     isMarkdown: Boolean = false,
     onLoadingChange: (Boolean) -> Unit = {},
     containerColor: androidx.compose.ui.graphics.Color? = null,
+    allowRemoteContent: Boolean = true,
+    contentPaddingDp: Int = 16,
 ) {
     val density = LocalDensity.current
     val systemDensity = LocalResources.current.displayMetrics.density
@@ -108,7 +110,7 @@ fun GithubMarkdown(
          }
           html, body { margin: 0; padding: 0 }
           img, video { max-width: 100%; height: auto; }
-          .markdown-body { padding: 16px; }
+          .markdown-body { padding: ${contentPaddingDp.coerceAtLeast(0)}px; }
         </style>
         $rendered
     """.trimIndent()
@@ -237,6 +239,13 @@ fun GithubMarkdown(
                             assetLoader.shouldInterceptRequest(request.url)?.let { return it }
                             val scheme = request.url.scheme ?: return null
                             if (!scheme.startsWith("http")) return null
+                            if (!allowRemoteContent) {
+                                return WebResourceResponse(
+                                    "text/plain",
+                                    "utf-8",
+                                    ByteArrayInputStream(ByteArray(0)),
+                                )
+                            }
                             val client: OkHttpClient = ksuApp.okhttpClient
                             val call = client.newCall(
                                 Request.Builder()

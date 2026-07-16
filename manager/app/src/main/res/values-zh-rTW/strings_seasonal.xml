@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_snow">四季主題</string>
+    <string name="settings_season_style">四季切換</string>
+    <string name="season_style_spring">春</string>
+    <string name="season_style_spring_summary">迎春花次第綻放，小草破土，油菜花海盛開，滿目嫩綠。</string>
+    <string name="season_style_summer">夏</string>
+    <string name="season_style_summer_summary">水光流動，荷花、荷葉、蓮藕、蓮蓬與蜻蜓點綴卡片。</string>
+    <string name="season_style_autumn">秋</string>
+    <string name="season_style_autumn_summary">天高雲淡，秋霜與秋雨交替，落葉隨風飄落。</string>
+    <string name="season_style_winter">冬</string>
+    <string name="season_style_winter_summary">保留原有雪境桌布、磨砂玻璃與卡片積雪。</string>
+    <string name="theme_preset_snow">四季主題</string>
+    <string name="theme_preset_snow_summary">春夏秋冬分別擁有專屬景色、玻璃色彩、卡片裝飾與環境細節。</string>
+</resources>

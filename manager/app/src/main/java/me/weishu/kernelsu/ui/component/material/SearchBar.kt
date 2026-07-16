@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 
 @Composable
 fun SearchAppBar(
@@ -72,6 +73,7 @@ fun SearchAppBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val scaledDensity = LocalDensity.current
+    val topBarContainerColor = immersiveTopBarColor(MaterialTheme.colorScheme.surface)
     val interactionSource = remember { MutableInteractionSource() }
 
     val scope = rememberCoroutineScope()
@@ -173,15 +175,18 @@ fun SearchAppBar(
         }
     }
 
-    Surface {
+    Surface(
+        color = topBarContainerColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
             LargeFlexibleTopAppBar(
                 title = title,
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
+                    containerColor = topBarContainerColor,
+                    scrolledContainerColor = topBarContainerColor,
                 ),
                 navigationIcon = { if (navigationIcon != null) navigationIcon() },
                 actions = { if (actions != null) actions() },

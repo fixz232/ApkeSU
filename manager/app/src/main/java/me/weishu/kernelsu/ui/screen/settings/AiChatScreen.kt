@@ -1,10 +1,8 @@
 package me.weishu.kernelsu.ui.screen.settings
 
-import android.content.Context
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.net.Uri
-import android.util.Base64
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
@@ -30,28 +30,56 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.StopCircle
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,290 +88,197 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collectLatest
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.data.model.Module
-import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
-import me.weishu.kernelsu.ksuApp
-import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
+import me.weishu.kernelsu.ui.component.markdown.GithubMarkdown
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
-import me.weishu.kernelsu.ui.util.getFileName
-import okhttp3.Call
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.ByteArrayOutputStream
-import java.io.IOException
-import kotlin.math.max
+import me.weishu.kernelsu.ui.navigation3.Route
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiChatScreen() {
     val context = LocalContext.current
-    val resources = LocalResources.current
     val navigator = LocalNavigator.current
-    val scope = rememberCoroutineScope()
-    val prefs = remember {
-        context.applicationContext.getSharedPreferences(AI_CHAT_PREFS, Context.MODE_PRIVATE)
-    }
-    val defaultPrompt = stringResource(id = R.string.ai_chat_default_system_prompt)
-    var baseUrl by rememberSaveable {
-        mutableStateOf(prefs.getString(AI_CHAT_BASE_URL, DEFAULT_AI_BASE_URL) ?: DEFAULT_AI_BASE_URL)
-    }
-    var apiKey by rememberSaveable {
-        mutableStateOf(prefs.getString(AI_CHAT_API_KEY, "") ?: "")
-    }
-    var model by rememberSaveable {
-        mutableStateOf(prefs.getString(AI_CHAT_MODEL, DEFAULT_AI_MODEL) ?: DEFAULT_AI_MODEL)
-    }
-    var systemPrompt by rememberSaveable {
-        mutableStateOf(prefs.getString(AI_CHAT_SYSTEM_PROMPT, defaultPrompt) ?: defaultPrompt)
-    }
-    var input by rememberSaveable { mutableStateOf("") }
-    var configExpanded by rememberSaveable {
-        mutableStateOf(
-            (prefs.getString(AI_CHAT_BASE_URL, null).isNullOrBlank() ||
-                prefs.getString(AI_CHAT_MODEL, null).isNullOrBlank())
-        )
-    }
-    var sending by rememberSaveable { mutableStateOf(false) }
-    var testingApi by rememberSaveable { mutableStateOf(false) }
-    var loadingModules by rememberSaveable { mutableStateOf(false) }
-    var activeCall by remember { mutableStateOf<Call?>(null) }
-    var activeAssistantId by remember { mutableStateOf<Long?>(null) }
-    var requestGeneration by remember { mutableLongStateOf(0L) }
-    var nextMessageId by remember { mutableLongStateOf(1L) }
-    var historyLoaded by remember { mutableStateOf(false) }
-    val messages = remember { mutableStateListOf<AiMessage>() }
-    val pendingAttachments = remember { mutableStateListOf<AiAttachment>() }
+    val viewModel = viewModel<AiChatViewModel>()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val messages = state.activeConversation.messages
     val listState = rememberLazyListState()
+    var conversationMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var actionMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var renameDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var renameValue by rememberSaveable { mutableStateOf("") }
+    var autoFollow by remember { mutableStateOf(true) }
+    val defaultConversationTitle = stringResource(R.string.ai_chat_default_conversation_title)
 
-    LaunchedEffect(Unit) {
-        val restored = loadAiChatHistory(prefs)
-        messages.clear()
-        messages.addAll(restored)
-        nextMessageId = (restored.maxOfOrNull { it.id } ?: 0L) + 1L
-        historyLoaded = true
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importDocument)
+    }
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importImage)
     }
 
-    LaunchedEffect(historyLoaded, messages.size, messages.lastOrNull()?.text) {
-        if (!historyLoaded) return@LaunchedEffect
-        delay(HISTORY_SAVE_DEBOUNCE_MS)
-        saveAiChatHistory(prefs, messages)
+    LaunchedEffect(viewModel) {
+        viewModel.events.collectLatest { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
-
-    fun currentConfig(): AiApiConfig {
-        return AiApiConfig(
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            model = model.trim(),
-            systemPrompt = systemPrompt.trim(),
-        )
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+            listState.isScrollInProgress to (lastVisible >= layout.totalItemsCount - 2)
+        }.collect { (scrolling, nearBottom) ->
+            if (scrolling) autoFollow = nearBottom
+        }
     }
-
-    fun addMessage(
-        role: AiRole,
-        text: String,
-        attachments: List<AiAttachment> = emptyList(),
-    ): Long {
-        val id = nextMessageId
-        messages.add(
-            AiMessage(
-                id = id,
-                role = role,
-                text = text,
-                attachments = attachments,
-            )
-        )
-        nextMessageId += 1
-        return id
-    }
-
-    fun updateMessage(id: Long, text: String) {
-        val index = messages.indexOfFirst { it.id == id }
-        if (index >= 0) {
-            messages[index] = messages[index].copy(text = text)
+    LaunchedEffect(messages.lastOrNull()?.id, messages.lastOrNull()?.text?.length) {
+        if (autoFollow && messages.isNotEmpty()) {
+            listState.scrollToItem(messages.lastIndex)
         }
     }
 
-    fun copyMessage(text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        clipboard.setPrimaryClip(ClipData.newPlainText("ai-chat", text))
-        Toast.makeText(context, R.string.ai_chat_copied, Toast.LENGTH_SHORT).show()
-    }
-
-    fun stopGeneration() {
-        requestGeneration += 1L
-        activeCall?.cancel()
-        activeCall = null
-        activeAssistantId?.let { id ->
-            val current = messages.firstOrNull { it.id == id }
-            if (current?.text == resources.getString(R.string.ai_chat_generating)) {
-                updateMessage(id, resources.getString(R.string.ai_chat_stopped))
-            }
-        }
-        activeAssistantId = null
-        sending = false
-    }
-
-    fun sendText(text: String, attachments: List<AiAttachment>) {
-        val config = currentConfig()
-        val cleanText = text.trim()
-        if (cleanText.isBlank() && attachments.isEmpty()) return
-        if (!config.isValid()) {
-            input = cleanText
-            Toast.makeText(context, R.string.ai_chat_need_config, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (sending) return
-
-        addMessage(
-            role = AiRole.User,
-            text = cleanText.ifBlank { "Please analyze the attached content." },
-            attachments = attachments,
-        )
-        input = ""
-        pendingAttachments.clear()
-        sending = true
-        val generation = requestGeneration + 1L
-        requestGeneration = generation
-        scope.launch {
-            var streamedText = ""
-            val assistantId = addMessage(AiRole.Assistant, resources.getString(R.string.ai_chat_generating))
-            activeAssistantId = assistantId
-            val result = runCatching {
-                requestAiChatStream(
-                    config = config,
-                    messages = messages.filterNot { it.id == assistantId },
-                    onCall = { call ->
-                        withContext(Dispatchers.Main.immediate) {
-                            if (generation == requestGeneration) {
-                                activeCall = call
-                            } else {
-                                call.cancel()
-                            }
-                        }
-                    },
-                    onDelta = { delta ->
-                        withContext(Dispatchers.Main.immediate) {
-                            if (generation == requestGeneration) {
-                                streamedText += delta
-                                updateMessage(assistantId, streamedText)
-                            }
-                        }
-                    },
-                )
-            }
-            if (generation != requestGeneration) return@launch
-            result.onSuccess { reply ->
-                updateMessage(assistantId, reply.ifBlank { streamedText.ifBlank { resources.getString(R.string.ai_chat_empty_response) } })
-            }.onFailure { error ->
-                if (streamedText.isBlank()) {
-                    updateMessage(
-                        assistantId,
-                        resources.getString(R.string.ai_chat_request_failed, error.message ?: error.javaClass.simpleName)
-                    )
-                    val index = messages.indexOfFirst { it.id == assistantId }
-                    if (index >= 0) {
-                        messages[index] = messages[index].copy(role = AiRole.Error)
-                    }
-                }
-            }
-            activeCall = null
-            activeAssistantId = null
-            sending = false
-        }
-    }
-
-    fun retryFrom(message: AiMessage) {
-        val index = messages.indexOfFirst { it.id == message.id }
-        if (index <= 0 || sending) return
-        val previousUser = messages.take(index).lastOrNull { it.role == AiRole.User } ?: return
-        while (messages.size > index) {
-            messages.removeAt(messages.lastIndex)
-        }
-        sendText(previousUser.text, previousUser.attachments)
-    }
-
-    val fileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            val result = runCatching { readTextAttachment(context, uri) }
-            result.onSuccess { pendingAttachments.add(it) }
-                .onFailure {
-                    Toast.makeText(context, R.string.ai_chat_file_failed, Toast.LENGTH_SHORT).show()
-                }
-        }
-    }
-
-    val imageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            val result = runCatching { readImageAttachment(context, uri) }
-            result.onSuccess { pendingAttachments.add(it) }
-                .onFailure { error ->
-                    val messageRes = if (error is ImageTooLargeException) {
-                        R.string.ai_chat_image_too_large
-                    } else {
-                        R.string.ai_chat_file_failed
-                    }
-                    Toast.makeText(context, messageRes, Toast.LENGTH_SHORT).show()
-                }
-        }
-    }
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
-        }
-    }
-
-    val pageContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
-    val barContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     Scaffold(
-        containerColor = pageContainerColor,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+        ),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(id = R.string.ai_chat_title)) },
+                title = { Text(stringResource(R.string.ai_chat_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navigator.pop() }) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.ai_chat_back),
                         )
                     }
                 },
+                actions = {
+                    Box {
+                        IconButton(onClick = { conversationMenuExpanded = true }) {
+                            Icon(
+                                Icons.Rounded.History,
+                                contentDescription = stringResource(R.string.ai_chat_conversations),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = conversationMenuExpanded,
+                            onDismissRequest = { conversationMenuExpanded = false },
+                        ) {
+                            state.conversations.forEach { conversation ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            conversation.displayTitle(defaultConversationTitle),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (conversation.id == state.activeConversationId) {
+                                                Icons.Rounded.CheckCircle
+                                            } else {
+                                                Icons.Rounded.ChatBubbleOutline
+                                            },
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        conversationMenuExpanded = false
+                                        viewModel.selectConversation(conversation.id)
+                                    },
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ai_chat_new_conversation)) },
+                                leadingIcon = { Icon(Icons.Rounded.AddComment, contentDescription = null) },
+                                onClick = {
+                                    conversationMenuExpanded = false
+                                    viewModel.newConversation()
+                                },
+                            )
+                        }
+                    }
+                    IconButton(onClick = viewModel::newConversation, enabled = !state.isSending) {
+                        Icon(
+                            Icons.Rounded.AddComment,
+                            contentDescription = stringResource(R.string.ai_chat_new_conversation),
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { actionMenuExpanded = true }) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.ai_chat_more_options),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = actionMenuExpanded,
+                            onDismissRequest = { actionMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ai_module_studio_title)) },
+                                leadingIcon = { Icon(Icons.Rounded.Build, contentDescription = null) },
+                                onClick = {
+                                    actionMenuExpanded = false
+                                    navigator.push(Route.AiModuleStudio)
+                                },
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ai_chat_rename)) },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                                onClick = {
+                                    actionMenuExpanded = false
+                                    renameValue = state.activeConversation.displayTitle(defaultConversationTitle)
+                                    renameDialogVisible = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ai_chat_clear)) },
+                                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                enabled = messages.isNotEmpty() && !state.isSending,
+                                onClick = {
+                                    actionMenuExpanded = false
+                                    viewModel.requestClearConversation()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ai_chat_delete_conversation)) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                                enabled = !state.isSending,
+                                onClick = {
+                                    actionMenuExpanded = false
+                                    viewModel.requestDeleteConversation()
+                                },
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = barContainerColor,
-                    scrolledContainerColor = barContainerColor,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
         },
@@ -356,151 +291,137 @@ fun AiChatScreen() {
                 .navigationBarsPadding(),
         ) {
             AiApiConfigCard(
-                expanded = configExpanded,
-                onExpandedChange = { configExpanded = it },
-                baseUrl = baseUrl,
-                onBaseUrlChange = { baseUrl = it },
-                apiKey = apiKey,
-                onApiKeyChange = { apiKey = it },
-                model = model,
-                onModelChange = { model = it },
-                systemPrompt = systemPrompt,
-                onSystemPromptChange = { systemPrompt = it },
-                testing = testingApi,
-                onSave = {
-                    prefs.edit()
-                        .putString(AI_CHAT_BASE_URL, baseUrl.trim())
-                        .putString(AI_CHAT_API_KEY, apiKey.trim())
-                        .putString(AI_CHAT_MODEL, model.trim())
-                        .putString(AI_CHAT_SYSTEM_PROMPT, systemPrompt.trim())
-                        .apply()
-                    Toast.makeText(context, R.string.ai_chat_config_saved, Toast.LENGTH_SHORT).show()
-                    configExpanded = false
-                },
-                onTest = {
-                    val config = currentConfig()
-                    if (!config.isValid() || testingApi) return@AiApiConfigCard
-                    testingApi = true
-                    scope.launch {
-                        val ok = runCatching { testAiConnection(config) }
-                        testingApi = false
-                        Toast.makeText(
-                            context,
-                            ok.fold(
-                                onSuccess = { R.string.ai_chat_test_ok },
-                                onFailure = { R.string.ai_chat_test_failed },
-                            ),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                },
+                state = state,
+                onExpandedChange = viewModel::setConfigExpanded,
+                onProviderChange = viewModel::selectProvider,
+                onConfigChange = { updated -> viewModel.updateConfig { updated } },
+                onSave = viewModel::saveConfig,
+                onTest = viewModel::testConnection,
+                onLoadModels = viewModel::loadModels,
             )
 
             if (messages.isEmpty()) {
-                Box(
+                AiChatEmptyState(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.ai_chat_welcome),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
+                        .fillMaxWidth(),
+                    configured = state.config.isValid(),
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
                     state = listState,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 10.dp,
-                    ),
                 ) {
-                    items(messages, key = { it.id }) { message ->
+                    items(messages, key = AiMessage::id) { message ->
                         AiMessageBubble(
                             message = message,
-                            sending = sending,
-                            onCopy = { copyMessage(message.text) },
-                            onRetry = { retryFrom(message) },
+                            sending = state.isSending,
+                            onCopy = { copyToClipboard(context, message.text) },
+                            onCopyCode = { copyToClipboard(context, it) },
+                            onRetry = { viewModel.retry(message.id) },
                         )
                     }
                 }
             }
 
             AiChatInputBar(
-                input = input,
-                onInputChange = { input = it },
-                sending = sending,
-                loadingModules = loadingModules,
-                attachments = pendingAttachments,
-                onRemoveAttachment = { pendingAttachments.remove(it) },
+                state = state,
+                onInputChange = viewModel::updateDraft,
+                onRemoveAttachment = viewModel::removePendingAttachment,
                 onAttachFile = { fileLauncher.launch(arrayOf("*/*")) },
                 onAttachImage = { imageLauncher.launch(arrayOf("image/*")) },
-                onAnalyzeModules = {
-                    if (loadingModules || sending) return@AiChatInputBar
-                    loadingModules = true
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { ModuleRepositoryImpl().getModules() }
-                        loadingModules = false
-                        result.onSuccess { modules ->
-                            if (modules.isEmpty()) {
-                                Toast.makeText(context, R.string.ai_chat_modules_empty, Toast.LENGTH_SHORT).show()
-                            } else {
-                                sendText(buildModuleAnalysisPrompt(modules), emptyList())
-                            }
-                        }.onFailure { error ->
-                            Toast.makeText(
-                                context,
-                                resources.getString(
-                                    R.string.ai_chat_modules_failed,
-                                    error.message ?: error.javaClass.simpleName,
-                                ),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    }
-                },
-                onClear = {
-                    messages.clear()
-                    pendingAttachments.clear()
-                    input = ""
-                    saveAiChatHistory(prefs, emptyList())
-                },
-                onStop = ::stopGeneration,
-                onSend = {
-                    sendText(input, pendingAttachments.toList())
-                },
+                onAnalyzeModules = viewModel::prepareModuleAnalysis,
+                onStop = viewModel::stopGeneration,
+                onSend = viewModel::requestSend,
             )
         }
+    }
+
+    state.pendingTransmission?.let { pending ->
+        TransmissionConfirmationDialog(
+            pending = pending,
+            onConfirm = viewModel::confirmTransmission,
+            onDismiss = viewModel::cancelTransmission,
+        )
+    }
+    if (state.showClearConfirmation) {
+        ConfirmationDialog(
+            title = stringResource(R.string.ai_chat_clear_title),
+            text = stringResource(R.string.ai_chat_clear_message),
+            confirmText = stringResource(R.string.ai_chat_clear),
+            onConfirm = viewModel::clearConversation,
+            onDismiss = viewModel::dismissClearConversation,
+        )
+    }
+    if (state.showDeleteConversationConfirmation) {
+        ConfirmationDialog(
+            title = stringResource(R.string.ai_chat_delete_conversation),
+            text = stringResource(R.string.ai_chat_delete_conversation_message),
+            confirmText = stringResource(R.string.ai_chat_delete),
+            onConfirm = viewModel::deleteConversation,
+            onDismiss = viewModel::dismissDeleteConversation,
+        )
+    }
+    if (renameDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { renameDialogVisible = false },
+            title = { Text(stringResource(R.string.ai_chat_rename)) },
+            text = {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = renameValue,
+                    onValueChange = { renameValue = it.take(32) },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.ai_chat_conversation_name)) },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = renameValue.isNotBlank(),
+                    onClick = {
+                        viewModel.renameActiveConversation(renameValue)
+                        renameDialogVisible = false
+                    },
+                ) { Text(stringResource(R.string.ai_chat_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameDialogVisible = false }) {
+                    Text(stringResource(R.string.ai_chat_cancel))
+                }
+            },
+        )
     }
 }
 
 @Composable
 private fun AiApiConfigCard(
-    expanded: Boolean,
+    state: AiChatUiState,
     onExpandedChange: (Boolean) -> Unit,
-    baseUrl: String,
-    onBaseUrlChange: (String) -> Unit,
-    apiKey: String,
-    onApiKeyChange: (String) -> Unit,
-    model: String,
-    onModelChange: (String) -> Unit,
-    systemPrompt: String,
-    onSystemPromptChange: (String) -> Unit,
-    testing: Boolean,
+    onProviderChange: (AiProviderPreset) -> Unit,
+    onConfigChange: (AiApiConfig) -> Unit,
     onSave: () -> Unit,
     onTest: () -> Unit,
+    onLoadModels: () -> Unit,
 ) {
+    val config = state.config
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var keyVisible by rememberSaveable { mutableStateOf(false) }
+    var modelMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var outputLimitText by rememberSaveable(config.maxOutputTokens) {
+        mutableStateOf(config.maxOutputTokens.toString())
+    }
+    var contextLimitText by rememberSaveable(config.contextWindowTokens) {
+        mutableStateOf(config.contextWindowTokens.toString())
+    }
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -509,99 +430,277 @@ private fun AiApiConfigCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, top = 10.dp, end = 8.dp, bottom = 4.dp),
+                .padding(start = 14.dp, top = 10.dp, end = 6.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Rounded.AutoFixHigh,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(
+            Icon(Icons.Rounded.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 10.dp),
-                text = stringResource(id = R.string.ai_chat_config_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    stringResource(
-                        id = if (expanded) {
-                            R.string.ai_chat_hide_config
-                        } else {
-                            R.string.ai_chat_edit_config
-                        }
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    stringResource(R.string.ai_chat_config_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
-                ExpressiveSwitch(
-                    checked = expanded,
-                    onCheckedChange = onExpandedChange,
-                    showThumbIcon = false,
+                Text(
+                    if (config.isValid()) {
+                        "${resolveAiTargetHost(config.baseUrl)} · ${config.model}"
+                    } else {
+                        stringResource(R.string.ai_chat_config_required)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = { onExpandedChange(!state.configExpanded) }) {
+                Icon(
+                    if (state.configExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = stringResource(
+                        if (state.configExpanded) R.string.ai_chat_hide_config else R.string.ai_chat_edit_config
+                    ),
                 )
             }
         }
-        if (expanded) {
+
+        if (state.configExpanded) {
+            HorizontalDivider()
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = baseUrl,
-                    onValueChange = onBaseUrlChange,
-                    label = { Text(stringResource(id = R.string.ai_chat_api_base)) },
-                    singleLine = true,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = model,
-                        onValueChange = onModelChange,
-                        label = { Text(stringResource(id = R.string.ai_chat_model)) },
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = apiKey,
-                        onValueChange = onApiKeyChange,
-                        label = { Text(stringResource(id = R.string.ai_chat_api_key)) },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                    )
-                }
-                OutlinedTextField(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(96.dp),
-                    value = systemPrompt,
-                    onValueChange = onSystemPromptChange,
-                    label = { Text(stringResource(id = R.string.ai_chat_system_prompt)) },
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AiProviderPreset.entries.forEach { provider ->
+                        FilterChip(
+                            selected = config.provider == provider,
+                            onClick = { onProviderChange(provider) },
+                            label = { Text(provider.displayName()) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = config.baseUrl,
+                    onValueChange = { value ->
+                        val newBaseUrl = value.take(2048)
+                        val hostChanged = resolveAiTargetHost(config.baseUrl) != resolveAiTargetHost(newBaseUrl)
+                        onConfigChange(
+                            config.copy(
+                                baseUrl = newBaseUrl,
+                                apiKey = if (hostChanged) "" else config.apiKey,
+                                customHeaders = if (hostChanged) "" else config.customHeaders,
+                            )
+                        )
+                    },
+                    label = { Text(stringResource(R.string.ai_chat_api_base)) },
+                    supportingText = { Text(stringResource(R.string.ai_chat_api_base_hint)) },
+                    singleLine = true,
+                    enabled = !state.isSending,
                 )
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = config.apiKey,
+                    onValueChange = { onConfigChange(config.copy(apiKey = it.take(4096))) },
+                    label = { Text(stringResource(R.string.ai_chat_api_key)) },
+                    singleLine = true,
+                    enabled = !state.isSending,
+                    visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { keyVisible = !keyVisible }) {
+                            Icon(
+                                if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                contentDescription = stringResource(
+                                    if (keyVisible) R.string.ai_chat_hide_key else R.string.ai_chat_show_key
+                                ),
+                            )
+                        }
+                    },
+                )
+                Box {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = config.model,
+                        onValueChange = { onConfigChange(config.copy(model = it.take(256))) },
+                        label = { Text(stringResource(R.string.ai_chat_model)) },
+                        singleLine = true,
+                        enabled = !state.isSending,
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (state.availableModels.isNotEmpty()) {
+                                    IconButton(onClick = { modelMenuExpanded = true }) {
+                                        Icon(Icons.Rounded.ExpandMore, contentDescription = null)
+                                    }
+                                }
+                                IconButton(
+                                    onClick = onLoadModels,
+                                    enabled = !state.loadingModels && !state.isSending,
+                                ) {
+                                    if (state.loadingModels) {
+                                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(
+                                            Icons.Rounded.Refresh,
+                                            contentDescription = stringResource(R.string.ai_chat_load_models),
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = modelMenuExpanded,
+                        onDismissRequest = { modelMenuExpanded = false },
+                    ) {
+                        state.availableModels.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                onClick = {
+                                    onConfigChange(config.copy(model = model))
+                                    modelMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
+                    Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text(stringResource(R.string.ai_chat_advanced_config))
+                    Spacer(Modifier.size(4.dp))
+                    Icon(
+                        if (advancedExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                if (advancedExpanded) {
+                    Text(
+                        stringResource(R.string.ai_chat_temperature, config.temperature),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Slider(
+                        value = config.temperature,
+                        onValueChange = { onConfigChange(config.copy(temperature = it)) },
+                        valueRange = 0f..2f,
+                        steps = 19,
+                        enabled = !state.isSending,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = outputLimitText,
+                            onValueChange = { value ->
+                                outputLimitText = value.filter(Char::isDigit).take(6)
+                                outputLimitText.toIntOrNull()?.let {
+                                    onConfigChange(config.copy(maxOutputTokens = it))
+                                }
+                            },
+                            label = { Text(stringResource(R.string.ai_chat_output_tokens)) },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                            ),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = contextLimitText,
+                            onValueChange = { value ->
+                                contextLimitText = value.filter(Char::isDigit).take(7)
+                                contextLimitText.toIntOrNull()?.let {
+                                    onConfigChange(config.copy(contextWindowTokens = it))
+                                }
+                            },
+                            label = { Text(stringResource(R.string.ai_chat_context_tokens)) },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                            ),
+                            singleLine = true,
+                        )
+                    }
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 92.dp),
+                        value = config.customHeaders,
+                        onValueChange = { onConfigChange(config.copy(customHeaders = it.take(8000))) },
+                        label = { Text(stringResource(R.string.ai_chat_custom_headers)) },
+                        supportingText = { Text(stringResource(R.string.ai_chat_custom_headers_hint)) },
+                        minLines = 2,
+                        maxLines = 5,
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 112.dp),
+                        value = config.systemPrompt,
+                        onValueChange = { onConfigChange(config.copy(systemPrompt = it.take(16000))) },
+                        label = { Text(stringResource(R.string.ai_chat_system_prompt)) },
+                        minLines = 3,
+                        maxLines = 7,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        modifier = Modifier.padding(start = 7.dp),
+                        text = stringResource(R.string.ai_chat_secure_storage_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                state.configNotice?.let { notice ->
+                    Text(
+                        text = notice,
+                        color = if (state.configNoticeIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (state.configDirty) {
+                    Text(
+                        text = stringResource(R.string.ai_chat_unsaved_config),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 Row(
                     modifier = Modifier.align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
-                        enabled = !testing && baseUrl.isNotBlank() && model.isNotBlank(),
+                        enabled = !state.testingApi && !state.isSending,
                         onClick = onTest,
                     ) {
-                        if (testing) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        if (state.testingApi) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Rounded.AutoFixHigh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_test_config))
+                        Spacer(Modifier.size(6.dp))
+                        Text(stringResource(R.string.ai_chat_test_config))
                     }
-                    Button(onClick = onSave) {
-                        Text(stringResource(id = R.string.ai_chat_save_config))
+                    Button(onClick = onSave, enabled = !state.isSending) {
+                        Text(stringResource(R.string.ai_chat_save_config))
                     }
                 }
             }
@@ -610,20 +709,45 @@ private fun AiApiConfigCard(
 }
 
 @Composable
+private fun AiChatEmptyState(modifier: Modifier, configured: Boolean) {
+    Column(
+        modifier = modifier.padding(horizontal = 28.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            if (configured) Icons.Rounded.ChatBubbleOutline else Icons.Rounded.Key,
+            contentDescription = null,
+            modifier = Modifier.size(38.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            modifier = Modifier.padding(top = 12.dp),
+            text = stringResource(
+                if (configured) R.string.ai_chat_empty_ready else R.string.ai_chat_welcome
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun AiMessageBubble(
     message: AiMessage,
     sending: Boolean,
     onCopy: () -> Unit,
+    onCopyCode: (String) -> Unit,
     onRetry: () -> Unit,
 ) {
     val isUser = message.role == AiRole.User
-    val isError = message.role == AiRole.Error
+    val isError = message.status == AiMessageStatus.Error
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         Surface(
-            modifier = Modifier.widthIn(max = 340.dp),
+            modifier = Modifier.widthIn(max = 560.dp),
             shape = RoundedCornerShape(8.dp),
             color = when {
                 isError -> MaterialTheme.colorScheme.errorContainer
@@ -635,30 +759,72 @@ private fun AiMessageBubble(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = message.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = when {
-                        isError -> MaterialTheme.colorScheme.onErrorContainer
-                        isUser -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                )
-                AttachmentChips(attachments = message.attachments)
-                if (!isUser && message.text.isNotBlank()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        TextButton(onClick = onCopy) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.size(4.dp))
-                            Text(stringResource(id = R.string.ai_chat_copy))
+                if (message.retryOfId != null) {
+                    Text(
+                        stringResource(R.string.ai_chat_regenerated_answer),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                when {
+                    message.status == AiMessageStatus.Generating && message.text.isBlank() -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text(
+                                modifier = Modifier.padding(start = 8.dp),
+                                text = stringResource(R.string.ai_chat_generating),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
-                        TextButton(
-                            enabled = !sending,
-                            onClick = onRetry,
-                        ) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.size(4.dp))
-                            Text(stringResource(id = R.string.ai_chat_retry))
+                    }
+                    !isUser && message.status == AiMessageStatus.Completed -> {
+                        GithubMarkdown(
+                            content = message.text,
+                            isMarkdown = true,
+                            containerColor = Color.Transparent,
+                            allowRemoteContent = false,
+                            contentPaddingDp = 0,
+                        )
+                    }
+                    else -> SelectionContainer {
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when {
+                                isError -> MaterialTheme.colorScheme.onErrorContainer
+                                isUser -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                    }
+                }
+                if (message.status == AiMessageStatus.Generating) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                AttachmentChips(message.attachments)
+                if (!isUser) {
+                    MessageStatus(message)
+                    CodeBlockActions(message.text, onCopyCode)
+                    if (message.text.isNotBlank() && message.status != AiMessageStatus.Generating) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = onCopy) {
+                                Icon(
+                                    Icons.Rounded.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(Modifier.size(4.dp))
+                                Text(stringResource(R.string.ai_chat_copy))
+                            }
+                            TextButton(enabled = !sending, onClick = onRetry) {
+                                Icon(
+                                    Icons.Rounded.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(Modifier.size(4.dp))
+                                Text(stringResource(R.string.ai_chat_retry))
+                            }
                         }
                     }
                 }
@@ -668,117 +834,216 @@ private fun AiMessageBubble(
 }
 
 @Composable
+private fun MessageStatus(message: AiMessage) {
+    val statusText = when (message.status) {
+        AiMessageStatus.Ready,
+        AiMessageStatus.Completed,
+        -> null
+        AiMessageStatus.Generating -> stringResource(R.string.ai_chat_generating)
+        AiMessageStatus.Stopped -> stringResource(R.string.ai_chat_stopped)
+        AiMessageStatus.Partial -> stringResource(R.string.ai_chat_partial_response)
+        AiMessageStatus.Error -> stringResource(R.string.ai_chat_failed_response)
+    }
+    if (statusText != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (message.status == AiMessageStatus.Stopped) Icons.Rounded.StopCircle else Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (message.status == AiMessageStatus.Stopped) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+            Text(
+                modifier = Modifier.padding(start = 6.dp),
+                text = buildString {
+                    append(statusText)
+                    message.errorDetail?.takeIf { it.isNotBlank() }?.let { append(" ").append(it) }
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    val details = buildList {
+        message.usage?.let { usage ->
+            val input = usage.inputTokens
+            val output = usage.outputTokens
+            if (input != null || output != null) add("${input ?: "?"} in / ${output ?: "?"} out")
+        }
+        if (message.droppedContextMessages > 0) {
+            add(
+                pluralStringResource(
+                    R.plurals.ai_chat_context_dropped,
+                    message.droppedContextMessages,
+                    message.droppedContextMessages,
+                )
+            )
+        }
+    }
+    if (details.isNotEmpty()) {
+        Text(
+            details.joinToString(" · "),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CodeBlockActions(markdown: String, onCopy: (String) -> Unit) {
+    val blocks = remember(markdown) { extractCodeBlocks(markdown).take(4) }
+    if (blocks.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        blocks.forEachIndexed { index, block ->
+            OutlinedButton(
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                onClick = { onCopy(block.code) },
+            ) {
+                Icon(
+                    Icons.Rounded.Code,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    block.language.ifBlank { stringResource(R.string.ai_chat_code_block, index + 1) },
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun AiChatInputBar(
-    input: String,
+    state: AiChatUiState,
     onInputChange: (String) -> Unit,
-    sending: Boolean,
-    loadingModules: Boolean,
-    attachments: List<AiAttachment>,
-    onRemoveAttachment: (AiAttachment) -> Unit,
+    onRemoveAttachment: (String) -> Unit,
     onAttachFile: () -> Unit,
     onAttachImage: () -> Unit,
     onAnalyzeModules: () -> Unit,
-    onClear: () -> Unit,
     onStop: () -> Unit,
     onSend: () -> Unit,
 ) {
     var toolsExpanded by rememberSaveable { mutableStateOf(false) }
+    val tokenEstimate = remember(state.config, state.activeConversation.messages, state.draft) {
+        val draftMessage = state.draft.takeIf(String::isNotBlank)?.let {
+            AiMessage(
+                id = Long.MAX_VALUE,
+                role = AiRole.User,
+                text = it,
+                status = AiMessageStatus.Ready,
+                attachments = state.pendingAttachments,
+            )
+        }
+        AiContextBuilder.estimateConversationTokens(
+            state.config,
+            state.activeConversation.messages + listOfNotNull(draftMessage),
+        )
+    }
     Surface(
-        tonalElevation = 2.dp,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.98f),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { toolsExpanded = !toolsExpanded },
-                    enabled = !sending,
-                ) {
-                    Icon(Icons.Rounded.MoreHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(stringResource(id = R.string.ai_chat_tools))
-                }
-                if (sending) {
-                    OutlinedButton(onClick = onStop) {
-                        Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_stop))
-                    }
+            PendingAttachmentRow(state.pendingAttachments, onRemoveAttachment)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(
+                        R.string.ai_chat_context_usage,
+                        tokenEstimate,
+                        state.config.contextWindowTokens,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                if (state.importingAttachment || state.analyzingModules) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 }
             }
-
-            if (toolsExpanded) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(onClick = onAttachFile, enabled = !sending) {
-                        Icon(Icons.Rounded.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_attach_file))
-                    }
-                    OutlinedButton(onClick = onAttachImage, enabled = !sending) {
-                        Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_attach_image))
-                    }
-                    OutlinedButton(onClick = onAnalyzeModules, enabled = !sending && !loadingModules) {
-                        if (loadingModules) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_analyze_modules))
-                    }
-                    TextButton(onClick = onClear, enabled = !sending) {
-                        Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(stringResource(id = R.string.ai_chat_clear))
-                    }
-                }
-            }
-
-            PendingAttachmentRow(
-                attachments = attachments,
-                onRemoveAttachment = onRemoveAttachment,
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
+                Box {
+                    IconButton(
+                        onClick = { toolsExpanded = true },
+                        enabled = !state.isSending && !state.importingAttachment,
+                    ) {
+                        Icon(Icons.Rounded.AttachFile, contentDescription = stringResource(R.string.ai_chat_tools))
+                    }
+                    DropdownMenu(
+                        expanded = toolsExpanded,
+                        onDismissRequest = { toolsExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ai_chat_attach_file)) },
+                            leadingIcon = { Icon(Icons.Rounded.AttachFile, contentDescription = null) },
+                            onClick = {
+                                toolsExpanded = false
+                                onAttachFile()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ai_chat_attach_image)) },
+                            leadingIcon = { Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null) },
+                            onClick = {
+                                toolsExpanded = false
+                                onAttachImage()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.ai_chat_analyze_modules)) },
+                            leadingIcon = { Icon(Icons.Rounded.Shield, contentDescription = null) },
+                            enabled = !state.analyzingModules,
+                            onClick = {
+                                toolsExpanded = false
+                                onAnalyzeModules()
+                            },
+                        )
+                    }
+                }
                 OutlinedTextField(
                     modifier = Modifier.weight(1f),
-                    value = input,
+                    value = state.draft,
                     onValueChange = onInputChange,
                     minLines = 1,
-                    maxLines = 4,
-                    placeholder = { Text(stringResource(id = R.string.ai_chat_input_hint)) },
-                    enabled = !sending,
+                    maxLines = 5,
+                    placeholder = { Text(stringResource(R.string.ai_chat_input_hint)) },
+                    enabled = !state.isSending,
                 )
-                Button(
-                    onClick = onSend,
-                    enabled = !sending && (input.isNotBlank() || attachments.isNotEmpty()),
-                ) {
-                    if (sending) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                if (state.isSending) {
+                    FilledTonalIconButton(onClick = onStop) {
+                        Icon(
+                            Icons.Rounded.StopCircle,
+                            contentDescription = stringResource(R.string.ai_chat_stop),
                         )
-                    } else {
-                        Text(stringResource(id = R.string.ai_chat_send))
+                    }
+                } else {
+                    FilledTonalIconButton(
+                        onClick = onSend,
+                        enabled = state.draft.isNotBlank() || state.pendingAttachments.isNotEmpty(),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Send,
+                            contentDescription = stringResource(R.string.ai_chat_send),
+                        )
                     }
                 }
             }
@@ -789,32 +1054,46 @@ private fun AiChatInputBar(
 @Composable
 private fun PendingAttachmentRow(
     attachments: List<AiAttachment>,
-    onRemoveAttachment: (AiAttachment) -> Unit,
+    onRemove: (String) -> Unit,
 ) {
     if (attachments.isEmpty()) return
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         attachments.forEach { attachment ->
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                onClick = { onRemoveAttachment(attachment) },
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(start = 9.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Icon(
+                        if (attachment.kind == AiAttachmentKind.Image) Icons.Rounded.Image else Icons.Rounded.AttachFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                    )
                     Text(
+                        modifier = Modifier.padding(start = 5.dp),
                         text = attachment.displayLabel(),
+                        style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.labelMedium,
                     )
+                    IconButton(
+                        modifier = Modifier.size(32.dp),
+                        onClick = { onRemove(attachment.id) },
+                    ) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.ai_chat_remove),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
@@ -829,454 +1108,165 @@ private fun AttachmentChips(attachments: List<AiAttachment>) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         attachments.forEach { attachment ->
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-            ) {
-                Text(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    text = attachment.displayLabel(),
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-private suspend fun requestAiChatStream(
-    config: AiApiConfig,
-    messages: List<AiMessage>,
-    onCall: suspend (Call) -> Unit,
-    onDelta: suspend (String) -> Unit,
-): String = withContext(Dispatchers.IO) {
-    val body = buildChatRequestBody(config, messages, stream = true).toString()
-    val requestBuilder = Request.Builder()
-        .url(resolveChatEndpoint(config.baseUrl))
-        .post(body.toRequestBody(JSON_MEDIA_TYPE))
-        .header("Content-Type", "application/json")
-    if (config.apiKey.isNotBlank()) {
-        requestBuilder.header("Authorization", "Bearer ${config.apiKey}")
-    }
-
-    val call = ksuApp.okhttpClient.newCall(requestBuilder.build())
-    onCall(call)
-    call.execute().use { response ->
-        if (!response.isSuccessful) {
-            val responseBody = response.body.string()
-            throw IOException("${response.code} ${response.message}: ${responseBody.take(600)}")
-        }
-        val contentType = response.header("Content-Type").orEmpty()
-        if (!contentType.contains("text/event-stream", ignoreCase = true)) {
-            return@withContext parseAiResponse(response.body.string())
-        }
-        parseAiStreamResponse(response, onDelta)
-    }
-}
-
-private suspend fun testAiConnection(config: AiApiConfig): String = withContext(Dispatchers.IO) {
-    val messages = listOf(AiMessage(id = 1, role = AiRole.User, text = "Reply with OK."))
-    val body = buildChatRequestBody(config, messages, stream = false)
-        .put("max_tokens", 8)
-        .toString()
-    val requestBuilder = Request.Builder()
-        .url(resolveChatEndpoint(config.baseUrl))
-        .post(body.toRequestBody(JSON_MEDIA_TYPE))
-        .header("Content-Type", "application/json")
-    if (config.apiKey.isNotBlank()) {
-        requestBuilder.header("Authorization", "Bearer ${config.apiKey}")
-    }
-    ksuApp.okhttpClient.newCall(requestBuilder.build()).execute().use { response ->
-        val responseBody = response.body.string()
-        if (!response.isSuccessful) {
-            throw IOException("${response.code} ${response.message}: ${responseBody.take(600)}")
-        }
-        parseAiResponse(responseBody)
-    }
-}
-
-private fun buildChatRequestBody(
-    config: AiApiConfig,
-    messages: List<AiMessage>,
-    stream: Boolean = false,
-): JSONObject {
-    val chatMessages = JSONArray()
-    if (config.systemPrompt.isNotBlank()) {
-        chatMessages.put(
-            JSONObject()
-                .put("role", "system")
-                .put("content", config.systemPrompt)
-        )
-    }
-
-    val requestMessages = messages
-        .filter { it.role != AiRole.Error }
-        .takeLast(MAX_HISTORY_MESSAGES)
-    requestMessages.forEachIndexed { index, message ->
-        val isLastUserMessage = index == requestMessages.lastIndex && message.role == AiRole.User
-        val role = if (message.role == AiRole.User) "user" else "assistant"
-        chatMessages.put(
-            JSONObject()
-                .put("role", role)
-                .put("content", buildMessageContent(message, includeImages = isLastUserMessage))
-        )
-    }
-
-    return JSONObject()
-        .put("model", config.model)
-        .put("messages", chatMessages)
-        .put("temperature", 0.6)
-        .put("stream", stream)
-}
-
-private fun buildMessageContent(message: AiMessage, includeImages: Boolean): Any {
-    if (message.role != AiRole.User) return message.text
-
-    val textContext = buildString {
-        append(message.text)
-        val files = message.attachments.filterIsInstance<AiAttachment.TextFile>()
-        if (files.isNotEmpty()) {
-            append("\n\nAttached file context:")
-            files.forEach { file ->
-                append("\n\n### ")
-                append(file.name)
-                append(" (")
-                append(formatBytes(file.sizeBytes))
-                if (file.truncated) append(", truncated")
-                append(")\n")
-                append(file.content)
-            }
-        }
-        val images = message.attachments.filterIsInstance<AiAttachment.ImageFile>()
-        if (images.isNotEmpty()) {
-            append("\n\nAttached images: ")
-            append(images.joinToString { it.name })
-        }
-    }.ifBlank {
-        "Please analyze the attached content."
-    }
-
-    val imageAttachments = if (includeImages) {
-        message.attachments.filterIsInstance<AiAttachment.ImageFile>()
-    } else {
-        emptyList()
-    }
-    if (imageAttachments.isEmpty()) return textContext
-
-    return JSONArray().apply {
-        put(JSONObject().put("type", "text").put("text", textContext))
-        imageAttachments.forEach { image ->
-            put(
-                JSONObject()
-                    .put("type", "image_url")
-                    .put(
-                        "image_url",
-                        JSONObject().put("url", image.dataUrl()),
+            Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (attachment.kind == AiAttachmentKind.Image) Icons.Rounded.Image else Icons.Rounded.AttachFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
                     )
-            )
-        }
-    }
-}
-
-private fun parseAiResponse(body: String): String {
-    val json = runCatching { JSONObject(body) }.getOrNull() ?: return body
-    val message = json.optJSONArray("choices")
-        ?.optJSONObject(0)
-        ?.optJSONObject("message")
-        ?: return body.take(MAX_ERROR_BODY_CHARS)
-    val content = message.opt("content")
-    if (content == null || content == JSONObject.NULL) {
-        return body.take(MAX_ERROR_BODY_CHARS)
-    }
-    if (content is JSONArray) {
-        return buildString {
-            for (index in 0 until content.length()) {
-                val item = content.optJSONObject(index) ?: continue
-                val text = item.optString("text")
-                if (text.isNotBlank()) append(text)
-            }
-        }.ifBlank { body.take(MAX_ERROR_BODY_CHARS) }
-    }
-    return content.toString().ifBlank { body.take(MAX_ERROR_BODY_CHARS) }
-}
-
-private suspend fun parseAiStreamResponse(
-    response: okhttp3.Response,
-    onDelta: suspend (String) -> Unit,
-): String {
-    val builder = StringBuilder()
-    val source = response.body.source()
-    while (!source.exhausted()) {
-        val line = source.readUtf8Line()?.trim() ?: continue
-        if (!line.startsWith("data:")) continue
-        val chunk = line.removePrefix("data:").trim()
-        if (chunk == "[DONE]") break
-        val json = runCatching { JSONObject(chunk) }.getOrNull() ?: continue
-        val delta = json.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("delta")
-            ?.opt("content")
-        val text = when (delta) {
-            is JSONArray -> buildString {
-                for (index in 0 until delta.length()) {
-                    val item = delta.optJSONObject(index) ?: continue
-                    val part = item.optString("text")
-                    if (part.isNotBlank()) append(part)
+                    Text(
+                        modifier = Modifier.padding(start = 5.dp),
+                        text = attachment.displayLabel(),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            null, JSONObject.NULL -> ""
-            else -> delta.toString()
-        }
-        if (text.isNotBlank()) {
-            builder.append(text)
-            onDelta(text)
-        }
-    }
-    return builder.toString()
-}
-
-private fun resolveChatEndpoint(baseUrl: String): String {
-    val clean = baseUrl.trim().trimEnd('/')
-    return if (clean.endsWith("/chat/completions")) {
-        clean
-    } else {
-        "$clean/chat/completions"
-    }
-}
-
-private suspend fun readTextAttachment(
-    context: Context,
-    uri: Uri,
-): AiAttachment.TextFile = withContext(Dispatchers.IO) {
-    val (bytes, truncated) = readBytesLimited(context, uri, MAX_TEXT_ATTACHMENT_BYTES)
-    val name = uri.getFileName(context).orEmpty().ifBlank { uri.lastPathSegment ?: "attachment" }
-    val text = bytes.toString(Charsets.UTF_8)
-        .replace(Regex("[\\p{Cntrl}&&[^\n\t\r]]"), " ")
-        .trim()
-        .ifBlank { "[empty or non-text file]" }
-        .take(MAX_TEXT_ATTACHMENT_CHARS)
-    AiAttachment.TextFile(
-        name = name,
-        sizeBytes = bytes.size.toLong(),
-        content = text,
-        truncated = truncated || text.length >= MAX_TEXT_ATTACHMENT_CHARS,
-    )
-}
-
-private suspend fun readImageAttachment(
-    context: Context,
-    uri: Uri,
-): AiAttachment.ImageFile = withContext(Dispatchers.IO) {
-    val (bytes, truncated) = readBytesLimited(context, uri, MAX_IMAGE_ATTACHMENT_BYTES + 1)
-    if (truncated || bytes.size > MAX_IMAGE_ATTACHMENT_BYTES) {
-        throw ImageTooLargeException()
-    }
-    val name = uri.getFileName(context).orEmpty().ifBlank { uri.lastPathSegment ?: "image" }
-    val mime = context.contentResolver.getType(uri)?.takeIf { it.startsWith("image/") } ?: "image/jpeg"
-    AiAttachment.ImageFile(
-        name = name,
-        sizeBytes = bytes.size.toLong(),
-        mimeType = mime,
-        base64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
-    )
-}
-
-private fun readBytesLimited(
-    context: Context,
-    uri: Uri,
-    limit: Int,
-): Pair<ByteArray, Boolean> {
-    val output = ByteArrayOutputStream()
-    var truncated = false
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) break
-            val remaining = limit - output.size()
-            if (remaining <= 0) {
-                truncated = true
-                break
-            }
-            val count = read.coerceAtMost(remaining)
-            output.write(buffer, 0, count)
-            if (count < read) {
-                truncated = true
-                break
-            }
-        }
-    }
-    return output.toByteArray() to truncated
-}
-
-private fun buildModuleAnalysisPrompt(modules: List<Module>): String {
-    val disabled = modules.count { !it.enabled }
-    val pendingUpdate = modules.count { it.update }
-    val pendingRemove = modules.count { it.remove }
-    val webUi = modules.count { it.hasWebUi }
-    val actionScripts = modules.count { it.hasActionScript }
-    val metamodules = modules.count { it.metamodule }
-    return buildString {
-        append("Please do a deep ApkeSU module health analysis in the user's language.\n")
-        append("Focus on compatibility risk, disabled modules, pending update/removal state, metamodule behavior, WebUI/action script hints, possible conflicts, and safe next steps.\n")
-        append("Do not invent facts. If evidence is insufficient, say what log or file should be checked next.\n\n")
-        append("Summary:\n")
-        append("- installed: ${modules.size}\n")
-        append("- disabled: $disabled\n")
-        append("- pending update: $pendingUpdate\n")
-        append("- pending removal: $pendingRemove\n")
-        append("- modules with WebUI: $webUi\n")
-        append("- modules with action script: $actionScripts\n")
-        append("- metamodules: $metamodules\n\n")
-        append("Module inventory:\n")
-        modules.sortedBy { it.name.lowercase() }.forEachIndexed { index, module ->
-            append("\n")
-            append(index + 1)
-            append(". ")
-            append(module.name)
-            append(" [")
-            append(module.id)
-            append("]\n")
-            append("   version: ")
-            append(module.version)
-            append(" (")
-            append(module.versionCode)
-            append("), author: ")
-            append(module.author)
-            append("\n")
-            append("   enabled: ")
-            append(module.enabled)
-            append(", update: ")
-            append(module.update)
-            append(", remove: ")
-            append(module.remove)
-            append(", webui: ")
-            append(module.hasWebUi)
-            append(", action: ")
-            append(module.hasActionScript)
-            append(", metamodule: ")
-            append(module.metamodule)
-            if (module.description.isNotBlank()) {
-                append("\n   description: ")
-                append(module.description.take(MAX_MODULE_DESCRIPTION_CHARS))
-            }
-            append("\n")
         }
     }
 }
 
-private fun AiAttachment.displayLabel(): String {
-    return "${name.take(28)} · ${formatBytes(sizeBytes)}"
-}
-
-private fun formatBytes(bytes: Long): String {
-    val size = max(bytes, 0L).toDouble()
-    return when {
-        size >= 1024 * 1024 -> "%.1f MB".format(size / 1024 / 1024)
-        size >= 1024 -> "%.1f KB".format(size / 1024)
-        else -> "${bytes} B"
-    }
-}
-
-private fun loadAiChatHistory(prefs: android.content.SharedPreferences): List<AiMessage> {
-    val text = prefs.getString(AI_CHAT_HISTORY, null) ?: return emptyList()
-    return runCatching {
-        val array = JSONArray(text)
-        buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                val role = runCatching { AiRole.valueOf(item.optString("role")) }.getOrNull() ?: continue
-                add(
-                    AiMessage(
-                        id = item.optLong("id", index + 1L),
-                        role = role,
-                        text = item.optString("text"),
-                    )
+@Composable
+private fun TransmissionConfirmationDialog(
+    pending: AiPendingTransmission,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val files = pending.attachments.count { it.kind != AiAttachmentKind.Image }
+    val images = pending.attachments.count { it.kind == AiAttachmentKind.Image }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Shield, contentDescription = null) },
+        title = { Text(stringResource(R.string.ai_chat_confirm_send_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    stringResource(R.string.ai_chat_send_destination, pending.targetHost),
+                    fontWeight = FontWeight.SemiBold,
                 )
+                Text(stringResource(R.string.ai_chat_external_api_warning))
+                Text(
+                    buildString {
+                        append(stringResource(R.string.ai_chat_data_summary))
+                        append(' ')
+                        append(stringResource(R.string.ai_chat_data_text))
+                        if (pending.sendsAuthentication) {
+                            append(", ").append(stringResource(R.string.ai_chat_data_auth))
+                        }
+                        if (files > 0) {
+                            append(", ").append(
+                                pluralStringResource(R.plurals.ai_chat_data_files, files, files)
+                            )
+                        }
+                        if (images > 0) {
+                            append(", ").append(
+                                pluralStringResource(R.plurals.ai_chat_data_images, images, images)
+                            )
+                        }
+                        if (pending.containsModuleInventory) {
+                            append(", ").append(stringResource(R.string.ai_chat_data_modules))
+                        }
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    SelectionContainer {
+                        Text(
+                            modifier = Modifier.padding(10.dp),
+                            text = buildTransmissionPreview(
+                                pending,
+                                stringResource(R.string.ai_chat_preview_truncated),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
             }
-        }
-    }.getOrDefault(emptyList())
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text(stringResource(R.string.ai_chat_confirm_send)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ai_chat_cancel)) }
+        },
+    )
 }
 
-private fun saveAiChatHistory(
-    prefs: android.content.SharedPreferences,
-    messages: List<AiMessage>,
+@Composable
+private fun ConfirmationDialog(
+    title: String,
+    text: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val array = JSONArray()
-    messages
-        .takeLast(MAX_SAVED_MESSAGES)
-        .filter { it.attachments.isEmpty() }
-        .forEach { message ->
-            array.put(
-                JSONObject()
-                    .put("id", message.id)
-                    .put("role", message.role.name)
-                    .put("text", message.text)
-            )
-        }
-    prefs.edit().putString(AI_CHAT_HISTORY, array.toString()).apply()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmText) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ai_chat_cancel)) }
+        },
+    )
 }
 
-private data class AiApiConfig(
-    val baseUrl: String,
-    val apiKey: String,
-    val model: String,
-    val systemPrompt: String,
-) {
-    fun isValid(): Boolean = baseUrl.isNotBlank() && model.isNotBlank()
+private fun copyToClipboard(context: Context, text: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+    clipboard.setPrimaryClip(ClipData.newPlainText("ai-chat", text))
+    Toast.makeText(context, R.string.ai_chat_copied, Toast.LENGTH_SHORT).show()
 }
 
-private data class AiMessage(
-    val id: Long,
-    val role: AiRole,
-    val text: String,
-    val attachments: List<AiAttachment> = emptyList(),
-)
-
-private enum class AiRole {
-    User,
-    Assistant,
-    Error,
+@Composable
+private fun AiProviderPreset.displayName(): String = when (this) {
+    AiProviderPreset.OpenAi -> stringResource(R.string.ai_chat_provider_openai)
+    AiProviderPreset.DeepSeek -> stringResource(R.string.ai_chat_provider_deepseek)
+    AiProviderPreset.Compatible -> stringResource(R.string.ai_chat_provider_compatible)
 }
 
-private sealed class AiAttachment {
-    abstract val name: String
-    abstract val sizeBytes: Long
+private fun AiConversation.displayTitle(defaultTitle: String): String =
+    title.takeUnless { it.isBlank() || it == DEFAULT_CONVERSATION_TITLE } ?: defaultTitle
 
-    data class TextFile(
-        override val name: String,
-        override val sizeBytes: Long,
-        val content: String,
-        val truncated: Boolean,
-    ) : AiAttachment()
+private fun AiAttachment.displayLabel(): String =
+    "${name.take(26)} · ${formatBytes(sizeBytes)}"
 
-    data class ImageFile(
-        override val name: String,
-        override val sizeBytes: Long,
-        val mimeType: String,
-        val base64: String,
-    ) : AiAttachment() {
-        fun dataUrl(): String = "data:$mimeType;base64,$base64"
+private data class CodeBlock(val language: String, val code: String)
+
+private fun extractCodeBlocks(markdown: String): List<CodeBlock> = CODE_BLOCK_REGEX
+    .findAll(markdown)
+    .map { match ->
+        CodeBlock(
+            language = match.groupValues[1].trim().take(20),
+            code = match.groupValues[2].trimEnd(),
+        )
     }
-}
+    .filter { it.code.isNotBlank() }
+    .toList()
 
-private class ImageTooLargeException : IOException()
+private fun buildTransmissionPreview(pending: AiPendingTransmission, truncatedLabel: String): String = buildString {
+    append(pending.text.take(700))
+    pending.attachments.forEach { attachment ->
+        append("\n\n[").append(attachment.name).append("]")
+        append(" ").append(attachment.mimeType).append(" / ").append(formatBytes(attachment.sizeBytes))
+        if (attachment.extractedText.isNotBlank()) {
+            append("\n").append(attachment.extractedText.take(1_200))
+            if (attachment.extractedText.length > 1_200) append("\n...").append(truncatedLabel)
+        }
+    }
+}.take(3_000)
 
-private const val AI_CHAT_PREFS = "ai_chat"
-private const val AI_CHAT_BASE_URL = "base_url"
-private const val AI_CHAT_API_KEY = "api_key"
-private const val AI_CHAT_MODEL = "model"
-private const val AI_CHAT_SYSTEM_PROMPT = "system_prompt"
-private const val AI_CHAT_HISTORY = "history"
-private const val DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
-private const val DEFAULT_AI_MODEL = "gpt-4o-mini"
-private const val MAX_HISTORY_MESSAGES = 12
-private const val MAX_SAVED_MESSAGES = 40
-private const val MAX_TEXT_ATTACHMENT_BYTES = 192 * 1024
-private const val MAX_TEXT_ATTACHMENT_CHARS = 80_000
-private const val MAX_IMAGE_ATTACHMENT_BYTES = 3 * 1024 * 1024
-private const val MAX_ERROR_BODY_CHARS = 4000
-private const val MAX_MODULE_DESCRIPTION_CHARS = 240
-private const val HISTORY_SAVE_DEBOUNCE_MS = 400L
-private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+private val CODE_BLOCK_REGEX = Regex("```([^\\n`]*)\\n([\\s\\S]*?)```", RegexOption.MULTILINE)

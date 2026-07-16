@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,6 +28,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
@@ -73,6 +76,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -83,7 +87,10 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.KsuIsValid
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
-import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
+import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
@@ -245,6 +252,12 @@ fun SettingPagerMiuix(
                             selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                             onSelectedIndexChange = actions.onSetUiModeIndex
                         )
+                        if (uiState.uiMode == InterfaceStyle.Snow.value) {
+                            SeasonMiuixPreference(
+                                selectedValue = uiState.seasonStyle,
+                                onSelectedIndexChange = actions.onSetSeasonStyleIndex,
+                            )
+                        }
                         DayNightMiuixPreference(
                             title = stringResource(id = R.string.settings_day_night_switch),
                             summary = stringResource(id = R.string.settings_day_night_switch_summary),
@@ -263,6 +276,19 @@ fun SettingPagerMiuix(
                                 )
                             },
                             onClick = actions.onOpenVisualEffects
+                        )
+                        ArrowPreference(
+                            title = stringResource(id = R.string.settings_ui_decoration_library),
+                            summary = stringResource(id = R.string.settings_ui_decoration_library_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.AutoFixHigh,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_ui_decoration_library),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            onClick = actions.onOpenUiDecorationLibrary
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_theme),
@@ -592,7 +618,8 @@ fun SettingPagerMiuix(
                             title = stringResource(R.string.settings_section_advanced),
                             summary = stringResource(R.string.settings_section_advanced_summary),
                             icon = Icons.Rounded.DeveloperMode,
-                            itemCount = ADVANCED_ITEM_COUNT,
+                            itemCount = ADVANCED_ITEM_COUNT + 1 +
+                                if (uiState.graphicsRendererFeatureEnabled) 1 else 0,
                             expanded = advancedExpanded,
                             onExpandedChange = { advancedExpanded = it },
                         ) {
@@ -700,6 +727,37 @@ fun SettingPagerMiuix(
                                 },
                                 onClick = actions.onOpenCpuSpoof
                             )
+
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_graphics_renderer_tool),
+                                summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.DeveloperMode,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(R.string.settings_graphics_renderer_tool),
+                                        tint = colorScheme.onBackground,
+                                    )
+                                },
+                                checked = uiState.graphicsRendererFeatureEnabled,
+                                onCheckedChange = actions.onSetGraphicsRendererFeatureEnabled,
+                            )
+
+                            if (uiState.graphicsRendererFeatureEnabled) {
+                                ArrowPreference(
+                                    title = stringResource(R.string.settings_graphics_renderer),
+                                    summary = stringResource(R.string.settings_graphics_renderer_summary),
+                                    startAction = {
+                                        Icon(
+                                            Icons.Rounded.DeveloperMode,
+                                            modifier = Modifier.padding(end = 6.dp),
+                                            contentDescription = stringResource(R.string.settings_graphics_renderer),
+                                            tint = colorScheme.onBackground,
+                                        )
+                                    },
+                                    onClick = actions.onOpenGraphicsRenderer,
+                                )
+                            }
 
                             ArrowPreference(
                                 title = stringResource(id = R.string.rescue_protection),
@@ -970,7 +1028,8 @@ private fun CollapsibleMiuixSection(
                 .padding(top = 6.dp, bottom = bottomPadding)
                 .fillMaxWidth()
                 .settingsLiquidGlassSurface(),
-            colors = liquidGlassMiuixCardColors(),
+            colors = snowMiuixCardColors(),
+            insideMargin = PaddingValues(top = if (isSnowInterfaceStyle()) 8.dp else 0.dp),
         ) {
             content()
         }
@@ -982,7 +1041,78 @@ private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 11
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 13
+    return 14 + if (uiMode == InterfaceStyle.Snow.value) 1 else 0
+}
+
+@Composable
+private fun SeasonMiuixPreference(
+    selectedValue: String,
+    onSelectedIndexChange: (Int) -> Unit,
+) {
+    val selectedSeason = SeasonStyle.fromValue(selectedValue)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.Palette,
+            modifier = Modifier.padding(end = 12.dp).size(24.dp),
+            contentDescription = null,
+            tint = colorScheme.onBackground,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_season_style),
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(selectedSeason.summaryRes),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
+            .selectableGroup()
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SeasonStyle.entries.forEachIndexed { index, season ->
+            val selected = season == selectedSeason
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) colorScheme.primaryContainer.copy(alpha = 0.92f) else Color.Transparent
+                    )
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = { onSelectedIndexChange(index) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(season.labelRes),
+                    color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariantSummary,
+                    fontSize = 14.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1061,5 +1191,5 @@ private fun Modifier.settingsLiquidGlassSurface(): Modifier {
         refractionHeight = 14.dp,
         refractionAmount = 9.dp,
         strokeAlpha = 0.66f,
-    )
+    ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
 }

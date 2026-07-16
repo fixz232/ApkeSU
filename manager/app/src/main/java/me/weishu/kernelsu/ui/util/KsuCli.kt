@@ -3,11 +3,11 @@ package me.weishu.kernelsu.ui.util
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.os.Parcelable
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.system.Os
+import android.util.Base64
 import android.util.Log
 import com.topjohnwu.superuser.CallbackList
 import com.topjohnwu.superuser.Shell
@@ -45,6 +45,14 @@ const val BUILTIN_MOUNT_VARIANT_LITE = "lite"
 const val BUILTIN_MOUNT_VARIANT_FULL = "full"
 const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
 const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
+private const val GRAPHICS_RENDERER_DIR = "/data/adb/apkesu/graphics_renderer"
+private const val GRAPHICS_RENDERER_MODE_FILE = "$GRAPHICS_RENDERER_DIR/mode"
+private const val GRAPHICS_RENDERER_BACKUP_MARKER = "$GRAPHICS_RENDERER_DIR/backup_complete"
+private const val GRAPHICS_RENDERER_ORIGINAL_RENDERER = "$GRAPHICS_RENDERER_DIR/original_renderer"
+private const val GRAPHICS_RENDERER_ORIGINAL_DISABLE = "$GRAPHICS_RENDERER_DIR/original_disable_vulkan"
+private const val GRAPHICS_RENDERER_RESTART_MARKER = "$GRAPHICS_RENDERER_DIR/restart_required"
+private const val GRAPHICS_RENDERER_SERVICE = "/data/adb/service.d/99-apkesu-graphics-renderer.sh"
+private const val GRAPHICS_RENDERER_SERVICE_ASSET = "graphics_renderer_service.sh"
 
 private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
@@ -632,6 +640,308 @@ suspend fun setCpuSpoofEnabled(enabled: Boolean): CpuSpoofCommandResult {
 
 suspend fun restoreDefaultCpuSpoof(): CpuSpoofCommandResult {
     return runCpuSpoofCommand("restore-default")
+}
+
+suspend fun getGraphicsRendererStatus(): GraphicsRendererStatus = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext GraphicsRendererStatus(error = "root_unavailable")
+    }
+
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val command = """
+        renderer="${'$'}(getprop debug.hwui.renderer 2>/dev/null)"
+        disable_vulkan="${'$'}(getprop debug.hwui.disable_vulkan 2>/dev/null)"
+        egl_driver="${'$'}(getprop ro.hardware.egl 2>/dev/null)"
+        hardware_vulkan="${'$'}(getprop ro.hardware.vulkan 2>/dev/null)"
+        vulkan_feature="${'$'}(pm list features 2>/dev/null | grep 'android.hardware.vulkan.level' | head -n 1)"
+        vulkan_driver=""
+        for candidate in /vendor/lib64/hw/vulkan.*.so /vendor/lib/hw/vulkan.*.so /system/vendor/lib64/hw/vulkan.*.so /system/vendor/lib/hw/vulkan.*.so; do
+          if [ -e "${'$'}candidate" ]; then vulkan_driver="${'$'}candidate"; break; fi
+        done
+        configured_mode="${'$'}(cat $GRAPHICS_RENDERER_MODE_FILE 2>/dev/null)"
+        original_renderer="${'$'}(cat $GRAPHICS_RENDERER_ORIGINAL_RENDERER 2>/dev/null)"
+        original_disable_vulkan="${'$'}(cat $GRAPHICS_RENDERER_ORIGINAL_DISABLE 2>/dev/null)"
+        [ -f $GRAPHICS_RENDERER_BACKUP_MARKER ] && backup_available=1 || backup_available=0
+        [ -x $GRAPHICS_RENDERER_SERVICE ] && persistent=1 || persistent=0
+        [ -f $GRAPHICS_RENDERER_RESTART_MARKER ] && restart_required=1 || restart_required=0
+        printf 'renderer=%s\n' "${'$'}renderer"
+        printf 'disable_vulkan=%s\n' "${'$'}disable_vulkan"
+        printf 'egl_driver=%s\n' "${'$'}egl_driver"
+        printf 'hardware_vulkan=%s\n' "${'$'}hardware_vulkan"
+        printf 'vulkan_feature=%s\n' "${'$'}vulkan_feature"
+        printf 'vulkan_driver=%s\n' "${'$'}vulkan_driver"
+        printf 'configured_mode=%s\n' "${'$'}configured_mode"
+        printf 'original_renderer=%s\n' "${'$'}original_renderer"
+        printf 'original_disable_vulkan=%s\n' "${'$'}original_disable_vulkan"
+        printf 'backup_available=%s\n' "${'$'}backup_available"
+        printf 'persistent=%s\n' "${'$'}persistent"
+        printf 'restart_required=%s\n' "${'$'}restart_required"
+    """.trimIndent()
+    val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        getRootShell().newJob().add(command).to(stdout, stderr).exec()
+    }
+    if (result == null) {
+        KsuCli.reset()
+        return@withContext GraphicsRendererStatus(error = "timeout")
+    }
+    if (!result.isSuccess) {
+        return@withContext GraphicsRendererStatus(
+            rootAvailable = true,
+            error = stderr.joinToString("\n").trim().ifBlank { "status_failed" },
+        )
+    }
+    parseGraphicsRendererStatus(stdout)
+}
+
+suspend fun setGraphicsRendererMode(
+    mode: GraphicsRendererMode,
+    persistent: Boolean,
+): GraphicsRendererCommandResult = withContext(Dispatchers.IO) {
+    if (mode == GraphicsRendererMode.Custom) {
+        return@withContext GraphicsRendererCommandResult(false, error = "invalid_mode")
+    }
+    val before = getGraphicsRendererStatus()
+    if (!before.rootAvailable) {
+        return@withContext GraphicsRendererCommandResult(false, before, before.error.ifBlank { "root_unavailable" })
+    }
+    if (mode == GraphicsRendererMode.Vulkan && !before.vulkanSupported) {
+        return@withContext GraphicsRendererCommandResult(false, before, "vulkan_unsupported")
+    }
+    if (mode == GraphicsRendererMode.SystemDefault) {
+        return@withContext restoreGraphicsRendererDefault(before)
+    }
+
+    val serviceBase64 = runCatching {
+        ksuApp.assets.open(GRAPHICS_RENDERER_SERVICE_ASSET).use { input ->
+            Base64.encodeToString(input.readBytes(), Base64.NO_WRAP)
+        }
+    }.getOrElse {
+        return@withContext GraphicsRendererCommandResult(false, before, "service_asset_missing")
+    }
+
+    if (!before.backupAvailable) {
+        val backup = runGraphicsRendererCommands(
+            listOf(
+                "mkdir -p $GRAPHICS_RENDERER_DIR && chmod 0700 $GRAPHICS_RENDERER_DIR",
+                atomicWriteCommand(GRAPHICS_RENDERER_ORIGINAL_RENDERER, before.rendererProperty),
+                atomicWriteCommand(GRAPHICS_RENDERER_ORIGINAL_DISABLE, before.disableVulkanProperty),
+                ": > $GRAPHICS_RENDERER_BACKUP_MARKER && chmod 0600 $GRAPHICS_RENDERER_BACKUP_MARKER",
+            )
+        )
+        if (!backup.first) {
+            return@withContext GraphicsRendererCommandResult(false, before, backup.second.ifBlank { "backup_failed" })
+        }
+    }
+
+    val applied = applyGraphicsRendererRuntime(mode)
+    if (!applied.first) {
+        rollbackGraphicsRendererRuntime(before)
+        return@withContext GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            applied.second.ifBlank { "apply_failed" },
+        )
+    }
+    val runtimeStatus = getGraphicsRendererStatus()
+    if (!runtimeMatchesGraphicsRendererMode(runtimeStatus, mode)) {
+        rollbackGraphicsRendererRuntime(before)
+        return@withContext GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            "runtime_verification_failed",
+        )
+    }
+
+    val committed = writeGraphicsRendererConfiguration(mode, persistent, serviceBase64, restartRequired = true)
+    if (!committed.first) {
+        rollbackGraphicsRendererRuntime(before)
+        restorePreviousGraphicsRendererConfiguration(before, serviceBase64)
+        return@withContext GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            committed.second.ifBlank { "config_write_failed" },
+        )
+    }
+
+    val finalStatus = getGraphicsRendererStatus()
+    val verified = finalStatus.configuredMode == mode &&
+        finalStatus.persistent == persistent &&
+        runtimeMatchesGraphicsRendererMode(finalStatus, mode)
+    if (!verified) {
+        rollbackGraphicsRendererRuntime(before)
+        restorePreviousGraphicsRendererConfiguration(before, serviceBase64)
+        return@withContext GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            "final_verification_failed",
+        )
+    }
+    GraphicsRendererCommandResult(true, finalStatus)
+}
+
+private suspend fun restoreGraphicsRendererDefault(
+    before: GraphicsRendererStatus,
+): GraphicsRendererCommandResult {
+    if (!before.configured && !before.backupAvailable) {
+        runGraphicsRendererCommands(listOf("rm -f $GRAPHICS_RENDERER_SERVICE $GRAPHICS_RENDERER_RESTART_MARKER"))
+        return GraphicsRendererCommandResult(true, getGraphicsRendererStatus())
+    }
+    if (!before.backupAvailable) {
+        return GraphicsRendererCommandResult(false, before, "backup_missing")
+    }
+    val restored = runGraphicsRendererCommands(
+        graphicsRendererPropertyCommands(
+            before.originalRendererProperty,
+            before.originalDisableVulkanProperty,
+        )
+    )
+    if (!restored.first) {
+        rollbackGraphicsRendererRuntime(before)
+        return GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            restored.second.ifBlank { "restore_failed" },
+        )
+    }
+    val runtimeStatus = getGraphicsRendererStatus()
+    if (
+        runtimeStatus.rendererProperty != before.originalRendererProperty ||
+        runtimeStatus.disableVulkanProperty != before.originalDisableVulkanProperty
+    ) {
+        rollbackGraphicsRendererRuntime(before)
+        return GraphicsRendererCommandResult(
+            false,
+            getGraphicsRendererStatus(),
+            "restore_verification_failed",
+        )
+    }
+    val cleanup = runGraphicsRendererCommands(
+        listOf(
+            "rm -f $GRAPHICS_RENDERER_SERVICE",
+            "rm -f $GRAPHICS_RENDERER_MODE_FILE $GRAPHICS_RENDERER_ORIGINAL_RENDERER " +
+                "$GRAPHICS_RENDERER_ORIGINAL_DISABLE $GRAPHICS_RENDERER_BACKUP_MARKER " +
+                "$GRAPHICS_RENDERER_RESTART_MARKER",
+            "rmdir $GRAPHICS_RENDERER_DIR 2>/dev/null || true",
+        )
+    )
+    if (!cleanup.first) {
+        return GraphicsRendererCommandResult(false, runtimeStatus, cleanup.second.ifBlank { "cleanup_failed" })
+    }
+    val finalStatus = getGraphicsRendererStatus()
+    return GraphicsRendererCommandResult(
+        success = !finalStatus.configured && !finalStatus.persistent,
+        status = finalStatus,
+        error = if (!finalStatus.configured && !finalStatus.persistent) "" else "cleanup_verification_failed",
+    )
+}
+
+private suspend fun applyGraphicsRendererRuntime(mode: GraphicsRendererMode): Pair<Boolean, String> =
+    runGraphicsRendererCommands(
+        when (mode) {
+            GraphicsRendererMode.Vulkan -> graphicsRendererPropertyCommands("skiavk", "false")
+            GraphicsRendererMode.OpenGl -> graphicsRendererPropertyCommands("skiagl", "true")
+            else -> emptyList()
+        }
+    )
+
+private suspend fun rollbackGraphicsRendererRuntime(status: GraphicsRendererStatus) {
+    runGraphicsRendererCommands(
+        graphicsRendererPropertyCommands(status.rendererProperty, status.disableVulkanProperty)
+    )
+}
+
+private fun graphicsRendererPropertyCommands(renderer: String, disableVulkan: String): List<String> = listOf(
+    resetGraphicsPropertyCommand("debug.hwui.renderer", renderer),
+    resetGraphicsPropertyCommand("debug.hwui.disable_vulkan", disableVulkan),
+)
+
+private fun resetGraphicsPropertyCommand(name: String, value: String): String {
+    val executable = shellQuote(getKsuDaemonPath())
+    return if (value.isEmpty()) {
+        "$executable resetprop --delete ${shellQuote(name)}"
+    } else {
+        "$executable resetprop ${shellQuote(name)} ${shellQuote(value)}"
+    }
+}
+
+private fun runtimeMatchesGraphicsRendererMode(
+    status: GraphicsRendererStatus,
+    mode: GraphicsRendererMode,
+): Boolean = when (mode) {
+    GraphicsRendererMode.Vulkan -> status.rendererProperty == "skiavk" &&
+        !status.disableVulkanProperty.equals("true", true)
+    GraphicsRendererMode.OpenGl -> status.rendererProperty == "skiagl" &&
+        status.disableVulkanProperty.equals("true", true)
+    GraphicsRendererMode.SystemDefault -> !status.configured
+    GraphicsRendererMode.Custom -> false
+}
+
+private suspend fun writeGraphicsRendererConfiguration(
+    mode: GraphicsRendererMode,
+    persistent: Boolean,
+    serviceBase64: String,
+    restartRequired: Boolean,
+): Pair<Boolean, String> {
+    val commands = mutableListOf(
+        "mkdir -p $GRAPHICS_RENDERER_DIR /data/adb/service.d && chmod 0700 $GRAPHICS_RENDERER_DIR",
+        atomicWriteCommand(GRAPHICS_RENDERER_MODE_FILE, mode.value),
+    )
+    if (persistent) {
+        commands += "printf '%s' ${shellQuote(serviceBase64)} | $BUSYBOX base64 -d > " +
+            "$GRAPHICS_RENDERER_SERVICE.tmp && chmod 0700 $GRAPHICS_RENDERER_SERVICE.tmp && " +
+            "chown 0:0 $GRAPHICS_RENDERER_SERVICE.tmp && mv -f $GRAPHICS_RENDERER_SERVICE.tmp $GRAPHICS_RENDERER_SERVICE"
+    } else {
+        commands += "rm -f $GRAPHICS_RENDERER_SERVICE $GRAPHICS_RENDERER_SERVICE.tmp"
+    }
+    commands += if (restartRequired) {
+        ": > $GRAPHICS_RENDERER_RESTART_MARKER && chmod 0600 $GRAPHICS_RENDERER_RESTART_MARKER"
+    } else {
+        "rm -f $GRAPHICS_RENDERER_RESTART_MARKER"
+    }
+    return runGraphicsRendererCommands(commands)
+}
+
+private suspend fun restorePreviousGraphicsRendererConfiguration(
+    status: GraphicsRendererStatus,
+    serviceBase64: String,
+) {
+    val mode = status.configuredMode
+    if (mode == null) {
+        runGraphicsRendererCommands(
+            listOf(
+                "rm -f $GRAPHICS_RENDERER_MODE_FILE $GRAPHICS_RENDERER_SERVICE $GRAPHICS_RENDERER_RESTART_MARKER"
+            )
+        )
+    } else {
+        writeGraphicsRendererConfiguration(mode, status.persistent, serviceBase64, status.restartRequired)
+    }
+}
+
+private fun atomicWriteCommand(path: String, value: String): String =
+    "printf '%s' ${shellQuote(value)} > $path.tmp && chmod 0600 $path.tmp && mv -f $path.tmp $path"
+
+private suspend fun runGraphicsRendererCommands(commands: List<String>): Pair<Boolean, String> {
+    if (commands.isEmpty()) return true to ""
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val script = buildString {
+        appendLine("set -e")
+        commands.forEach(::appendLine)
+    }
+    val result = runCatching {
+        withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob().add(script).to(stdout, stderr).exec()
+        }
+    }.getOrElse { error ->
+        return false to error.message.orEmpty().ifBlank { "shell_failed" }
+    }
+    if (result == null) {
+        KsuCli.reset()
+        return false to "timeout"
+    }
+    val detail = stderr.joinToString("\n").trim().ifBlank { stdout.joinToString("\n").trim() }
+    return result.isSuccess to detail
 }
 
 private suspend fun runCpuSpoofCommand(command: String): CpuSpoofCommandResult = withContext(Dispatchers.IO) {
@@ -1228,15 +1538,29 @@ private fun flashWithIoAk3(
 }
 
 private fun copyUriToCache(uri: Uri, fileName: String): File {
-    val file = File(ksuApp.cacheDir, fileName)
-    val input = ksuApp.contentResolver.openInputStream(uri)
-        ?: error("Unable to open selected file: $uri")
-    input.use { source ->
-        file.outputStream().use { output ->
-            source.copyTo(output)
+    val requestedName = File(fileName).name
+    val baseName = requestedName.substringBeforeLast('.', requestedName)
+        .take(32)
+        .padEnd(3, '_')
+    val extension = requestedName.substringAfterLast('.', "")
+        .takeIf { it.isNotEmpty() }
+        ?.let { ".$it" }
+        .orEmpty()
+    val file = File.createTempFile("${baseName}_", extension, ksuApp.cacheDir)
+    return try {
+        val input = ksuApp.contentResolver.openInputStream(uri)
+            ?: error("Unable to open selected file: $uri")
+        input.use { source ->
+            file.outputStream().use { output ->
+                source.copyTo(output)
+            }
         }
+        require(file.length() > 0) { "Selected file is empty: $uri" }
+        file
+    } catch (error: Exception) {
+        file.delete()
+        throw error
     }
-    return file
 }
 
 fun flashModule(
@@ -1320,7 +1644,7 @@ sealed class LkmSelection : Parcelable {
     data object KmiNone : LkmSelection()
 }
 
-fun installBoot(
+suspend fun installBoot(
     bootUri: Uri?,
     lkm: LkmSelection,
     ota: Boolean,
@@ -1330,61 +1654,58 @@ fun installBoot(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit,
 ): FlashResult {
-    val bootFile = bootUri?.let { uri -> copyUriToCache(uri, "boot.img") }
-
-    var cmd = "boot-patch"
-
-    cmd += if (bootFile == null) {
-        // no boot.img, use -f to flash
-        " -f"
-    } else {
-        " -b ${shellQuote(bootFile.absolutePath)}"
-    }
-
-    if (allowShell) {
-        cmd += " --allow-shell"
-    }
-
-    if (enableAdb) {
-        cmd += " --enable-adbd"
-    }
-
-    if (ota) {
-        cmd += " -u"
-    }
-
+    var bootFile: File? = null
     var lkmFile: File? = null
-    when (lkm) {
-        is LkmSelection.LkmUri -> {
-            lkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
-            cmd += " -m ${shellQuote(lkmFile.absolutePath)}"
-        }
-
-        is LkmSelection.KmiString -> {
-            cmd += " --kmi ${shellQuote(lkm.value)}"
-        }
-
-        is LkmSelection.PathMaskKmiString -> {
-            cmd += " --pathmask-lkm --kmi ${shellQuote(lkm.value)}"
-        }
-
-        LkmSelection.KmiNone -> {
-            // do nothing
-        }
-    }
-
-    // output dir
-    if (bootFile != null) {
-        val downloadsDir =
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        cmd += " -o ${shellQuote(downloadsDir.absolutePath)}"
-    }
-
-    partition?.let { part ->
-        cmd += " --partition ${shellQuote(part)}"
-    }
+    var patchedOutput: File? = null
 
     return try {
+        bootFile = bootUri?.let { uri -> copyUriToCache(uri, "boot.img") }
+        var cmd = "boot-patch"
+
+        cmd += bootFile?.let { " -b ${shellQuote(it.absolutePath)}" } ?: " -f"
+
+        if (allowShell) {
+            cmd += " --allow-shell"
+        }
+        if (enableAdb) {
+            cmd += " --enable-adbd"
+        }
+        if (ota) {
+            cmd += " -u"
+        }
+
+        when (lkm) {
+            is LkmSelection.LkmUri -> {
+                val selectedLkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
+                lkmFile = selectedLkmFile
+                cmd += " -m ${shellQuote(selectedLkmFile.absolutePath)}"
+            }
+
+            is LkmSelection.KmiString -> {
+                cmd += " --kmi ${shellQuote(lkm.value)}"
+            }
+
+            is LkmSelection.PathMaskKmiString -> {
+                cmd += " --pathmask-lkm --kmi ${shellQuote(lkm.value)}"
+            }
+
+            LkmSelection.KmiNone -> Unit
+        }
+
+        if (bootFile != null) {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+            val outputName = "apkesu_patched_$timestamp.img"
+            val outputFile = File(ksuApp.cacheDir, outputName)
+            outputFile.delete()
+            patchedOutput = outputFile
+            cmd += " -o ${shellQuote(ksuApp.cacheDir.absolutePath)}"
+            cmd += " --out-name ${shellQuote(outputName)}"
+        } else {
+            partition?.let { part ->
+                cmd += " --partition ${shellQuote(part)}"
+            }
+        }
+
         if (bootFile == null) {
             // Direct install writes the patched boot immediately. Refresh the
             // persistent daemon first so the next boot keeps the APK-bundled
@@ -1399,20 +1720,40 @@ fun installBoot(
         val result = flashWithIO("${shellQuote(getKsuDaemonPath())} $cmd", onStdout, onStderr)
         Log.i("KernelSU", "install boot result: ${result.isSuccess}")
 
-        if (result.isSuccess) {
-            // Keep /data/adb/ksud available after reboot for both direct flash and
-            // manually flashed patched images.
-            if (!install()) {
-                onStderr("Warning: patched successfully, but failed to refresh the ApkeSU daemon")
-            }
+        if (!result.isSuccess) {
+            return FlashResult(result, false)
         }
 
-        // if boot uri is empty, it is direct install, when success, we should show reboot button
-        val showReboot = bootUri == null && result.isSuccess
+        patchedOutput?.let { output ->
+            if (!output.isFile || output.length() == 0L) {
+                val error = "Patched image output is missing or empty"
+                onStderr(error)
+                return FlashResult(1, error, false)
+            }
+            val savedPath = runCatching {
+                saveFileToDownloads(
+                    context = ksuApp,
+                    displayName = output.name,
+                    source = output,
+                )
+            }.getOrElse { throwable ->
+                val error = "Failed to save patched image: ${throwable.localizedMessage ?: throwable.javaClass.simpleName}"
+                onStderr(error)
+                return FlashResult(1, error, false)
+            }
+            onStdout("- Patched image saved to $savedPath")
+        }
+
+        if (bootFile != null && rootAvailable() && !install()) {
+            onStderr("Warning: patched successfully, but failed to refresh the ApkeSU daemon")
+        }
+
+        val showReboot = bootUri == null
         FlashResult(result, showReboot)
     } finally {
         bootFile?.delete()
         lkmFile?.delete()
+        patchedOutput?.delete()
     }
 }
 
@@ -1438,7 +1779,13 @@ fun flashAnyKernelZip(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
-    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+    if (!install()) {
+        val error = "Failed to install the ApkeSU daemon before AnyKernel flash"
+        onStderr(error)
+        return FlashResult(1, error, false)
+    }
+
+    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
     val tmpFile = copyUriToCache(uri, "anykernel_${timestamp}.zip")
 
     val destZip = tmpFile.absolutePath
@@ -1449,35 +1796,39 @@ fun flashAnyKernelZip(
     val cmd = """
         mkdir -p '$destDir' && \
         $BUSYBOX unzip -p -o '$destZip' "META-INF/com/google/android/update-binary" > '$destDir/update-binary' 2>/dev/null && \
-        cp '$destZip' '$destDir/$destZipName' 2>/dev/null || true && \
+        $BUSYBOX test -s '$destDir/update-binary' && \
+        $BUSYBOX cp '$destZip' '$destDir/$destZipName' && \
         $BUSYBOX chmod 755 '$destDir/update-binary' && \
         $BUSYBOX chown root:root '$destDir/update-binary' && \
         (cd '$destDir' && \
-            if [ -f './update-binary' ] && grep -q "AnyKernel3" './update-binary'; then \
+            if [ -f './update-binary' ] && $BUSYBOX grep -q "AnyKernel3" './update-binary'; then \
                 AKHOME='$destDir/tmp' $BUSYBOX ash '$destDir/update-binary' 3 1 '$destDir/$destZipName'; \
             else \
                 echo 'No installer script found' >&2; exit 1; \
             fi)
     """.trimIndent().replace(Regex("\\s+\\\\\\s*"), " ")
 
-    val result = flashWithIoAk3(cmd, onStdout, onStderr)
-    if (result.isSuccess) {
-        runCatching {
-            if (!execKsud("rescue mark-pending ${shellQuote("AnyKernel install")}", true)) {
-                onStderr("Rescue protection: failed to mark next boot pending")
+    return try {
+        val result = flashWithIoAk3(cmd, onStdout, onStderr)
+        if (result.isSuccess) {
+            runCatching {
+                if (!execKsud("rescue mark-pending ${shellQuote("AnyKernel install")}", true)) {
+                    onStderr("Rescue protection: failed to mark next boot pending")
+                }
+            }.onFailure {
+                Log.w(TAG, "failed to mark rescue pending after AnyKernel install", it)
             }
-        }.onFailure {
-            Log.w(TAG, "failed to mark rescue pending after AnyKernel install", it)
         }
-    }
-    try {
-        return FlashResult(result, result.isSuccess)
+        FlashResult(result, result.isSuccess)
     } finally {
         runCatching {
             createRootShell(true).use { shell ->
-                shell.newJob().add("rm -rf '$destDir' '$destZip'").exec()
+                shell.newJob()
+                    .add("rm -rf ${shellQuote(destDir)} ${shellQuote(destZip)}")
+                    .exec()
             }
         }
+        tmpFile.delete()
     }
 }
 
@@ -1695,19 +2046,33 @@ private val fallbackSupportedKmis = listOf(
 private val kmiNameRegex = Regex("""^android\d+-\d+(?:\.\d+)?$""")
 
 suspend fun getCurrentKmi(): String = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val cmd = "boot-info current-kmi"
-    ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} $cmd").trim()
+    runCatching {
+        val shell = getRootShell()
+        val cmd = "boot-info current-kmi"
+        ShellUtils.fastCmd(shell, "${shellQuote(getKsuDaemonPath())} $cmd").trim()
+    }.getOrElse {
+        Log.w(TAG, "current KMI detection failed", it)
+        ""
+    }
 }
 
 suspend fun getSupportedKmis(): List<String> = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val cmd = "boot-info supported-kmis"
-    val out = shell.newJob().add("${getKsuDaemonPath()} $cmd").to(ArrayList(), null).exec().out
-    out.map { it.trim() }
-        .filter { it.matches(kmiNameRegex) }
-        .distinct()
-        .ifEmpty { fallbackSupportedKmis }
+    runCatching {
+        val shell = getRootShell()
+        val cmd = "boot-info supported-kmis"
+        val result = shell.newJob()
+            .add("${shellQuote(getKsuDaemonPath())} $cmd")
+            .to(ArrayList(), null)
+            .exec()
+        check(result.isSuccess) { result.err.joinToString("\n").ifBlank { "ksud exited with ${result.code}" } }
+        result.out.map { it.trim() }
+            .filter { it.matches(kmiNameRegex) }
+            .distinct()
+            .ifEmpty { fallbackSupportedKmis }
+    }.getOrElse {
+        Log.w(TAG, "supported KMI detection failed; using packaged fallback list", it)
+        fallbackSupportedKmis
+    }
 }
 
 suspend fun isAbDevice(): Boolean = withContext(Dispatchers.IO) {

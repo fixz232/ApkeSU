@@ -43,6 +43,7 @@ import me.weishu.kernelsu.ui.component.FloatingBottomBar
 import me.weishu.kernelsu.ui.component.FloatingBottomBarItem
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -69,6 +70,7 @@ fun BottomBarMiuix(
     val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
     val isLiquidGlass = isLiquidGlassTheme()
+    val isSnowStyle = isSnowInterfaceStyle()
 
     val destinations = BottomBarDestination.entries.toList()
     val customIcons = LocalCustomNavigationIcons.current
@@ -76,6 +78,8 @@ fun BottomBarMiuix(
         Color.Transparent
     } else if (isLiquidGlass) {
         liquidGlassSurfaceColor().copy(alpha = 0.72f)
+    } else if (isSnowStyle) {
+        MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
     } else {
         MiuixTheme.colorScheme.surface
     }

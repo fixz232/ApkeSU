@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.component.alpha
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,11 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +63,11 @@ import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
+import me.weishu.kernelsu.ui.component.snow.SnowBackdrop
+import me.weishu.kernelsu.ui.component.snow.SnowCapBand
+import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
@@ -131,6 +142,34 @@ object AlphaColors {
         divider = Color(0xFF354238),
     )
 
+    private val SnowLight = AlphaPalette(
+        background = Color.Transparent,
+        topBar = Color(0xB8F4FAFA),
+        surface = Color(0xC7F7FBFB),
+        surfaceStrong = Color(0xA8DDEDEE),
+        accent = Color(0xFF086B72),
+        onAccent = Color.White,
+        accentSoft = Color(0xA8CDE9E7),
+        text = Color(0xFF10282B),
+        muted = Color(0xFF405E62),
+        disabled = Color(0xFF7E979A),
+        divider = Color(0x8FFFFFFF),
+    )
+
+    private val SnowDark = AlphaPalette(
+        background = Color.Transparent,
+        topBar = Color(0xA80A1A1E),
+        surface = Color(0xB5192A2E),
+        surfaceStrong = Color(0x9C29454A),
+        accent = Color(0xFF8BE7D8),
+        onAccent = Color(0xFF06231F),
+        accentSoft = Color(0x9C1E5652),
+        text = Color(0xFFF4FAFA),
+        muted = Color(0xFFC6D8D9),
+        disabled = Color(0xFF829596),
+        divider = Color(0x62DDF6F4),
+    )
+
     val Background: Color
         @Composable
         @ReadOnlyComposable
@@ -186,10 +225,22 @@ object AlphaColors {
         @ReadOnlyComposable
         get() = current.divider
 
+    val Snow: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (isInDarkTheme()) Color(0xFFDCE9E9) else Color(0xFFFDFEFE)
+
+    val SnowShadow: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (isInDarkTheme()) Color(0xFF78999A) else Color(0xFFB5CBCC)
+
     private val current: AlphaPalette
         @Composable
         @ReadOnlyComposable
         get() = when {
+            isSnowStyle() && isInDarkTheme() -> SnowDark
+            isSnowStyle() -> SnowLight
             isStudioStyle() -> AlphaPalette(
                 background = colorScheme.surface,
                 topBar = colorScheme.surface,
@@ -216,27 +267,46 @@ object AlphaShapes {
     val Card: Shape
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) RoundedCornerShape(30.dp) else RoundedCornerShape(8.dp)
+        get() = when {
+            isDeltaStyle() -> RoundedCornerShape(30.dp)
+            else -> RoundedCornerShape(8.dp)
+        }
 
     val Control: Shape
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) RoundedCornerShape(26.dp) else RoundedCornerShape(8.dp)
+        get() = when {
+            isDeltaStyle() -> RoundedCornerShape(26.dp)
+            isSnowStyle() -> RoundedCornerShape(8.dp)
+            else -> RoundedCornerShape(8.dp)
+        }
 
     val Button: Shape
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) CircleShape else RoundedCornerShape(8.dp)
+        get() = when {
+            isDeltaStyle() -> CircleShape
+            isSnowStyle() -> RoundedCornerShape(8.dp)
+            else -> RoundedCornerShape(8.dp)
+        }
 
     val BottomBar: Shape
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) RoundedCornerShape(36.dp) else RoundedCornerShape(0.dp)
+        get() = when {
+            isDeltaStyle() -> RoundedCornerShape(36.dp)
+            isSnowStyle() -> RoundedCornerShape(18.dp)
+            else -> RoundedCornerShape(0.dp)
+        }
 
     val NavItem: Shape
         @Composable
         @ReadOnlyComposable
-        get() = if (isDeltaStyle()) RoundedCornerShape(28.dp) else RoundedCornerShape(0.dp)
+        get() = when {
+            isDeltaStyle() -> RoundedCornerShape(28.dp)
+            isSnowStyle() -> RoundedCornerShape(12.dp)
+            else -> RoundedCornerShape(0.dp)
+        }
 }
 
 @Composable
@@ -253,8 +323,14 @@ fun isStudioStyle(): Boolean {
 
 @Composable
 @ReadOnlyComposable
+fun isSnowStyle(): Boolean {
+    return LocalInterfaceStyle.current == InterfaceStyle.Snow.value
+}
+
+@Composable
+@ReadOnlyComposable
 fun alphaStrongWeight(): FontWeight {
-    return if (isStudioStyle()) FontWeight.SemiBold else FontWeight.Black
+    return if (isStudioStyle() || isSnowStyle()) FontWeight.SemiBold else FontWeight.Black
 }
 
 @Composable
@@ -272,23 +348,31 @@ fun AlphaScreen(
     onTopActionClick: () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val background = if (LocalNightBackgroundEffectActive.current) {
-        AlphaColors.Background.copy(alpha = 0.84f)
-    } else {
-        AlphaColors.Background
+    val snowStyle = isSnowStyle()
+    val background = when {
+        snowStyle -> Color.Transparent
+        LocalNightBackgroundEffectActive.current -> AlphaColors.Background.copy(alpha = 0.84f)
+        else -> AlphaColors.Background
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(background)
+    Box(
+        modifier = Modifier.fillMaxSize().background(background),
     ) {
-        AlphaTopBar(
-            title = title,
-            actionIcon = topActionIcon,
-            onActionClick = onTopActionClick,
-        )
-        Box(modifier = Modifier.weight(1f)) {
-            content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
+        if (snowStyle) {
+            SnowBackdrop(
+                snowColor = AlphaColors.Snow,
+                accentColor = AlphaColors.Accent,
+                useDefaultPhoto = !LocalImmersiveBackgroundActive.current,
+            )
+        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            AlphaTopBar(
+                title = title,
+                actionIcon = topActionIcon,
+                onActionClick = onTopActionClick,
+            )
+            Box(modifier = Modifier.weight(1f)) {
+                content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
+            }
         }
     }
 }
@@ -299,11 +383,66 @@ fun AlphaTopBar(
     actionIcon: ImageVector? = null,
     onActionClick: () -> Unit = {},
 ) {
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
+    val topBarColor = immersiveTopBarColor(AlphaColors.TopBar)
+    val dividerColor = if (immersiveBackgroundActive) Color.Transparent else AlphaColors.Divider
+    val topBarElevation = if (immersiveBackgroundActive) 0.dp else 4.dp
+
+    if (isSnowStyle()) {
+        val snowTopBarBrush = Brush.verticalGradient(
+            colors = listOf(
+                AlphaColors.TopBar.copy(alpha = if (immersiveBackgroundActive) 0.56f else 0.72f),
+                AlphaColors.Surface.copy(alpha = if (immersiveBackgroundActive) 0.42f else 0.58f),
+            )
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(snowTopBarBrush),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
+                    .height(64.dp)
+                    .padding(start = 18.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    color = AlphaColors.Text,
+                    fontSize = alphaSp(23f, maxScale = 1.04f),
+                    lineHeight = alphaSp(27f, maxScale = 1.04f),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (actionIcon != null) {
+                    IconButton(onClick = onActionClick) {
+                        Icon(
+                            imageVector = actionIcon,
+                            contentDescription = null,
+                            tint = AlphaColors.Text,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                }
+            }
+            SnowCapBand(
+                snowColor = AlphaColors.Snow,
+                shadowColor = AlphaColors.SnowShadow,
+                modifier = Modifier.fillMaxWidth().height(10.dp),
+            )
+        }
+        return
+    }
+
     if (isStudioStyle()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AlphaColors.TopBar)
+                .background(topBarColor)
                 .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
         ) {
             Row(
@@ -338,7 +477,7 @@ fun AlphaTopBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(AlphaColors.Divider),
+                    .background(dividerColor),
             )
         }
         return
@@ -348,7 +487,7 @@ fun AlphaTopBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AlphaColors.TopBar)
+                .background(topBarColor)
                 .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
                 .padding(bottom = 10.dp),
         ) {
@@ -405,8 +544,8 @@ fun AlphaTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp)
-            .background(AlphaColors.TopBar)
+            .shadow(topBarElevation)
+            .background(topBarColor)
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
             .height(68.dp)
             .padding(start = 18.dp, end = 14.dp),
@@ -442,15 +581,51 @@ fun AlphaCard(
     content: @Composable () -> Unit,
 ) {
     val shape = AlphaShapes.Card
+    val snowStyle = isSnowStyle()
+    val layoutDirection = LocalLayoutDirection.current
+    val resolvedPadding = if (snowStyle) {
+        PaddingValues(
+            start = contentPadding.calculateStartPadding(layoutDirection),
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            end = contentPadding.calculateEndPadding(layoutDirection),
+            bottom = contentPadding.calculateBottomPadding(),
+        )
+    } else {
+        contentPadding
+    }
+    val snowGlassBrush = Brush.linearGradient(
+        colors = listOf(
+            AlphaColors.Surface.copy(alpha = if (isInDarkTheme()) 0.76f else 0.84f),
+            AlphaColors.SurfaceStrong.copy(alpha = if (isInDarkTheme()) 0.66f else 0.72f),
+            AlphaColors.Surface.copy(alpha = if (isInDarkTheme()) 0.70f else 0.80f),
+        )
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(if (isDeltaStyle()) 4.dp else 0.dp, shape)
+            .shadow(if (isDeltaStyle()) 4.dp else if (snowStyle) 3.dp else 0.dp, shape)
             .clip(shape)
-            .background(AlphaColors.Surface)
-            .padding(contentPadding),
+            .then(
+                if (snowStyle) {
+                    Modifier
+                        .background(snowGlassBrush, shape)
+                        .border(1.dp, AlphaColors.Snow.copy(alpha = 0.54f), shape)
+                } else {
+                    Modifier.background(AlphaColors.Surface)
+                }
+            )
+            .uiDecoratedCard(shape = shape),
     ) {
-        content()
+        Box(modifier = Modifier.padding(resolvedPadding)) {
+            content()
+        }
+        if (snowStyle) {
+            SnowCapBand(
+                snowColor = AlphaColors.Snow,
+                shadowColor = AlphaColors.SnowShadow,
+                modifier = Modifier.fillMaxWidth().height(14.dp).align(Alignment.TopCenter),
+            )
+        }
     }
 }
 
@@ -507,6 +682,7 @@ fun AlphaOutlinedButton(
                 when {
                     isDeltaStyle() -> AlphaColors.AccentSoft
                     isStudioStyle() -> AlphaColors.SurfaceStrong
+                    isSnowStyle() -> AlphaColors.SurfaceStrong
                     else -> AlphaColors.Background
                 }
             )
@@ -575,6 +751,52 @@ fun AlphaBottomBar(
 ) {
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val delta = isDeltaStyle()
+    if (isSnowStyle()) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .padding(bottom = navBottom + 8.dp)
+                .height(64.dp)
+                .shadow(4.dp, AlphaShapes.BottomBar)
+                .clip(AlphaShapes.BottomBar)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            AlphaColors.Surface.copy(alpha = 0.82f),
+                            AlphaColors.SurfaceStrong.copy(alpha = 0.66f),
+                            AlphaColors.Surface.copy(alpha = 0.76f),
+                        )
+                    ),
+                    shape = AlphaShapes.BottomBar,
+                )
+                .border(1.dp, AlphaColors.Snow.copy(alpha = 0.48f), AlphaShapes.BottomBar),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AlphaNavDestination.entries.forEachIndexed { index, destination ->
+                    AlphaNavItem(
+                        destination = destination,
+                        selected = selectedIndex == index,
+                        onClick = { onSelected(index) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            SnowCapBand(
+                snowColor = AlphaColors.Snow,
+                shadowColor = AlphaColors.SnowShadow,
+                modifier = Modifier.fillMaxWidth().height(11.dp).align(Alignment.TopCenter),
+            )
+        }
+        return
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -630,7 +852,7 @@ private fun AlphaNavItem(
                     color = AlphaColors.Text,
                     fontSize = alphaSp(14f, maxScale = 1.0f),
                     lineHeight = alphaSp(16f, maxScale = 1.0f),
-                    fontWeight = FontWeight.Black,
+                    fontWeight = alphaStrongWeight(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -641,6 +863,10 @@ private fun AlphaNavItem(
         Column(
             modifier = modifier
                 .fillMaxSize()
+                .clip(AlphaShapes.NavItem)
+                .background(
+                    if (isSnowStyle() && selected) AlphaColors.AccentSoft else Color.Transparent
+                )
                 .clickable(onClick = onClick),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -656,11 +882,92 @@ private fun AlphaNavItem(
                 color = color,
                 fontSize = alphaSp(12f, maxScale = 1.0f),
                 lineHeight = alphaSp(14f, maxScale = 1.0f),
-                fontWeight = FontWeight.Black,
+                fontWeight = alphaStrongWeight(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+@Composable
+fun AlphaNavigationRail(
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(78.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        AlphaColors.Surface.copy(alpha = 0.78f),
+                        AlphaColors.SurfaceStrong.copy(alpha = 0.62f),
+                    )
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = AlphaColors.Snow.copy(alpha = 0.42f),
+                shape = RoundedCornerShape(0.dp),
+            )
+            .padding(top = topPadding, bottom = bottomPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        SnowCapBand(
+            snowColor = AlphaColors.Snow,
+            shadowColor = AlphaColors.SnowShadow,
+            modifier = Modifier.fillMaxWidth().height(11.dp),
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        AlphaNavDestination.entries.forEachIndexed { index, destination ->
+            AlphaRailItem(
+                destination = destination,
+                selected = selectedIndex == index,
+                onClick = { onSelected(index) },
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun AlphaRailItem(
+    destination: AlphaNavDestination,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val color = if (selected) AlphaColors.Accent else AlphaColors.Muted
+    Column(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .width(64.dp)
+            .height(58.dp)
+            .clip(AlphaShapes.NavItem)
+            .background(if (selected) AlphaColors.AccentSoft else Color.Transparent)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = destination.icon,
+            contentDescription = stringResource(destination.label),
+            tint = color,
+            modifier = Modifier.size(25.dp),
+        )
+        Text(
+            text = stringResource(destination.label),
+            color = color,
+            fontSize = alphaSp(11f, maxScale = 1.0f),
+            lineHeight = alphaSp(13f, maxScale = 1.0f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

@@ -152,7 +152,10 @@ class WebUIActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .globalScrollEffectController(globalScrollEffectState),
+                            .globalScrollEffectController(
+                                state = globalScrollEffectState,
+                                pointerFallbackEnabled = true,
+                            ),
                     ) {
                         CustomWallpaperRoot(
                             uriString = wallpaperState.uriString,

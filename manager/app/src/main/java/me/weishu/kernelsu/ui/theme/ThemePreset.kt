@@ -108,6 +108,21 @@ enum class ThemePreset(
         pageScale = 1.0f,
     ),
 
+    SNOW(
+        value = "snow",
+        titleRes = me.weishu.kernelsu.R.string.theme_preset_snow,
+        summaryRes = me.weishu.kernelsu.R.string.theme_preset_snow_summary,
+        colorMode = ColorMode.SYSTEM,
+        keyColor = 0xFF287E86.toInt(),
+        paletteStyle = PaletteStyle.Fidelity,
+        colorSpec = ColorSpec.SpecVersion.SPEC_2025,
+        miuixMonet = false,
+        enableBlur = false,
+        enableFloatingBottomBar = true,
+        enableFloatingBottomBarBlur = false,
+        pageScale = 1.0f,
+    ),
+
     SKROOTPRO(
         value = "skrootpro",
         titleRes = me.weishu.kernelsu.R.string.theme_preset_skrootpro,
@@ -182,6 +197,7 @@ enum class ThemePreset(
             ALPHA -> InterfaceStyle.Alpha.value
             DELTA -> InterfaceStyle.Delta.value
             LIQUID_GLASS -> InterfaceStyle.LiquidGlass.value
+            SNOW -> InterfaceStyle.Snow.value
             STUDIO -> InterfaceStyle.Studio.value
             PREMIUM_GLOSS -> InterfaceStyle.Miuix.value
             GEEK_DARK -> InterfaceStyle.Material.value
