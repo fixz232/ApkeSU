@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#102326">
+  <meta name="description" content="ApkeSU 基于 KernelSU 深度改造，聚焦 Manager 体验、LKM 修补、模块管理与个人设备调试。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ApkeSU - 把 Root 管理做得更完整">
+  <meta property="og:description" content="面向 Android GKI 设备的开源 Root 管理、修补与调试工具。">
+  <title>ApkeSU - Android GKI Root 管理与调试工具</title>
+  <link rel="icon" href="./assets/images/apkesu-icon.png">
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./assets/main.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+  <header class="site-header" data-header>
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="ApkeSU 首页">
+        <img src="./assets/images/apkesu-icon.png" alt="" width="36" height="36">
+        <span>ApkeSU</span>
+      </a>
+
+      <nav class="desktop-nav" aria-label="页面导航">
+        <a href="#capabilities">核心能力</a>
+        <a href="#personalize">个性化</a>
+        <a href="#opensource">开源</a>
+        <a href="#community">社区</a>
+      </nav>
+
+      <a class="nav-source" href="https://github.com/fixz232/ApkeSU" target="_blank" rel="noreferrer">GitHub</a>
+
+      <button class="menu-button" type="button" aria-label="打开导航菜单" aria-expanded="false" aria-controls="mobile-menu" data-menu-button>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <nav class="mobile-menu" id="mobile-menu" aria-label="移动端页面导航" data-mobile-menu hidden>
+      <a href="#capabilities">核心能力</a>
+      <a href="#personalize">个性化</a>
+      <a href="#opensource">开源</a>
+      <a href="#community">社区</a>
+      <a href="https://github.com/fixz232/ApkeSU" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <span class="nav-sentinel" data-nav-sentinel aria-hidden="true"></span>
+      <img class="hero-media" src="./assets/images/apkesu-aurora.jpg" alt="ApkeSU Manager 内置极光主题背景">
+      <div class="hero-shade" aria-hidden="true"></div>
+
+      <div class="hero-inner content-width">
+        <div class="hero-copy">
+          <p class="hero-kicker">APKESU FOR ANDROID GKI</p>
+          <h1 id="hero-title">把 Root 管理，<br><span>做得更完整。</span></h1>
+          <p class="hero-lead">基于 KernelSU 深度改造，聚焦 Manager 体验、LKM 修补与个人设备调试。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="https://github.com/fixz232/ApkeSU/releases" target="_blank" rel="noreferrer">
+              获取 ApkeSU <span aria-hidden="true">&#8599;</span>
+            </a>
+            <a class="button button-secondary" href="https://github.com/fixz232/ApkeSU" target="_blank" rel="noreferrer">
+              GitHub 源码 <span aria-hidden="true">&#8594;</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-identity" aria-label="ApkeSU Manager 应用图标">
+          <div class="identity-orbit" aria-hidden="true"></div>
+          <img src="./assets/images/apkesu-icon.png" alt="ApkeSU 的白发扳手角色应用图标" width="192" height="192">
+        </div>
+      </div>
+    </section>
+
+    <section class="origin-strip" aria-label="项目来源">
+      <div class="content-width origin-inner">
+        <strong>源自 KernelSU，面向真实设备继续演进</strong>
+        <p>持续跟进上游安全修复与功能迭代，所有修改保持开源。</p>
+        <a href="https://github.com/tiann/KernelSU" target="_blank" rel="noreferrer">查看上游 <span aria-hidden="true">&#8599;</span></a>
+      </div>
+    </section>
+
+    <section class="system-section section-space" aria-labelledby="system-title">
+      <div class="content-width system-layout">
+        <div class="section-copy reveal">
+          <h2 id="system-title">Root 之后，管理才真正开始。</h2>
+          <p>从内核策略、ksud 到 Manager，ApkeSU 把关键状态放在同一条链路里，让异常更容易被发现和处理。</p>
+        </div>
+
+        <div class="runtime-map reveal" aria-label="ApkeSU 运行链路示意">
+          <div class="map-heading">
+            <strong>设备内运行链路</strong>
+            <span>本地执行</span>
+          </div>
+          <ol>
+            <li>
+              <span class="map-index">KERNEL</span>
+              <div>
+                <strong>权限与策略</strong>
+                <p>Allowlist、App Profile、SELinux</p>
+              </div>
+            </li>
+            <li>
+              <span class="map-index">KSUD</span>
+              <div>
+                <strong>用户态协同</strong>
+                <p>模块生命周期、挂载、事件处理</p>
+              </div>
+            </li>
+            <li>
+              <span class="map-index">MANAGER</span>
+              <div>
+                <strong>清晰可控</strong>
+                <p>授权、诊断、修补与模块管理</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="capabilities" class="capabilities section-space" aria-labelledby="capabilities-title">
+      <div class="content-width">
+        <div class="section-heading reveal">
+          <h2 id="capabilities-title">功能不止四个词，而是一整套工作流。</h2>
+          <p>从应用授权到镜像修补，再到模块、诊断和进阶工具，每项能力都对应 Manager 里的真实入口。</p>
+        </div>
+
+        <div class="feature-explorer reveal">
+          <div class="feature-tabs" role="tablist" aria-label="ApkeSU 功能分类" aria-orientation="vertical">
+            <button class="feature-tab is-active" id="feature-tab-root" type="button" role="tab" aria-selected="true" aria-controls="feature-panel-root" data-feature-tab="root">
+              <strong>Root 与授权</strong>
+              <span>应用级权限和 Profile</span>
+            </button>
+            <button class="feature-tab" id="feature-tab-install" type="button" role="tab" aria-selected="false" aria-controls="feature-panel-install" data-feature-tab="install" tabindex="-1">
+              <strong>修补与安装</strong>
+              <span>boot、LKM 和 OTA</span>
+            </button>
+            <button class="feature-tab" id="feature-tab-module" type="button" role="tab" aria-selected="false" aria-controls="feature-panel-module" data-feature-tab="module" tabindex="-1">
+              <strong>模块生态</strong>
+              <span>ZIP、仓库和 WebUI</span>
+            </button>
+            <button class="feature-tab" id="feature-tab-diagnostic" type="button" role="tab" aria-selected="false" aria-controls="feature-panel-diagnostic" data-feature-tab="diagnostic" tabindex="-1">
+              <strong>诊断与救援</strong>
+              <span>日志、状态和恢复</span>
+            </button>
+            <button class="feature-tab" id="feature-tab-advanced" type="button" role="tab" aria-selected="false" aria-controls="feature-panel-advanced" data-feature-tab="advanced" tabindex="-1">
+              <strong>进阶工具</strong>
+              <span>内置扩展和创作工具</span>
+            </button>
+          </div>
+
+          <div class="feature-panels">
+            <article class="feature-panel" id="feature-panel-root" role="tabpanel" aria-labelledby="feature-tab-root" data-feature-panel="root">
+              <span class="panel-label">ROOT CONTROL</span>
+              <h3>应用授权不是一个总开关。</h3>
+              <p>按应用管理超级用户权限，并用 App Profile 精确约束 Root 进程身份、能力和挂载行为。</p>
+              <dl class="feature-facts">
+                <div><dt>超级用户列表</dt><dd>授权、撤销并查看应用的 Root 使用状态。</dd></div>
+                <div><dt>App Profile</dt><dd>设置 uid、gid、groups、capabilities、SELinux 与挂载命名空间。</dd></div>
+                <div><dt>配置模板</dt><dd>保存、导入和复用 Profile，批量保持一致策略。</dd></div>
+              </dl>
+            </article>
+
+            <article class="feature-panel" id="feature-panel-install" role="tabpanel" aria-labelledby="feature-tab-install" data-feature-panel="install" hidden>
+              <span class="panel-label">PATCH &amp; INSTALL</span>
+              <h3>从镜像修补到设备写入，路径可选择。</h3>
+              <p>既能选择 boot 或 init_boot 文件生成补丁，也能在已有 Root 环境中直接安装。</p>
+              <dl class="feature-facts">
+                <div><dt>镜像修补</dt><dd>识别 boot 与 init_boot，并输出可刷写的修补镜像。</dd></div>
+                <div><dt>LKM 选择</dt><dd>使用匹配 KMI 的内置 LKM，或选择本地 .ko 文件。</dd></div>
+                <div><dt>直接安装</dt><dd>写入当前分区，或在 OTA 完成后安装到非活动槽。</dd></div>
+                <div><dt>恢复路径</dt><dd>支持原厂镜像恢复和永久卸载，操作前显示风险提示。</dd></div>
+              </dl>
+            </article>
+
+            <article class="feature-panel" id="feature-panel-module" role="tabpanel" aria-labelledby="feature-tab-module" data-feature-panel="module" hidden>
+              <span class="panel-label">MODULE ECOSYSTEM</span>
+              <h3>模块从发现、安装到 WebUI 都在 Manager 内完成。</h3>
+              <p>管理本地模块和在线仓库，同时保留 Metamodule 这一层系统挂载能力。</p>
+              <dl class="feature-facts">
+                <div><dt>本地安装</dt><dd>选择一个或多个模块 ZIP，按顺序执行安装。</dd></div>
+                <div><dt>模块仓库</dt><dd>按更新时间、名称或 Stars 浏览，并查看源码入口。</dd></div>
+                <div><dt>生命周期</dt><dd>启用、停用、执行操作、撤销卸载并检查更新。</dd></div>
+                <div><dt>挂载能力</dt><dd>支持 Metamodule 与内置 Hybrid Mount，提供多种挂载模式。</dd></div>
+              </dl>
+            </article>
+
+            <article class="feature-panel" id="feature-panel-diagnostic" role="tabpanel" aria-labelledby="feature-tab-diagnostic" data-feature-panel="diagnostic" hidden>
+              <span class="panel-label">DIAGNOSTICS</span>
+              <h3>出问题时，先给出能行动的状态。</h3>
+              <p>Manager 会把驱动、ksud、版本和 Root Shell 状态汇总到诊断入口，而不是只显示“失败”。</p>
+              <dl class="feature-facts">
+                <div><dt>Root 诊断</dt><dd>检查驱动连接、Manager 身份、daemon 与版本匹配。</dd></div>
+                <div><dt>SU Log</dt><dd>记录并筛选 Root execve、Classic SU、授权和 daemon 重启事件。</dd></div>
+                <div><dt>救援保护</dt><dd>备份启动镜像，在连续启动失败后提供自动恢复路径。</dd></div>
+              </dl>
+            </article>
+
+            <article class="feature-panel" id="feature-panel-advanced" role="tabpanel" aria-labelledby="feature-tab-advanced" data-feature-panel="advanced" hidden>
+              <span class="panel-label">POWER TOOLS</span>
+              <h3>常用扩展不必散落在多个工具里。</h3>
+              <p>ApkeSU 将部分高级能力直接接入 Manager，并保留独立 WebUI 和安全检查。</p>
+              <dl class="feature-facts">
+                <div><dt>KPatch Next</dt><dd>内置安装入口与 WebUI，用于管理 KPM 包和排除规则。</dd></div>
+                <div><dt>Pathmask LKM</dt><dd>为目标镜像嵌入隐藏路径能力，并选择匹配设备的 KMI。</dd></div>
+                <div><dt>AI Module Studio</dt><dd>创建、检查和导出模块项目，危险脚本模式会在导出前提示。</dd></div>
+              </dl>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="personalize" class="personalize section-space" aria-labelledby="personalize-title">
+      <div class="content-width">
+        <div class="section-heading appearance-heading reveal">
+          <h2 id="personalize-title">美化不是换个颜色，而是整套 Manager 体验。</h2>
+          <p>界面风格、背景、图标、卡片、启动媒体和声音都能独立设置，也可以打包成主题文件迁移。</p>
+        </div>
+
+        <div class="appearance-showcase reveal">
+          <figure class="theme-preview" id="theme-preview-panel" role="tabpanel" aria-live="polite" data-theme-preview="aurora">
+            <img class="theme-preview-image" src="./assets/images/apkesu-aurora.jpg" alt="ApkeSU 极光夜间背景预览" data-theme-image width="1080" height="1350">
+            <figcaption>
+              <img src="./assets/images/apkesu-icon.png" alt="" width="64" height="64">
+              <div>
+                <span data-theme-name>极光夜色</span>
+                <strong data-theme-title>暗色模式也可以有层次</strong>
+                <p data-theme-description>极光、星河、星云与星空可作为夜间背景，并能调整穿透强度。</p>
+              </div>
+            </figcaption>
+          </figure>
+
+          <div class="appearance-controls">
+            <div class="theme-switcher" role="tablist" aria-label="背景效果预览">
+              <button class="theme-switch is-active" id="theme-switch-aurora" type="button" role="tab" aria-selected="true" aria-controls="theme-preview-panel" data-theme-button data-theme="aurora" data-image="./assets/images/apkesu-aurora.jpg" data-alt="ApkeSU 极光夜间背景预览" data-name="极光夜色" data-title="暗色模式也可以有层次" data-description="极光、星河、星云与星空可作为夜间背景，并能调整穿透强度。">极光</button>
+              <button class="theme-switch" id="theme-switch-galaxy" type="button" role="tab" aria-selected="false" aria-controls="theme-preview-panel" data-theme-button data-theme="galaxy" data-image="./assets/images/apkesu-galaxy.jpg" data-alt="ApkeSU 星河夜间背景预览" data-name="星河夜色" data-title="让背景穿过卡片和面板" data-description="夜间背景支持界面穿透与不透明度调整，保留氛围也保留文字可读性。" tabindex="-1">星河</button>
+              <button class="theme-switch" id="theme-switch-spring" type="button" role="tab" aria-selected="false" aria-controls="theme-preview-panel" data-theme-button data-theme="spring" data-image="./assets/images/apkesu-spring.jpg" data-alt="ApkeSU 四季春日背景预览" data-name="四季春日" data-title="季节景色协调整套界面" data-description="Four Seasons 将场景、玻璃表面、卡片装饰与环境细节组合为完整主题。" tabindex="-1">春日</button>
+              <button class="theme-switch" id="theme-switch-snow" type="button" role="tab" aria-selected="false" aria-controls="theme-preview-panel" data-theme-button data-theme="snow" data-image="./assets/images/apkesu-snow.jpg" data-alt="ApkeSU 四季雪境背景预览" data-name="四季雪境" data-title="雪景、霜花与浮动导航" data-description="雪境风格加入霜花背景、环境细节和协调的浮动导航，适合清透浅色界面。" tabindex="-1">雪境</button>
+            </div>
+
+            <div class="appearance-specs">
+              <div><strong>背景系统</strong><p>设置全局图片或视频，也能为首页、授权、模块、设置和安装页分别覆盖。</p></div>
+              <div><strong>首页卡片</strong><p>主状态卡、授权卡、模块卡和系统卡都能使用独立图片或视频壁纸。</p></div>
+              <div><strong>启动体验</strong><p>支持图片、GIF、视频启动动画，以及启动音效、点击音效和背景音乐。</p></div>
+              <div><strong>主题迁移</strong><p>将背景、图标、声音和启动媒体打包为 .kstheme 文件导入或导出。</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="style-catalog reveal">
+          <div>
+            <strong>8 种界面风格，多套一键预设</strong>
+            <p>Miuix 与 Material 之外，还提供不同布局和控件语言，不只是修改主题色。</p>
+          </div>
+          <div class="style-names" aria-label="ApkeSU 界面风格">
+            <span>Miuix</span><span>Material</span><span>Obsidian Console</span><span>Liquid Glass</span>
+            <span>Four Seasons</span><span>SKRoot(Pro)</span><span>Alpha</span><span>Delta</span>
+          </div>
+        </div>
+
+        <div class="icon-personalization reveal">
+          <div>
+            <h3>连图标也不必固定。</h3>
+            <p>可以替换启动器图标和四个底部导航图标，让桌面入口与 Manager 内部保持同一套风格。</p>
+            <a class="text-link" href="https://github.com/fixz232/ApkeSU/tree/main/manager" target="_blank" rel="noreferrer">查看 Manager 源码 <span aria-hidden="true">&#8599;</span></a>
+          </div>
+          <div class="icon-ribbon" aria-label="ApkeSU 可选应用图标展示">
+            <img src="./assets/images/apkesu-icon-blue.png" alt="蓝发角色图标" loading="lazy" width="432" height="432">
+            <img src="./assets/images/apkesu-icon.png" alt="白发扳手角色主图标" loading="lazy" width="192" height="192">
+            <img src="./assets/images/apkesu-icon-eyepatch.png" alt="眼罩角色图标" loading="lazy" width="432" height="432">
+            <img src="./assets/images/apkesu-icon-fox.png" alt="狐狸面具图标" loading="lazy" width="432" height="432">
+            <img src="./assets/images/apkesu-icon-skroot.png" alt="SK Root 图标" loading="lazy" width="432" height="432">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="opensource" class="opensource section-space" aria-labelledby="opensource-title">
+      <div class="content-width opensource-layout">
+        <div class="reveal">
+          <h2 id="opensource-title">源码公开，边界也写清楚。</h2>
+          <p>ApkeSU 是 KernelSU 的衍生开源项目。内核部分遵循 GPL-2.0-only，其他衍生代码遵循 GPL-3.0-or-later。</p>
+        </div>
+
+        <div class="license-list reveal" aria-label="开源原则">
+          <div><strong>完整源码</strong><span>公开修改与对应代码</span></div>
+          <div><strong>尊重上游</strong><span>保留来源与许可证</span></div>
+          <div><strong>免费分发</strong><span>无官方付费售卖版本</span></div>
+        </div>
+
+        <a class="button button-dark" href="https://github.com/fixz232/ApkeSU" target="_blank" rel="noreferrer">
+          GitHub 源码 <span aria-hidden="true">&#8599;</span>
+        </a>
+      </div>
+    </section>
+
+    <section id="community" class="community section-space" aria-labelledby="community-title">
+      <div class="content-width">
+        <div class="section-heading compact-heading reveal">
+          <h2 id="community-title">在社区里继续交流。</h2>
+          <p>反馈问题、讨论设备适配，或跟进项目更新。</p>
+        </div>
+
+        <div class="community-links reveal">
+          <a href="https://t.me/+LkrMQKXtXvpmYmNl" target="_blank" rel="noreferrer">
+            <span><strong>Telegram</strong><small>加入 ApkeSU 讨论组</small></span>
+            <b aria-hidden="true">&#8599;</b>
+          </a>
+          <a href="https://qm.qq.com/q/8O7qvLM3zq" target="_blank" rel="noreferrer">
+            <span><strong>QQ 群</strong><small>加入中文用户社区</small></span>
+            <b aria-hidden="true">&#8599;</b>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <aside class="risk-note" aria-label="使用提示">
+      <div class="content-width">
+        <strong>请只在你拥有并了解风险的设备上使用。</strong>
+        <p>刷写启动镜像、内核或模块前，请先备份数据并确认设备恢复方案。</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <div class="content-width">
+      <a class="brand footer-brand" href="#top" aria-label="ApkeSU 首页">
+        <img src="./assets/images/apkesu-icon.png" alt="" width="32" height="32">
+        <span>ApkeSU</span>
+      </a>
+      <p>面向 Android 底层技术学习、开源交流与个人设备调试。</p>
+      <div>
+        <a href="https://github.com/fixz232/ApkeSU" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://github.com/tiann/KernelSU" target="_blank" rel="noreferrer">KernelSU 上游</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
