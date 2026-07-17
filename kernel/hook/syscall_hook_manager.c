@@ -156,7 +156,7 @@ void __init ksu_syscall_hook_manager_init(void)
         pr_err("hook_manager: not all syscall handlers were registered\n");
 
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
-    ret = register_trace_sys_enter(ksu_sys_enter_handler, NULL);
+    ret = register_trace_prio_sys_enter(ksu_sys_enter_handler, NULL, INT_MIN);
 #ifndef CONFIG_KRETPROBES
     ksu_mark_running_process_locked();
 #endif
