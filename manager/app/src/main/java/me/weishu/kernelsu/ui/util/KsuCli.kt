@@ -418,18 +418,25 @@ fun createRootShell(globalMnt: Boolean = false): Shell {
     }
 }
 
-fun execKsud(args: String, newShell: Boolean = false): Boolean {
+fun execKsud(
+    args: String,
+    newShell: Boolean = false,
+    globalMnt: Boolean = false,
+): Boolean {
     if (shouldSkipUnsafeKsudCommand()) {
         Log.w(TAG, "skip ksud command without safe root shell: $args")
         return false
     }
 
     return if (newShell) {
-        withNewRootShell {
+        withNewRootShell(globalMnt = globalMnt) {
             ShellUtils.fastCmdResult(this, "${shellQuote(getKsuDaemonPath())} $args")
         }
     } else {
-        ShellUtils.fastCmdResult(getRootShell(), "${shellQuote(getKsuDaemonPath())} $args")
+        ShellUtils.fastCmdResult(
+            getRootShell(globalMnt),
+            "${shellQuote(getKsuDaemonPath())} $args",
+        )
     }
 }
 
@@ -2065,7 +2072,7 @@ private fun restorePatchedImageAccess(output: File): Boolean {
 
 fun reboot(reason: String = "") {
     if (reason == "soft_reboot") {
-        execKsud("soft-reboot", true)
+        execKsud("soft-reboot", true, true)
         return
     }
     val shell = getRootShell()
