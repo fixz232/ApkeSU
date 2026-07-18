@@ -181,7 +181,8 @@ fun HomePager(
                 bottomInnerPadding = bottomInnerPadding,
             )
 
-            InterfaceStyle.Snow.value -> HomePagerMiuix(
+            InterfaceStyle.Snow.value,
+            InterfaceStyle.Pixel.value -> HomePagerMiuix(
                 state = uiState,
                 actions = actions,
                 bottomInnerPadding = bottomInnerPadding,

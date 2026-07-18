@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -91,9 +93,12 @@ import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelPalette
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -240,7 +245,7 @@ fun SettingPagerMiuix(
                         OverlayDropdownPreference(
                             title = stringResource(id = R.string.settings_ui_mode),
                             summary = stringResource(id = R.string.settings_ui_mode_summary),
-                            items = InterfaceStyle.entries.map { stringResource(it.labelRes) },
+                            items = InterfaceStyle.selectableEntries.map { stringResource(it.labelRes) },
                             startAction = {
                                 Icon(
                                     Icons.Rounded.Dashboard,
@@ -256,6 +261,12 @@ fun SettingPagerMiuix(
                             SeasonMiuixPreference(
                                 selectedValue = uiState.seasonStyle,
                                 onSelectedIndexChange = actions.onSetSeasonStyleIndex,
+                            )
+                        }
+                        if (uiState.uiMode == InterfaceStyle.Pixel.value) {
+                            PixelMiuixPreference(
+                                selectedValue = uiState.pixelStyle,
+                                onSelectedIndexChange = actions.onSetPixelStyleIndex,
                             )
                         }
                         DayNightMiuixPreference(
@@ -701,16 +712,21 @@ fun SettingPagerMiuix(
                             )
 
                             ArrowPreference(
-                                title = stringResource(id = R.string.hidden_path_config),
-                                summary = stringResource(id = R.string.hidden_path_config_summary),
+                                title = pathConfigTitle(uiState),
+                                summary = pathConfigSummary(uiState),
                                 startAction = {
                                     Icon(
                                         Icons.Rounded.Visibility,
                                         modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.hidden_path_config),
-                                        tint = colorScheme.onBackground
+                                        contentDescription = pathConfigTitle(uiState),
+                                        tint = if (uiState.canOpenPathConfig) {
+                                            colorScheme.onBackground
+                                        } else {
+                                            colorScheme.disabledOnSecondaryVariant
+                                        }
                                     )
                                 },
+                                enabled = uiState.canOpenPathConfig,
                                 onClick = actions.onOpenHiddenPathConfig
                             )
 
@@ -1041,7 +1057,7 @@ private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 11
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 14 + if (uiMode == InterfaceStyle.Snow.value) 1 else 0
+    return 14 + if (uiMode == InterfaceStyle.Snow.value || uiMode == InterfaceStyle.Pixel.value) 1 else 0
 }
 
 @Composable
@@ -1110,6 +1126,123 @@ private fun SeasonMiuixPreference(
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PixelMiuixPreference(
+    selectedValue: String,
+    onSelectedIndexChange: (Int) -> Unit,
+) {
+    val selectedStyle = PixelStyle.fromValue(selectedValue)
+    val dark = isInDarkTheme()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.Palette,
+            modifier = Modifier.padding(end = 12.dp).size(24.dp),
+            contentDescription = null,
+            tint = colorScheme.onBackground,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_pixel_style),
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(selectedStyle.summaryRes),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
+            .selectableGroup()
+            .padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        PixelStyle.entries.toList().chunked(2).forEach { styleRow ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                styleRow.forEach { pixelStyle ->
+                    val index = PixelStyle.entries.indexOf(pixelStyle)
+                    val selected = pixelStyle == selectedStyle
+                    val previewPalette = pixelPalette(pixelStyle, dark)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (selected) {
+                                    colorScheme.primaryContainer.copy(alpha = 0.92f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            )
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelectedIndexChange(index) },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(width = 26.dp, height = 18.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(previewPalette.surface)
+                                .border(1.dp, previewPalette.outline, RoundedCornerShape(2.dp)),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .fillMaxWidth(0.55f)
+                                    .height(4.dp)
+                                    .background(previewPalette.primary),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(7.dp, 4.dp)
+                                    .background(previewPalette.secondary),
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            text = stringResource(pixelStyle.labelRes),
+                            color = if (selected) {
+                                colorScheme.onPrimaryContainer
+                            } else {
+                                colorScheme.onSurfaceVariantSummary
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                repeat(2 - styleRow.size) {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
     }

@@ -355,6 +355,7 @@ fun SettingPagerSkrootpro(
                         }
                     ),
                     leadingIcon = Icons.Rounded.Apps,
+                    enabled = uiState.canOpenKPatchNextWebUi,
                     onClick = {
                         if (uiState.canOpenKPatchNextWebUi) {
                             actions.onOpenKPatchNextWebUi()
@@ -362,9 +363,10 @@ fun SettingPagerSkrootpro(
                     },
                 )
                 SkrootproActionRow(
-                    title = stringResource(R.string.hidden_path_config),
-                    summary = stringResource(R.string.hidden_path_config_summary),
+                    title = pathConfigTitle(uiState),
+                    summary = pathConfigSummary(uiState),
                     leadingIcon = Icons.Rounded.Visibility,
+                    enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
                 SkrootproActionRow(
@@ -442,7 +444,7 @@ private fun SkrootproStylePicker(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        InterfaceStyle.entries.forEachIndexed { index, style ->
+        InterfaceStyle.selectableEntries.forEachIndexed { index, style ->
             val selected = InterfaceStyle.selectedIndex(uiState.uiMode) == index
             Box(
                 modifier = Modifier
@@ -853,6 +855,7 @@ private fun SkrootproActionRow(
     title: String,
     summary: String,
     leadingIcon: ImageVector? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -861,7 +864,7 @@ private fun SkrootproActionRow(
             .padding(top = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(SkrootproColors.BarSurface)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -874,13 +877,13 @@ private fun SkrootproActionRow(
                 androidx.compose.material3.Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = SkrootproColors.Text,
+                    tint = if (enabled) SkrootproColors.Text else SkrootproColors.DisabledText,
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = SkrootproColors.Text,
+                    color = if (enabled) SkrootproColors.Text else SkrootproColors.DisabledText,
                     fontSize = skrootproSp(16f, maxScale = 1.05f),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -889,7 +892,7 @@ private fun SkrootproActionRow(
                 if (summary.isNotBlank()) {
                     Text(
                         text = summary,
-                        color = SkrootproColors.Muted,
+                        color = if (enabled) SkrootproColors.Muted else SkrootproColors.DisabledText,
                         fontSize = skrootproSp(12.5f, maxScale = 1.05f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -900,7 +903,7 @@ private fun SkrootproActionRow(
         androidx.compose.material3.Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
             contentDescription = null,
-            tint = SkrootproColors.Muted,
+            tint = if (enabled) SkrootproColors.Muted else SkrootproColors.DisabledText,
         )
     }
 }

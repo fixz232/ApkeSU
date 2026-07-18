@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Parcelable
+import android.os.Process
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.system.Os
@@ -13,6 +14,7 @@ import com.topjohnwu.superuser.CallbackList
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ShellUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -36,6 +38,7 @@ private const val TAG = "KsuCli"
 private const val SHELL_JOB_TIMEOUT_MILLIS = 10_000L
 private const val ANDROID_16_API = 36
 private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
+const val CPU_SPOOF_PROPERTY_VALUE_LIMIT = 91
 private val managerRegistrationLock = Any()
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
 const val KPATCH_NEXT_MODULE_ID = "KPatch-Next"
@@ -45,6 +48,9 @@ const val BUILTIN_MOUNT_VARIANT_LITE = "lite"
 const val BUILTIN_MOUNT_VARIANT_FULL = "full"
 const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
 const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
+private const val SUSFS_PATH_CONFIG_DIR = "/data/adb/ksu/susfs"
+private const val SUSFS_PATH_CONFIG_FILE = "$SUSFS_PATH_CONFIG_DIR/paths.txt"
+private const val SUSFS_PATH_SERVICE_FILE = "/data/adb/service.d/98-apkesu-susfs-paths.sh"
 private const val GRAPHICS_RENDERER_DIR = "/data/adb/apkesu/graphics_renderer"
 private const val GRAPHICS_RENDERER_MODE_FILE = "$GRAPHICS_RENDERER_DIR/mode"
 private const val GRAPHICS_RENDERER_BACKUP_MARKER = "$GRAPHICS_RENDERER_DIR/backup_complete"
@@ -53,6 +59,8 @@ private const val GRAPHICS_RENDERER_ORIGINAL_DISABLE = "$GRAPHICS_RENDERER_DIR/o
 private const val GRAPHICS_RENDERER_RESTART_MARKER = "$GRAPHICS_RENDERER_DIR/restart_required"
 private const val GRAPHICS_RENDERER_SERVICE = "/data/adb/service.d/99-apkesu-graphics-renderer.sh"
 private const val GRAPHICS_RENDERER_SERVICE_ASSET = "graphics_renderer_service.sh"
+private const val GRAPHICS_RENDERER_VERIFICATION_ATTEMPTS = 8
+private const val GRAPHICS_RENDERER_VERIFICATION_DELAY_MILLIS = 250L
 
 private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
@@ -126,6 +134,26 @@ data class CpuSpoofCommandResult(
     val error: String = "",
 )
 
+internal fun mergeCpuSpoofStatus(
+    previous: CpuSpoofStatus,
+    refreshed: CpuSpoofStatus,
+): CpuSpoofStatus {
+    val hasPayload = refreshed.supported ||
+        refreshed.configured ||
+        refreshed.enabled ||
+        refreshed.applied ||
+        refreshed.current.isNotBlank() ||
+        refreshed.target.isNotBlank() ||
+        refreshed.original.isNotBlank() ||
+        refreshed.manufacturer.isNotBlank() ||
+        refreshed.platform.isNotBlank()
+    return if (refreshed.error.isNotBlank() && !hasPayload) {
+        previous.copy(error = refreshed.error)
+    } else {
+        refreshed
+    }
+}
+
 data class HiddenPathConfigState(
     val targetPaths: List<String> = emptyList(),
     val appPackages: List<String> = emptyList(),
@@ -147,6 +175,20 @@ data class HiddenPathVisibilityResult(
     val rootExists: Boolean = false,
     val moduleLoaded: Boolean = false,
     val resolvedCount: String = "",
+    val error: String = "",
+)
+
+data class SusfsPathConfigState(
+    val available: Boolean = false,
+    val toolPath: String = "",
+    val paths: List<String> = emptyList(),
+    val error: String = "",
+)
+
+data class SusfsPathApplyResult(
+    val success: Boolean = false,
+    val appliedCount: Int = 0,
+    val requiresReboot: Boolean = false,
     val error: String = "",
 )
 
@@ -574,11 +616,11 @@ fun setEpkesuHideEnabled(enabled: Boolean): Boolean {
 }
 
 fun isCpuSpoofModelValid(model: String): Boolean {
+    if (model.any { it.isISOControl() }) return false
     val value = model.trim()
     return value.isNotEmpty() &&
         !value.startsWith('-') &&
-        value.toByteArray(Charsets.UTF_8).size <= 91 &&
-        value.none { it.isISOControl() }
+        value.toByteArray(Charsets.UTF_8).size <= CPU_SPOOF_PROPERTY_VALUE_LIMIT
 }
 
 suspend fun getCpuSpoofStatus(): CpuSpoofStatus = withContext(Dispatchers.IO) {
@@ -643,7 +685,7 @@ suspend fun restoreDefaultCpuSpoof(): CpuSpoofCommandResult {
 }
 
 suspend fun getGraphicsRendererStatus(): GraphicsRendererStatus = withContext(Dispatchers.IO) {
-    if (shouldSkipUnsafeKsudCommand()) {
+    if (!rootAvailable()) {
         return@withContext GraphicsRendererStatus(error = "root_unavailable")
     }
 
@@ -743,8 +785,9 @@ suspend fun setGraphicsRendererMode(
             applied.second.ifBlank { "apply_failed" },
         )
     }
-    val runtimeStatus = getGraphicsRendererStatus()
-    if (!runtimeMatchesGraphicsRendererMode(runtimeStatus, mode)) {
+    val runtimeStatus = awaitGraphicsRendererStatus { it.matchesRuntimeMode(mode) }
+    if (!runtimeStatus.matchesRuntimeMode(mode)) {
+        logGraphicsRendererVerificationFailure("runtime", mode, runtimeStatus)
         rollbackGraphicsRendererRuntime(before)
         return@withContext GraphicsRendererCommandResult(
             false,
@@ -764,11 +807,16 @@ suspend fun setGraphicsRendererMode(
         )
     }
 
-    val finalStatus = getGraphicsRendererStatus()
+    val finalStatus = awaitGraphicsRendererStatus { status ->
+        status.configuredMode == mode &&
+            status.persistent == persistent &&
+            status.matchesRuntimeMode(mode)
+    }
     val verified = finalStatus.configuredMode == mode &&
         finalStatus.persistent == persistent &&
-        runtimeMatchesGraphicsRendererMode(finalStatus, mode)
+        finalStatus.matchesRuntimeMode(mode)
     if (!verified) {
+        logGraphicsRendererVerificationFailure("final", mode, finalStatus)
         rollbackGraphicsRendererRuntime(before)
         restorePreviousGraphicsRendererConfiguration(before, serviceBase64)
         return@withContext GraphicsRendererCommandResult(
@@ -784,8 +832,25 @@ private suspend fun restoreGraphicsRendererDefault(
     before: GraphicsRendererStatus,
 ): GraphicsRendererCommandResult {
     if (!before.configured && !before.backupAvailable) {
-        runGraphicsRendererCommands(listOf("rm -f $GRAPHICS_RENDERER_SERVICE $GRAPHICS_RENDERER_RESTART_MARKER"))
-        return GraphicsRendererCommandResult(true, getGraphicsRendererStatus())
+        val cleanup = runGraphicsRendererCommands(
+            listOf(
+                "rm -f $GRAPHICS_RENDERER_SERVICE $GRAPHICS_RENDERER_SERVICE.tmp",
+                "rm -f $GRAPHICS_RENDERER_MODE_FILE $GRAPHICS_RENDERER_ORIGINAL_RENDERER " +
+                    "$GRAPHICS_RENDERER_ORIGINAL_DISABLE $GRAPHICS_RENDERER_BACKUP_MARKER " +
+                    "$GRAPHICS_RENDERER_RESTART_MARKER",
+                "rmdir $GRAPHICS_RENDERER_DIR 2>/dev/null || true",
+            )
+        )
+        val status = getGraphicsRendererStatus()
+        return GraphicsRendererCommandResult(
+            success = cleanup.first && !status.configured && !status.persistent,
+            status = status,
+            error = when {
+                !cleanup.first -> cleanup.second.ifBlank { "cleanup_failed" }
+                status.configured || status.persistent -> "cleanup_verification_failed"
+                else -> ""
+            },
+        )
     }
     if (!before.backupAvailable) {
         return GraphicsRendererCommandResult(false, before, "backup_missing")
@@ -804,7 +869,10 @@ private suspend fun restoreGraphicsRendererDefault(
             restored.second.ifBlank { "restore_failed" },
         )
     }
-    val runtimeStatus = getGraphicsRendererStatus()
+    val runtimeStatus = awaitGraphicsRendererStatus { status ->
+        status.rendererProperty == before.originalRendererProperty &&
+            status.disableVulkanProperty == before.originalDisableVulkanProperty
+    }
     if (
         runtimeStatus.rendererProperty != before.originalRendererProperty ||
         runtimeStatus.disableVulkanProperty != before.originalDisableVulkanProperty
@@ -865,16 +933,31 @@ private fun resetGraphicsPropertyCommand(name: String, value: String): String {
     }
 }
 
-private fun runtimeMatchesGraphicsRendererMode(
+private suspend fun awaitGraphicsRendererStatus(
+    predicate: (GraphicsRendererStatus) -> Boolean,
+): GraphicsRendererStatus {
+    var status = getGraphicsRendererStatus()
+    repeat(GRAPHICS_RENDERER_VERIFICATION_ATTEMPTS - 1) {
+        if (predicate(status)) return status
+        if (!status.rootAvailable && status.error == "root_unavailable") return status
+        delay(GRAPHICS_RENDERER_VERIFICATION_DELAY_MILLIS)
+        status = getGraphicsRendererStatus()
+    }
+    return status
+}
+
+private fun logGraphicsRendererVerificationFailure(
+    stage: String,
+    expectedMode: GraphicsRendererMode,
     status: GraphicsRendererStatus,
-    mode: GraphicsRendererMode,
-): Boolean = when (mode) {
-    GraphicsRendererMode.Vulkan -> status.rendererProperty == "skiavk" &&
-        !status.disableVulkanProperty.equals("true", true)
-    GraphicsRendererMode.OpenGl -> status.rendererProperty == "skiagl" &&
-        status.disableVulkanProperty.equals("true", true)
-    GraphicsRendererMode.SystemDefault -> !status.configured
-    GraphicsRendererMode.Custom -> false
+) {
+    Log.w(
+        TAG,
+        "graphics renderer $stage verification failed: expected=${expectedMode.value}, " +
+            "current=${status.currentMode.value}, renderer=${status.rendererProperty}, " +
+            "disableVulkan=${status.disableVulkanProperty}, configured=${status.configuredMode?.value}, " +
+            "persistent=${status.persistent}, error=${status.error}",
+    )
 }
 
 private suspend fun writeGraphicsRendererConfiguration(
@@ -1073,6 +1156,186 @@ suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): Boolean
         false
     }
 }
+
+fun normalizeSusfsPath(raw: String): String? {
+    val trimmed = raw.trim()
+    if (
+        trimmed.isEmpty() ||
+        !trimmed.startsWith('/') ||
+        trimmed == "/" ||
+        trimmed.length > 4096 ||
+        trimmed.any(Char::isISOControl)
+    ) {
+        return null
+    }
+    val normalized = trimmed.trimEnd('/').ifEmpty { return null }
+    val blockedManagementPaths = listOf(
+        "/data/adb/modules",
+        "/data/adb/ksu",
+        "/data/adb/ap",
+    )
+    if (
+        normalized == "/data/adb" ||
+        blockedManagementPaths.any { normalized == it || normalized.startsWith("$it/") }
+    ) {
+        return null
+    }
+    return normalized
+}
+
+suspend fun getSusfsPathConfig(): SusfsPathConfigState = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext SusfsPathConfigState(error = "root_unavailable")
+    }
+    if (Natives.isLateLoadMode || Natives.isLkmMode) {
+        return@withContext SusfsPathConfigState(error = "gki_mode_required")
+    }
+
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val command = buildString {
+        appendLine("tool=''")
+        appendLine("for candidate in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs /system/bin/ksu_susfs; do")
+        appendLine("  if [ -x \"${'$'}candidate\" ]; then tool=\"${'$'}candidate\"; break; fi")
+        appendLine("done")
+        appendLine("if [ -z \"${'$'}tool\" ]; then tool=\$(command -v ksu_susfs 2>/dev/null); fi")
+        appendLine("printf '__TOOL__=%s\\n' \"${'$'}tool\"")
+        appendLine("if [ -f ${shellQuote(SUSFS_PATH_CONFIG_FILE)} ]; then")
+        appendLine("  while IFS= read -r target_path; do")
+        appendLine("    [ -n \"${'$'}target_path\" ] && printf '__PATH__=%s\\n' \"${'$'}target_path\"")
+        appendLine("  done < ${shellQuote(SUSFS_PATH_CONFIG_FILE)}")
+        appendLine("fi")
+    }
+    val result = runCatching {
+        withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+            getRootShell().newJob().add(command).to(stdout, stderr).exec()
+        }
+    }.getOrElse { error ->
+        KsuCli.reset()
+        return@withContext SusfsPathConfigState(error = error.message.orEmpty().ifBlank { "shell_failed" })
+    }
+    if (result == null) {
+        KsuCli.reset()
+        return@withContext SusfsPathConfigState(error = "timeout")
+    }
+    if (!result.isSuccess) {
+        return@withContext SusfsPathConfigState(
+            error = stderr.joinToString("\n").trim().ifBlank { "probe_failed" },
+        )
+    }
+
+    val toolPath = stdout.firstOrNull { it.startsWith("__TOOL__=") }
+        ?.substringAfter('=')
+        ?.trim()
+        .orEmpty()
+    val paths = stdout.asSequence()
+        .filter { it.startsWith("__PATH__=") }
+        .map { it.substringAfter('=') }
+        .mapNotNull(::normalizeSusfsPath)
+        .distinct()
+        .toList()
+    SusfsPathConfigState(
+        available = toolPath.isNotBlank(),
+        toolPath = toolPath,
+        paths = paths,
+        error = if (toolPath.isBlank()) "tool_unavailable" else "",
+    )
+}
+
+suspend fun saveAndApplySusfsPathConfig(paths: List<String>): SusfsPathApplyResult = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext SusfsPathApplyResult(error = "root_unavailable")
+    }
+    if (Natives.isLateLoadMode || Natives.isLkmMode) {
+        return@withContext SusfsPathApplyResult(error = "gki_mode_required")
+    }
+    if (paths.size > 128) {
+        return@withContext SusfsPathApplyResult(error = "too_many_paths")
+    }
+    val normalized = paths.mapNotNull(::normalizeSusfsPath).distinct()
+    if (normalized.size != paths.size) {
+        return@withContext SusfsPathApplyResult(error = "invalid_path")
+    }
+
+    val previous = getSusfsPathConfig()
+    if (!previous.available) {
+        return@withContext SusfsPathApplyResult(error = previous.error.ifBlank { "tool_unavailable" })
+    }
+    val requiresReboot = previous.paths.any { it !in normalized }
+    val configText = normalized.joinToString(separator = "\n", postfix = if (normalized.isEmpty()) "" else "\n")
+    val serviceScript = susfsPathServiceScript()
+    val serviceBase64 = Base64.encodeToString(serviceScript.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val pendingConfig = "$SUSFS_PATH_CONFIG_FILE.pending"
+    val pendingService = "$SUSFS_PATH_SERVICE_FILE.pending"
+    val command = buildString {
+        appendLine("set -e")
+        appendLine("mkdir -p ${shellQuote(SUSFS_PATH_CONFIG_DIR)} /data/adb/service.d")
+        appendLine("trap 'rm -f $pendingConfig $pendingConfig.tmp $pendingService' EXIT")
+        appendLine(atomicWriteCommand(pendingConfig, configText))
+        appendLine(
+            "printf '%s' ${shellQuote(serviceBase64)} | $BUSYBOX base64 -d > " +
+                shellQuote(pendingService)
+        )
+        appendLine("chmod 0700 ${shellQuote(pendingService)}")
+        appendLine("chown 0:0 ${shellQuote(pendingService)}")
+        normalized.forEach { path ->
+            appendLine("${shellQuote(previous.toolPath)} add_sus_path ${shellQuote(path)}")
+        }
+        appendLine("mv -f ${shellQuote(pendingConfig)} ${shellQuote(SUSFS_PATH_CONFIG_FILE)}")
+        appendLine("mv -f ${shellQuote(pendingService)} ${shellQuote(SUSFS_PATH_SERVICE_FILE)}")
+    }
+    val result = runCatching {
+        withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * 3) {
+            getRootShell().newJob().add(command).to(stdout, stderr).exec()
+        }
+    }.getOrElse { error ->
+        KsuCli.reset()
+        return@withContext SusfsPathApplyResult(
+            requiresReboot = requiresReboot,
+            error = error.message.orEmpty().ifBlank { "shell_failed" },
+        )
+    }
+    if (result == null) {
+        KsuCli.reset()
+        return@withContext SusfsPathApplyResult(requiresReboot = requiresReboot, error = "timeout")
+    }
+    if (!result.isSuccess) {
+        return@withContext SusfsPathApplyResult(
+            requiresReboot = true,
+            error = stderr.joinToString("\n").trim().ifBlank {
+                stdout.joinToString("\n").trim().ifBlank { "apply_failed" }
+            },
+        )
+    }
+    SusfsPathApplyResult(
+        success = true,
+        appliedCount = normalized.size,
+        requiresReboot = requiresReboot,
+    )
+}
+
+private fun susfsPathServiceScript(): String = """#!/system/bin/sh
+CONFIG=$SUSFS_PATH_CONFIG_FILE
+TOOL=
+for candidate in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs /system/bin/ksu_susfs; do
+    if [ -x "${'$'}candidate" ]; then
+        TOOL="${'$'}candidate"
+        break
+    fi
+done
+if [ -z "${'$'}TOOL" ]; then
+    TOOL=\$(command -v ksu_susfs 2>/dev/null)
+fi
+[ -x "${'$'}TOOL" ] || exit 0
+[ -f "${'$'}CONFIG" ] || exit 0
+while IFS= read -r target_path; do
+    case "${'$'}target_path" in
+        /*) "${'$'}TOOL" add_sus_path "${'$'}target_path" >/dev/null 2>&1 ;;
+    esac
+done < "${'$'}CONFIG"
+"""
 
 suspend fun getHiddenPathLogs(): String = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
@@ -1695,8 +1958,7 @@ suspend fun installBoot(
         if (bootFile != null) {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
             val outputName = "apkesu_patched_$timestamp.img"
-            val outputFile = File(ksuApp.cacheDir, outputName)
-            outputFile.delete()
+            val outputFile = preparePatchedImageOutput(ksuApp.cacheDir, outputName)
             patchedOutput = outputFile
             cmd += " -o ${shellQuote(ksuApp.cacheDir.absolutePath)}"
             cmd += " --out-name ${shellQuote(outputName)}"
@@ -1725,8 +1987,14 @@ suspend fun installBoot(
         }
 
         patchedOutput?.let { output ->
-            if (!output.isFile || output.length() == 0L) {
-                val error = "Patched image output is missing or empty"
+            var outputError = validatePatchedImageOutput(output)
+            if (outputError != null && output.isFile && output.length() > 0L) {
+                Log.w(TAG, "$outputError; attempting to restore app access")
+                restorePatchedImageAccess(output)
+                outputError = validatePatchedImageOutput(output)
+            }
+            if (outputError != null) {
+                val error = "Patched image output is unavailable: $outputError"
                 onStderr(error)
                 return FlashResult(1, error, false)
             }
@@ -1755,6 +2023,44 @@ suspend fun installBoot(
         lkmFile?.delete()
         patchedOutput?.delete()
     }
+}
+
+internal fun preparePatchedImageOutput(cacheDir: File, outputName: String): File {
+    check(cacheDir.isDirectory || cacheDir.mkdirs()) {
+        "Unable to prepare patched image directory"
+    }
+    val output = File(cacheDir, outputName)
+    if (output.exists()) {
+        check(output.delete()) { "Unable to replace stale patched image output" }
+    }
+    output.outputStream().use { }
+    return output
+}
+
+internal fun validatePatchedImageOutput(output: File): String? {
+    if (!output.isFile) return "file is missing"
+    if (output.length() <= 0L) return "file is empty"
+    return runCatching {
+        output.inputStream().use { it.read() }
+    }.exceptionOrNull()?.let { throwable ->
+        "file is not readable (${throwable.localizedMessage ?: throwable.javaClass.simpleName})"
+    }
+}
+
+private fun restorePatchedImageAccess(output: File): Boolean {
+    val uid = Process.myUid()
+    val result = withNewRootShell {
+        newJob()
+            .add(
+                "chown $uid:$uid ${shellQuote(output.absolutePath)} && " +
+                    "chmod 0600 ${shellQuote(output.absolutePath)}"
+            )
+            .exec()
+    }
+    if (!result.isSuccess) {
+        Log.w(TAG, "Failed to restore patched image access: ${result.err.joinToString("; ")}")
+    }
+    return result.isSuccess
 }
 
 fun reboot(reason: String = "") {

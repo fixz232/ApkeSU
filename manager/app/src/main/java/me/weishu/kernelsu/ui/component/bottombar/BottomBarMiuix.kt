@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.Extension
@@ -43,7 +44,13 @@ import me.weishu.kernelsu.ui.component.FloatingBottomBar
 import me.weishu.kernelsu.ui.component.FloatingBottomBarItem
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
+import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationContainerColor
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -71,23 +78,34 @@ fun BottomBarMiuix(
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
+    val isPixelStyle = isPixelInterfaceStyle()
 
     val destinations = BottomBarDestination.entries.toList()
     val customIcons = LocalCustomNavigationIcons.current
-    val barColor = if (blurBackdrop != null) {
+    val barColor = if (isPixelStyle) {
+        pixelNavigationContainerColor()
+    } else if (blurBackdrop != null) {
         Color.Transparent
     } else if (isLiquidGlass) {
         liquidGlassSurfaceColor().copy(alpha = 0.72f)
     } else if (isSnowStyle) {
-        MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
+        seasonNavigationContainerColor()
     } else {
         MiuixTheme.colorScheme.surface
     }
     if (!enableFloatingBottomBar) {
-        BlurredBar(blurBackdrop) {
+        val navigationShape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+        val navigationModifier = modifier.then(
+            when {
+                isPixelStyle -> Modifier.pixelNavigationSurface(navigationShape)
+                isSnowStyle -> Modifier.seasonNavigationSurface(navigationShape, paintBackground = false)
+                else -> Modifier
+            },
+        )
+        BlurredBar(blurBackdrop, blurActive = !isPixelStyle) {
             if (customIcons.hasSelected) {
                 MiuixCustomNavigationBar(
-                    modifier = modifier,
+                    modifier = navigationModifier,
                     color = barColor,
                     destinations = destinations,
                     customIcons = customIcons,
@@ -102,7 +120,7 @@ fun BottomBarMiuix(
                     )
                 }
                 NavigationBar(
-                    modifier = modifier,
+                    modifier = navigationModifier,
                     color = barColor,
                     content = {
                         items.forEachIndexed { index, item ->
@@ -212,6 +230,8 @@ private fun RowScope.MiuixCustomNavigationBarItem(
     onClick: () -> Unit,
 ) {
     val label = stringResource(destination.label)
+    val isSnowStyle = isSnowInterfaceStyle()
+    val itemShape = if (isSnowStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -221,7 +241,7 @@ private fun RowScope.MiuixCustomNavigationBarItem(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clip(CircleShape)
+            .clip(itemShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -233,9 +253,19 @@ private fun RowScope.MiuixCustomNavigationBarItem(
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .background(
-                    if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
-                    CircleShape,
+                .then(
+                    if (selected && isSnowStyle) {
+                        Modifier.seasonNavigationIndicator(itemShape)
+                    } else {
+                        Modifier.background(
+                            if (selected) {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                Color.Transparent
+                            },
+                            itemShape,
+                        )
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
@@ -25,6 +26,12 @@ import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.ui.LocalMainPagerState
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationContainerColor
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationSurface
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
@@ -43,12 +50,13 @@ fun NavigationRailMiuix(
     val mainState = LocalMainPagerState.current
     val customIcons = LocalCustomNavigationIcons.current
     val railColor = when {
+        isPixelInterfaceStyle() -> pixelNavigationContainerColor()
         blurBackdrop != null -> Color.Transparent
-        isSnowInterfaceStyle() -> MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
+        isSnowInterfaceStyle() -> seasonNavigationContainerColor()
         else -> MiuixTheme.colorScheme.surface
     }
 
-    BlurredBar(blurBackdrop) {
+    BlurredBar(blurBackdrop, blurActive = !isPixelInterfaceStyle()) {
         if (customIcons.hasSelected) {
             MiuixCustomNavigationRail(
                 blurBackdrop = blurBackdrop,
@@ -62,6 +70,7 @@ fun NavigationRailMiuix(
             }
             NavigationRail(
                 modifier = modifier
+                    .navigationRailDecoration()
                     .fillMaxHeight(),
                 color = railColor,
             ) {
@@ -92,8 +101,9 @@ private fun MiuixCustomNavigationRail(
 ) {
     val customIcons = LocalCustomNavigationIcons.current
     val railColor = when {
+        isPixelInterfaceStyle() -> pixelNavigationContainerColor()
         blurBackdrop != null -> Color.Transparent
-        isSnowInterfaceStyle() -> MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
+        isSnowInterfaceStyle() -> seasonNavigationContainerColor()
         else -> MiuixTheme.colorScheme.surface
     }
     Column(
@@ -101,6 +111,7 @@ private fun MiuixCustomNavigationRail(
             .fillMaxHeight()
             .width(82.dp)
             .background(railColor)
+            .navigationRailDecoration()
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -125,6 +136,8 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
     onClick: () -> Unit,
 ) {
     val label = stringResource(destination.label)
+    val isSnowStyle = isSnowInterfaceStyle()
+    val itemShape = if (isSnowStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -134,7 +147,7 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
         modifier = Modifier
             .padding(vertical = 4.dp)
             .width(72.dp)
-            .clip(CircleShape)
+            .clip(itemShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -147,9 +160,19 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .background(
-                    if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
-                    CircleShape,
+                .then(
+                    if (selected && isSnowStyle) {
+                        Modifier.seasonNavigationIndicator(itemShape)
+                    } else {
+                        Modifier.background(
+                            if (selected) {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                Color.Transparent
+                            },
+                            itemShape,
+                        )
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -173,5 +196,15 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
             lineHeight = 14.sp,
             color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
         )
+    }
+}
+
+@Composable
+private fun Modifier.navigationRailDecoration(): Modifier {
+    val shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
+    return when {
+        isPixelInterfaceStyle() -> pixelNavigationSurface(shape)
+        isSnowInterfaceStyle() -> seasonNavigationSurface(shape, paintBackground = false)
+        else -> this
     }
 }

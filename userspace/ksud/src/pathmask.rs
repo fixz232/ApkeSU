@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{assets, boot_patch, defs, utils};
+use crate::{assets, boot_patch, defs, ksucalls, utils};
 
 const PATHMASK_DIR: &str = concatcp!(defs::WORKING_DIR, "pathmask/");
 const CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "config.json");
@@ -173,6 +173,8 @@ pub fn apply() -> Result<()> {
 }
 
 fn apply_inner() -> Result<()> {
+    ensure_pathmask_runtime_supported()?;
+
     let config = read_config()?;
     let module_params = build_module_params(&config)?;
     let kmi = boot_patch::get_current_kmi().context("failed to detect current KMI")?;
@@ -234,6 +236,11 @@ pub fn apply_if_configured() {
         return;
     }
 
+    if let Err(err) = ensure_pathmask_runtime_supported() {
+        append_log(format!("skip boot auto-load: {err:#}"));
+        return;
+    }
+
     if is_module_loaded() {
         append_log("skip boot auto-load: pathmask already loaded");
         return;
@@ -243,6 +250,16 @@ pub fn apply_if_configured() {
         append_log(format!("boot auto-load failed: {err:#}"));
         log::warn!("pathmask: boot auto-load failed: {err:#}");
     }
+}
+
+fn ensure_pathmask_runtime_supported() -> Result<()> {
+    if ksucalls::is_late_load() {
+        bail!("pathmask LKM is disabled in jailbreak mode");
+    }
+    if !ksucalls::is_lkm_mode() {
+        bail!("pathmask LKM is only available in LKM mode; use SUSFS path config in GKI mode");
+    }
+    Ok(())
 }
 
 pub fn unload() -> Result<()> {

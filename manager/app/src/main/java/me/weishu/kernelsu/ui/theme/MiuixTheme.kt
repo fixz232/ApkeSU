@@ -13,6 +13,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.LocalContentColor
@@ -29,10 +31,18 @@ fun MiuixKernelSUTheme(
     val context = LocalContext.current
     val systemDarkTheme = isSystemInDarkTheme()
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
-    val darkTheme = appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
+    val forcePixelCyberDark =
+        LocalInterfaceStyle.current == InterfaceStyle.Pixel.value &&
+            LocalPixelStyle.current == PixelStyle.CyberHacker
+    val darkTheme = forcePixelCyberDark ||
+        appSettings.colorMode.isDark ||
+        (appSettings.colorMode.isSystem && systemDarkTheme)
     val colorStyle = appSettings.paletteStyle
     val colorSpec = appSettings.colorSpec
-    val materialColorScheme = rememberAppMaterialColorScheme(appSettings)
+    val materialColorScheme = rememberAppMaterialColorScheme(
+        appSettings = appSettings,
+        forceDark = forcePixelCyberDark,
+    )
 
     val miuixPaletteStyle = try {
         ThemePaletteStyle.valueOf(colorStyle.name)
@@ -47,13 +57,17 @@ fun MiuixKernelSUTheme(
     }
 
     val controller = ThemeController(
-        when (appSettings.colorMode) {
-            ColorMode.SYSTEM -> ColorSchemeMode.System
-            ColorMode.LIGHT -> ColorSchemeMode.Light
-            ColorMode.DARK, ColorMode.DARK_AMOLED -> ColorSchemeMode.Dark
-            ColorMode.MONET_SYSTEM -> ColorSchemeMode.MonetSystem
-            ColorMode.MONET_LIGHT -> ColorSchemeMode.MonetLight
-            ColorMode.MONET_DARK -> ColorSchemeMode.MonetDark
+        if (forcePixelCyberDark) {
+            ColorSchemeMode.Dark
+        } else {
+            when (appSettings.colorMode) {
+                ColorMode.SYSTEM -> ColorSchemeMode.System
+                ColorMode.LIGHT -> ColorSchemeMode.Light
+                ColorMode.DARK, ColorMode.DARK_AMOLED -> ColorSchemeMode.Dark
+                ColorMode.MONET_SYSTEM -> ColorSchemeMode.MonetSystem
+                ColorMode.MONET_LIGHT -> ColorSchemeMode.MonetLight
+                ColorMode.MONET_DARK -> ColorSchemeMode.MonetDark
+            }
         },
         keyColor = when {
             isLiquidGlass -> Color(0xFFE7F1FF)

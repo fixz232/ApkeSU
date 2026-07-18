@@ -118,11 +118,13 @@ import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.miuix.SearchBarFake
 import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
+import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
 import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
 import me.weishu.kernelsu.ui.screen.settings.SettingsWallpaperCropDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
@@ -892,8 +894,13 @@ fun ModuleItem(
                         refractionAmount = 9.dp,
                         strokeAlpha = 0.66f,
                     ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
+                } else if (isSnowInterfaceStyle()) {
+                    Modifier.snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
                 } else {
-                    Modifier
+                    Modifier.pixelMiuixCardSurface(
+                        shape = RoundedCornerShape(18.dp),
+                        paintBackground = false,
+                    )
                 }
             ),
         colors = if (hasWallpaper) {

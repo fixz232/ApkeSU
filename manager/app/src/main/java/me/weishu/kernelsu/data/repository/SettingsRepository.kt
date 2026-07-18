@@ -5,6 +5,7 @@ import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.util.BuiltinMountStatus
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
@@ -44,7 +45,15 @@ interface SettingsRepository {
     var blurIntensity: Float
     var switchStyle: String
     var seasonStyle: String
-    var uiDecorationConfig: UiDecorationConfig
+    var pixelStyle: String
+    val uiDecorationConfig: UiDecorationConfig
+    fun saveUiDecorationConfig(config: UiDecorationConfig): Boolean
+    fun getCustomUiDecorationPresets(): List<CustomUiDecorationPreset>
+    fun saveCustomUiDecorationPreset(name: String, config: UiDecorationConfig): CustomUiDecorationPreset?
+    fun renameCustomUiDecorationPreset(presetId: String, name: String): Boolean
+    fun deleteCustomUiDecorationPreset(presetId: String): Boolean
+    fun importCustomUiDecorationPresets(presets: List<CustomUiDecorationPreset>): Int
+    fun getRecentUiDecorationComponents(): List<String>
     var globalSnowEnabled: Boolean
     var globalSnowEffect: String
     var nightBackgroundEffect: String

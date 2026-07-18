@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,6 +94,18 @@ import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
+import me.weishu.kernelsu.ui.component.pixel.PixelBianliangMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelCloudTownMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelDunhuangMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelFishingHarborMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelJiangnanMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelLavaValleyMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelOceanMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelThreeKingdomsMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelTribalJungleMotto
+import me.weishu.kernelsu.ui.component.pixel.PixelVikingMotto
+import me.weishu.kernelsu.ui.component.snow.SeasonMotto
+import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.miuix.DropdownItem
@@ -178,6 +191,61 @@ fun HomePagerMiuix(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        SeasonMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelOceanMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelThreeKingdomsMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelBianliangMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelFishingHarborMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelTribalJungleMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelLavaValleyMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelDunhuangMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelVikingMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelJiangnanMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        PixelCloudTownMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
                         StatusCard(
                             state = state,
                             actions = actions,
@@ -2084,7 +2152,13 @@ private fun Modifier.homeLiquidGlassSurface(
     surfaceColor: Color = Color.Unspecified,
     surfaceAlpha: Float = 0.58f,
 ): Modifier {
-    if (!enabled) return this
+    if (!enabled) {
+        return if (isSnowInterfaceStyle()) {
+            snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
+        } else {
+            this
+        }
+    }
     return globalLiquidGlassSurface(
         shape = RoundedCornerShape(18.dp),
         surfaceColor = surfaceColor,

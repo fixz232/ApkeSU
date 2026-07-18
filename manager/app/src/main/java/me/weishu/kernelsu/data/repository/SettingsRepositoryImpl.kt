@@ -29,8 +29,18 @@ import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
+import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CUSTOM_PRESETS_KEY
+import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_RECENT_COMPONENTS_KEY
+import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
+import me.weishu.kernelsu.ui.component.decoration.MAX_CUSTOM_UI_DECORATION_PRESETS
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.componentTokens
+import me.weishu.kernelsu.ui.component.decoration.customUiDecorationPresetsFromJson
+import me.weishu.kernelsu.ui.component.decoration.customUiDecorationPresetsToJson
+import me.weishu.kernelsu.ui.component.decoration.sanitizeCustomUiDecorationPresetName
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.DELTA_COLOR_VARIANT_KEY
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
@@ -103,6 +113,7 @@ import me.weishu.kernelsu.ui.util.getEpkesuHideStatus as readEpkesuHideStatus
 import me.weishu.kernelsu.ui.util.setEpkesuHideEnabled as writeEpkesuHideEnabled
 import me.weishu.kernelsu.ui.util.setCustomNavigationIcon as writeCustomNavigationIcon
 import me.weishu.kernelsu.ui.util.setCustomNavigationIconCrop as writeCustomNavigationIconCrop
+import org.json.JSONArray
 import java.util.UUID
 
 class SettingsRepositoryImpl : SettingsRepository {
@@ -112,8 +123,15 @@ class SettingsRepositoryImpl : SettingsRepository {
     }
 
     override var uiMode: String
-        get() = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE) ?: UiMode.DEFAULT_VALUE
-        set(value) = prefs.edit { putString("ui_mode", value) }
+        get() {
+            val storedValue = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE)
+            val normalizedValue = InterfaceStyle.normalizeValue(storedValue)
+            if (storedValue != normalizedValue) {
+                prefs.edit { putString("ui_mode", normalizedValue) }
+            }
+            return normalizedValue
+        }
+        set(value) = prefs.edit { putString("ui_mode", InterfaceStyle.normalizeValue(value)) }
 
     override var checkModuleUpdate: Boolean
         get() = prefs.getBoolean("module_check_update", true)
@@ -267,9 +285,108 @@ class SettingsRepositoryImpl : SettingsRepository {
             }
         }
 
-    override var uiDecorationConfig: UiDecorationConfig
+    override var pixelStyle: String
+        get() = PixelStyle.fromValue(prefs.getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE)).value
+        set(value) {
+            val pixelStyle = PixelStyle.fromValue(value)
+            prefs.edit {
+                putString(PIXEL_STYLE_KEY, pixelStyle.value)
+                putInt(themeKey("key_color"), pixelStyle.keyColor)
+                putString(themeKey("theme_preset"), ThemePreset.PIXEL.value)
+            }
+        }
+
+    override val uiDecorationConfig: UiDecorationConfig
         get() = UiDecorationConfig.fromJsonString(prefs.getString(UI_DECORATION_CONFIG_KEY, null))
-        set(value) = prefs.edit { putString(UI_DECORATION_CONFIG_KEY, value.normalized().toJsonString()) }
+
+    override fun saveUiDecorationConfig(config: UiDecorationConfig): Boolean {
+        val normalized = config.normalized()
+        val recent = (normalized.componentTokens() + getRecentUiDecorationComponents())
+            .distinct()
+            .take(MAX_RECENT_UI_DECORATION_COMPONENTS)
+        return prefs.edit()
+            .putString(UI_DECORATION_CONFIG_KEY, normalized.toJsonString())
+            .putString(UI_DECORATION_RECENT_COMPONENTS_KEY, JSONArray(recent).toString())
+            .commit()
+    }
+
+    override fun getCustomUiDecorationPresets(): List<CustomUiDecorationPreset> {
+        return runCatching {
+            customUiDecorationPresetsFromJson(prefs.getString(UI_DECORATION_CUSTOM_PRESETS_KEY, null))
+        }.getOrDefault(emptyList()).sortedByDescending(CustomUiDecorationPreset::updatedAt)
+    }
+
+    override fun saveCustomUiDecorationPreset(
+        name: String,
+        config: UiDecorationConfig,
+    ): CustomUiDecorationPreset? {
+        val sanitizedName = sanitizeCustomUiDecorationPresetName(name)
+        if (sanitizedName.isBlank()) return null
+        val preset = CustomUiDecorationPreset(
+            id = UUID.randomUUID().toString(),
+            name = sanitizedName,
+            updatedAt = System.currentTimeMillis(),
+            config = config.normalized(),
+        )
+        val next = (listOf(preset) + getCustomUiDecorationPresets())
+            .distinctBy(CustomUiDecorationPreset::id)
+            .take(MAX_CUSTOM_UI_DECORATION_PRESETS)
+        return preset.takeIf { persistCustomUiDecorationPresets(next) }
+    }
+
+    override fun renameCustomUiDecorationPreset(presetId: String, name: String): Boolean {
+        val sanitizedName = sanitizeCustomUiDecorationPresetName(name)
+        if (sanitizedName.isBlank()) return false
+        var found = false
+        val next = getCustomUiDecorationPresets().map { preset ->
+            if (preset.id == presetId) {
+                found = true
+                preset.copy(name = sanitizedName, updatedAt = System.currentTimeMillis())
+            } else {
+                preset
+            }
+        }
+        return found && persistCustomUiDecorationPresets(next)
+    }
+
+    override fun deleteCustomUiDecorationPreset(presetId: String): Boolean {
+        val current = getCustomUiDecorationPresets()
+        val next = current.filterNot { it.id == presetId }
+        return next.size != current.size && persistCustomUiDecorationPresets(next)
+    }
+
+    override fun importCustomUiDecorationPresets(presets: List<CustomUiDecorationPreset>): Int {
+        val imported = presets
+            .mapNotNull { preset ->
+                val name = sanitizeCustomUiDecorationPresetName(preset.name)
+                preset.takeIf { name.isNotBlank() }?.copy(name = name, config = preset.config.normalized())
+            }
+            .distinctBy(CustomUiDecorationPreset::id)
+            .take(MAX_CUSTOM_UI_DECORATION_PRESETS)
+        if (imported.isEmpty()) return 0
+        val importedIds = imported.mapTo(hashSetOf(), CustomUiDecorationPreset::id)
+        val next = (imported + getCustomUiDecorationPresets().filterNot { it.id in importedIds })
+            .take(MAX_CUSTOM_UI_DECORATION_PRESETS)
+        return if (persistCustomUiDecorationPresets(next)) imported.size else -1
+    }
+
+    override fun getRecentUiDecorationComponents(): List<String> {
+        val raw = prefs.getString(UI_DECORATION_RECENT_COMPONENTS_KEY, null) ?: return emptyList()
+        return runCatching {
+            val json = JSONArray(raw)
+            buildList {
+                repeat(json.length()) { index ->
+                    json.optString(index).takeIf(String::isNotBlank)?.let(::add)
+                }
+            }.distinct().take(MAX_RECENT_UI_DECORATION_COMPONENTS)
+        }.getOrDefault(emptyList())
+    }
+
+    private fun persistCustomUiDecorationPresets(presets: List<CustomUiDecorationPreset>): Boolean {
+        return prefs.edit()
+            .putString(UI_DECORATION_CUSTOM_PRESETS_KEY, customUiDecorationPresetsToJson(presets))
+            .commit()
+    }
 
     override var globalSnowEnabled: Boolean
         get() = prefs.getBoolean(GLOBAL_SNOW_ENABLED_KEY, false)
@@ -701,7 +818,7 @@ class SettingsRepositoryImpl : SettingsRepository {
     override fun isLkmMode(): Boolean = Natives.isLkmMode
 
     override fun applyThemePreset(preset: ThemePreset) {
-        val targetUiMode = preset.targetUiMode(uiMode)
+        val targetUiMode = InterfaceStyle.normalizeValue(preset.targetUiMode(uiMode))
         prefs.edit {
             putString("ui_mode", targetUiMode)
             writeThemeSnapshot(
@@ -745,10 +862,11 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override fun applyCustomThemePreset(presetId: String): Boolean {
         val preset = getCustomThemePresets().firstOrNull { it.id == presetId } ?: return false
+        val targetUiMode = InterfaceStyle.normalizeValue(preset.uiMode)
         prefs.edit {
-            putString("ui_mode", preset.uiMode)
-            writeThemeSnapshot(preset.snapshot, preset.uiMode)
-            putString(themeKey("theme_preset", themeSyncStrategy, preset.uiMode), ThemePreset.CUSTOM.value)
+            putString("ui_mode", targetUiMode)
+            writeThemeSnapshot(preset.snapshot, targetUiMode)
+            putString(themeKey("theme_preset", themeSyncStrategy, targetUiMode), ThemePreset.CUSTOM.value)
         }
         return true
     }
@@ -868,7 +986,9 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     private fun readCustomThemePreset(id: String): CustomThemePreset? {
         val name = prefs.getString(customThemePresetKey(id, "name"), null)?.takeIf { it.isNotBlank() } ?: return null
-        val uiMode = prefs.getString(customThemePresetKey(id, "ui_mode"), UiMode.DEFAULT_VALUE) ?: UiMode.DEFAULT_VALUE
+        val uiMode = InterfaceStyle.normalizeValue(
+            prefs.getString(customThemePresetKey(id, "ui_mode"), UiMode.DEFAULT_VALUE)
+        )
         val defaultPreset = defaultThemePresetForUiMode(uiMode)
         val updatedAt = prefs.getLong(customThemePresetKey(id, "updated_at"), 0L)
         val snapshot = ThemeAppearanceSnapshot(
@@ -912,7 +1032,7 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     private fun android.content.SharedPreferences.Editor.writeCustomThemePreset(preset: CustomThemePreset) {
         putString(customThemePresetKey(preset.id, "name"), preset.name)
-        putString(customThemePresetKey(preset.id, "ui_mode"), preset.uiMode)
+        putString(customThemePresetKey(preset.id, "ui_mode"), InterfaceStyle.normalizeValue(preset.uiMode))
         putLong(customThemePresetKey(preset.id, "updated_at"), preset.updatedAt)
         putInt(customThemePresetKey(preset.id, "color_mode"), preset.snapshot.colorMode)
         putBoolean(customThemePresetKey(preset.id, "miuix_monet"), preset.snapshot.miuixMonet)
@@ -946,6 +1066,7 @@ class SettingsRepositoryImpl : SettingsRepository {
         const val CUSTOM_MANAGER_NAME_KEY = "custom_manager_name"
         const val MAX_CUSTOM_MANAGER_NAME_LENGTH = 40
         const val CUSTOM_THEME_PRESET_IDS_KEY = "custom_theme_preset_ids"
+        const val MAX_RECENT_UI_DECORATION_COMPONENTS = 16
         val CUSTOM_THEME_PRESET_FIELDS = listOf(
             "name",
             "ui_mode",

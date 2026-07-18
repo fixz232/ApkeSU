@@ -44,10 +44,14 @@ fun MaterialKernelSUTheme(
 }
 
 @Composable
-internal fun rememberAppMaterialColorScheme(appSettings: AppSettings): ColorScheme {
+internal fun rememberAppMaterialColorScheme(
+    appSettings: AppSettings,
+    forceDark: Boolean = false,
+): ColorScheme {
     val context = LocalContext.current
     val systemDarkTheme = isSystemInDarkTheme()
-    val darkTheme = appSettings.colorMode.isDark || (appSettings.colorMode.isSystem && systemDarkTheme)
+    val darkTheme = forceDark || appSettings.colorMode.isDark ||
+        (appSettings.colorMode.isSystem && systemDarkTheme)
     val colorStyle = appSettings.paletteStyle
     val colorSpec = appSettings.colorSpec
 

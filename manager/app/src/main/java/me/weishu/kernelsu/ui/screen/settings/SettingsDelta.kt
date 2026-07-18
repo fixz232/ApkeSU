@@ -109,6 +109,10 @@ fun SettingPagerDelta(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             DeltaSettingsSection(title = stringResource(R.string.settings_ui_mode)) {
+                DeltaAlphaModePicker(
+                    deltaSelected = uiState.uiMode == InterfaceStyle.Delta.value,
+                    onModeSelected = actions.onSetAlphaDeltaMode,
+                )
                 DeltaStylePicker(uiState = uiState, actions = actions)
             }
 
@@ -288,6 +292,7 @@ fun SettingPagerDelta(
                         }
                     ),
                     icon = Icons.Rounded.Apps,
+                    enabled = uiState.canOpenKPatchNextWebUi,
                     onClick = {
                         if (uiState.canOpenKPatchNextWebUi) {
                             actions.onOpenKPatchNextWebUi()
@@ -295,9 +300,10 @@ fun SettingPagerDelta(
                     },
                 )
                 DeltaActionRow(
-                    title = stringResource(R.string.hidden_path_config),
-                    summary = stringResource(R.string.hidden_path_config_summary),
+                    title = pathConfigTitle(uiState),
+                    summary = pathConfigSummary(uiState),
                     icon = Icons.Rounded.Visibility,
+                    enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
                 DeltaActionRow(
@@ -785,6 +791,59 @@ private fun DeltaSettingsSection(
 }
 
 @Composable
+private fun DeltaAlphaModePicker(
+    deltaSelected: Boolean,
+    onModeSelected: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_alpha_delta_mode),
+            color = DeltaColors.Ink,
+            fontSize = deltaSp(14f, maxScale = 1.0f),
+            fontWeight = FontWeight.Black,
+        )
+        Text(
+            text = stringResource(R.string.settings_alpha_delta_mode_summary),
+            color = DeltaColors.Muted,
+            fontSize = deltaSp(12f, maxScale = 1.0f),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(DeltaShapes.Control)
+                .background(DeltaColors.SurfaceDeep)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf(false, true).forEach { useDelta ->
+                val selected = deltaSelected == useDelta
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .clip(DeltaShapes.Control)
+                        .background(if (selected) DeltaColors.Accent else DeltaColors.SurfaceDeep)
+                        .clickable(enabled = !selected) { onModeSelected(useDelta) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (useDelta) R.string.settings_delta_mode else R.string.settings_alpha_mode
+                        ),
+                        color = if (selected) Color.White else DeltaColors.Muted,
+                        fontSize = deltaSp(13f, maxScale = 1.0f),
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DeltaStylePicker(
     uiState: SettingsUiState,
     actions: SettingsScreenActions,
@@ -796,7 +855,7 @@ private fun DeltaStylePicker(
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        InterfaceStyle.entries.forEachIndexed { index, style ->
+        InterfaceStyle.selectableEntries.forEachIndexed { index, style ->
             val selected = InterfaceStyle.selectedIndex(uiState.uiMode) == index
             Box(
                 modifier = Modifier
@@ -825,12 +884,13 @@ private fun DeltaActionRow(
     title: String,
     summary: String,
     icon: ImageVector? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -839,14 +899,14 @@ private fun DeltaActionRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = DeltaColors.Accent,
+                tint = if (enabled) DeltaColors.Accent else DeltaColors.Disabled,
                 modifier = Modifier.size(22.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = DeltaColors.Ink,
+                color = if (enabled) DeltaColors.Ink else DeltaColors.Disabled,
                 fontSize = deltaSp(14f),
                 fontWeight = FontWeight.Black,
                 maxLines = 1,
@@ -855,7 +915,7 @@ private fun DeltaActionRow(
             if (summary.isNotBlank()) {
                 Text(
                     text = summary,
-                    color = DeltaColors.Muted,
+                    color = if (enabled) DeltaColors.Muted else DeltaColors.Disabled,
                     fontSize = deltaSp(11.5f),
                     lineHeight = deltaSp(14.5f),
                     fontWeight = FontWeight.Medium,

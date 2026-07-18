@@ -583,6 +583,11 @@ private fun graphicsRendererResultMessage(
         "vulkan_unsupported" -> R.string.graphics_renderer_vulkan_unavailable
         "backup_missing" -> R.string.graphics_renderer_backup_missing
         "timeout" -> R.string.graphics_renderer_timeout
+        "runtime_verification_failed",
+        "final_verification_failed",
+        "restore_verification_failed",
+        "cleanup_verification_failed",
+        -> R.string.graphics_renderer_verification_failed
         else -> null
     }
     return knownMessage?.let(resources::getString)

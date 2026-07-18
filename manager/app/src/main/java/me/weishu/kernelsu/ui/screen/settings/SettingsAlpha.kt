@@ -123,6 +123,10 @@ fun SettingPagerAlpha(
                 title = stringResource(R.string.settings_ui_mode),
                 icon = Icons.Rounded.Apps,
             ) {
+                AlphaDeltaModePicker(
+                    deltaSelected = uiState.uiMode == InterfaceStyle.Delta.value,
+                    onModeSelected = actions.onSetAlphaDeltaMode,
+                )
                 AlphaStylePicker(uiState = uiState, actions = actions)
             }
 
@@ -306,6 +310,7 @@ fun SettingPagerAlpha(
                         }
                     ),
                     icon = Icons.Rounded.Apps,
+                    enabled = uiState.canOpenKPatchNextWebUi,
                     onClick = {
                         if (uiState.canOpenKPatchNextWebUi) {
                             actions.onOpenKPatchNextWebUi()
@@ -313,9 +318,10 @@ fun SettingPagerAlpha(
                     },
                 )
                 AlphaActionRow(
-                    title = stringResource(R.string.hidden_path_config),
-                    summary = stringResource(R.string.hidden_path_config_summary),
+                    title = pathConfigTitle(uiState),
+                    summary = pathConfigSummary(uiState),
                     icon = Icons.Rounded.Visibility,
+                    enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
                 AlphaActionRow(
@@ -618,6 +624,59 @@ private fun AlphaSection(
 }
 
 @Composable
+private fun AlphaDeltaModePicker(
+    deltaSelected: Boolean,
+    onModeSelected: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_alpha_delta_mode),
+            color = AlphaColors.Text,
+            fontSize = alphaSp(14f, maxScale = 1.0f),
+            fontWeight = alphaStrongWeight(),
+        )
+        Text(
+            text = stringResource(R.string.settings_alpha_delta_mode_summary),
+            color = AlphaColors.Muted,
+            fontSize = alphaSp(12f, maxScale = 1.0f),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(AlphaShapes.Control)
+                .background(AlphaColors.SurfaceStrong)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf(false, true).forEach { useDelta ->
+                val selected = deltaSelected == useDelta
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .clip(AlphaShapes.Control)
+                        .background(if (selected) AlphaColors.Accent else AlphaColors.SurfaceStrong)
+                        .clickable(enabled = !selected) { onModeSelected(useDelta) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (useDelta) R.string.settings_delta_mode else R.string.settings_alpha_mode
+                        ),
+                        color = if (selected) AlphaColors.OnAccent else AlphaColors.Muted,
+                        fontSize = alphaSp(13f, maxScale = 1.0f),
+                        fontWeight = alphaStrongWeight(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun AlphaStylePicker(
     uiState: SettingsUiState,
     actions: SettingsScreenActions,
@@ -630,7 +689,7 @@ private fun AlphaStylePicker(
             .padding(horizontal = if (snow) 12.dp else 8.dp, vertical = if (snow) 10.dp else 8.dp),
         horizontalArrangement = Arrangement.spacedBy(if (snow) 8.dp else 6.dp),
     ) {
-        InterfaceStyle.entries.forEachIndexed { index, style ->
+        InterfaceStyle.selectableEntries.forEachIndexed { index, style ->
             val selected = InterfaceStyle.selectedIndex(uiState.uiMode) == index
             Row(
                 modifier = Modifier
@@ -878,6 +937,7 @@ private fun AlphaActionRow(
     title: String,
     summary: String,
     icon: ImageVector? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val snow = isSnowStyle()
@@ -885,7 +945,7 @@ private fun AlphaActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (snow) 62.dp else 52.dp)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (snow) 12.dp else 14.dp, vertical = if (snow) 9.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (snow) 11.dp else 10.dp),
@@ -902,7 +962,7 @@ private fun AlphaActionRow(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = AlphaColors.Accent,
+                        tint = if (enabled) AlphaColors.Accent else AlphaColors.Disabled,
                         modifier = Modifier.size(19.dp),
                     )
                 }
@@ -910,7 +970,7 @@ private fun AlphaActionRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = AlphaColors.Accent,
+                    tint = if (enabled) AlphaColors.Accent else AlphaColors.Disabled,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -918,7 +978,7 @@ private fun AlphaActionRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = AlphaColors.Text,
+                color = if (enabled) AlphaColors.Text else AlphaColors.Disabled,
                 fontSize = alphaSp(if (snow) 14.5f else 15f),
                 fontWeight = alphaStrongWeight(),
                 maxLines = if (snow) 2 else 1,
@@ -927,7 +987,7 @@ private fun AlphaActionRow(
             if (summary.isNotBlank()) {
                 Text(
                     text = summary,
-                    color = AlphaColors.Muted,
+                    color = if (enabled) AlphaColors.Muted else AlphaColors.Disabled,
                     fontSize = alphaSp(if (snow) 12.5f else 12f),
                     lineHeight = alphaSp(if (snow) 16f else 15f),
                     fontWeight = FontWeight.Medium,
@@ -940,7 +1000,7 @@ private fun AlphaActionRow(
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                 contentDescription = null,
-                tint = AlphaColors.Muted,
+                tint = if (enabled) AlphaColors.Muted else AlphaColors.Disabled,
                 modifier = Modifier.size(18.dp),
             )
         }

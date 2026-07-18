@@ -66,6 +66,7 @@ fun UiDecorationBackdrop(modifier: Modifier = Modifier) {
             UiBackgroundDecoration.StarMap -> drawStarMap(palette, alpha, progress)
             UiBackgroundDecoration.Botanical -> drawBotanicalBackdrop(palette, alpha, progress)
             UiBackgroundDecoration.Frost -> drawFrostBackdrop(palette, alpha, progress)
+            UiBackgroundDecoration.PixelGrid -> drawPixelGridBackdrop(palette, alpha)
         }
     }
 }
@@ -102,17 +103,19 @@ fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
 fun Modifier.uiDecoratedCard(
     shape: Shape,
     enabled: Boolean = true,
+    nativeDecorations: Set<UiCardDecoration> = emptySet(),
 ): Modifier {
     val config = LocalUiDecorationConfig.current
-    if (!enabled || !config.isActiveFor(LocalUiDecorationScope.current) || config.card == UiCardDecoration.None) {
+    val configuredStyle = config.card.withoutNativeDuplicate(nativeDecorations)
+    if (!enabled || !config.isActiveFor(LocalUiDecorationScope.current) || configuredStyle == UiCardDecoration.None) {
         return this
     }
     val palette = uiDecorationPalette()
     val seasonalInterface = LocalInterfaceStyle.current == InterfaceStyle.Snow.value
-    val style = if (seasonalInterface && config.card in SEASONAL_CARD_DECORATIONS) {
+    val style = if (seasonalInterface && configuredStyle in SEASONAL_CARD_DECORATIONS) {
         UiCardDecoration.Highlight
     } else {
-        config.card
+        configuredStyle
     }
     val alpha = config.opacity * config.intensity
     return drawWithContent {
@@ -251,6 +254,39 @@ private fun DrawScope.drawFrostBackdrop(palette: UiDecorationPalette, alpha: Flo
     }
 }
 
+private fun DrawScope.drawPixelGridBackdrop(palette: UiDecorationPalette, alpha: Float) {
+    val cell = 26.dp.toPx()
+    var x = cell
+    while (x < size.width) {
+        drawLine(
+            color = palette.primary.copy(alpha = alpha * 0.09f),
+            start = Offset(x, 0f),
+            end = Offset(x, size.height),
+            strokeWidth = 0.55.dp.toPx(),
+        )
+        x += cell
+    }
+    var y = cell
+    while (y < size.height) {
+        drawLine(
+            color = palette.primary.copy(alpha = alpha * 0.075f),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 0.55.dp.toPx(),
+        )
+        y += cell
+    }
+    PIXEL_DECORATION_POINTS.forEachIndexed { index, point ->
+        val side = (if (index % 4 == 0) 3.dp else 2.dp).toPx()
+        drawRect(
+            color = (if (index % 3 == 0) palette.secondary else palette.highlight)
+                .copy(alpha = alpha * 0.26f),
+            topLeft = Offset(size.width * point.first, size.height * point.second),
+            size = Size(side, side),
+        )
+    }
+}
+
 private fun DrawScope.drawTopBarDecoration(
     style: UiTopBarDecoration,
     palette: UiDecorationPalette,
@@ -320,6 +356,24 @@ private fun DrawScope.drawTopBarDecoration(
                     center = Offset(size.width * x, if (x in 0.33f..0.67f) edgeY - 4.dp.toPx() else edgeY),
                 )
             }
+        }
+        UiTopBarDecoration.PixelHud -> {
+            val unit = 3.dp.toPx()
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.58f),
+                topLeft = Offset(size.width * 0.08f, edgeY - unit),
+                size = Size(size.width * 0.24f, unit),
+            )
+            drawRect(
+                color = palette.secondary.copy(alpha = alpha * 0.66f),
+                topLeft = Offset(size.width * 0.33f, edgeY - unit),
+                size = Size(unit * 2f, unit),
+            )
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.58f),
+                topLeft = Offset(size.width * 0.68f, edgeY - unit),
+                size = Size(size.width * 0.24f, unit),
+            )
         }
     }
 }
@@ -394,6 +448,38 @@ private fun DrawScope.drawNavigationDecoration(
                 cap = StrokeCap.Round,
             )
         }
+        UiNavigationDecoration.PixelDock -> {
+            val unit = 3.dp.toPx()
+            val left = size.width * 0.18f
+            val right = size.width * 0.82f
+            val top = center.y - 16.dp.toPx()
+            val bottom = center.y + 22.dp.toPx()
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.50f),
+                topLeft = Offset(left, top),
+                size = Size((right - left) * 0.18f, unit),
+            )
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.50f),
+                topLeft = Offset(left, top),
+                size = Size(unit, bottom - top),
+            )
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.50f),
+                topLeft = Offset(right - (right - left) * 0.18f, bottom - unit),
+                size = Size((right - left) * 0.18f, unit),
+            )
+            drawRect(
+                color = palette.primary.copy(alpha = alpha * 0.50f),
+                topLeft = Offset(right - unit, top),
+                size = Size(unit, bottom - top),
+            )
+            drawRect(
+                color = palette.secondary.copy(alpha = alpha * 0.64f),
+                topLeft = Offset(center.x - unit, bottom - unit),
+                size = Size(unit * 2f, unit),
+            )
+        }
     }
 }
 
@@ -424,6 +510,60 @@ private fun DrawScope.drawCardDecoration(
         UiCardDecoration.Maple -> drawMapleCard(palette, alpha)
         UiCardDecoration.Snow -> drawSnowCard(palette, alpha)
         UiCardDecoration.Circuit -> drawCircuitCard(palette, alpha)
+        UiCardDecoration.PixelFrame -> drawPixelCard(palette, alpha, PixelCardPattern.Generic)
+        UiCardDecoration.PixelHandheld -> drawPixelCard(palette, alpha, PixelCardPattern.Handheld)
+        UiCardDecoration.PixelArcade -> drawPixelCard(palette, alpha, PixelCardPattern.Arcade)
+        UiCardDecoration.PixelPastoral -> drawPixelCard(palette, alpha, PixelCardPattern.Pastoral)
+        UiCardDecoration.PixelStarVoyage -> drawPixelCard(palette, alpha, PixelCardPattern.StarVoyage)
+        UiCardDecoration.PixelInkJade -> drawPixelCard(palette, alpha, PixelCardPattern.InkJade)
+        UiCardDecoration.PixelWasteland -> drawPixelCard(palette, alpha, PixelCardPattern.Wasteland)
+        UiCardDecoration.PixelOcean -> drawPixelCard(palette, alpha, PixelCardPattern.Ocean)
+        UiCardDecoration.PixelCyber -> drawPixelCard(palette, alpha, PixelCardPattern.Cyber)
+        UiCardDecoration.PixelThreeKingdoms -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.ThreeKingdoms,
+        )
+        UiCardDecoration.PixelBianliang -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.Bianliang,
+        )
+        UiCardDecoration.PixelFishingHarbor -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.FishingHarbor,
+        )
+        UiCardDecoration.PixelTribalJungle -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.TribalJungle,
+        )
+        UiCardDecoration.PixelLavaValley -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.LavaValley,
+        )
+        UiCardDecoration.PixelDunhuangDesert -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.DunhuangDesert,
+        )
+        UiCardDecoration.PixelVikingSnowfield -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.VikingSnowfield,
+        )
+        UiCardDecoration.PixelJiangnanWatertown -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.JiangnanWatertown,
+        )
+        UiCardDecoration.PixelCloudTown -> drawPixelCard(
+            palette,
+            alpha,
+            PixelCardPattern.CloudTown,
+        )
     }
 }
 
@@ -533,6 +673,23 @@ private fun DrawScope.drawCircuitCard(palette: UiDecorationPalette, alpha: Float
     }
 }
 
+private fun DrawScope.drawPixelCard(
+    palette: UiDecorationPalette,
+    alpha: Float,
+    pattern: PixelCardPattern,
+) {
+    val unit = 3.dp.toPx().coerceAtMost(size.minDimension / 9f)
+    drawPixelCardPattern(
+        pattern = pattern,
+        unit = unit,
+        primary = palette.primary,
+        secondary = palette.secondary,
+        highlight = palette.highlight,
+        shadow = palette.muted,
+        alpha = alpha,
+    )
+}
+
 private fun DrawScope.drawTinyFlower(
     center: Offset,
     radius: Float,
@@ -618,6 +775,21 @@ private val STAR_CONNECTIONS = listOf(
 private val FROST_POINTS = listOf(
     0.03f to 0.10f, 0.06f to 0.31f, 0.02f to 0.62f, 0.08f to 0.88f,
     0.96f to 0.18f, 0.92f to 0.42f, 0.98f to 0.71f, 0.93f to 0.91f,
+)
+
+private val PIXEL_DECORATION_POINTS = listOf(
+    0.08f to 0.14f,
+    0.19f to 0.34f,
+    0.31f to 0.18f,
+    0.45f to 0.52f,
+    0.58f to 0.25f,
+    0.71f to 0.66f,
+    0.83f to 0.16f,
+    0.92f to 0.43f,
+    0.14f to 0.79f,
+    0.36f to 0.88f,
+    0.64f to 0.81f,
+    0.88f to 0.72f,
 )
 
 private val SEASONAL_CARD_DECORATIONS = setOf(

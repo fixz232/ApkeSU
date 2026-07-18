@@ -40,6 +40,11 @@ pub fn on_post_data_fs() -> Result<()> {
 
     if rescue_skip_modules {
         warn!("rescue requested temporary module skip; skip post-fs-data module stages");
+        match crate::cpu_spoof::disable_for_recovery() {
+            Ok(true) => warn!("disabled CPU spoof during rescue startup"),
+            Ok(false) => {}
+            Err(e) => warn!("failed to disable CPU spoof during rescue startup: {e:#}"),
+        }
         if let Err(e) = assets::ensure_binaries(true) {
             warn!("failed to extract bin assets during rescue module skip: {e}");
         }
@@ -74,6 +79,11 @@ pub fn on_post_data_fs() -> Result<()> {
     // if we are in safe mode, we should disable all modules
     if safe_mode {
         warn!("safe mode, skip post-fs-data scripts and disable all modules!");
+        match crate::cpu_spoof::disable_for_recovery() {
+            Ok(true) => warn!("disabled CPU spoof during safe-mode startup"),
+            Ok(false) => {}
+            Err(e) => warn!("failed to disable CPU spoof during safe-mode startup: {e:#}"),
+        }
         if let Err(e) = crate::module::disable_all_modules() {
             warn!("disable all modules failed: {e}");
         }
@@ -139,10 +149,6 @@ pub fn on_post_data_fs() -> Result<()> {
 
     // Apply property hiding before services and applications can inspect boot state.
     crate::epkesu_hide::apply_if_enabled();
-
-    // CPU spoof uses the same post-fs-data window so apps observe the configured
-    // ro.soc.model from the beginning of the boot session.
-    crate::cpu_spoof::apply_if_enabled();
 
     // execute metamodule mount script
     if let Err(e) = metamodule::exec_mount_script(module_dir) {
@@ -223,6 +229,11 @@ pub fn on_boot_completed() {
     // post-fs-data is the preferred early window. Retry here for devices whose
     // property service was not ready during that stage.
     crate::epkesu_hide::apply_if_enabled();
+
+    // Changing ro.soc.model before SystemUI and vendor services initialize can
+    // break launcher startup on some ROMs. Apply only after Android reports a
+    // completed boot; safe mode and rescue startup disable the saved setting.
+    crate::cpu_spoof::apply_if_enabled_after_boot();
 }
 
 const fn resetprop() -> ResetProp {

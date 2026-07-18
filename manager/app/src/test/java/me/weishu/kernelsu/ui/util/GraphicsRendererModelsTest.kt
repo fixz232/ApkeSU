@@ -54,6 +54,27 @@ class GraphicsRendererModelsTest {
     }
 
     @Test
+    fun runtimeVerificationAcceptsSettledPropertiesBeforeConfigurationIsWritten() {
+        val stale = parseGraphicsRendererStatus(
+            listOf(
+                "renderer=",
+                "disable_vulkan=",
+                "configured_mode=",
+            )
+        )
+        val settled = parseGraphicsRendererStatus(
+            listOf(
+                "renderer=skiavk",
+                "disable_vulkan=false",
+                "configured_mode=",
+            )
+        )
+
+        assertFalse(stale.matchesRuntimeMode(GraphicsRendererMode.Vulkan))
+        assertTrue(settled.matchesRuntimeMode(GraphicsRendererMode.Vulkan))
+    }
+
+    @Test
     fun openGlConfigurationRecognizesDisableVulkanProperty() {
         val status = parseGraphicsRendererStatus(
             listOf(

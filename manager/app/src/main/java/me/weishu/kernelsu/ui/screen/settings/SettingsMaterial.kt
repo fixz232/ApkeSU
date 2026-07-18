@@ -222,7 +222,7 @@ private fun SettingsMaterialContent(
                     icon = Icons.Rounded.Dashboard,
                     title = stringResource(id = R.string.settings_ui_mode),
                     summary = stringResource(id = R.string.settings_ui_mode_summary),
-                    items = InterfaceStyle.entries.map { stringResource(it.labelRes) },
+                    items = InterfaceStyle.selectableEntries.map { stringResource(it.labelRes) },
                     selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                     onItemSelected = actions.onSetUiModeIndex
                 )
@@ -638,14 +638,16 @@ private fun SettingsMaterialContent(
                     )
                 },
                 {
+                    val pathConfigTitle = pathConfigTitle(uiState)
                     SegmentedListItem(
                         onClick = actions.onOpenHiddenPathConfig,
-                        headlineContent = { Text(stringResource(id = R.string.hidden_path_config)) },
-                        supportingContent = { Text(stringResource(id = R.string.hidden_path_config_summary)) },
+                        enabled = uiState.canOpenPathConfig,
+                        headlineContent = { Text(pathConfigTitle) },
+                        supportingContent = { Text(pathConfigSummary(uiState)) },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Visibility,
-                                stringResource(id = R.string.hidden_path_config)
+                                pathConfigTitle,
                             )
                         },
                         trailingContent = {

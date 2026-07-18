@@ -105,3 +105,12 @@ internal fun inferGraphicsRendererMode(
     }
     else -> GraphicsRendererMode.Custom
 }
+
+internal fun GraphicsRendererStatus.matchesRuntimeMode(mode: GraphicsRendererMode): Boolean = when (mode) {
+    GraphicsRendererMode.Vulkan -> rendererProperty == "skiavk" &&
+        !disableVulkanProperty.equals("true", true)
+    GraphicsRendererMode.OpenGl -> rendererProperty == "skiagl" &&
+        disableVulkanProperty.equals("true", true)
+    GraphicsRendererMode.SystemDefault -> !configured
+    GraphicsRendererMode.Custom -> false
+}

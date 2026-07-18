@@ -87,6 +87,7 @@ fun SettingPager(
         onSetDayNightMode = viewModel::setDayNightMode,
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetSeasonStyleIndex = viewModel::setSeasonStyleIndex,
+        onSetPixelStyleIndex = viewModel::setPixelStyleIndex,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
         onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
         onSetNightBackgroundEffectIndex = viewModel::setNightBackgroundEffectIndex,
@@ -95,7 +96,15 @@ fun SettingPager(
         onSetGlobalScrollEffectEnabled = viewModel::setGlobalScrollEffectEnabled,
         onSetGlobalScrollEffectIndex = viewModel::setGlobalScrollEffectIndex,
         onSetUiModeIndex = { index ->
-            viewModel.setUiMode(InterfaceStyle.fromIndex(index).value)
+            val style = InterfaceStyle.fromIndex(index)
+            if (style != InterfaceStyle.Alpha || uiState.uiMode != InterfaceStyle.Delta.value) {
+                viewModel.setUiMode(style.value)
+            }
+        },
+        onSetAlphaDeltaMode = { useDelta ->
+            viewModel.setUiMode(
+                if (useDelta) InterfaceStyle.Delta.value else InterfaceStyle.Alpha.value
+            )
         },
         onOpenLauncherIcon = { navigator.push(Route.LauncherIcon) },
         onOpenNavigationIcons = { navigator.push(Route.NavigationIcons) },
@@ -153,15 +162,29 @@ fun SettingPager(
         onSetAvcSpoofEnabled = viewModel::setAvcSpoofEnabled,
         onSetDefaultUmountModules = viewModel::setDefaultUmountModules,
         onOpenBuiltinMount = { navigator.push(Route.BuiltinMount) },
-        onSetKPatchNextEnabled = viewModel::setKPatchNextEnabled,
-        onOpenKPatchNextWebUi = {
-            context.startActivity(
-                Intent(context, WebUIActivity::class.java)
-                    .setData("kernelsu://webui/$KPATCH_NEXT_MODULE_ID".toUri())
-                    .putExtra("id", KPATCH_NEXT_MODULE_ID)
-            )
+        onSetKPatchNextEnabled = { enabled ->
+            if (!uiState.isLateLoadMode) {
+                viewModel.setKPatchNextEnabled(enabled)
+            }
         },
-        onOpenHiddenPathConfig = { navigator.push(Route.HiddenPathConfig) },
+        onOpenKPatchNextWebUi = {
+            if (uiState.canOpenKPatchNextWebUi) {
+                context.startActivity(
+                    Intent(context, WebUIActivity::class.java)
+                        .setData("kernelsu://webui/$KPATCH_NEXT_MODULE_ID".toUri())
+                        .putExtra("id", KPATCH_NEXT_MODULE_ID)
+                )
+            }
+        },
+        onOpenHiddenPathConfig = {
+            when (uiState.pathConfigBackend) {
+                PathConfigBackend.PathmaskLkm -> navigator.push(Route.HiddenPathConfig)
+                PathConfigBackend.SusfsGki -> navigator.push(Route.SusfsPathConfig)
+                PathConfigBackend.Disabled,
+                PathConfigBackend.Unknown,
+                -> Unit
+            }
+        },
         onOpenAiChat = { navigator.push(Route.AiChat) },
         onOpenRescueProtection = { navigator.push(Route.RescueProtection) },
         onOpenCpuSpoof = { navigator.push(Route.CpuSpoof) },
@@ -182,7 +205,8 @@ fun SettingPager(
         InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Snow.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
+        InterfaceStyle.Snow.value,
+        InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
         else -> {
             when (LocalUiMode.current) {
                 UiMode.Miuix -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)

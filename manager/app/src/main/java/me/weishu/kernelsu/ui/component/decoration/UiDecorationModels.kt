@@ -5,6 +5,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 const val UI_DECORATION_CONFIG_KEY = "ui_decoration_config"
+const val UI_DECORATION_CUSTOM_PRESETS_KEY = "ui_decoration_custom_presets"
+const val UI_DECORATION_RECENT_COMPONENTS_KEY = "ui_decoration_recent_components"
 
 enum class UiDecorationScope(val value: String) {
     Home("home"),
@@ -25,19 +27,59 @@ enum class UiCardDecoration(val value: String) {
     Lotus("lotus"),
     Maple("maple"),
     Snow("snow"),
-    Circuit("circuit");
+    Circuit("circuit"),
+    PixelFrame("pixel_frame"),
+    PixelHandheld("pixel_handheld"),
+    PixelArcade("pixel_arcade"),
+    PixelPastoral("pixel_pastoral"),
+    PixelStarVoyage("pixel_star_voyage"),
+    PixelInkJade("pixel_ink_jade"),
+    PixelWasteland("pixel_wasteland"),
+    PixelOcean("pixel_ocean"),
+    PixelCyber("pixel_cyber"),
+    PixelThreeKingdoms("pixel_three_kingdoms"),
+    PixelBianliang("pixel_bianliang"),
+    PixelFishingHarbor("pixel_fishing_harbor"),
+    PixelTribalJungle("pixel_tribal_jungle"),
+    PixelLavaValley("pixel_lava_valley"),
+    PixelDunhuangDesert("pixel_dunhuang_desert"),
+    PixelVikingSnowfield("pixel_viking_snowfield"),
+    PixelJiangnanWatertown("pixel_jiangnan_watertown"),
+    PixelCloudTown("pixel_cloud_town");
 
     companion object {
         fun fromValue(value: String?): UiCardDecoration = entries.firstOrNull { it.value == value } ?: Highlight
     }
 }
 
+internal val PIXEL_CARD_DECORATIONS: Set<UiCardDecoration> = setOf(
+    UiCardDecoration.PixelFrame,
+    UiCardDecoration.PixelHandheld,
+    UiCardDecoration.PixelArcade,
+    UiCardDecoration.PixelPastoral,
+    UiCardDecoration.PixelStarVoyage,
+    UiCardDecoration.PixelInkJade,
+    UiCardDecoration.PixelWasteland,
+    UiCardDecoration.PixelOcean,
+    UiCardDecoration.PixelCyber,
+    UiCardDecoration.PixelThreeKingdoms,
+    UiCardDecoration.PixelBianliang,
+    UiCardDecoration.PixelFishingHarbor,
+    UiCardDecoration.PixelTribalJungle,
+    UiCardDecoration.PixelLavaValley,
+    UiCardDecoration.PixelDunhuangDesert,
+    UiCardDecoration.PixelVikingSnowfield,
+    UiCardDecoration.PixelJiangnanWatertown,
+    UiCardDecoration.PixelCloudTown,
+)
+
 enum class UiBackgroundDecoration(val value: String) {
     None("none"),
     SoftRays("soft_rays"),
     StarMap("star_map"),
     Botanical("botanical"),
-    Frost("frost");
+    Frost("frost"),
+    PixelGrid("pixel_grid");
 
     companion object {
         fun fromValue(value: String?): UiBackgroundDecoration = entries.firstOrNull { it.value == value } ?: SoftRays
@@ -49,7 +91,8 @@ enum class UiTopBarDecoration(val value: String) {
     FineLine("fine_line"),
     Prism("prism"),
     Seasonal("seasonal"),
-    Circuit("circuit");
+    Circuit("circuit"),
+    PixelHud("pixel_hud");
 
     companion object {
         fun fromValue(value: String?): UiTopBarDecoration = entries.firstOrNull { it.value == value } ?: FineLine
@@ -61,7 +104,8 @@ enum class UiNavigationDecoration(val value: String) {
     UnderGlow("under_glow"),
     LiquidHalo("liquid_halo"),
     Orbit("orbit"),
-    MinimalLine("minimal_line");
+    MinimalLine("minimal_line"),
+    PixelDock("pixel_dock");
 
     companion object {
         fun fromValue(value: String?): UiNavigationDecoration = entries.firstOrNull { it.value == value } ?: UnderGlow
@@ -74,7 +118,8 @@ enum class UiDecorationPreset(val value: String) {
     Lotus("lotus"),
     Autumn("autumn"),
     Winter("winter"),
-    Tech("tech");
+    Tech("tech"),
+    Pixel("pixel");
 
     companion object {
         fun fromValue(value: String?): UiDecorationPreset? = entries.firstOrNull { it.value == value }
@@ -100,6 +145,24 @@ data class UiDecorationConfig(
     )
 
     fun isActiveFor(scope: UiDecorationScope): Boolean = enabled && scope in scopes
+
+    fun deduplicateNativePixelChrome(pixelStyleActive: Boolean): UiDecorationConfig {
+        if (!pixelStyleActive) return this
+        return copy(
+            background = background.withoutNativeDuplicate(UiBackgroundDecoration.PixelGrid),
+            topBar = topBar.withoutNativeDuplicate(UiTopBarDecoration.PixelHud),
+            navigation = navigation.withoutNativeDuplicate(UiNavigationDecoration.PixelDock),
+        )
+    }
+
+    fun effectiveOnNativePixelSurface(pixelStyleActive: Boolean): UiDecorationConfig {
+        val chrome = deduplicateNativePixelChrome(pixelStyleActive)
+        return if (pixelStyleActive) {
+            chrome.copy(card = card.withoutNativeDuplicate(PIXEL_CARD_DECORATIONS))
+        } else {
+            chrome
+        }
+    }
 
     fun withPreset(preset: UiDecorationPreset): UiDecorationConfig {
         val components = presetComponents(preset)
@@ -166,6 +229,104 @@ data class UiDecorationConfig(
     }
 }
 
+@Immutable
+data class CustomUiDecorationPreset(
+    val id: String,
+    val name: String,
+    val updatedAt: Long,
+    val config: UiDecorationConfig,
+) {
+    internal fun toJsonObject(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("name", name)
+        put("updated_at", updatedAt)
+        put("config", JSONObject(config.normalized().toJsonString()))
+    }
+
+    companion object {
+        internal fun fromJsonObject(json: JSONObject): CustomUiDecorationPreset {
+            val id = json.optString("id").trim().take(MAX_CUSTOM_PRESET_ID_LENGTH)
+            val name = sanitizeCustomUiDecorationPresetName(json.optString("name"))
+            require(id.isNotBlank()) { "Preset id is missing" }
+            require(name.isNotBlank()) { "Preset name is missing" }
+            val configJson = json.optJSONObject("config") ?: error("Preset config is missing")
+            return CustomUiDecorationPreset(
+                id = id,
+                name = name,
+                updatedAt = json.optLong("updated_at", 0L).coerceAtLeast(0L),
+                config = UiDecorationConfig.fromJsonString(configJson.toString()).normalized(),
+            )
+        }
+    }
+}
+
+fun customUiDecorationPresetsToJson(presets: List<CustomUiDecorationPreset>): String {
+    val normalized = presets
+        .distinctBy(CustomUiDecorationPreset::id)
+        .take(MAX_CUSTOM_UI_DECORATION_PRESETS)
+    return JSONObject().apply {
+        put("schema", UI_DECORATION_PRESET_BUNDLE_SCHEMA)
+        put("version", UI_DECORATION_PRESET_BUNDLE_VERSION)
+        put("presets", JSONArray().apply {
+            normalized.forEach { put(it.toJsonObject()) }
+        })
+    }.toString(2)
+}
+
+fun customUiDecorationPresetsFromJson(raw: String?): List<CustomUiDecorationPreset> {
+    require(!raw.isNullOrBlank()) { "Preset file is empty" }
+    val root = JSONObject(raw)
+    require(root.optString("schema") == UI_DECORATION_PRESET_BUNDLE_SCHEMA) {
+        "Unsupported preset file"
+    }
+    require(root.optInt("version", 0) in 1..UI_DECORATION_PRESET_BUNDLE_VERSION) {
+        "Unsupported preset version"
+    }
+    val presetsJson = root.optJSONArray("presets") ?: error("Preset list is missing")
+    require(presetsJson.length() <= MAX_IMPORTED_UI_DECORATION_PRESETS) {
+        "Preset file contains too many entries"
+    }
+    return buildList {
+        repeat(presetsJson.length()) { index ->
+            val presetJson = presetsJson.optJSONObject(index) ?: return@repeat
+            runCatching { CustomUiDecorationPreset.fromJsonObject(presetJson) }
+                .getOrNull()
+                ?.let(::add)
+        }
+    }.distinctBy(CustomUiDecorationPreset::id)
+}
+
+fun sanitizeCustomUiDecorationPresetName(name: String): String =
+    name.trim().replace(Regex("\\s+"), " ").take(MAX_CUSTOM_PRESET_NAME_LENGTH)
+
+fun UiDecorationConfig.componentTokens(): List<String> = listOf(
+    "card:${card.value}",
+    "background:${background.value}",
+    "top_bar:${topBar.value}",
+    "navigation:${navigation.value}",
+)
+
+fun UiDecorationConfig.forPreview(): UiDecorationConfig = copy(
+    enabled = true,
+    scopes = UiDecorationScope.entries.toSet(),
+)
+
+internal fun UiCardDecoration.withoutNativeDuplicate(
+    nativeDecorations: Set<UiCardDecoration>,
+): UiCardDecoration = if (this in nativeDecorations) UiCardDecoration.None else this
+
+private fun UiBackgroundDecoration.withoutNativeDuplicate(
+    nativeDecoration: UiBackgroundDecoration,
+): UiBackgroundDecoration = if (this == nativeDecoration) UiBackgroundDecoration.None else this
+
+private fun UiTopBarDecoration.withoutNativeDuplicate(
+    nativeDecoration: UiTopBarDecoration,
+): UiTopBarDecoration = if (this == nativeDecoration) UiTopBarDecoration.None else this
+
+private fun UiNavigationDecoration.withoutNativeDuplicate(
+    nativeDecoration: UiNavigationDecoration,
+): UiNavigationDecoration = if (this == nativeDecoration) UiNavigationDecoration.None else this
+
 private data class UiDecorationComponents(
     val card: UiCardDecoration,
     val background: UiBackgroundDecoration,
@@ -210,6 +371,12 @@ private fun presetComponents(preset: UiDecorationPreset): UiDecorationComponents
         topBar = UiTopBarDecoration.Circuit,
         navigation = UiNavigationDecoration.Orbit,
     )
+    UiDecorationPreset.Pixel -> UiDecorationComponents(
+        card = UiCardDecoration.PixelFrame,
+        background = UiBackgroundDecoration.PixelGrid,
+        topBar = UiTopBarDecoration.PixelHud,
+        navigation = UiNavigationDecoration.PixelDock,
+    )
 }
 
 private fun sanitizeUnitValue(value: Float, fallback: Float): Float {
@@ -218,4 +385,10 @@ private fun sanitizeUnitValue(value: Float, fallback: Float): Float {
 
 const val DEFAULT_UI_DECORATION_INTENSITY = 0.68f
 const val DEFAULT_UI_DECORATION_OPACITY = 0.62f
-private const val UI_DECORATION_CONFIG_VERSION = 1
+private const val UI_DECORATION_CONFIG_VERSION = 2
+const val MAX_CUSTOM_UI_DECORATION_PRESETS = 50
+private const val MAX_IMPORTED_UI_DECORATION_PRESETS = 100
+private const val MAX_CUSTOM_PRESET_NAME_LENGTH = 40
+private const val MAX_CUSTOM_PRESET_ID_LENGTH = 80
+private const val UI_DECORATION_PRESET_BUNDLE_SCHEMA = "apkesu_ui_decoration_presets"
+private const val UI_DECORATION_PRESET_BUNDLE_VERSION = 1

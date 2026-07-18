@@ -13,6 +13,7 @@ const CONFIG_PATH: &str = concatcp!(defs::WORKING_DIR, ".cpu_spoof.json");
 const CPU_MODEL_PROPERTY: &str = "ro.soc.model";
 const CPU_MANUFACTURER_PROPERTY: &str = "ro.soc.manufacturer";
 const CPU_PLATFORM_PROPERTY: &str = "ro.board.platform";
+const BOOT_COMPLETED_PROPERTY: &str = "sys.boot_completed";
 const MAX_PROPERTY_VALUE_BYTES: usize = 91;
 
 #[derive(Clone, Debug, Default)]
@@ -91,8 +92,9 @@ pub fn configure(model: &str) -> Result<()> {
     if next.enabled
         && let Err(err) = apply_config(&next)
     {
-        restore_runtime_value(&snapshot.model)?;
-        restore_config(previous.as_ref())?;
+        if let Err(rollback_err) = rollback_runtime_and_config(&snapshot.model, previous.as_ref()) {
+            bail!("failed to apply CPU spoof: {err:#}; rollback failed: {rollback_err:#}");
+        }
         return Err(err);
     }
 
@@ -114,8 +116,9 @@ pub fn enable() -> Result<()> {
 
     write_config(&next)?;
     if let Err(err) = apply_config(&next) {
-        restore_runtime_value(&snapshot.model)?;
-        restore_config(previous.as_ref())?;
+        if let Err(rollback_err) = rollback_runtime_and_config(&snapshot.model, previous.as_ref()) {
+            bail!("failed to enable CPU spoof: {err:#}; rollback failed: {rollback_err:#}");
+        }
         return Err(err);
     }
 
@@ -158,7 +161,19 @@ pub fn restore_default() -> Result<()> {
     clear_config()
 }
 
-pub fn apply_if_enabled() {
+pub fn apply_if_enabled_after_boot() {
+    match is_boot_completed() {
+        Ok(true) => {}
+        Ok(false) => {
+            log::warn!("cpu-spoof: skip automatic apply before Android boot completes");
+            return;
+        }
+        Err(err) => {
+            log::warn!("cpu-spoof: failed to verify boot completion: {err:#}");
+            return;
+        }
+    }
+
     let Ok(Some(mut config)) = read_config() else {
         return;
     };
@@ -187,6 +202,26 @@ pub fn apply_if_enabled() {
     if let Err(err) = apply_config(&config) {
         log::warn!("cpu-spoof: apply failed: {err:#}");
     }
+}
+
+pub fn disable_for_recovery() -> Result<bool> {
+    let Some(mut config) = read_config()? else {
+        return Ok(false);
+    };
+    if !config.enabled {
+        return Ok(false);
+    }
+    config.enabled = false;
+    config.original.clear();
+    write_config(&config)?;
+    Ok(true)
+}
+
+fn is_boot_completed() -> Result<bool> {
+    sys_prop::init().context("failed to initialize system property API")?;
+    Ok(resetprop()
+        .get(BOOT_COMPLETED_PROPERTY)
+        .is_some_and(|value| value.trim() == "1"))
 }
 
 fn read_cpu_snapshot() -> Result<CpuSnapshot> {
@@ -242,6 +277,9 @@ fn restore_runtime_value(value: &str) -> Result<()> {
 }
 
 fn validate_model(model: &str) -> Result<String> {
+    if model.chars().any(char::is_control) {
+        bail!("CPU model contains control characters");
+    }
     let value = model.trim();
     if value.is_empty() {
         bail!("CPU model cannot be empty");
@@ -251,9 +289,6 @@ fn validate_model(model: &str) -> Result<String> {
     }
     if value.len() > MAX_PROPERTY_VALUE_BYTES {
         bail!("CPU model exceeds Android property value limit");
-    }
-    if value.chars().any(char::is_control) {
-        bail!("CPU model contains control characters");
     }
     Ok(value.to_owned())
 }
@@ -306,6 +341,23 @@ fn restore_config(config: Option<&CpuSpoofConfig>) -> Result<()> {
     config.map_or_else(clear_config, write_config)
 }
 
+fn rollback_runtime_and_config(runtime_value: &str, config: Option<&CpuSpoofConfig>) -> Result<()> {
+    let runtime_result = restore_runtime_value(runtime_value);
+    let config_result = restore_config(config);
+    match (runtime_result, config_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(runtime_err), Ok(())) => {
+            Err(runtime_err).context("failed to restore the previous CPU runtime value")
+        }
+        (Ok(()), Err(config_err)) => {
+            Err(config_err).context("failed to restore the previous CPU spoof configuration")
+        }
+        (Err(runtime_err), Err(config_err)) => bail!(
+            "runtime restore failed: {runtime_err:#}; configuration restore failed: {config_err:#}"
+        ),
+    }
+}
+
 fn clear_config() -> Result<()> {
     match fs::remove_file(CONFIG_PATH) {
         Ok(()) => Ok(()),
@@ -326,7 +378,7 @@ fn write_atomic(path: &str, content: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_model;
+    use super::{MAX_PROPERTY_VALUE_BYTES, validate_model};
 
     #[test]
     fn accepts_normal_cpu_models() {
@@ -337,7 +389,16 @@ mod tests {
     #[test]
     fn rejects_unsafe_cpu_models() {
         assert!(validate_model("\nSM8750").is_err());
+        assert!(validate_model("SM8750\tAB").is_err());
         assert!(validate_model("-SM8750").is_err());
         assert!(validate_model(" ").is_err());
+    }
+
+    #[test]
+    fn enforces_android_property_value_byte_limit() {
+        assert!(validate_model(&"A".repeat(MAX_PROPERTY_VALUE_BYTES)).is_ok());
+        assert!(validate_model(&"A".repeat(MAX_PROPERTY_VALUE_BYTES + 1)).is_err());
+        assert!(validate_model(&"麒麟".repeat(15)).is_ok());
+        assert!(validate_model(&"麒麟".repeat(16)).is_err());
     }
 }

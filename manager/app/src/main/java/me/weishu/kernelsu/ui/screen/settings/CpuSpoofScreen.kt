@@ -74,13 +74,13 @@ import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.CpuSpoofCommandResult
 import me.weishu.kernelsu.ui.util.CpuSpoofStatus
+import me.weishu.kernelsu.ui.util.CPU_SPOOF_PROPERTY_VALUE_LIMIT
 import me.weishu.kernelsu.ui.util.getCpuSpoofStatus
 import me.weishu.kernelsu.ui.util.isCpuSpoofModelValid
+import me.weishu.kernelsu.ui.util.mergeCpuSpoofStatus
 import me.weishu.kernelsu.ui.util.restoreDefaultCpuSpoof
 import me.weishu.kernelsu.ui.util.saveCpuSpoofTarget
 import me.weishu.kernelsu.ui.util.setCpuSpoofEnabled
-
-private const val CPU_PROPERTY_VALUE_LIMIT = 91
 
 private data class CpuSpoofPreset(
     val title: String,
@@ -124,7 +124,11 @@ fun CpuSpoofScreen() {
         scope.launch {
             loading = true
             try {
-                applyStatus(getCpuSpoofStatus(), replaceDraft)
+                val refreshed = getCpuSpoofStatus()
+                applyStatus(
+                    next = mergeCpuSpoofStatus(status, refreshed),
+                    replaceDraft = replaceDraft && refreshed.error.isBlank(),
+                )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -141,8 +145,9 @@ fun CpuSpoofScreen() {
         replaceDraft: Boolean = false,
         action: suspend () -> CpuSpoofCommandResult,
     ) {
+        if (busy) return
+        busy = true
         scope.launch {
-            busy = true
             try {
                 val result = action()
                 val refreshedStatus = try {
@@ -152,10 +157,19 @@ fun CpuSpoofScreen() {
                 } catch (error: Throwable) {
                     status.copy(error = error.message.orEmpty().ifBlank { "status_failed" })
                 }
-                applyStatus(refreshedStatus, replaceDraft && result.success)
+                val refreshFailed = refreshedStatus.error.isNotBlank()
+                applyStatus(
+                    next = mergeCpuSpoofStatus(status, refreshedStatus),
+                    replaceDraft = replaceDraft && result.success && !refreshFailed,
+                )
+                val message = when {
+                    !result.success -> failureMessage
+                    refreshFailed -> R.string.cpu_spoof_action_completed_refresh_failed
+                    else -> successMessage
+                }
                 Toast.makeText(
                     context,
-                    if (result.success) successMessage else failureMessage,
+                    message,
                     Toast.LENGTH_LONG,
                 ).show()
             } catch (error: CancellationException) {
@@ -202,6 +216,7 @@ fun CpuSpoofScreen() {
     }
 
     fun selectPreset(preset: CpuSpoofPreset) {
+        if (busy) return
         draft = preset.model
         draftDirty = true
         runAction(
@@ -265,6 +280,7 @@ fun CpuSpoofScreen() {
                     CircularProgressIndicator(modifier = Modifier.size(28.dp))
                 }
             } else {
+                val controlsEnabled = status.supported && status.error.isBlank() && !busy
                 CpuSpoofRuntimePanel(
                     status = status,
                     busy = busy,
@@ -272,7 +288,7 @@ fun CpuSpoofScreen() {
                 )
                 CpuSpoofCustomPanel(
                     value = draft,
-                    enabled = status.supported && !busy,
+                    enabled = controlsEnabled,
                     onValueChange = {
                         draft = it
                         draftDirty = true
@@ -281,11 +297,11 @@ fun CpuSpoofScreen() {
                 )
                 CpuSpoofPresetPanel(
                     selectedTarget = status.target,
-                    enabled = status.supported && !busy,
+                    enabled = controlsEnabled,
                     onSelected = ::selectPreset,
                 )
                 CpuSpoofRestorePanel(
-                    enabled = status.configured && !busy,
+                    enabled = status.configured && status.error.isBlank() && !busy,
                     onRestore = { showRestoreConfirmation = true },
                 )
             }
@@ -331,13 +347,14 @@ private fun CpuSpoofRuntimePanel(
     val supported = status.supported
     val active = status.enabled && status.applied
     val stateText = when {
+        status.error.isNotBlank() -> stringResource(R.string.cpu_spoof_status_error)
         !supported -> stringResource(R.string.cpu_spoof_unsupported)
         active -> stringResource(R.string.cpu_spoof_enabled)
         status.enabled -> stringResource(R.string.cpu_spoof_pending)
         else -> stringResource(R.string.cpu_spoof_disabled)
     }
     val stateColor = when {
-        !supported || status.enabled && !status.applied -> MaterialTheme.colorScheme.error
+        status.error.isNotBlank() || !supported || status.enabled && !status.applied -> MaterialTheme.colorScheme.error
         active -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -365,7 +382,7 @@ private fun CpuSpoofRuntimePanel(
             }
             StyledSwitch(
                 checked = status.enabled,
-                enabled = supported && !busy,
+                enabled = supported && status.error.isBlank() && !busy,
                 onCheckedChange = onEnabledChange,
             )
         }
@@ -445,7 +462,7 @@ private fun CpuSpoofCustomPanel(
             label = { Text(stringResource(R.string.cpu_spoof_target_cpu)) },
             supportingText = {
                 val count = value.trim().toByteArray(Charsets.UTF_8).size
-                Text(stringResource(R.string.cpu_spoof_model_count, count, CPU_PROPERTY_VALUE_LIMIT))
+                Text(stringResource(R.string.cpu_spoof_model_count, count, CPU_SPOOF_PROPERTY_VALUE_LIMIT))
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { if (valid) onSave() }),

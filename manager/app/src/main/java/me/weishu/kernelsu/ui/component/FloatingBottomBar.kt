@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -65,7 +67,14 @@ import me.weishu.kernelsu.ui.component.liquid.rememberCombinedBackdrop
 import me.weishu.kernelsu.ui.component.liquid.vibrancy
 import me.weishu.kernelsu.ui.component.miuix.animation.DampedDragAnimation
 import me.weishu.kernelsu.ui.component.miuix.animation.InteractiveHighlight
+import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationContainerColor
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationIndicator
+import me.weishu.kernelsu.ui.component.pixel.pixelNavigationSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
+import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -156,9 +165,14 @@ fun RowScope.FloatingBottomBarItem(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
+    val itemShape = when {
+        isPixelInterfaceStyle() -> RoundedCornerShape(6.dp)
+        isSnowInterfaceStyle() -> RoundedCornerShape(10.dp)
+        else -> CircleShape
+    }
     Column(
         modifier
-            .clip(CircleShape)
+            .clip(itemShape)
             .clickable(
                 interactionSource = null,
                 indication = null,
@@ -191,17 +205,25 @@ fun FloatingBottomBar(
     val isInDark = isInDarkTheme()
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
-    val pillShape = remember { CircleShape }
+    val isPixelStyle = isPixelInterfaceStyle()
+    val pillShape: Shape = remember(isPixelStyle, isSnowStyle) {
+        when {
+            isPixelStyle -> RoundedCornerShape(8.dp)
+            isSnowStyle -> RoundedCornerShape(14.dp)
+            else -> CircleShape
+        }
+    }
     val accentColor = MiuixTheme.colorScheme.primary
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val containerColor = when {
         isLiquidGlass -> liquidGlassSurfaceColor().copy(alpha = if (isBlurEnabled) 0.48f else 0.76f)
-        isSnowStyle -> surfaceContainer.copy(alpha = if (isInDark) 0.72f else 0.82f)
+        isSnowStyle -> seasonNavigationContainerColor()
+        isPixelStyle -> pixelNavigationContainerColor()
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
 
-    val activeBackdrop = if (isBlurEnabled) backdrop else null
+    val activeBackdrop = if (isBlurEnabled && !isPixelStyle) backdrop else null
     val tabsBackdrop = if (activeBackdrop != null) rememberLayerBackdrop() else null
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -320,13 +342,19 @@ fun FloatingBottomBar(
                     tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
                 }
                 .graphicsLayer { translationX = panelOffset }
-                .dropShadow(
-                    shape = pillShape,
-                    shadow = Shadow(
-                        radius = 10.dp,
-                        color = Color.Black,
-                        alpha = if (isInDark) 0.2f else 0.1f,
-                    ),
+                .then(
+                    if (isPixelStyle) {
+                        Modifier
+                    } else {
+                        Modifier.dropShadow(
+                            shape = pillShape,
+                            shadow = Shadow(
+                                radius = 10.dp,
+                                color = Color.Black,
+                                alpha = if (isInDark) 0.2f else 0.1f,
+                            ),
+                        )
+                    }
                 )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -367,6 +395,16 @@ fun FloatingBottomBar(
                             Modifier.background(containerColor, pillShape)
                         }
                     }
+                )
+                .then(
+                    when {
+                        isPixelStyle -> Modifier.pixelNavigationSurface(pillShape)
+                        isSnowStyle -> Modifier.seasonNavigationSurface(
+                            shape = pillShape,
+                            paintBackground = false,
+                        )
+                        else -> Modifier
+                    },
                 )
                 .then(if (activeBackdrop != null) interactiveHighlight.modifier else Modifier)
                 .height(64.dp)
@@ -458,6 +496,16 @@ fun FloatingBottomBar(
                                 alpha = dampedDragAnimation.pressProgress,
                             )
                         }
+                        .then(
+                            if (isSnowStyle) {
+                                Modifier.seasonNavigationIndicator(
+                                    shape = pillShape,
+                                    paintBackground = false,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
                         .height(56.dp)
                         .width(tabWidthDp)
                 )
@@ -475,8 +523,17 @@ fun FloatingBottomBar(
                                 (1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f))
                         }
                         .then(dampedDragAnimation.modifier)
-                        .clip(pillShape)
-                        .background(accentColor.copy(alpha = 0.15f), pillShape)
+                        .then(
+                            if (isPixelStyle) {
+                                Modifier.pixelNavigationIndicator(pillShape)
+                            } else if (isSnowStyle) {
+                                Modifier.seasonNavigationIndicator(pillShape)
+                            } else {
+                                Modifier
+                                    .clip(pillShape)
+                                    .background(accentColor.copy(alpha = 0.15f), pillShape)
+                            }
+                        )
                         .height(56.dp)
                         .width(tabWidthDp)
                 )

@@ -10,10 +10,7 @@ enum class UiMode(val value: String) {
     Material("material");
 
     companion object {
-        fun fromValue(value: String): UiMode = when (value) {
-            Material.value -> Material
-            else -> Miuix
-        }
+        fun fromValue(value: String): UiMode = Miuix
 
         val DEFAULT_VALUE = Miuix.value
     }
@@ -21,21 +18,35 @@ enum class UiMode(val value: String) {
 
 enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
     Miuix(UiMode.Miuix.value, R.string.interface_style_miuix),
-    Material(UiMode.Material.value, R.string.interface_style_material),
     Studio("studio", R.string.interface_style_studio),
     LiquidGlass("liquid_glass", R.string.interface_style_liquid_glass),
     Snow("snow", R.string.interface_style_snow),
+    Pixel("pixel", R.string.interface_style_pixel),
     Skrootpro("skrootpro", R.string.interface_style_skrootpro),
     Alpha("alpha", R.string.interface_style_alpha),
     Delta("delta", R.string.interface_style_delta);
 
     companion object {
-        fun fromIndex(index: Int): InterfaceStyle = entries.getOrElse(index) { Miuix }
+        val selectableEntries: List<InterfaceStyle> = entries.filterNot { it == Delta }
 
-        fun selectedIndex(value: String): Int = entries.indexOfFirst { it.value == value }
-            .takeIf { it >= 0 } ?: entries.indexOf(Miuix)
+        fun fromIndex(index: Int): InterfaceStyle = selectableEntries.getOrElse(index) { Miuix }
 
-        fun isMiuixBased(value: String): Boolean = value != Material.value
+        fun selectedIndex(value: String): Int {
+            val normalizedValue = normalizeValue(value)
+            val selected = if (normalizedValue == Delta.value) {
+                Alpha
+            } else {
+                entries.firstOrNull { it.value == normalizedValue }
+            }
+            return selectableEntries.indexOf(selected).takeIf { it >= 0 }
+                ?: selectableEntries.indexOf(Miuix)
+        }
+
+        fun normalizeValue(value: String?): String {
+            return entries.firstOrNull { it.value == value }?.value ?: Miuix.value
+        }
+
+        fun isMiuixBased(value: String): Boolean = normalizeValue(value) != UiMode.Material.value
     }
 }
 

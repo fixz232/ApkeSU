@@ -2,12 +2,17 @@ package me.weishu.kernelsu.ui.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalSkrootproTopBarColor
 import me.weishu.kernelsu.ui.LocalSkrootproTopBarContentColor
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.snow.seasonTopBarContentColor
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelPalette
 
 data class TopBarColors(
     val container: Color,
@@ -26,7 +31,42 @@ fun skrootproTopBarColors(defaultContainer: Color, defaultContent: Color): TopBa
         }
         return TopBarColors(
             container = seasonalContainer,
-            content = defaultContent,
+            content = seasonTopBarContentColor(defaultContent),
+        )
+    }
+
+    if (LocalInterfaceStyle.current == InterfaceStyle.Pixel.value) {
+        val pixelStyle = LocalPixelStyle.current
+        val dark = isInDarkTheme()
+        val palette = pixelPalette(pixelStyle, dark)
+        return TopBarColors(
+            container = palette.surface.copy(alpha = 0.94f),
+            content = when (pixelStyle) {
+                PixelStyle.ClassicHandheld,
+                PixelStyle.NeonArcade,
+                PixelStyle.PastoralFields,
+                PixelStyle.StarVoyage,
+                PixelStyle.InkJade,
+                PixelStyle.CyberHacker,
+                PixelStyle.ThreeKingdoms,
+                PixelStyle.BianliangMarket,
+                PixelStyle.FishingHarbor,
+                PixelStyle.TribalJungle,
+                PixelStyle.LavaValley,
+                PixelStyle.DunhuangDesert,
+                PixelStyle.VikingSnowfield,
+                PixelStyle.JiangnanWatertown,
+                PixelStyle.CloudTown,
+                -> palette.primary
+
+                PixelStyle.RustWasteland -> if (dark) {
+                    lerp(palette.primary, palette.highlight, 0.20f)
+                } else {
+                    palette.primary
+                }
+
+                PixelStyle.OceanDepths -> defaultContent
+            },
         )
     }
 

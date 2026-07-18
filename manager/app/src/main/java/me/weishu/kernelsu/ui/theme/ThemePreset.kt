@@ -123,6 +123,21 @@ enum class ThemePreset(
         pageScale = 1.0f,
     ),
 
+    PIXEL(
+        value = "pixel",
+        titleRes = me.weishu.kernelsu.R.string.theme_preset_pixel,
+        summaryRes = me.weishu.kernelsu.R.string.theme_preset_pixel_summary,
+        colorMode = ColorMode.SYSTEM,
+        keyColor = 0xFF526D43.toInt(),
+        paletteStyle = PaletteStyle.Fidelity,
+        colorSpec = ColorSpec.SpecVersion.SPEC_2025,
+        miuixMonet = false,
+        enableBlur = false,
+        enableFloatingBottomBar = true,
+        enableFloatingBottomBarBlur = false,
+        pageScale = 1.0f,
+    ),
+
     SKROOTPRO(
         value = "skrootpro",
         titleRes = me.weishu.kernelsu.R.string.theme_preset_skrootpro,
@@ -185,27 +200,23 @@ enum class ThemePreset(
 
     companion object {
         val workshopPresets: List<ThemePreset>
-            get() = entries.filterNot { it == CUSTOM || it == STUDIO }
+            get() = entries.filterNot { it == CUSTOM || it == STUDIO || it == DELTA }
 
         fun fromValue(value: String?): ThemePreset = entries.find { it.value == value } ?: CLEAN_TOOL
     }
 
     fun targetUiMode(currentUiMode: String): String {
         return when (this) {
-            CUSTOM -> currentUiMode
+            CUSTOM -> InterfaceStyle.normalizeValue(currentUiMode)
             SKROOTPRO -> InterfaceStyle.Skrootpro.value
             ALPHA -> InterfaceStyle.Alpha.value
             DELTA -> InterfaceStyle.Delta.value
             LIQUID_GLASS -> InterfaceStyle.LiquidGlass.value
             SNOW -> InterfaceStyle.Snow.value
+            PIXEL -> InterfaceStyle.Pixel.value
             STUDIO -> InterfaceStyle.Studio.value
             PREMIUM_GLOSS -> InterfaceStyle.Miuix.value
-            GEEK_DARK -> InterfaceStyle.Material.value
-            CLEAN_TOOL, DYNAMIC_COLOR -> if (currentUiMode == InterfaceStyle.Material.value) {
-                InterfaceStyle.Material.value
-            } else {
-                InterfaceStyle.Miuix.value
-            }
+            GEEK_DARK, CLEAN_TOOL, DYNAMIC_COLOR -> InterfaceStyle.Miuix.value
         }
     }
 

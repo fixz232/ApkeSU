@@ -90,6 +90,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object SusfsPathConfig : Route
+
+    @Parcelize
+    @Serializable
     data object AiChat : Route
 
     @Parcelize

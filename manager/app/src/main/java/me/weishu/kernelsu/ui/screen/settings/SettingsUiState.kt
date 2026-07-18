@@ -15,7 +15,9 @@ import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPAC
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -29,6 +31,13 @@ import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.LauncherIconOption
+
+enum class UiDecorationSaveState {
+    Idle,
+    Saving,
+    Saved,
+    Failed,
+}
 
 @Immutable
 data class SettingsUiState(
@@ -56,7 +65,11 @@ data class SettingsUiState(
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
     val seasonStyle: String = SeasonStyle.DEFAULT_VALUE,
+    val pixelStyle: String = PixelStyle.DEFAULT_VALUE,
     val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
+    val uiDecorationSaveState: UiDecorationSaveState = UiDecorationSaveState.Idle,
+    val customUiDecorationPresets: List<CustomUiDecorationPreset> = emptyList(),
+    val recentUiDecorationComponents: List<String> = emptyList(),
     val globalSnowEnabled: Boolean = false,
     val globalSnowEffect: String = GlobalSnowEffect.DEFAULT_VALUE,
     val nightBackgroundEffect: String = NightBackgroundEffect.DEFAULT_VALUE,
@@ -146,6 +159,7 @@ data class SettingsUiState(
 
     val isLkmMode: Boolean = false,
     val isLateLoadMode: Boolean = false,
+    val runtimeModeResolved: Boolean = false,
 
     // Auto Jailbreak
     val autoJailbreak: Boolean = false
@@ -164,6 +178,7 @@ data class SettingsScreenActions(
     val onSetDayNightMode: (Boolean) -> Unit,
     val onSetSwitchStyleIndex: (Int) -> Unit,
     val onSetSeasonStyleIndex: (Int) -> Unit,
+    val onSetPixelStyleIndex: (Int) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,
     val onSetNightBackgroundEffectIndex: (Int) -> Unit,
@@ -172,6 +187,7 @@ data class SettingsScreenActions(
     val onSetGlobalScrollEffectEnabled: (Boolean) -> Unit,
     val onSetGlobalScrollEffectIndex: (Int) -> Unit,
     val onSetUiModeIndex: (Int) -> Unit,
+    val onSetAlphaDeltaMode: (Boolean) -> Unit,
     val onOpenLauncherIcon: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,

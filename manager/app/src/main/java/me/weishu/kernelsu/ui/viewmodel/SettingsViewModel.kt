@@ -25,8 +25,11 @@ import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
+import me.weishu.kernelsu.ui.screen.settings.UiDecorationSaveState
 import me.weishu.kernelsu.ui.theme.ColorMode
 import me.weishu.kernelsu.ui.theme.DeltaColorVariant
 import me.weishu.kernelsu.ui.theme.ThemeAppearanceDefaults
@@ -52,6 +55,7 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     private var refreshJob: Job? = null
+    private var uiDecorationSaveJob: Job? = null
 
     init {
         refresh()
@@ -82,7 +86,10 @@ class SettingsViewModel(
             val blurIntensity = repo.blurIntensity
             val switchStyle = repo.switchStyle
             val seasonStyle = repo.seasonStyle
+            val pixelStyle = repo.pixelStyle
             val uiDecorationConfig = repo.uiDecorationConfig
+            val customUiDecorationPresets = repo.getCustomUiDecorationPresets()
+            val recentUiDecorationComponents = repo.getRecentUiDecorationComponents()
             val globalSnowEnabled = repo.globalSnowEnabled
             val globalSnowEffect = repo.globalSnowEffect
             val nightBackgroundEffect = repo.nightBackgroundEffect
@@ -131,6 +138,7 @@ class SettingsViewModel(
                 blurIntensity = blurIntensity,
             )
             val isLkmMode = repo.isLkmMode()
+            val runtimeModeResolved = Natives.version > 0
 
             // Async loading for natives/features
             val suCompatStatus = repo.getSuCompatStatus()
@@ -180,7 +188,10 @@ class SettingsViewModel(
                     blurIntensity = blurIntensity,
                     switchStyle = switchStyle,
                     seasonStyle = seasonStyle,
+                    pixelStyle = pixelStyle,
                     uiDecorationConfig = uiDecorationConfig,
+                    customUiDecorationPresets = customUiDecorationPresets,
+                    recentUiDecorationComponents = recentUiDecorationComponents,
                     globalSnowEnabled = globalSnowEnabled,
                     globalSnowEffect = globalSnowEffect,
                     nightBackgroundEffect = nightBackgroundEffect,
@@ -252,46 +263,53 @@ class SettingsViewModel(
                     isLkmMode = isLkmMode,
                     autoJailbreak = autoJailbreak,
                     isLateLoadMode = isLateLoadMode,
+                    runtimeModeResolved = runtimeModeResolved,
                 )
             }
         }
     }
 
     fun setUiMode(mode: String) {
+        val normalizedMode = InterfaceStyle.normalizeValue(mode)
         if (repo.themeSyncStrategy == ThemeSyncStrategy.PER_STYLE) {
-            repo.uiMode = mode
+            repo.uiMode = normalizedMode
             refresh()
             return
         }
 
-        when (mode) {
+        when (normalizedMode) {
             InterfaceStyle.Studio.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.STUDIO)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.STUDIO)
                 return
             }
 
             InterfaceStyle.Skrootpro.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.SKROOTPRO)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.SKROOTPRO)
                 return
             }
 
             InterfaceStyle.Alpha.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.ALPHA)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.ALPHA)
                 return
             }
 
             InterfaceStyle.Delta.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.DELTA)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.DELTA)
                 return
             }
 
             InterfaceStyle.LiquidGlass.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.LIQUID_GLASS)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.LIQUID_GLASS)
                 return
             }
 
             InterfaceStyle.Snow.value -> {
-                applyInterfacePresetPreservingColorMode(mode, ThemePreset.SNOW)
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.SNOW)
+                return
+            }
+
+            InterfaceStyle.Pixel.value -> {
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.PIXEL)
                 return
             }
         }
@@ -303,41 +321,20 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.Alpha.value ||
             oldMode == InterfaceStyle.Delta.value ||
             oldMode == InterfaceStyle.LiquidGlass.value ||
-            oldMode == InterfaceStyle.Snow.value
+            oldMode == InterfaceStyle.Snow.value ||
+            oldMode == InterfaceStyle.Pixel.value
 
-        if (isLeavingSpecialStyle && (mode == InterfaceStyle.Miuix.value || mode == InterfaceStyle.Material.value)) {
-            applyInterfacePresetPreservingColorMode(mode, ThemePreset.CLEAN_TOOL)
+        if (isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value) {
+            applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.CLEAN_TOOL)
             return
         }
 
-        val newThemeMode = when {
-            oldMode == InterfaceStyle.Material.value && InterfaceStyle.isMiuixBased(mode) -> {
-                val colorMode = ColorMode.fromValue(currentThemeMode)
-                val baseMode = if (colorMode == ColorMode.DARK_AMOLED) 2 else currentThemeMode
-                if (repo.miuixMonet && !colorMode.isMonet) {
-                    ColorMode.fromValue(baseMode).toMonetMode()
-                } else if (!repo.miuixMonet && colorMode.isMonet) {
-                    ColorMode.fromValue(baseMode).toNonMonetMode()
-                } else baseMode
-            }
-
-            InterfaceStyle.isMiuixBased(oldMode) &&
-                mode == InterfaceStyle.Material.value -> {
-                val colorMode = ColorMode.fromValue(currentThemeMode)
-                if (colorMode.isMonet) {
-                    colorMode.toNonMonetMode()
-                } else currentThemeMode
-            }
-
-            else -> currentThemeMode
-        }
-
-        repo.uiMode = mode
-        repo.themeMode = newThemeMode
+        repo.uiMode = normalizedMode
+        repo.themeMode = currentThemeMode
         _uiState.update {
             it.copy(
-                uiMode = mode,
-                themeMode = newThemeMode,
+                uiMode = normalizedMode,
+                themeMode = currentThemeMode,
                 themePreset = ThemePreset.CUSTOM.value
             )
         }
@@ -350,10 +347,16 @@ class SettingsViewModel(
         } else {
             null
         }
+        val selectedPixelStyle = if (mode == InterfaceStyle.Pixel.value) {
+            PixelStyle.fromValue(repo.pixelStyle)
+        } else {
+            null
+        }
         repo.uiMode = mode
         repo.applyThemePreset(preset)
         repo.themeMode = colorMode
         selectedSeason?.let { repo.seasonStyle = it.value }
+        selectedPixelStyle?.let { repo.pixelStyle = it.value }
         refresh()
     }
 
@@ -394,8 +397,66 @@ class SettingsViewModel(
 
     fun setUiDecorationConfig(config: UiDecorationConfig) {
         val normalized = config.normalized()
-        repo.uiDecorationConfig = normalized
-        _uiState.update { it.copy(uiDecorationConfig = normalized) }
+        if (uiDecorationSaveJob?.isActive == true) return
+        _uiState.update { it.copy(uiDecorationSaveState = UiDecorationSaveState.Saving) }
+        uiDecorationSaveJob = viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                runCatching {
+                    repo.saveUiDecorationConfig(normalized) && repo.uiDecorationConfig == normalized
+                }.getOrDefault(false)
+            }
+            _uiState.update { current ->
+                if (saved) {
+                    current.copy(
+                        uiDecorationConfig = normalized,
+                        uiDecorationSaveState = UiDecorationSaveState.Saved,
+                        recentUiDecorationComponents = repo.getRecentUiDecorationComponents(),
+                    )
+                } else {
+                    current.copy(uiDecorationSaveState = UiDecorationSaveState.Failed)
+                }
+            }
+        }
+    }
+
+    fun consumeUiDecorationSaveState() {
+        _uiState.update { current ->
+            if (current.uiDecorationSaveState == UiDecorationSaveState.Saving) {
+                current
+            } else {
+                current.copy(uiDecorationSaveState = UiDecorationSaveState.Idle)
+            }
+        }
+    }
+
+    fun saveCustomUiDecorationPreset(name: String, config: UiDecorationConfig): Boolean {
+        repo.saveCustomUiDecorationPreset(name, config) ?: return false
+        _uiState.update { current -> current.copy(customUiDecorationPresets = repo.getCustomUiDecorationPresets()) }
+        return true
+    }
+
+    fun renameCustomUiDecorationPreset(presetId: String, name: String): Boolean {
+        val saved = repo.renameCustomUiDecorationPreset(presetId, name)
+        if (saved) {
+            _uiState.update { it.copy(customUiDecorationPresets = repo.getCustomUiDecorationPresets()) }
+        }
+        return saved
+    }
+
+    fun deleteCustomUiDecorationPreset(presetId: String): Boolean {
+        val deleted = repo.deleteCustomUiDecorationPreset(presetId)
+        if (deleted) {
+            _uiState.update { it.copy(customUiDecorationPresets = repo.getCustomUiDecorationPresets()) }
+        }
+        return deleted
+    }
+
+    suspend fun importCustomUiDecorationPresets(presets: List<CustomUiDecorationPreset>): Int {
+        val count = withContext(Dispatchers.IO) { repo.importCustomUiDecorationPresets(presets) }
+        if (count > 0) {
+            _uiState.update { it.copy(customUiDecorationPresets = repo.getCustomUiDecorationPresets()) }
+        }
+        return count
     }
 
     fun setSeasonStyleIndex(index: Int) {
@@ -406,6 +467,18 @@ class SettingsViewModel(
                 seasonStyle = season.value,
                 keyColor = season.keyColor,
                 themePreset = ThemePreset.SNOW.value,
+            )
+        }
+    }
+
+    fun setPixelStyleIndex(index: Int) {
+        val pixelStyle = PixelStyle.fromIndex(index)
+        repo.pixelStyle = pixelStyle.value
+        _uiState.update {
+            it.copy(
+                pixelStyle = pixelStyle.value,
+                keyColor = pixelStyle.keyColor,
+                themePreset = ThemePreset.PIXEL.value,
             )
         }
     }
@@ -976,6 +1049,10 @@ class SettingsViewModel(
     }
 
     fun setKPatchNextEnabled(enabled: Boolean) {
+        if (Natives.isLateLoadMode) {
+            _uiState.update { it.copy(isLateLoadMode = true) }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setKPatchNextEnabled(enabled)) {
                 refreshKPatchNextStatus()

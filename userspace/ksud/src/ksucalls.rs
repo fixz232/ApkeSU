@@ -268,6 +268,10 @@ pub fn is_late_load() -> bool {
     get_info().flags & ksu_uapi::KSU_GET_INFO_FLAG_LATE_LOAD != 0
 }
 
+pub fn is_lkm_mode() -> bool {
+    get_info().flags & ksu_uapi::KSU_GET_INFO_FLAG_LKM != 0
+}
+
 pub fn is_uapi_version_mismatch() -> bool {
     get_info().uapi_version != ksu_uapi::KERNEL_SU_UAPI_VERSION
 }

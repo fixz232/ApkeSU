@@ -55,7 +55,10 @@ fun PreInstallStyleSettingsScreen() {
     }
 
     val onStyleSelected: (Int) -> Unit = { index ->
-        viewModel.setUiMode(InterfaceStyle.fromIndex(index).value)
+        val style = InterfaceStyle.fromIndex(index)
+        if (style != InterfaceStyle.Alpha || uiState.uiMode != InterfaceStyle.Delta.value) {
+            viewModel.setUiMode(style.value)
+        }
     }
 
     when (LocalUiMode.current) {
@@ -162,7 +165,7 @@ private fun StyleSettingsContent(
     SegmentedColumn(
         modifier = modifier,
         title = stringResource(R.string.settings_ui_mode),
-        content = InterfaceStyle.entries.mapIndexed { index, style ->
+        content = InterfaceStyle.selectableEntries.mapIndexed { index, style ->
             {
                 SegmentedRadioItem(
                     title = stringResource(style.labelRes),

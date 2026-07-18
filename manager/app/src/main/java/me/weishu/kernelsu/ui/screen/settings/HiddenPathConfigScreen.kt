@@ -99,6 +99,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
@@ -206,6 +207,14 @@ private data class HiddenPathTemplate(
 
 @Composable
 fun HiddenPathConfigScreen() {
+    if (!Natives.isLkmMode && !Natives.isLateLoadMode) {
+        SusfsPathConfigScreen()
+        return
+    }
+    if (Natives.isLateLoadMode) {
+        HiddenPathUnavailableScreen()
+        return
+    }
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -562,6 +571,47 @@ fun HiddenPathConfigScreen() {
                     else -> HiddenPathHelpTab()
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HiddenPathUnavailableScreen() {
+    val navigator = LocalNavigator.current
+    val onBack = dropUnlessResumed { navigator.pop() }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.hidden_path_config)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.close),
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_hidden_path_jailbreak_disabled_summary),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }

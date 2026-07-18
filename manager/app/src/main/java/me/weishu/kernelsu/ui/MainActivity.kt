@@ -106,8 +106,13 @@ import me.weishu.kernelsu.ui.component.decoration.UiDecorationChromeOverlay
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelBackdrop
+import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonAmbientOverlay
+import me.weishu.kernelsu.ui.component.snow.SeasonChromeOverlay
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyleWallpaper
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
@@ -137,6 +142,7 @@ import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
 import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
 import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
+import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
@@ -279,10 +285,15 @@ class MainActivity : ComponentActivity() {
                     fontScale = systemDensity.fontScale * uiState.fontScale,
                 )
             }
+            val effectiveUiDecorationConfig = remember(uiState.uiDecorationConfig, uiState.interfaceStyle) {
+                uiState.uiDecorationConfig.deduplicateNativePixelChrome(
+                    pixelStyleActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value,
+                )
+            }
 
             CompositionLocalProvider(
                 LocalNavigator provides navigator,
-                LocalUiDecorationConfig provides uiState.uiDecorationConfig,
+                LocalUiDecorationConfig provides effectiveUiDecorationConfig,
                 LocalUiDecorationScope provides uiDecorationScope,
                 LocalDensity provides density,
                 LocalColorMode provides appSettings.colorMode.value,
@@ -295,6 +306,7 @@ class MainActivity : ComponentActivity() {
                 LocalUiMode provides uiMode,
                 LocalInterfaceStyle provides uiState.interfaceStyle,
                 LocalSeasonStyle provides SeasonStyle.fromValue(uiState.seasonStyle),
+                LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
@@ -353,7 +365,14 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.PreInstallStyleSettings> { PreInstallStyleSettingsScreen() }
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
                                 entry<Route.UiDecorationLibrary> { UiDecorationLibraryScreen() }
-                                entry<Route.HiddenPathConfig> { HiddenPathConfigScreen() }
+                                entry<Route.HiddenPathConfig> {
+                                    if (!Natives.isLkmMode && !Natives.isLateLoadMode) {
+                                        SusfsPathConfigScreen()
+                                    } else {
+                                        HiddenPathConfigScreen()
+                                    }
+                                }
+                                entry<Route.SusfsPathConfig> { SusfsPathConfigScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
                                 entry<Route.AiModuleStudio> { AiModuleStudioScreen() }
                                 entry<Route.RescueProtection> { RescueProtectionScreen() }
@@ -399,11 +418,13 @@ class MainActivity : ComponentActivity() {
                     }
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
                     val seasonalStyleActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
+                    val pixelStyleActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
                     val hasCustomBackground =
                         !effectiveBackground.wallpaperUriString.isNullOrBlank() ||
                             !effectiveBackground.videoUriString.isNullOrBlank()
                     val immersiveBackgroundActive =
                         seasonalStyleActive ||
+                            pixelStyleActive ||
                             hasCustomBackground ||
                             (
                                 darkMode &&
@@ -436,6 +457,9 @@ class MainActivity : ComponentActivity() {
                                     if (seasonalStyleActive && !hasCustomBackground) {
                                         SeasonStyleWallpaper(modifier = Modifier.fillMaxSize())
                                         SeasonAmbientOverlay(modifier = Modifier.fillMaxSize())
+                                    }
+                                    if (pixelStyleActive && !hasCustomBackground) {
+                                        PixelBackdrop(modifier = Modifier.fillMaxSize())
                                     }
                                     if (!uiState.nightBackgroundPassthrough) {
                                         NightBackgroundEffectOverlay(
@@ -473,6 +497,8 @@ class MainActivity : ComponentActivity() {
                         }
 
                         UiDecorationChromeOverlay(modifier = Modifier.fillMaxSize())
+                        SeasonChromeOverlay(modifier = Modifier.fillMaxSize())
+                        PixelChromeOverlay(modifier = Modifier.fillMaxSize())
 
                         if (uiState.nightBackgroundPassthrough) {
                             NightBackgroundEffectOverlay(

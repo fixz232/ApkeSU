@@ -78,6 +78,7 @@ fun defaultThemePresetForUiMode(uiMode: String): ThemePreset {
         InterfaceStyle.Delta.value -> ThemePreset.DELTA
         InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
         InterfaceStyle.Snow.value -> ThemePreset.SNOW
+        InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
         else -> ThemePreset.CLEAN_TOOL
     }
 }

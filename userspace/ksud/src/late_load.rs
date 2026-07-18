@@ -284,6 +284,10 @@ pub fn run(
     // 13. Execute boot-completed stage scripts (non-blocking)
     init_event::run_stage("boot-completed", false);
 
+    // Late-load runs after Android is already up, so property spoofing cannot
+    // interfere with SystemUI or launcher initialization.
+    crate::cpu_spoof::apply_if_enabled_after_boot();
+
     // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
     info!("Restarting KernelSU Manager {package_name}...");
     let _ = Command::new("am")

@@ -42,6 +42,9 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
+import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardColors
+import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -221,7 +224,9 @@ fun Modifier.snowMiuixCardSurface(
     enabled: Boolean = true,
     capHeight: Dp = 13.dp,
 ): Modifier {
-    if (!enabled || !isSnowInterfaceStyle()) return uiDecoratedCard(shape = shape, enabled = enabled)
+    if (!enabled) return uiDecoratedCard(shape = shape, enabled = false)
+    if (isPixelInterfaceStyle()) return pixelMiuixCardSurface(shape = shape, enabled = true)
+    if (!isSnowInterfaceStyle()) return uiDecoratedCard(shape = shape, enabled = true)
 
     val dark = isInDarkTheme()
     val season = LocalSeasonStyle.current
@@ -239,6 +244,8 @@ fun Modifier.snowMiuixCardSurface(
         .border(1.dp, edgeColor, shape)
         .drawWithContent {
             drawContent()
+            drawSeasonCardInterior(season, dark)
+            drawSeasonCardFramePolish(season, dark)
             drawSeasonCardDecoration(
                 season = season,
                 capHeight = capHeight.toPx(),
@@ -254,7 +261,9 @@ fun Modifier.snowMiuixCardSurface(
 fun snowMiuixCardColors(
     color: Color = MiuixTheme.colorScheme.surfaceContainer,
     enabled: Boolean = true,
-) = if (enabled && isSnowInterfaceStyle()) {
+) = if (enabled && isPixelInterfaceStyle()) {
+    pixelMiuixCardColors(color = color, enabled = true)
+} else if (enabled && isSnowInterfaceStyle()) {
     val season = LocalSeasonStyle.current
     val dark = isInDarkTheme()
     val seasonalColor = if (season == SeasonStyle.Winter) {
@@ -356,6 +365,197 @@ private fun seasonEdgeColor(season: SeasonStyle, dark: Boolean): Color {
         SeasonStyle.Winter -> Color.White
     }
     return tint.copy(alpha = if (dark) 0.34f else 0.72f)
+}
+
+private fun DrawScope.drawSeasonCardInterior(season: SeasonStyle, dark: Boolean) {
+    if (size.width < 72.dp.toPx() || size.height < 48.dp.toPx()) return
+    when (season) {
+        SeasonStyle.Spring -> drawSpringCardInterior(dark)
+        SeasonStyle.Summer -> drawSummerCardInterior(dark)
+        SeasonStyle.Autumn -> drawAutumnCardInterior(dark)
+        SeasonStyle.Winter -> drawWinterCardInterior(dark)
+    }
+}
+
+private fun DrawScope.drawSpringCardInterior(dark: Boolean) {
+    val alpha = if (dark) 0.24f else 0.22f
+    val branchColor = Color(0xFF527348).copy(alpha = alpha)
+    val branchStart = Offset(size.width * 0.70f, size.height * 0.18f)
+    val branchEnd = Offset(size.width * 0.98f, size.height * 0.46f)
+    drawLine(
+        color = branchColor,
+        start = branchStart,
+        end = branchEnd,
+        strokeWidth = 1.1.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
+    listOf(
+        0.77f to 0.25f,
+        0.85f to 0.31f,
+        0.93f to 0.39f,
+    ).forEachIndexed { index, (x, y) ->
+        val center = Offset(size.width * x, size.height * y)
+        drawOval(
+            color = Color(0xFF7EAB68).copy(alpha = alpha * 0.92f),
+            topLeft = center - Offset(4.dp.toPx(), 2.dp.toPx()),
+            size = Size(8.dp.toPx(), 4.dp.toPx()),
+        )
+        if (index != 1) {
+            drawFlower(
+                center = center + Offset(-2.dp.toPx(), -4.dp.toPx()),
+                radius = 2.2.dp.toPx(),
+                petalColor = Color(0xFFF3B8C7).copy(alpha = alpha * 1.15f),
+                centerColor = Color(0xFFE6B84A).copy(alpha = alpha * 1.2f),
+            )
+        }
+    }
+    listOf(0.07f, 0.14f, 0.23f, 0.31f, 0.41f).forEachIndexed { index, x ->
+        val bottom = Offset(size.width * x, size.height)
+        drawLine(
+            color = Color(0xFF5F8E4D).copy(alpha = alpha * 0.70f),
+            start = bottom,
+            end = Offset(bottom.x + (if (index % 2 == 0) -1 else 1) * 4.dp.toPx(), size.height - (7 + index % 3 * 3).dp.toPx()),
+            strokeWidth = 0.8.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+private fun DrawScope.drawSummerCardInterior(dark: Boolean) {
+    val alpha = if (dark) 0.23f else 0.21f
+    listOf(
+        Triple(0.18f, 0.76f, 0.22f),
+        Triple(0.55f, 0.62f, 0.30f),
+        Triple(0.84f, 0.80f, 0.20f),
+    ).forEachIndexed { index, (x, y, widthFraction) ->
+        val rippleWidth = size.width * widthFraction
+        val rippleHeight = (8 + index * 2).dp.toPx()
+        drawOval(
+            color = Color(0xFF70C9C5).copy(alpha = alpha * 0.82f),
+            topLeft = Offset(size.width * x - rippleWidth / 2f, size.height * y - rippleHeight / 2f),
+            size = Size(rippleWidth, rippleHeight),
+            style = Stroke(width = 0.8.dp.toPx()),
+        )
+    }
+    val leafCenter = Offset(size.width * 0.84f, size.height * 0.68f)
+    drawOval(
+        color = Color(0xFF5B9C5F).copy(alpha = alpha * 0.92f),
+        topLeft = leafCenter - Offset(16.dp.toPx(), 7.dp.toPx()),
+        size = Size(32.dp.toPx(), 14.dp.toPx()),
+    )
+    drawLine(
+        color = Color(0xFFD9EABF).copy(alpha = alpha),
+        start = leafCenter,
+        end = leafCenter + Offset(13.dp.toPx(), 0f),
+        strokeWidth = 0.7.dp.toPx(),
+    )
+    drawDragonfly(
+        center = Offset(size.width * 0.74f, size.height * 0.28f),
+        scale = 0.78f,
+        alpha = alpha * 1.15f,
+    )
+}
+
+private fun DrawScope.drawAutumnCardInterior(dark: Boolean) {
+    val alpha = if (dark) 0.24f else 0.22f
+    listOf(0.13f, 0.28f, 0.46f, 0.63f, 0.79f, 0.92f).forEachIndexed { index, x ->
+        val startY = size.height * (0.24f + index % 3 * 0.13f)
+        drawLine(
+            color = Color(0xFFBCCACC).copy(alpha = alpha * 0.62f),
+            start = Offset(size.width * x, startY),
+            end = Offset(size.width * x - 5.dp.toPx(), startY + 18.dp.toPx()),
+            strokeWidth = 0.7.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
+    val leaves = listOf(
+        Triple(0.16f, 0.75f, -24f),
+        Triple(0.71f, 0.70f, 18f),
+        Triple(0.88f, 0.82f, -42f),
+    )
+    val colors = listOf(Color(0xFFD3933C), Color(0xFFB9583A), Color(0xFF82793A))
+    leaves.forEachIndexed { index, (x, y, rotation) ->
+        drawAutumnLeaf(
+            center = Offset(size.width * x, size.height * y),
+            length = (11 + index * 2).dp.toPx(),
+            width = 4.dp.toPx(),
+            color = colors[index].copy(alpha = alpha * 1.05f),
+            rotationDegrees = rotation,
+        )
+    }
+}
+
+private fun DrawScope.drawWinterCardInterior(dark: Boolean) {
+    val alpha = if (dark) 0.24f else 0.20f
+    val frostColor = Color(0xFFDDF4F8).copy(alpha = alpha)
+    listOf(
+        Offset(size.width * 0.12f, size.height * 0.68f),
+        Offset(size.width * 0.82f, size.height * 0.34f),
+    ).forEachIndexed { index, center ->
+        drawCardFrostCrystal(
+            center = center,
+            radius = (10 + index * 3).dp.toPx(),
+            color = frostColor.copy(alpha = frostColor.alpha * (1f - index * 0.12f)),
+        )
+    }
+    val driftHeight = 13.dp.toPx().coerceAtMost(size.height * 0.20f)
+    val drift = Path().apply {
+        moveTo(0f, size.height)
+        lineTo(size.width, size.height)
+        lineTo(size.width, size.height - driftHeight * 0.55f)
+        cubicTo(
+            size.width * 0.76f,
+            size.height - driftHeight,
+            size.width * 0.58f,
+            size.height - driftHeight * 0.38f,
+            size.width * 0.36f,
+            size.height - driftHeight * 0.70f,
+        )
+        cubicTo(
+            size.width * 0.18f,
+            size.height - driftHeight,
+            size.width * 0.08f,
+            size.height - driftHeight * 0.42f,
+            0f,
+            size.height - driftHeight * 0.58f,
+        )
+        close()
+    }
+    drawPath(
+        path = drift,
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFFEAF8FB).copy(alpha = alpha * 0.62f),
+                Color(0xFFB8DCE5).copy(alpha = alpha * 0.34f),
+            ),
+            startY = size.height - driftHeight,
+            endY = size.height,
+        ),
+    )
+}
+
+private fun DrawScope.drawCardFrostCrystal(center: Offset, radius: Float, color: Color) {
+    repeat(3) { index ->
+        rotate(index * 60f, center) {
+            drawLine(
+                color = color,
+                start = Offset(center.x - radius, center.y),
+                end = Offset(center.x + radius, center.y),
+                strokeWidth = 0.75.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+            listOf(-0.55f, 0.55f).forEach { direction ->
+                val branchX = center.x + radius * direction
+                drawLine(
+                    color = color,
+                    start = Offset(branchX, center.y),
+                    end = Offset(branchX - radius * 0.18f * direction, center.y - radius * 0.20f),
+                    strokeWidth = 0.6.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+    }
 }
 
 private fun DrawScope.drawSeasonCardDecoration(

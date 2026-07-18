@@ -40,4 +40,13 @@ class SeasonStyleTest {
             assertNotEquals(0, season.wallpaperRes)
         }
     }
+
+    @Test
+    fun cardFramePolishRequiresUsablePositiveBounds() {
+        assertTrue(seasonCardFramePolishEnabled(320f, 180f, 72f, 48f))
+        assertEquals(false, seasonCardFramePolishEnabled(71.9f, 180f, 72f, 48f))
+        assertEquals(false, seasonCardFramePolishEnabled(320f, 47.9f, 72f, 48f))
+        assertEquals(false, seasonCardFramePolishEnabled(320f, 180f, 0f, 48f))
+        assertEquals(false, seasonCardFramePolishEnabled(320f, 180f, 72f, -1f))
+    }
 }

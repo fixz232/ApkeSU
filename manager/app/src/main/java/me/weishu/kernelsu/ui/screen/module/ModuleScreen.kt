@@ -197,7 +197,8 @@ fun ModulePager(
             return
         }
 
-        InterfaceStyle.Snow.value -> {
+        InterfaceStyle.Snow.value,
+        InterfaceStyle.Pixel.value -> {
             ModulePagerMiuix(
                 uiState = rawUiState,
                 confirmDialogState = rawUiState.confirmDialogState,

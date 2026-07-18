@@ -9,8 +9,11 @@ import androidx.compose.ui.platform.LocalContext
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 
 enum class ColorMode(val value: Int) {
     SYSTEM(0),
@@ -55,7 +58,11 @@ data class AppSettings(
 object ThemeController {
     fun getAppSettings(context: Context): AppSettings {
         val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val uiMode = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE) ?: UiMode.DEFAULT_VALUE
+        val storedUiMode = prefs.getString("ui_mode", UiMode.DEFAULT_VALUE)
+        val uiMode = InterfaceStyle.normalizeValue(storedUiMode)
+        if (storedUiMode != uiMode) {
+            prefs.edit().putString("ui_mode", uiMode).apply()
+        }
         val defaultPreset = when (uiMode) {
             InterfaceStyle.Studio.value -> ThemePreset.STUDIO
             InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
@@ -63,6 +70,7 @@ object ThemeController {
             InterfaceStyle.Delta.value -> ThemePreset.DELTA
             InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
             InterfaceStyle.Snow.value -> ThemePreset.SNOW
+            InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
             else -> ThemePreset.CLEAN_TOOL
         }
         val syncStrategy = ThemeSyncStrategy.fromValue(
@@ -128,6 +136,12 @@ fun KernelSUTheme(
 @Composable
 @ReadOnlyComposable
 fun isInDarkTheme(): Boolean {
+    if (
+        LocalInterfaceStyle.current == InterfaceStyle.Pixel.value &&
+        LocalPixelStyle.current == PixelStyle.CyberHacker
+    ) {
+        return true
+    }
     return when (LocalColorMode.current) {
         1, 4 -> false  // Force light mode
         2, 5, 6 -> true   // Force dark mode

@@ -30,6 +30,8 @@ import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.theme.AppSettings
@@ -105,6 +107,7 @@ class MainActivityViewModel(
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
             seasonStyle = settingRepo.seasonStyle,
+            pixelStyle = settingRepo.pixelStyle,
             uiDecorationConfig = settingRepo.uiDecorationConfig,
             globalSnowEnabled = settingRepo.globalSnowEnabled,
             globalSnowEffect = settingRepo.globalSnowEffect,
@@ -153,6 +156,7 @@ class MainActivityViewModel(
             scrollHideNavigationBar = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
             seasonStyle = SeasonStyle.DEFAULT_VALUE,
+            pixelStyle = PixelStyle.DEFAULT_VALUE,
             uiDecorationConfig = UiDecorationConfig(),
             globalSnowEnabled = false,
             globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
@@ -198,6 +202,7 @@ class MainActivityViewModel(
             "ui_mode",
             SWITCH_STYLE_KEY,
             SEASON_STYLE_KEY,
+            PIXEL_STYLE_KEY,
             UI_DECORATION_CONFIG_KEY,
             GLOBAL_SNOW_ENABLED_KEY,
             GLOBAL_SNOW_EFFECT_KEY,
