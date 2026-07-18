@@ -4,6 +4,9 @@ import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -11,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
 import com.materialkolor.dynamiccolor.ColorSpec
+import com.materialkolor.rememberDynamicColorScheme
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
@@ -39,7 +43,7 @@ fun MiuixKernelSUTheme(
         (appSettings.colorMode.isSystem && systemDarkTheme)
     val colorStyle = appSettings.paletteStyle
     val colorSpec = appSettings.colorSpec
-    val materialColorScheme = rememberAppMaterialColorScheme(
+    val materialColorScheme = rememberAppColorScheme(
         appSettings = appSettings,
         forceDark = forcePixelCyberDark,
     )
@@ -102,4 +106,44 @@ fun MiuixKernelSUTheme(
             }
         }
     )
+}
+
+@Composable
+private fun rememberAppColorScheme(
+    appSettings: AppSettings,
+    forceDark: Boolean = false,
+): ColorScheme {
+    val context = LocalContext.current
+    val systemDarkTheme = isSystemInDarkTheme()
+    val darkTheme = forceDark || appSettings.colorMode.isDark ||
+        (appSettings.colorMode.isSystem && systemDarkTheme)
+
+    return if (appSettings.keyColor == 0) {
+        val baseScheme = if (darkTheme) {
+            dynamicDarkColorScheme(context)
+        } else {
+            dynamicLightColorScheme(context)
+        }
+        rememberDynamicColorScheme(
+            seedColor = Color.Unspecified,
+            isDark = darkTheme,
+            isAmoled = appSettings.colorMode.isAmoled,
+            style = appSettings.paletteStyle,
+            specVersion = appSettings.colorSpec,
+            primary = baseScheme.primary,
+            secondary = baseScheme.secondary,
+            tertiary = baseScheme.tertiary,
+            neutral = baseScheme.surface,
+            neutralVariant = baseScheme.surfaceVariant,
+            error = baseScheme.error,
+        )
+    } else {
+        rememberDynamicColorScheme(
+            seedColor = Color(appSettings.keyColor),
+            isDark = darkTheme,
+            isAmoled = appSettings.colorMode.isAmoled,
+            style = appSettings.paletteStyle,
+            specVersion = appSettings.colorSpec,
+        )
+    }
 }

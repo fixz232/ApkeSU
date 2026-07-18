@@ -57,8 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
@@ -145,19 +143,11 @@ fun NavigationIconScreen() {
         },
     )
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> NavigationIconScreenMaterial(
-            icons = uiState.customNavigationIcons,
-            actions = actions,
-            onBack = onBack,
-        )
-
-        UiMode.Miuix -> NavigationIconScreenMiuix(
-            icons = uiState.customNavigationIcons,
-            actions = actions,
-            onBack = onBack,
-        )
-    }
+    NavigationIconScreenMiuix(
+        icons = uiState.customNavigationIcons,
+        actions = actions,
+        onBack = onBack,
+    )
 
     val cropSlot = cropTarget.value?.let(::navigationIconSlotFromId)
     if (cropSlot != null) {
@@ -194,101 +184,6 @@ fun NavigationIconScreen() {
             },
         )
     }
-}
-
-@Composable
-private fun NavigationIconScreenMaterial(
-    icons: CustomNavigationIconSet,
-    actions: NavigationIconActions,
-    onBack: () -> Unit,
-) {
-    MaterialScaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            MaterialTopAppBar(
-                title = { Text(stringResource(R.string.settings_navigation_icons)) },
-                navigationIcon = {
-                    MaterialIconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            SegmentedColumn(
-                content = buildList {
-                    CustomNavigationIconSlot.entries.forEach { slot ->
-                        add {
-                            NavigationIconMaterialItem(
-                                slot = slot,
-                                state = icons[slot],
-                                actions = actions,
-                            )
-                        }
-                    }
-                },
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-private fun NavigationIconMaterialItem(
-    slot: CustomNavigationIconSlot,
-    state: CustomNavigationIconState,
-    actions: NavigationIconActions,
-) {
-    val title = stringResource(slot.titleRes)
-    SegmentedListItem(
-        onClick = { actions.onPick(slot) },
-        headlineContent = { Text(title) },
-        supportingContent = {
-            NavigationIconSummary(
-                selected = state.hasSelected,
-                cropText = stringResource(R.string.settings_navigation_icon_crop_action),
-                previewText = stringResource(R.string.settings_navigation_icon_preview_action),
-                clearText = stringResource(R.string.settings_navigation_icon_clear_action),
-                onCrop = { actions.onCrop(slot) },
-                onPreview = { actions.onPreview(slot) },
-                onClear = { actions.onClear(slot) },
-            )
-        },
-        leadingContent = {
-            CustomNavigationIconImage(
-                state = state,
-                contentDescription = title,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    imageVector = slot.materialFallbackIcon,
-                    contentDescription = title,
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        },
-        trailingContent = {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                null
-            )
-        },
-    )
 }
 
 @Composable

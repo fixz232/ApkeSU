@@ -1,7 +1,6 @@
 package me.weishu.kernelsu.ui.screen.appprofile
 
 import android.widget.Toast
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -22,8 +21,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
@@ -38,10 +35,8 @@ import java.util.concurrent.atomic.AtomicLong
 
 @Composable
 fun AppProfileScreen(uid: Int) {
-    val uiMode = LocalUiMode.current
     val navigator = LocalNavigator.current
     val context = LocalContext.current
-    val snackbarHost = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val viewModel: SuperUserViewModel = viewModel()
     val appGroupState = remember(uid) {
@@ -87,11 +82,7 @@ fun AppProfileScreen(uid: Int) {
 
     fun showMessage(message: String) {
         scope.launch {
-            if (uiMode == UiMode.Material) {
-                snackbarHost.showSnackbar(message)
-            } else {
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -156,9 +147,6 @@ fun AppProfileScreen(uid: Int) {
                         persistedProfile = updatedProfile
                         if (generation == profileWriteGeneration.get()) {
                             profile = updatedProfile
-                            if (uiMode == UiMode.Material) {
-                                viewModel.loadAppList()
-                            }
                         }
                     } else {
                         withContext(Dispatchers.IO) {
@@ -176,16 +164,8 @@ fun AppProfileScreen(uid: Int) {
         },
     )
 
-    when (uiMode) {
-        UiMode.Miuix -> AppProfileScreenMiuix(
-            state = state,
-            actions = actions,
-        )
-
-        UiMode.Material -> AppProfileScreenMaterial(
-            state = state,
-            actions = actions,
-            snackBarHost = snackbarHost,
-        )
-    }
+    AppProfileScreenMiuix(
+        state = state,
+        actions = actions,
+    )
 }

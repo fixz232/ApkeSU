@@ -21,8 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
 import me.weishu.kernelsu.ui.component.CustomVideoPassthroughBackground
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
@@ -42,53 +40,13 @@ fun SettingsVideoBackgroundPreviewDialog(
 ) {
     if (!show) return
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> MaterialVideoBackgroundPreviewDialog(
-            uriString = uriString,
-            durationSeconds = durationSeconds,
-            opacity = opacity,
-            passthroughEnabled = passthroughEnabled,
-            passthroughOpacity = passthroughOpacity,
-            onDismissRequest = onDismissRequest,
-        )
-
-        UiMode.Miuix -> MiuixVideoBackgroundPreviewDialog(
-            uriString = uriString,
-            durationSeconds = durationSeconds,
-            opacity = opacity,
-            passthroughEnabled = passthroughEnabled,
-            passthroughOpacity = passthroughOpacity,
-            onDismissRequest = onDismissRequest,
-        )
-    }
-}
-
-@Composable
-private fun MaterialVideoBackgroundPreviewDialog(
-    uriString: String?,
-    durationSeconds: Int,
-    opacity: Float,
-    passthroughEnabled: Boolean,
-    passthroughOpacity: Float,
-    onDismissRequest: () -> Unit,
-) {
-    AlertDialog(
+    MiuixVideoBackgroundPreviewDialog(
+        uriString = uriString,
+        durationSeconds = durationSeconds,
+        opacity = opacity,
+        passthroughEnabled = passthroughEnabled,
+        passthroughOpacity = passthroughOpacity,
         onDismissRequest = onDismissRequest,
-        title = { Text(stringResource(R.string.settings_video_background_preview)) },
-        text = {
-            VideoPreviewFrame(
-                uriString = uriString,
-                durationSeconds = durationSeconds,
-                opacity = opacity,
-                passthroughEnabled = passthroughEnabled,
-                passthroughOpacity = passthroughOpacity,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text(stringResource(android.R.string.ok))
-            }
-        },
     )
 }
 

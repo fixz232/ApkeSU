@@ -26,8 +26,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
 import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
@@ -47,45 +45,26 @@ fun SettingsNavigationIconPreviewDialog(
     val title = stringResource(slot.previewTitleRes)
     val fallbackIcon = slot.fallbackIcon
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> AlertDialog(
-            onDismissRequest = onDismissRequest,
-            title = { Text(title) },
-            text = {
+    OverlayDialog(
+        show = true,
+        title = title,
+        onDismissRequest = onDismissRequest,
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 NavigationIconPreviewFrame(
                     title = title,
                     state = state,
                     fallbackIcon = fallbackIcon,
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = onDismissRequest) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-        )
-
-        UiMode.Miuix -> OverlayDialog(
-            show = true,
-            title = title,
-            onDismissRequest = onDismissRequest,
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NavigationIconPreviewFrame(
-                        title = title,
-                        state = state,
-                        fallbackIcon = fallbackIcon,
-                    )
-                    MiuixTextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(android.R.string.ok),
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            },
-        )
-    }
+                MiuixTextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(android.R.string.ok),
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        },
+    )
 }
 
 private val CustomNavigationIconSlot.fallbackIcon: ImageVector

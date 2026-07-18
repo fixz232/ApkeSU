@@ -61,9 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -143,27 +141,15 @@ fun LauncherIconScreen() {
             onPickCustomIcon = pickCustomIcon,
         )
     } else {
-        when (LocalUiMode.current) {
-            UiMode.Material -> LauncherIconScreenMaterial(
-                selectedIndex = selectedIndex,
-                customManagerName = uiState.customManagerName,
-                defaultManagerName = defaultManagerName,
-                onBack = dropUnlessResumed { navigator.pop() },
-                onEditManagerName = { showManagerNameDialog = true },
-                onSelect = viewModel::setLauncherIconByIndex,
-                onPickCustomIcon = pickCustomIcon,
-            )
-
-            UiMode.Miuix -> LauncherIconScreenMiuix(
-                selectedIndex = selectedIndex,
-                customManagerName = uiState.customManagerName,
-                defaultManagerName = defaultManagerName,
-                onBack = dropUnlessResumed { navigator.pop() },
-                onEditManagerName = { showManagerNameDialog = true },
-                onSelect = viewModel::setLauncherIconByIndex,
-                onPickCustomIcon = pickCustomIcon,
-            )
-        }
+        LauncherIconScreenMiuix(
+            selectedIndex = selectedIndex,
+            customManagerName = uiState.customManagerName,
+            defaultManagerName = defaultManagerName,
+            onBack = dropUnlessResumed { navigator.pop() },
+            onEditManagerName = { showManagerNameDialog = true },
+            onSelect = viewModel::setLauncherIconByIndex,
+            onPickCustomIcon = pickCustomIcon,
+        )
     }
 
     SettingsWallpaperCropDialog(
@@ -188,50 +174,6 @@ fun LauncherIconScreen() {
         onDismissRequest = { showManagerNameDialog = false },
         onConfirm = viewModel::setCustomManagerName,
     )
-}
-
-@Composable
-private fun LauncherIconScreenMaterial(
-    selectedIndex: Int,
-    customManagerName: String,
-    defaultManagerName: String,
-    onBack: () -> Unit,
-    onEditManagerName: () -> Unit,
-    onSelect: (Int) -> Unit,
-    onPickCustomIcon: () -> Unit,
-) {
-    MaterialScaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
-        topBar = {
-            androidx.compose.material3.TopAppBar(
-                title = { Text(stringResource(R.string.settings_manager_identity)) },
-                navigationIcon = {
-                    androidx.compose.material3.IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        LauncherIconPickerContent(
-            selectedIndex = selectedIndex,
-            customManagerName = customManagerName,
-            defaultManagerName = defaultManagerName,
-            onEditManagerName = onEditManagerName,
-            onSelect = onSelect,
-            onPickCustomIcon = onPickCustomIcon,
-            onRestore = { onSelect(0) },
-            modifier = Modifier.padding(innerPadding),
-        )
-    }
 }
 
 @Composable

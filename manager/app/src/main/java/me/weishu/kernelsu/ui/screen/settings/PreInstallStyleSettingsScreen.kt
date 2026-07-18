@@ -31,8 +31,6 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedRadioItem
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -61,58 +59,11 @@ fun PreInstallStyleSettingsScreen() {
         }
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> PreInstallStyleSettingsMaterial(
-            uiState = uiState,
-            onStyleSelected = onStyleSelected,
-            onBack = onBack,
-        )
-
-        UiMode.Miuix -> PreInstallStyleSettingsMiuix(
-            uiState = uiState,
-            onStyleSelected = onStyleSelected,
-            onBack = onBack,
-        )
-    }
-}
-
-@Composable
-private fun PreInstallStyleSettingsMaterial(
-    uiState: SettingsUiState,
-    onStyleSelected: (Int) -> Unit,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_ui_mode)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        StyleSettingsContent(
-            uiState = uiState,
-            onStyleSelected = onStyleSelected,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
+    PreInstallStyleSettingsMiuix(
+        uiState = uiState,
+        onStyleSelected = onStyleSelected,
+        onBack = onBack,
+    )
 }
 
 @Composable

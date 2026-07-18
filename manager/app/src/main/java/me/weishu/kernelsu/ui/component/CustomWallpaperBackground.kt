@@ -19,7 +19,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,8 +43,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
@@ -108,10 +105,7 @@ fun CustomWallpaperRoot(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val isLiquidGlass = isLiquidGlassTheme()
-    val surfaceColor = when (LocalUiMode.current) {
-        UiMode.Material -> MaterialTheme.colorScheme.surface
-        UiMode.Miuix -> liquidGlassBackdropColor()
-    }
+    val surfaceColor = liquidGlassBackdropColor()
 
     Box(
         modifier = Modifier

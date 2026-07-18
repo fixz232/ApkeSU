@@ -93,9 +93,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
@@ -437,10 +435,7 @@ fun ThemeStoreScreen() {
             content = screenContent,
         )
     } else {
-        when (LocalUiMode.current) {
-            UiMode.Material -> MaterialThemeStoreScreen(actions.onBack, screenContent)
-            UiMode.Miuix -> MiuixThemeStoreScreen(actions.onBack, screenContent)
-        }
+        MiuixThemeStoreScreen(actions.onBack, screenContent)
     }
 
     val target = cropTarget
@@ -546,32 +541,6 @@ fun ThemeStoreScreen() {
             },
         )
     }
-}
-
-@Composable
-private fun MaterialThemeStoreScreen(
-    onBack: () -> Unit,
-    content: @Composable (PaddingValues) -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.theme_store)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.close))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-        content = content,
-    )
 }
 
 @Composable
@@ -1423,13 +1392,9 @@ private fun ThemeStoreCardVideoPreviewDialog(
 ) {
     if (!show || slot == null || uriString.isNullOrBlank() || crop == null) return
 
-    val aspectRatio = if (LocalUiMode.current == UiMode.Material) {
-        slot.aspectRatio
-    } else {
-        when (slot) {
-            ThemeStoreImageSlot.Lkm -> 1.86f
-            else -> slot.aspectRatio
-        }
+    val aspectRatio = when (slot) {
+        ThemeStoreImageSlot.Lkm -> 1.86f
+        else -> slot.aspectRatio
     }
 
     androidx.compose.material3.AlertDialog(
@@ -1571,19 +1536,10 @@ private fun ThemeStoreSurface(
         return
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> androidx.compose.material3.Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            content = { content() },
-        )
-
-        UiMode.Miuix -> Card(
-            modifier = Modifier.fillMaxWidth(),
-            content = { content() },
-        )
-    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        content = { content() },
+    )
 }
 
 @Composable

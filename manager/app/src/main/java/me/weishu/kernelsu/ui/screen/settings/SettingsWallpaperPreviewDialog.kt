@@ -25,8 +25,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.rememberCustomWallpaperPreviewBitmap
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
@@ -48,53 +46,13 @@ fun SettingsWallpaperPreviewDialog(
     if (!show) return
 
     val imageBitmap = rememberCustomWallpaperPreviewBitmap(uriString, crop)
-    when (LocalUiMode.current) {
-        UiMode.Material -> MaterialWallpaperPreviewDialog(
-            imageBitmap = imageBitmap,
-            uriString = uriString,
-            opacity = opacity,
-            passthroughEnabled = passthroughEnabled,
-            passthroughOpacity = passthroughOpacity,
-            onDismissRequest = onDismissRequest,
-        )
-
-        UiMode.Miuix -> MiuixWallpaperPreviewDialog(
-            imageBitmap = imageBitmap,
-            uriString = uriString,
-            opacity = opacity,
-            passthroughEnabled = passthroughEnabled,
-            passthroughOpacity = passthroughOpacity,
-            onDismissRequest = onDismissRequest,
-        )
-    }
-}
-
-@Composable
-private fun MaterialWallpaperPreviewDialog(
-    imageBitmap: ImageBitmap?,
-    uriString: String?,
-    opacity: Float,
-    passthroughEnabled: Boolean,
-    passthroughOpacity: Float,
-    onDismissRequest: () -> Unit,
-) {
-    AlertDialog(
+    MiuixWallpaperPreviewDialog(
+        imageBitmap = imageBitmap,
+        uriString = uriString,
+        opacity = opacity,
+        passthroughEnabled = passthroughEnabled,
+        passthroughOpacity = passthroughOpacity,
         onDismissRequest = onDismissRequest,
-        title = { Text(stringResource(R.string.settings_wallpaper_preview)) },
-        text = {
-            WallpaperPreviewFrame(
-                imageBitmap = imageBitmap,
-                uriString = uriString,
-                opacity = opacity,
-                passthroughEnabled = passthroughEnabled,
-                passthroughOpacity = passthroughOpacity,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text(stringResource(android.R.string.ok))
-            }
-        }
     )
 }
 

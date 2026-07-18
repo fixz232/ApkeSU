@@ -2,7 +2,6 @@ package me.weishu.kernelsu.ui.screen.flash
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,8 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.KernelStatusEvents
 import me.weishu.kernelsu.ui.util.reboot
@@ -38,8 +35,6 @@ fun FlashScreen(flashIt: FlashIt) {
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
     var operationRequested by rememberSaveable(flashIt) { mutableStateOf(false) }
     var refreshSent by rememberSaveable(flashIt) { mutableStateOf(false) }
-    val uiMode = LocalUiMode.current
-    val snackbarHost = remember { SnackbarHostState() }
     val logSavedMessage = stringResource(R.string.log_saved)
     val logSaveFailedMessage = stringResource(R.string.log_save_failed)
     val flashErrorCode = stringResource(R.string.flash_error_code)
@@ -48,11 +43,7 @@ fun FlashScreen(flashIt: FlashIt) {
 
     fun showMessage(message: String) {
         scope.launch {
-            if (uiMode == UiMode.Material) {
-                snackbarHost.showSnackbar(message)
-            } else {
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -104,8 +95,5 @@ fun FlashScreen(flashIt: FlashIt) {
         onDismissJailbreakWarning = dropUnlessResumed { navigator.pop() },
     )
 
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> FlashScreenMiuix(state, actions)
-        UiMode.Material -> FlashScreenMaterial(state, actions, snackbarHost)
-    }
+    FlashScreenMiuix(state, actions)
 }

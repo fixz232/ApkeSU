@@ -6,8 +6,6 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 
 data class RebootListOption(
     @param:StringRes val labelRes: Int,
@@ -36,8 +34,5 @@ fun getRebootListOption(): List<RebootListOption> {
 
 @Composable
 fun RebootListPopup() {
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> RebootListPopupMiuix()
-        UiMode.Material -> RebootListPopupMaterial()
-    }
+    RebootListPopupMiuix()
 }

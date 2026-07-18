@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -483,13 +482,7 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 )
                                         ) {
-                                            when (uiMode) {
-                                                UiMode.Material -> androidx.compose.material3.Scaffold(
-                                                    containerColor = Color.Transparent
-                                                ) { navDisplay() }
-
-                                                UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { navDisplay() }
-                                            }
+                                            Scaffold(containerColor = Color.Transparent) { navDisplay() }
                                         }
                                     }
                                 }
@@ -775,11 +768,7 @@ fun MainScreen(
         value = fullFeatured
     }
     val userScrollEnabled = isFullFeatured
-    val uiMode = LocalUiMode.current
-    val surfaceColor = when (uiMode) {
-        UiMode.Material -> MaterialTheme.colorScheme.surface // Blur is not used in Material, this is just a placeholder
-        UiMode.Miuix -> liquidGlassBackdropColor()
-    }
+    val surfaceColor = liquidGlassBackdropColor()
     val blurBackdrop = rememberBlurBackdrop(enableBlur)
     val floatingBarBackdrop = if (enableFloatingBottomBar && enableFloatingBottomBarBlur) {
         rememberLayerBackdrop {
@@ -807,7 +796,7 @@ fun MainScreen(
     MainScreenBackHandler(mainPagerState, navController)
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val useNavigationRail = isLandscape && !(uiMode == UiMode.Miuix && enableFloatingBottomBar)
+    val useNavigationRail = isLandscape && !enableFloatingBottomBar
     val navigationBarVisibilityState = rememberNavigationBarVisibilityState(
         enabled = !useNavigationRail && (autoHideNavigationBar || scrollHideNavigationBar),
         autoHideAfterInactivity = autoHideNavigationBar,
@@ -855,34 +844,17 @@ fun MainScreen(
                 .only(WindowInsetsSides.Start)
             val navBarBottomPadding = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
-            when (uiMode) {
-                UiMode.Material -> androidx.compose.material3.Scaffold(containerColor = Color.Transparent) {
-                    Row {
-                        SideRail(
-                            blurBackdrop = blurBackdrop,
-                        )
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .consumeWindowInsets(startInsets)
-                        ) {
-                            pagerContent(navBarBottomPadding)
-                        }
-                    }
-                }
-
-                UiMode.Miuix -> Scaffold(containerColor = Color.Transparent) { _ ->
-                    Row {
-                        SideRail(
-                            blurBackdrop = blurBackdrop,
-                        )
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .consumeWindowInsets(startInsets)
-                        ) {
-                            pagerContent(navBarBottomPadding)
-                        }
+            Scaffold(containerColor = Color.Transparent) { _ ->
+                Row {
+                    SideRail(
+                        blurBackdrop = blurBackdrop,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .consumeWindowInsets(startInsets)
+                    ) {
+                        pagerContent(navBarBottomPadding)
                     }
                 }
             }
@@ -902,20 +874,11 @@ fun MainScreen(
                 }
             }
 
-            when (uiMode) {
-                UiMode.Material -> androidx.compose.material3.Scaffold(
-                    bottomBar = bottomBar,
-                    containerColor = Color.Transparent,
-                ) { innerPadding ->
-                    pagerContent(innerPadding.calculateBottomPadding())
-                }
-
-                UiMode.Miuix -> Scaffold(
-                    bottomBar = bottomBar,
-                    containerColor = Color.Transparent,
-                ) { innerPadding ->
-                    pagerContent(innerPadding.calculateBottomPadding())
-                }
+            Scaffold(
+                bottomBar = bottomBar,
+                containerColor = Color.Transparent,
+            ) { innerPadding ->
+                pagerContent(innerPadding.calculateBottomPadding())
             }
         }
         }

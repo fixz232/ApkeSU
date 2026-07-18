@@ -108,8 +108,6 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
@@ -369,75 +367,39 @@ fun UiDecorationLibraryScreen() {
         )
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> Scaffold(
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets.safeDrawing.only(
-                WindowInsetsSides.Top + WindowInsetsSides.Horizontal
-            ),
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.settings_ui_decoration_library)) },
-                    navigationIcon = {
-                        IconButton(onClick = closeScreen) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.close),
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    ),
-                )
-            },
-            bottomBar = {
-                DecorationApplyBar(
-                    hasChanges = hasChanges,
-                    enabled = draftConfig.enabled,
-                    saveState = uiState.uiDecorationSaveState,
-                    onRevert = { draftConfig = appliedConfig },
-                    onApply = applyDraft,
-                )
-            },
-            content = bodyContent,
-        )
-
-        UiMode.Miuix -> MiuixScaffold(
-            containerColor = Color.Transparent,
-            popupHost = { },
-            contentWindowInsets = WindowInsets.systemBars
-                .add(WindowInsets.displayCutout)
-                .only(WindowInsetsSides.Horizontal),
-            topBar = {
-                MiuixTopAppBar(
-                    title = stringResource(R.string.settings_ui_decoration_library),
-                    color = Color.Transparent,
-                    titleColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurface,
-                    navigationIcon = {
-                        MiuixIconButton(onClick = closeScreen) {
-                            MiuixIcon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                                contentDescription = stringResource(R.string.close),
-                            )
-                        }
-                    },
-                )
-            },
-            bottomBar = {
-                DecorationApplyBar(
-                    hasChanges = hasChanges,
-                    enabled = draftConfig.enabled,
-                    saveState = uiState.uiDecorationSaveState,
-                    onRevert = { draftConfig = appliedConfig },
-                    onApply = applyDraft,
-                )
-            },
-            content = bodyContent,
-        )
-    }
+    MiuixScaffold(
+        containerColor = Color.Transparent,
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+        topBar = {
+            MiuixTopAppBar(
+                title = stringResource(R.string.settings_ui_decoration_library),
+                color = Color.Transparent,
+                titleColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurface,
+                navigationIcon = {
+                    MiuixIconButton(onClick = closeScreen) {
+                        MiuixIcon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
+                            contentDescription = stringResource(R.string.close),
+                        )
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            DecorationApplyBar(
+                hasChanges = hasChanges,
+                enabled = draftConfig.enabled,
+                saveState = uiState.uiDecorationSaveState,
+                onRevert = { draftConfig = appliedConfig },
+                onApply = applyDraft,
+            )
+        },
+        content = bodyContent,
+    )
 }
 
 @Composable
@@ -598,29 +560,12 @@ private fun DecorationEditorPane(
 @Composable
 private fun DecorationTabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     val labels = DecorationLibraryTab.entries.map { stringResource(it.labelRes) }
-    when (LocalUiMode.current) {
-        UiMode.Material -> PrimaryTabRow(selectedTabIndex = selectedTab) {
-            DecorationLibraryTab.entries.forEachIndexed { index, tab ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { onTabSelected(index) },
-                    text = {
-                        Text(
-                            text = stringResource(tab.labelRes),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                )
-            }
-        }
-        UiMode.Miuix -> MiuixTabRow(
-            tabs = labels,
-            selectedTabIndex = selectedTab,
-            onTabSelected = onTabSelected,
-            height = 48.dp,
-        )
-    }
+    MiuixTabRow(
+        tabs = labels,
+        selectedTabIndex = selectedTab,
+        onTabSelected = onTabSelected,
+        height = 48.dp,
+    )
 }
 
 @Composable
@@ -1794,10 +1739,7 @@ private fun DecorationSlider(
                 )
             }
         }
-        when (LocalUiMode.current) {
-            UiMode.Material -> Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
-            UiMode.Miuix -> MiuixSlider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
-        }
+        MiuixSlider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
     }
 }
 

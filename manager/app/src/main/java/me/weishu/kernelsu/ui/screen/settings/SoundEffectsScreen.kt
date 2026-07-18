@@ -56,8 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
@@ -185,58 +183,11 @@ fun SoundEffectsScreen() {
         },
     )
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> SoundEffectsScreenMaterial(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-
-        UiMode.Miuix -> SoundEffectsScreenMiuix(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-    }
-}
-
-@Composable
-private fun SoundEffectsScreenMaterial(
-    uiState: SettingsUiState,
-    actions: SoundEffectsActions,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_sound_effects)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        SoundEffectsContent(
-            uiState = uiState,
-            actions = actions,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
+    SoundEffectsScreenMiuix(
+        uiState = uiState,
+        actions = actions,
+        onBack = onBack,
+    )
 }
 
 @Composable

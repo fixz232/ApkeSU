@@ -34,8 +34,6 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.PI
@@ -142,10 +140,7 @@ private fun decorationProgress(motionEnabled: Boolean, label: String): Float {
 @ReadOnlyComposable
 private fun uiDecorationPalette(): UiDecorationPalette {
     val dark = isInDarkTheme()
-    val primary = when (LocalUiMode.current) {
-        UiMode.Material -> androidx.compose.material3.MaterialTheme.colorScheme.primary
-        UiMode.Miuix -> MiuixTheme.colorScheme.primary
-    }
+    val primary = MiuixTheme.colorScheme.primary
     val secondary = lerp(
         primary,
         if (dark) Color(0xFF8FD3C7) else Color(0xFF247E72),

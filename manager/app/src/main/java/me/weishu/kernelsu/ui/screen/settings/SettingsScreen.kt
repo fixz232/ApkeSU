@@ -16,8 +16,6 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MIME_TYPES
@@ -207,12 +205,7 @@ fun SettingPager(
         InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Snow.value,
         InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
-        else -> {
-            when (LocalUiMode.current) {
-                UiMode.Miuix -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
-                UiMode.Material -> SettingPagerMaterial(uiState, actions, bottomInnerPadding)
-            }
-        }
+        else -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
     }
 
     SettingsWallpaperPreviewDialog(

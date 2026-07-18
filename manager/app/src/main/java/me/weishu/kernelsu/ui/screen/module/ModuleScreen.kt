@@ -23,8 +23,6 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.screen.flash.FlashIt
@@ -37,7 +35,6 @@ fun ModulePager(
     bottomInnerPadding: Dp,
     isCurrentPage: Boolean = true
 ) {
-    val uiMode = LocalUiMode.current
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val resource = LocalResources.current
@@ -210,21 +207,11 @@ fun ModulePager(
         }
     }
 
-    when (uiMode) {
-        UiMode.Miuix -> ModulePagerMiuix(
-            uiState = rawUiState,
-            confirmDialogState = rawUiState.confirmDialogState,
-            moduleEvent = viewModel.moduleEvent,
-            actions = actions,
-            bottomInnerPadding = bottomInnerPadding,
-        )
-
-        UiMode.Material -> ModulePagerMaterial(
-            uiState = rawUiState,
-            confirmDialogState = rawUiState.confirmDialogState,
-            moduleEvent = viewModel.moduleEvent,
-            actions = actions,
-            bottomInnerPadding = bottomInnerPadding,
-        )
-    }
+    ModulePagerMiuix(
+        uiState = rawUiState,
+        confirmDialogState = rawUiState.confirmDialogState,
+        moduleEvent = viewModel.moduleEvent,
+        actions = actions,
+        bottomInnerPadding = bottomInnerPadding,
+    )
 }

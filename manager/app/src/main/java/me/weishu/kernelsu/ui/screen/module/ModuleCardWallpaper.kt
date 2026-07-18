@@ -46,8 +46,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
@@ -275,45 +273,26 @@ internal fun ModuleCardWallpaperPreviewDialog(
     if (!show) return
 
     val imageBitmap = remember(bitmap) { bitmap?.asImageBitmap() }
-    when (LocalUiMode.current) {
-        UiMode.Material -> AlertDialog(
-            onDismissRequest = onDismissRequest,
-            title = { Text(stringResource(R.string.module_wallpaper_preview)) },
-            text = {
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.module_wallpaper_preview),
+        onDismissRequest = onDismissRequest,
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 ModuleCardWallpaperPreviewFrame(
                     moduleName = moduleName,
                     imageBitmap = imageBitmap,
                     uriString = uriString,
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = onDismissRequest) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-        )
-
-        UiMode.Miuix -> OverlayDialog(
-            show = true,
-            title = stringResource(R.string.module_wallpaper_preview),
-            onDismissRequest = onDismissRequest,
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ModuleCardWallpaperPreviewFrame(
-                        moduleName = moduleName,
-                        imageBitmap = imageBitmap,
-                        uriString = uriString,
-                    )
-                    MiuixTextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(android.R.string.ok),
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            },
-        )
-    }
+                MiuixTextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(android.R.string.ok),
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        },
+    )
 }
 
 @Composable

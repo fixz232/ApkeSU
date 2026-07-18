@@ -68,8 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
@@ -202,19 +200,11 @@ fun BackgroundSettingsScreen() {
         )
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> BackgroundSettingsScreenMaterial(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-
-        UiMode.Miuix -> BackgroundSettingsScreenMiuix(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-    }
+    BackgroundSettingsScreenMiuix(
+        uiState = uiState,
+        actions = actions,
+        onBack = onBack,
+    )
 
     val cropState = cropScopeKey?.let(uiState::backgroundStateForScope)
     SettingsWallpaperCropDialog(
@@ -246,45 +236,6 @@ fun BackgroundSettingsScreen() {
         passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
         onDismissRequest = { previewScopeKey = null },
     )
-}
-
-@Composable
-private fun BackgroundSettingsScreenMaterial(
-    uiState: SettingsUiState,
-    actions: BackgroundSettingsActions,
-    onBack: () -> Unit,
-) {
-    androidx.compose.material3.Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_backgrounds)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        BackgroundSettingsContent(
-            uiState = uiState,
-            actions = actions,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
 }
 
 @Composable

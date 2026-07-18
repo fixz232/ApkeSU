@@ -59,8 +59,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
@@ -101,58 +99,11 @@ fun VisualEffectsScreen() {
         onSetGlobalScrollEffectIndex = viewModel::setGlobalScrollEffectIndex,
     )
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> VisualEffectsScreenMaterial(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-
-        UiMode.Miuix -> VisualEffectsScreenMiuix(
-            uiState = uiState,
-            actions = actions,
-            onBack = onBack,
-        )
-    }
-}
-
-@Composable
-private fun VisualEffectsScreenMaterial(
-    uiState: SettingsUiState,
-    actions: VisualEffectsActions,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_section_visual_effects)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        VisualEffectsContent(
-            uiState = uiState,
-            actions = actions,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
+    VisualEffectsScreenMiuix(
+        uiState = uiState,
+        actions = actions,
+        onBack = onBack,
+    )
 }
 
 @Composable

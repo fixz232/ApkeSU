@@ -16,7 +16,6 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -29,8 +28,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
 import me.weishu.kernelsu.ksuApp
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.adjustLightnessArgb
 import me.weishu.kernelsu.ui.util.cssColorFromArgb
@@ -371,37 +368,22 @@ private data class MarkdownColors(
 
 @Composable
 private fun getMarkdownColors(containerColor: androidx.compose.ui.graphics.Color?): MarkdownColors {
-    val uiMode = LocalUiMode.current
+    val bgArgb = containerColor?.toArgb() ?: MiuixTheme.colorScheme.surfaceContainer.toArgb()
+    val bgLuminance = relativeLuminance(bgArgb)
 
-    return when (uiMode) {
-        UiMode.Material -> {
-            MarkdownColors(
-                bgCode = cssColorFromArgb(MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()),
-                bgRowAlt = cssColorFromArgb(MaterialTheme.colorScheme.surfaceContainerLow.toArgb()),
-                fgDefault = cssColorFromArgb(MaterialTheme.colorScheme.onSurface.toArgb()),
-                fgLink = cssColorFromArgb(MaterialTheme.colorScheme.primary.toArgb())
-            )
-        }
-
-        UiMode.Miuix -> {
-            val bgArgb = containerColor?.toArgb() ?: MiuixTheme.colorScheme.surfaceContainer.toArgb()
-            val bgLuminance = relativeLuminance(bgArgb)
-
-            fun makeVariant(delta: Float, ratio: Double): Int {
-                val candidate = adjustLightnessArgb(bgArgb, delta)
-                val madeLighter = delta > 0f
-                return ensureVisibleByMix(bgArgb, candidate, ratio, madeLighter)
-            }
-
-            val codeDelta = if (bgLuminance > 0.6) -0.05f else 0.05f
-            val rowAltDelta = if (bgLuminance > 0.6) -0.02f else 0.02f
-
-            MarkdownColors(
-                bgCode = cssColorFromArgb(makeVariant(codeDelta, 1.1)),
-                bgRowAlt = cssColorFromArgb(makeVariant(rowAltDelta, 1.05)),
-                fgDefault = cssColorFromArgb(MiuixTheme.colorScheme.onSurface.toArgb()),
-                fgLink = cssColorFromArgb(MiuixTheme.colorScheme.primary.toArgb())
-            )
-        }
+    fun makeVariant(delta: Float, ratio: Double): Int {
+        val candidate = adjustLightnessArgb(bgArgb, delta)
+        val madeLighter = delta > 0f
+        return ensureVisibleByMix(bgArgb, candidate, ratio, madeLighter)
     }
+
+    val codeDelta = if (bgLuminance > 0.6) -0.05f else 0.05f
+    val rowAltDelta = if (bgLuminance > 0.6) -0.02f else 0.02f
+
+    return MarkdownColors(
+        bgCode = cssColorFromArgb(makeVariant(codeDelta, 1.1)),
+        bgRowAlt = cssColorFromArgb(makeVariant(rowAltDelta, 1.05)),
+        fgDefault = cssColorFromArgb(MiuixTheme.colorScheme.onSurface.toArgb()),
+        fgLink = cssColorFromArgb(MiuixTheme.colorScheme.primary.toArgb())
+    )
 }

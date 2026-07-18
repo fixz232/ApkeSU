@@ -39,8 +39,6 @@ import me.weishu.kernelsu.magica.MagicaService
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalMainPagerState
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
@@ -189,21 +187,12 @@ fun HomePager(
                 installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
             )
 
-            else -> when (LocalUiMode.current) {
-                UiMode.Miuix -> HomePagerMiuix(
-                    state = uiState,
-                    actions = actions,
-                    bottomInnerPadding = bottomInnerPadding,
-                    installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
-                )
-
-                UiMode.Material -> HomePagerMaterial(
-                    state = uiState,
-                    actions = actions,
-                    bottomInnerPadding = bottomInnerPadding,
-                    installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
-                )
-            }
+            else -> HomePagerMiuix(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+                installFeedbackActive = installFeedbackActive && showInlineInstallFeedback,
+            )
         }
 
         if (!uiState.isFullFeatured) {

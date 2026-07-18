@@ -59,8 +59,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_MIME_TYPES
@@ -121,19 +119,11 @@ fun StartupAnimationScreen() {
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when (LocalUiMode.current) {
-            UiMode.Material -> StartupAnimationScreenMaterial(
-                uiState = uiState,
-                actions = actions,
-                onBack = onBack,
-            )
-
-            UiMode.Miuix -> StartupAnimationScreenMiuix(
-                uiState = uiState,
-                actions = actions,
-                onBack = onBack,
-            )
-        }
+        StartupAnimationScreenMiuix(
+            uiState = uiState,
+            actions = actions,
+            onBack = onBack,
+        )
 
         if (showPreview.value && !previewUri.value.isNullOrBlank()) {
             StartupAnimationOverlay(
@@ -149,45 +139,6 @@ fun StartupAnimationScreen() {
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun StartupAnimationScreenMaterial(
-    uiState: SettingsUiState,
-    actions: StartupAnimationActions,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_startup_animation)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        StartupAnimationContent(
-            uiState = uiState,
-            actions = actions,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
     }
 }
 

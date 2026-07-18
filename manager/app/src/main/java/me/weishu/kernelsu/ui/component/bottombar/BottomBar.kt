@@ -19,8 +19,6 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalMainPagerState
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.alpha.AlphaBottomBar
 import me.weishu.kernelsu.ui.component.delta.DeltaBottomBar
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproBottomBar
@@ -149,10 +147,7 @@ fun BottomBar(
         return
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> BottomBarMiuix(blurBackdrop, backdrop, modifier)
-        UiMode.Material -> BottomBarMaterial()
-    }
+    BottomBarMiuix(blurBackdrop, backdrop, modifier)
 }
 
 @Composable
@@ -172,8 +167,5 @@ fun SideRail(
         return
     }
 
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> NavigationRailMiuix(blurBackdrop, modifier)
-        UiMode.Material -> NavigationRailMaterial(modifier)
-    }
+    NavigationRailMiuix(blurBackdrop, modifier)
 }

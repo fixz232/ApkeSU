@@ -75,8 +75,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperBackground
@@ -128,45 +126,7 @@ fun HomeCardWallpaperScreen() {
     val navigator = LocalNavigator.current
     val onBack = dropUnlessResumed { navigator.pop() }
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> HomeCardWallpaperScreenMaterial(onBack = onBack)
-        UiMode.Miuix -> HomeCardWallpaperScreenMiuix(onBack = onBack)
-    }
-}
-
-@Composable
-private fun HomeCardWallpaperScreenMaterial(
-    onBack: () -> Unit,
-) {
-    androidx.compose.material3.Scaffold(
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            androidx.compose.material3.TopAppBar(
-                title = { Text(stringResource(R.string.home_card_wallpapers)) },
-                navigationIcon = {
-                    androidx.compose.material3.IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        HomeCardWallpaperContent(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
+    HomeCardWallpaperScreenMiuix(onBack = onBack)
 }
 
 @Composable
@@ -325,8 +285,7 @@ private fun HomeCardWallpaperItem(
     onShowPreviewChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uiMode = LocalUiMode.current
-    val aspectRatio = homeCardWallpaperAspectRatio(target = target, uiMode = uiMode)
+    val aspectRatio = homeCardWallpaperAspectRatio(target)
     val title = stringResource(target.titleRes)
     val state = rememberHomeMetricCardWallpaperState(
         target = target,
@@ -1030,11 +989,12 @@ private fun HomeCardWallpaperPreviewDialog(
 ) {
     if (!show) return
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> AlertDialog(
-            onDismissRequest = onDismissRequest,
-            title = { Text(stringResource(target.previewLabelRes)) },
-            text = {
+    OverlayDialog(
+        show = true,
+        title = stringResource(target.previewLabelRes),
+        onDismissRequest = onDismissRequest,
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 HomeCardWallpaperLivePreviewFrame(
                     target = target,
                     title = title,
@@ -1043,38 +1003,15 @@ private fun HomeCardWallpaperPreviewDialog(
                     crop = crop,
                     aspectRatio = aspectRatio,
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = onDismissRequest) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-        )
-
-        UiMode.Miuix -> OverlayDialog(
-            show = true,
-            title = stringResource(target.previewLabelRes),
-            onDismissRequest = onDismissRequest,
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    HomeCardWallpaperLivePreviewFrame(
-                        target = target,
-                        title = title,
-                        bitmap = bitmap,
-                        videoUriString = videoUriString,
-                        crop = crop,
-                        aspectRatio = aspectRatio,
-                    )
-                    MiuixTextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(android.R.string.ok),
-                        onClick = onDismissRequest,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            },
-        )
-    }
+                MiuixTextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(android.R.string.ok),
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -1116,9 +1053,8 @@ private fun HomeCardWallpaperLivePreviewFrame(
 
 private fun homeCardWallpaperAspectRatio(
     target: HomeMetricCardWallpaperTarget,
-    uiMode: UiMode,
 ): Float {
-    return if (uiMode == UiMode.Miuix && target == HomeMetricCardWallpaperTarget.Lkm) {
+    return if (target == HomeMetricCardWallpaperTarget.Lkm) {
         MIUIX_LKM_CARD_WALLPAPER_ASPECT_RATIO
     } else {
         target.aspectRatio

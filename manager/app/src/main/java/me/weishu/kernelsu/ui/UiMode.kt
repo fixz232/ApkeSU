@@ -6,8 +6,7 @@ import androidx.annotation.StringRes
 import me.weishu.kernelsu.R
 
 enum class UiMode(val value: String) {
-    Miuix("miuix"),
-    Material("material");
+    Miuix("miuix");
 
     companion object {
         fun fromValue(value: String): UiMode = Miuix
@@ -46,7 +45,7 @@ enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
             return entries.firstOrNull { it.value == value }?.value ?: Miuix.value
         }
 
-        fun isMiuixBased(value: String): Boolean = normalizeValue(value) != UiMode.Material.value
+        fun isMiuixBased(value: String): Boolean = true
     }
 }
 

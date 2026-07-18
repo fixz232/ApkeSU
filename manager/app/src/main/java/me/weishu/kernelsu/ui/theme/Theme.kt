@@ -120,17 +120,10 @@ fun KernelSUTheme(
     val context = LocalContext.current
     val currentAppSettings = appSettings ?: ThemeController.getAppSettings(context)
 
-    when (uiMode) {
-        UiMode.Miuix -> MiuixKernelSUTheme(
-            appSettings = currentAppSettings,
-            content = content
-        )
-
-        UiMode.Material -> MaterialKernelSUTheme(
-            appSettings = currentAppSettings,
-            content = content
-        )
-    }
+    MiuixKernelSUTheme(
+        appSettings = currentAppSettings,
+        content = content
+    )
 }
 
 @Composable

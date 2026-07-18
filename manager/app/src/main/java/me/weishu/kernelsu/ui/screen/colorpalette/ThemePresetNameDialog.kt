@@ -21,8 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -37,60 +35,11 @@ fun ThemePresetNameDialog(
     onConfirm: (String) -> Unit,
 ) {
     if (!show) return
-    when (LocalUiMode.current) {
-        UiMode.Material -> MaterialThemePresetNameDialog(
-            title = title,
-            initialName = initialName,
-            onDismissRequest = onDismissRequest,
-            onConfirm = onConfirm,
-        )
-
-        UiMode.Miuix -> MiuixThemePresetNameDialog(
-            title = title,
-            initialName = initialName,
-            onDismissRequest = onDismissRequest,
-            onConfirm = onConfirm,
-        )
-    }
-}
-
-@Composable
-private fun MaterialThemePresetNameDialog(
-    title: String,
-    initialName: String,
-    onDismissRequest: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
-    val trimmed = name.trim()
-    AlertDialog(
-        modifier = Modifier.imePadding(),
+    MiuixThemePresetNameDialog(
+        title = title,
+        initialName = initialName,
         onDismissRequest = onDismissRequest,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it.take(40) },
-                singleLine = true,
-                label = { Text(stringResource(R.string.theme_custom_preset_name)) },
-            )
-        },
-        confirmButton = {
-            TextButton(
-                enabled = trimmed.isNotBlank(),
-                onClick = {
-                    onConfirm(trimmed)
-                    onDismissRequest()
-                }
-            ) {
-                Text(stringResource(R.string.confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text(stringResource(android.R.string.cancel))
-            }
-        }
+        onConfirm = onConfirm,
     )
 }
 

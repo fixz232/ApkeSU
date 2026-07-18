@@ -45,8 +45,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalUiMode
-import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.rememberCustomImageBitmap
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
@@ -76,11 +74,12 @@ fun SettingsWallpaperCropDialog(
     val dialogTitle = title ?: stringResource(R.string.settings_wallpaper_crop)
     val dialogEmptyText = emptyText ?: stringResource(R.string.settings_wallpaper_not_selected)
 
-    when (LocalUiMode.current) {
-        UiMode.Material -> AlertDialog(
-            onDismissRequest = onDismissRequest,
-            title = { Text(dialogTitle) },
-            text = {
+    OverlayDialog(
+        show = true,
+        title = dialogTitle,
+        onDismissRequest = onDismissRequest,
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 WallpaperCropEditor(
                     imageBitmap = imageBitmap,
                     uriString = uriString,
@@ -90,62 +89,28 @@ fun SettingsWallpaperCropDialog(
                     cropAspectRatio = cropAspectRatio,
                     onCropChange = { editCrop = it },
                 )
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissRequest) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onCropChange(editCrop)
-                        onDismissRequest()
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-        )
-
-        UiMode.Miuix -> OverlayDialog(
-            show = true,
-            title = dialogTitle,
-            onDismissRequest = onDismissRequest,
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    WallpaperCropEditor(
-                        imageBitmap = imageBitmap,
-                        uriString = uriString,
-                        crop = editCrop,
-                        emptyText = dialogEmptyText,
-                        editorAspectRatio = editorAspectRatio,
-                        cropAspectRatio = cropAspectRatio,
-                        onCropChange = { editCrop = it },
+                    MiuixTextButton(
+                        modifier = Modifier.weight(1f),
+                        text = stringResource(android.R.string.cancel),
+                        onClick = onDismissRequest,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        MiuixTextButton(
-                            modifier = Modifier.weight(1f),
-                            text = stringResource(android.R.string.cancel),
-                            onClick = onDismissRequest,
-                        )
-                        MiuixTextButton(
-                            modifier = Modifier.weight(1f),
-                            text = stringResource(android.R.string.ok),
-                            onClick = {
-                                onCropChange(editCrop)
-                                onDismissRequest()
-                            },
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                        )
-                    }
+                    MiuixTextButton(
+                        modifier = Modifier.weight(1f),
+                        text = stringResource(android.R.string.ok),
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        onClick = {
+                            onCropChange(editCrop)
+                            onDismissRequest()
+                        },
+                    )
                 }
-            },
-        )
-    }
+            }
+        },
+    )
 }
 
 @Composable

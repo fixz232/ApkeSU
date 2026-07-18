@@ -26,17 +26,18 @@ class InterfaceStyleTest {
 
     @Test
     fun materialIsNotSelectableAndMigratesToMiuix() {
-        assertFalse(InterfaceStyle.entries.any { it.value == UiMode.Material.value })
-        assertFalse(InterfaceStyle.selectableEntries.any { it.value == UiMode.Material.value })
-        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue(UiMode.Material.value))
+        val legacyMaterialValue = "material"
+        assertFalse(InterfaceStyle.entries.any { it.value == legacyMaterialValue })
+        assertFalse(InterfaceStyle.selectableEntries.any { it.value == legacyMaterialValue })
+        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue(legacyMaterialValue))
         assertEquals(
             InterfaceStyle.selectedIndex(InterfaceStyle.Miuix.value),
-            InterfaceStyle.selectedIndex(UiMode.Material.value),
+            InterfaceStyle.selectedIndex(legacyMaterialValue),
         )
-        assertEquals(UiMode.Miuix, UiMode.fromValue(UiMode.Material.value))
+        assertEquals(UiMode.Miuix, UiMode.fromValue(legacyMaterialValue))
         assertEquals(
             InterfaceStyle.Miuix.value,
-            ThemePreset.GEEK_DARK.targetUiMode(UiMode.Material.value),
+            ThemePreset.GEEK_DARK.targetUiMode(legacyMaterialValue),
         )
     }
 }
