@@ -397,6 +397,14 @@ private fun AdvancedOptionsPanel(
                 summary = stringResource(id = R.string.enable_adb_summary),
                 onCheckedChange = actions.onSelectEnableAdb
             )
+            AnimatedVisibility(visible = state.canForceBackup) {
+                CheckboxPreference(
+                    title = stringResource(id = R.string.install_force_backup),
+                    checked = state.forceBackup,
+                    summary = stringResource(id = R.string.install_force_backup_summary),
+                    onCheckedChange = actions.onSelectForceBackup,
+                )
+            }
         }
     }
 }

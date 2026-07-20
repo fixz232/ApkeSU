@@ -571,6 +571,8 @@
     <string name="settings_uninstall">卸载</string>
     <string name="settings_uninstall_permanent">永久卸载</string>
     <string name="settings_restore_stock_image">恢复原厂镜像</string>
+    <string name="install_force_backup">备份原始镜像</string>
+    <string name="install_force_backup_summary">保留所选未修补镜像，便于以后恢复</string>
     <string name="settings_uninstall_permanent_message">完全并永久卸载 ApkeSU（Root 权限和所有模块）</string>
     <string name="settings_restore_stock_image_message">恢复原厂镜像（若存在备份），一般在 OTA 前使用；如果你需要卸载 ApkeSU，请使用「永久卸载」</string>
     <string name="flashing">刷写中</string>

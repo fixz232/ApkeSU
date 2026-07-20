@@ -132,6 +132,9 @@ enum Commands {
     Install {
         #[arg(long, default_value = None)]
         libadbroot: Option<PathBuf>,
+
+        #[arg(long, default_value = None)]
+        data_path: Option<PathBuf>,
     },
 
     /// Unload KernelSU kernel module (LKM Only)
@@ -977,7 +980,10 @@ pub fn run() -> Result<()> {
                 Rescue::ClearLogs => rescue::clear_logs(),
             }
         }
-        Commands::Install { libadbroot } => utils::install(libadbroot),
+        Commands::Install {
+            libadbroot,
+            data_path,
+        } => utils::install(libadbroot, data_path),
         Commands::Unload => crate::unload::unload(),
         Commands::Uninstall { package_name } => utils::uninstall(&package_name),
         Commands::Sepolicy { command } => match command {

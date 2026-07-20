@@ -25,10 +25,12 @@ const MANAGER_CERT_HASH: &[u8] =
 mod android {
     use super::Result;
     pub(super) use crate::defs::{BACKUP_FILENAME, KSU_BACKUP_DIR, KSU_BACKUP_FILE_PREFIX};
+    use crate::defs::{DEFAULT_MANAGER_PACKAGE, KSU_TEMP_BACKUP_DIR_NAME};
     use android_bootimg::cpio::{Cpio, CpioEntry};
     use anyhow::{Context, anyhow, bail, ensure};
     use regex_lite::Regex;
-    use std::fs::{self, OpenOptions};
+    use rustix::process::getuid;
+    use std::fs::{self, File, OpenOptions};
     use std::io::Write;
     use std::os::fd::AsRawFd;
     use std::os::unix::fs::PermissionsExt;
@@ -123,17 +125,40 @@ mod android {
         Ok(base16ct::lower::encode_string(&result))
     }
 
-    pub(super) fn do_backup(cpio: &mut Cpio, image: &Path) -> Result<()> {
-        let sha1 = calculate_sha1(image)?;
+    fn find_backup_location(sha1: &str) -> Result<(File, String)> {
         let filename = format!("{KSU_BACKUP_FILE_PREFIX}{sha1}");
-
-        println!("- Backup stock boot image");
         let target = format!("{KSU_BACKUP_DIR}{filename}");
-        let mut target_file = OpenOptions::new()
+        if let Ok(target_file) = OpenOptions::new()
             .create(true)
             .truncate(true)
             .write(true)
-            .open(&target)?;
+            .open(&target)
+        {
+            return Ok((target_file, target));
+        }
+
+        let user_id = getuid().as_raw() / 100_000;
+        let backup_dir =
+            format!("/data/user_de/{user_id}/{DEFAULT_MANAGER_PACKAGE}/{KSU_TEMP_BACKUP_DIR_NAME}");
+        std::fs::remove_dir_all(&backup_dir).ok();
+        std::fs::create_dir(&backup_dir)?;
+        let backup_file = format!("{backup_dir}/{filename}");
+        if let Ok(file) = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&backup_file)
+        {
+            return Ok((file, backup_file));
+        }
+
+        bail!("Both {KSU_BACKUP_DIR} and {backup_dir} are not accessible")
+    }
+
+    pub(super) fn do_backup(cpio: &mut Cpio, image: &Path) -> Result<()> {
+        let sha1 = calculate_sha1(image)?;
+        let (mut target_file, target) = find_backup_location(&sha1)?;
+        println!("- Backup stock boot image");
         let mut source = OpenOptions::new()
             .create(false)
             .truncate(false)
@@ -653,6 +678,11 @@ pub struct BootPatchArgs {
     #[arg(short, long, default_value = "false")]
     pub flash: bool,
 
+    /// Force backup source image as stock image.
+    #[cfg(target_os = "android")]
+    #[arg(long, default_value = "false")]
+    pub backup: bool,
+
     /// Output path. If not specified, will use current directory.
     /// If specified, the boot image will be written to the directory
     /// even if --flash is specified.
@@ -735,6 +765,8 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             #[cfg(target_os = "android")]
             flash,
             #[cfg(target_os = "android")]
+            backup,
+            #[cfg(target_os = "android")]
             partition,
             no_custom_rc,
         } = args;
@@ -785,7 +817,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
 
                 #[cfg(target_os = "android")]
                 if ota {
-                    let slot_suffix = get_slot_suffix(true);
+                    let slot_suffix = get_slot_suffix(true)?;
                     println!("- Trying to auto detect KMI version from boot");
                     return parse_kmi_from_boot(Path::new(&format!(
                         "/dev/block/by-name/boot{slot_suffix}"
@@ -903,8 +935,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
             apply_pathmask_lkm(&mut cpio, pathmask_lkm, &kmi)?;
 
             #[cfg(target_os = "android")]
-            if !is_kernelsu_patched
-                && flash
+            if (backup || (!is_kernelsu_patched && flash))
                 && let Err(e) = do_backup(&mut cpio, &boot_image_file)
             {
                 println!("- Backup stock image failed: {e:?}");

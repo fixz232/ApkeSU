@@ -606,6 +606,8 @@
     <string name="settings_uninstall">Uninstall</string>
     <string name="settings_uninstall_permanent">Uninstall permanently</string>
     <string name="settings_restore_stock_image">Restore stock image</string>
+    <string name="install_force_backup">Back up original image</string>
+    <string name="install_force_backup_summary">Keep the selected unpatched image for later restoration</string>
     <string name="settings_uninstall_permanent_message">Uninstalling ApkeSU (root and all modules) completely and permanently.</string>
     <string name="settings_restore_stock_image_message">Restore the stock factory image (if a backup exists), usually used before OTA; if you need to uninstall ApkeSU, please use \"Uninstall permanently\".</string>
     <string name="flashing">Flashing</string>

@@ -1646,7 +1646,11 @@ suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatc
 fun install(): Boolean {
     val start = SystemClock.elapsedRealtime()
     val libadbroot = File(ksuApp.applicationInfo.nativeLibraryDir, "libadbroot.so").absolutePath
-    val result = execKsud("install --libadbroot ${shellQuote(libadbroot)}", true)
+    val dataPath = ksuApp.applicationInfo.deviceProtectedDataDir
+    val result = execKsud(
+        "install --libadbroot ${shellQuote(libadbroot)} --data-path ${shellQuote(dataPath)}",
+        true,
+    )
     Log.w(TAG, "install result: $result, cost: ${SystemClock.elapsedRealtime() - start}ms")
     return result
 }
@@ -1921,6 +1925,7 @@ suspend fun installBoot(
     partition: String?,
     allowShell: Boolean,
     enableAdb: Boolean,
+    forceBackup: Boolean,
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit,
 ): FlashResult {
@@ -1942,6 +1947,9 @@ suspend fun installBoot(
         }
         if (ota) {
             cmd += " -u"
+        }
+        if (forceBackup) {
+            cmd += " --backup"
         }
 
         when (lkm) {

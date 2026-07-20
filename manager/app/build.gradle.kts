@@ -8,6 +8,10 @@ plugins {
     id("kotlin-parcelize")
 }
 
+providers.gradleProperty("APKESU_BUILD_DIR").orNull?.let { customBuildDir ->
+    layout.buildDirectory.set(file(customBuildDir))
+}
+
 val androidCompileSdkVersion: Int by rootProject.extra
 val androidCompileSdkVersionMinor: Int by rootProject.extra
 val androidCompileNdkVersion: String by rootProject.extra
