@@ -50,6 +50,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object AppIdManager : Route
+
+    @Parcelize
+    @Serializable
     data object ColorPalette : Route
 
     @Parcelize
@@ -94,6 +98,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object ForegroundToolProtection : Route
+
+    @Parcelize
+    @Serializable
     data object AiChat : Route
 
     @Parcelize
@@ -119,6 +127,30 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object ThemeStore : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreAssets : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreBackgrounds : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreTransfer : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreMy : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreLibrary : Route
+
+    @Parcelize
+    @Serializable
+    data object ModuleWallpaperBackup : Route
 
     @Parcelize
     @Serializable

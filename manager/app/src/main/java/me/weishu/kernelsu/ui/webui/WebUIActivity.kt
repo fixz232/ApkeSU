@@ -57,6 +57,9 @@ import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
+import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
+import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
 import me.weishu.kernelsu.ui.theme.LocalColorMode
 import me.weishu.kernelsu.ui.theme.THEME_SYNC_STRATEGY_KEY
@@ -136,6 +139,7 @@ class WebUIActivity : ComponentActivity() {
                 LocalInterfaceStyle provides uiModeValue,
                 LocalColorMode provides localColorMode,
                 LocalSwitchStyle provides SwitchStyle.fromValue(visualEffectsState.switchStyle),
+                LocalSeasonStyle provides SeasonStyle.fromValue(visualEffectsState.seasonStyle),
                 LocalScrollAnimation provides visualEffectsState.globalScrollEnabled,
                 LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(visualEffectsState.globalScrollEffect),
                 LocalNightBackgroundEffectActive provides (
@@ -217,6 +221,7 @@ private data class WebUiWallpaperState(
 
 private data class WebUiVisualEffectsState(
     val switchStyle: String,
+    val seasonStyle: String,
     val globalSnowEnabled: Boolean,
     val globalSnowEffect: String,
     val nightBackgroundEffect: String,
@@ -260,6 +265,7 @@ private fun readWebUiWallpaperState(prefs: SharedPreferences): WebUiWallpaperSta
 private fun readWebUiVisualEffectsState(prefs: SharedPreferences): WebUiVisualEffectsState {
     return WebUiVisualEffectsState(
         switchStyle = prefs.getString(SWITCH_STYLE_KEY, SwitchStyle.DEFAULT_VALUE) ?: SwitchStyle.DEFAULT_VALUE,
+        seasonStyle = prefs.getString(SEASON_STYLE_KEY, SeasonStyle.DEFAULT_VALUE) ?: SeasonStyle.DEFAULT_VALUE,
         globalSnowEnabled = prefs.getBoolean(GLOBAL_SNOW_ENABLED_KEY, false),
         globalSnowEffect = prefs.getString(GLOBAL_SNOW_EFFECT_KEY, GlobalSnowEffect.DEFAULT_VALUE)
             ?: GlobalSnowEffect.DEFAULT_VALUE,
@@ -306,6 +312,7 @@ private val wallpaperPreferenceKeys = setOf(
 
 private val visualEffectsPreferenceKeys = setOf(
     SWITCH_STYLE_KEY,
+    SEASON_STYLE_KEY,
     GLOBAL_SNOW_ENABLED_KEY,
     GLOBAL_SNOW_EFFECT_KEY,
     NIGHT_BACKGROUND_EFFECT_KEY,

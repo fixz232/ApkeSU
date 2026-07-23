@@ -17,7 +17,11 @@ import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.snow.DEFAULT_SEASON_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -65,7 +69,11 @@ data class SettingsUiState(
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
     val seasonStyle: String = SeasonStyle.DEFAULT_VALUE,
+    val seasonCardMotionEnabled: Boolean = DEFAULT_SEASON_CARD_MOTION_ENABLED,
+    val rainStyle: String = RainStyle.DEFAULT_VALUE,
+    val rainCardMotionEnabled: Boolean = DEFAULT_RAIN_CARD_MOTION_ENABLED,
     val pixelStyle: String = PixelStyle.DEFAULT_VALUE,
+    val pixelCardMotionEnabled: Boolean = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
     val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
     val uiDecorationSaveState: UiDecorationSaveState = UiDecorationSaveState.Idle,
     val customUiDecorationPresets: List<CustomUiDecorationPreset> = emptyList(),
@@ -82,6 +90,7 @@ data class SettingsUiState(
     val enableWebDebugging: Boolean = false,
     val launcherIcon: String = LauncherIconOption.DEFAULT_VALUE,
     val customManagerName: String = "",
+    val customHomeTitle: String = "",
     val customWallpaperUri: String? = null,
     val customWallpaperOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     val customWallpaperCrop: CustomWallpaperCrop = CustomWallpaperCrop(),
@@ -178,7 +187,11 @@ data class SettingsScreenActions(
     val onSetDayNightMode: (Boolean) -> Unit,
     val onSetSwitchStyleIndex: (Int) -> Unit,
     val onSetSeasonStyleIndex: (Int) -> Unit,
+    val onSetSeasonCardMotionEnabled: (Boolean) -> Unit,
+    val onSetRainStyleIndex: (Int) -> Unit,
+    val onSetRainCardMotionEnabled: (Boolean) -> Unit,
     val onSetPixelStyleIndex: (Int) -> Unit,
+    val onSetPixelCardMotionEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,
     val onSetNightBackgroundEffectIndex: (Int) -> Unit,
@@ -189,6 +202,7 @@ data class SettingsScreenActions(
     val onSetUiModeIndex: (Int) -> Unit,
     val onSetAlphaDeltaMode: (Boolean) -> Unit,
     val onOpenLauncherIcon: () -> Unit,
+    val onEditHomeTitle: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
     val onOpenVisualEffects: () -> Unit,

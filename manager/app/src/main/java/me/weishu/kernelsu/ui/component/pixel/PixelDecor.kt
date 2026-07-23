@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.max
@@ -44,7 +46,8 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.decoration.PIXEL_CARD_DECORATIONS
 import me.weishu.kernelsu.ui.component.decoration.PixelCardPattern
-import me.weishu.kernelsu.ui.component.decoration.drawPixelCardPattern
+import me.weishu.kernelsu.ui.component.decoration.drawPixelCardPatternOverlay
+import me.weishu.kernelsu.ui.component.decoration.drawPixelCardPatternUnderlay
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -269,7 +272,7 @@ fun PixelChromeOverlay(modifier: Modifier = Modifier) {
 fun PixelOceanMotto(modifier: Modifier = Modifier) {
     if (!isPixelInterfaceStyle() || LocalPixelStyle.current != PixelStyle.OceanDepths) return
     val palette = pixelPalette(PixelStyle.OceanDepths, isInDarkTheme())
-    val shape = RoundedCornerShape(5.dp)
+    val shape = pixelMottoShape
     Box(
         modifier = modifier
             .height(28.dp)
@@ -337,8 +340,19 @@ fun Modifier.pixelMiuixCardSurface(
     val style = LocalPixelStyle.current
     val dark = isInDarkTheme()
     val palette = pixelPalette(style, dark)
+    val paintPalette = pixelCardPaintPalette(style, dark)
+    val cardMotionEnabled = LocalPixelCardMotionEnabled.current
+    val cardMotionProgress = LocalPixelCardMotionProgress.current
+    val cardShape = if (isPixelInterfaceStyle()) RectangleShape else shape
     return this
-        .clip(shape)
+        .drawWithContent {
+            drawContent()
+            drawPixelCardDecoration(style, paintPalette)
+            if (cardMotionEnabled) {
+                drawPixelCardMotionOverlay(style, paintPalette, cardMotionProgress.value)
+            }
+        }
+        .clip(cardShape)
         .then(
             if (paintBackground) {
                 val surfaceAlpha = if (style == PixelStyle.CyberHacker) {
@@ -348,7 +362,7 @@ fun Modifier.pixelMiuixCardSurface(
                 } else {
                     0.92f
                 }
-                Modifier.background(palette.surface.copy(alpha = surfaceAlpha), shape)
+                Modifier.background(palette.surface.copy(alpha = surfaceAlpha), cardShape)
             } else {
                 Modifier
             }
@@ -382,18 +396,47 @@ fun Modifier.pixelMiuixCardSurface(
                 PixelStyle.CloudTown -> palette.secondary.copy(alpha = if (dark) 0.68f else 0.54f)
                 else -> palette.outline.copy(alpha = if (dark) 0.86f else 0.72f)
             },
-            shape = shape,
+            shape = cardShape,
         )
         .drawWithContent {
-            drawPixelCardMaterial(style, palette)
+            drawPixelCardMaterial(style, paintPalette)
+            drawPixelCardUnderlay(style, paintPalette)
+            if (cardMotionEnabled) {
+                drawPixelCardMotionUnderlay(style, paintPalette, cardMotionProgress.value)
+            }
             drawContent()
-            drawPixelCardDecoration(style, palette)
         }
         .uiDecoratedCard(
-            shape = shape,
+            shape = cardShape,
             enabled = enabled,
             nativeDecorations = PIXEL_CARD_DECORATIONS,
         )
+}
+
+@Composable
+@ReadOnlyComposable
+fun pixelAwareMiuixCardCornerRadius(defaultRadius: Dp): Dp {
+    return resolvePixelMiuixCardCornerRadius(isPixelInterfaceStyle(), defaultRadius)
+}
+
+internal fun resolvePixelMiuixCardCornerRadius(pixelStyle: Boolean, defaultRadius: Dp): Dp {
+    return if (pixelStyle) 0.dp else defaultRadius
+}
+
+@Composable
+@ReadOnlyComposable
+fun pixelAwareMiuixCardShape(defaultShape: Shape): Shape {
+    return if (isPixelInterfaceStyle()) RectangleShape else defaultShape
+}
+
+internal val pixelMottoShape: Shape = RectangleShape
+
+internal fun pixelCardPaintPalette(style: PixelStyle, dark: Boolean): PixelPalette {
+    val palette = pixelPalette(style, dark)
+    if (dark || style == PixelStyle.CyberHacker) return palette
+    return palette.copy(
+        highlight = lerp(palette.primary, palette.highlight, 0.42f),
+    )
 }
 
 @Composable
@@ -401,15 +444,16 @@ fun pixelMiuixCardColors(
     color: Color = MiuixTheme.colorScheme.surfaceContainer,
     enabled: Boolean = true,
 ) = if (enabled && isPixelInterfaceStyle()) {
-    val style = LocalPixelStyle.current
-    val palette = pixelPalette(style, isInDarkTheme())
     CardDefaults.defaultColors(
-        color = lerp(color, palette.surface, if (style == PixelStyle.CyberHacker) 0.72f else 0.48f)
-            .copy(alpha = if (style == PixelStyle.CyberHacker) 0.86f else 0.94f),
+        // The modifier owns the pixel surface. Keeping Card's own layer transparent
+        // prevents it from covering mode-specific material and interior artwork.
+        color = pixelCardContentLayerColor(color),
     )
 } else {
     CardDefaults.defaultColors(color = color)
 }
+
+internal fun pixelCardContentLayerColor(baseColor: Color): Color = baseColor.copy(alpha = 0f)
 
 @Composable
 fun pixelNavigationContainerColor(): Color {
@@ -437,8 +481,9 @@ fun Modifier.pixelNavigationSurface(shape: Shape): Modifier {
             shape,
         )
         .drawWithContent {
-            drawContent()
             val unit = 3.dp.toPx().coerceAtMost(size.minDimension / 8f)
+            drawPixelNavigationFoundation(style, palette, unit)
+            drawContent()
             drawPixelFrame(unit, palette.primary.copy(alpha = 0.64f), palette.secondary.copy(alpha = 0.70f))
             drawPixelModeNavigationFrame(style, palette, unit)
             drawPixelNavigationAccent(style, palette, unit)
@@ -454,11 +499,63 @@ fun Modifier.pixelNavigationIndicator(shape: Shape): Modifier {
         .background(palette.primary.copy(alpha = 0.18f), shape)
         .border(1.dp, palette.primary.copy(alpha = 0.72f), shape)
         .drawWithContent {
-            drawContent()
             val unit = 2.dp.toPx().coerceAtMost(size.minDimension / 10f)
+            drawPixelIndicatorFoundation(style, palette, unit)
+            drawContent()
             drawPixelIndicatorAccent(style, palette, unit)
             drawPixelModeIndicatorPolish(style, palette, unit)
         }
+}
+
+private fun DrawScope.drawPixelNavigationFoundation(
+    style: PixelStyle,
+    palette: PixelPalette,
+    unit: Float,
+) {
+    if (unit <= 0f) return
+    val accentAlpha = if (style == PixelStyle.CyberHacker) 0.16f else 0.075f
+    if (size.width >= size.height) {
+        drawRect(
+            color = palette.highlight.copy(alpha = accentAlpha * 0.72f),
+            topLeft = Offset(size.width * 0.15f, unit * 0.72f),
+            size = Size(size.width * 0.28f, unit * 0.34f),
+        )
+        drawRect(
+            color = palette.shadow.copy(alpha = accentAlpha),
+            topLeft = Offset(size.width * 0.36f, size.height - unit * 1.08f),
+            size = Size(size.width * 0.49f, unit * 0.38f),
+        )
+    } else {
+        drawRect(
+            color = palette.highlight.copy(alpha = accentAlpha * 0.72f),
+            topLeft = Offset(unit * 0.72f, size.height * 0.15f),
+            size = Size(unit * 0.34f, size.height * 0.28f),
+        )
+        drawRect(
+            color = palette.shadow.copy(alpha = accentAlpha),
+            topLeft = Offset(size.width - unit * 1.08f, size.height * 0.36f),
+            size = Size(unit * 0.38f, size.height * 0.49f),
+        )
+    }
+}
+
+private fun DrawScope.drawPixelIndicatorFoundation(
+    style: PixelStyle,
+    palette: PixelPalette,
+    unit: Float,
+) {
+    if (unit <= 0f) return
+    val accentAlpha = if (style == PixelStyle.CyberHacker) 0.20f else 0.10f
+    drawRect(
+        color = palette.highlight.copy(alpha = accentAlpha * 0.75f),
+        topLeft = Offset(unit * 1.5f, unit * 0.72f),
+        size = Size((size.width - unit * 3f).coerceAtLeast(0f), unit * 0.36f),
+    )
+    drawRect(
+        color = palette.secondary.copy(alpha = accentAlpha),
+        topLeft = Offset(size.width * 0.31f, size.height - unit * 1.08f),
+        size = Size(size.width * 0.38f, unit * 0.38f),
+    )
 }
 
 private fun DrawScope.drawPixelBackdropBase(style: PixelStyle, palette: PixelPalette) {
@@ -1313,9 +1410,21 @@ private fun DrawScope.drawOceanDepthsScene(palette: PixelPalette) {
     }
 }
 
+private fun DrawScope.drawPixelCardUnderlay(style: PixelStyle, palette: PixelPalette) {
+    val unit = 3.dp.toPx().coerceAtMost(size.minDimension / 10f)
+    drawPixelCardPatternUnderlay(
+        pattern = style.cardPattern(),
+        unit = unit,
+        primary = palette.primary,
+        secondary = palette.secondary,
+        highlight = palette.highlight,
+        shadow = palette.shadow,
+    )
+}
+
 private fun DrawScope.drawPixelCardDecoration(style: PixelStyle, palette: PixelPalette) {
     val unit = 3.dp.toPx().coerceAtMost(size.minDimension / 10f)
-    drawPixelCardPattern(
+    drawPixelCardPatternOverlay(
         pattern = style.cardPattern(),
         unit = unit,
         primary = palette.primary,

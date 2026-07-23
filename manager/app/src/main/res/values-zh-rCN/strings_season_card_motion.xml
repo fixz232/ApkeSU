@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_season_card_motion">四季卡片动效</string>
+    <string name="settings_season_card_motion_summary">让花瓣、水光、落叶与冰晶随季节轻缓流动，不移动卡片和正文。</string>
+</resources>

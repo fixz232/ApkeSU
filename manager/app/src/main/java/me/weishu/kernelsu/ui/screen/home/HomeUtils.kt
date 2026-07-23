@@ -40,7 +40,7 @@ fun homeWarningMessages(state: HomeUiState): List<String> = buildList {
     } else if (state.showKernelPrBuildWarning) {
         add(stringResource(id = R.string.home_pr_kernel_warning))
     }
-    if (state.showVersionMismatchWarning) {
+    if (state.showVersionMismatchWarning && !state.showManagerWarning) {
         add(
             stringResource(
                 id = R.string.home_version_mismatch,
@@ -53,7 +53,18 @@ fun homeWarningMessages(state: HomeUiState): List<String> = buildList {
         add(stringResource(id = R.string.home_gki_warning))
     }
     if (state.showManagerWarning) {
-        add(stringResource(id = R.string.home_manager_identity_warning))
+        val driverVersion = state.ksuVersion
+        if (driverVersion != null && driverVersion.toLong() != state.currentManagerVersionCode) {
+            add(
+                stringResource(
+                    id = R.string.home_manager_build_mismatch_warning,
+                    driverVersion,
+                    state.currentManagerVersionCode,
+                )
+            )
+        } else {
+            add(stringResource(id = R.string.home_manager_identity_warning))
+        }
     }
     if (state.showUAPIMisMatchWarning) {
         add(

@@ -27,6 +27,7 @@ import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationSaveState
@@ -76,9 +77,9 @@ class SettingsViewModel(
             val enablePredictiveBack = repo.enablePredictiveBack
             val uiMode = repo.uiMode
             val isLiquidGlassInterface = uiMode == InterfaceStyle.LiquidGlass.value
-            val enableBlur = if (isLiquidGlassInterface) false else repo.enableBlur
+            val enableBlur = if (isLiquidGlassInterface) true else repo.enableBlur
             val enableFloatingBottomBar = repo.enableFloatingBottomBar
-            val enableFloatingBottomBarBlur = if (isLiquidGlassInterface) false else repo.enableFloatingBottomBarBlur
+            val enableFloatingBottomBarBlur = if (isLiquidGlassInterface) true else repo.enableFloatingBottomBarBlur
             val autoHideNavigationBar = repo.autoHideNavigationBar
             val scrollHideNavigationBar = repo.scrollHideNavigationBar
             val pageScale = repo.pageScale
@@ -86,7 +87,11 @@ class SettingsViewModel(
             val blurIntensity = repo.blurIntensity
             val switchStyle = repo.switchStyle
             val seasonStyle = repo.seasonStyle
+            val seasonCardMotionEnabled = repo.seasonCardMotionEnabled
+            val rainStyle = repo.rainStyle
+            val rainCardMotionEnabled = repo.rainCardMotionEnabled
             val pixelStyle = repo.pixelStyle
+            val pixelCardMotionEnabled = repo.pixelCardMotionEnabled
             val uiDecorationConfig = repo.uiDecorationConfig
             val customUiDecorationPresets = repo.getCustomUiDecorationPresets()
             val recentUiDecorationComponents = repo.getRecentUiDecorationComponents()
@@ -102,6 +107,7 @@ class SettingsViewModel(
             val enableWebDebugging = repo.enableWebDebugging
             val launcherIcon = repo.launcherIcon
             val customManagerName = repo.customManagerName
+            val customHomeTitle = repo.customHomeTitle
             val customWallpaperUri = repo.customWallpaperUri
             val customWallpaperOpacity = repo.customWallpaperOpacity
             val customWallpaperCrop = repo.customWallpaperCrop
@@ -188,7 +194,11 @@ class SettingsViewModel(
                     blurIntensity = blurIntensity,
                     switchStyle = switchStyle,
                     seasonStyle = seasonStyle,
+                    seasonCardMotionEnabled = seasonCardMotionEnabled,
+                    rainStyle = rainStyle,
+                    rainCardMotionEnabled = rainCardMotionEnabled,
                     pixelStyle = pixelStyle,
+                    pixelCardMotionEnabled = pixelCardMotionEnabled,
                     uiDecorationConfig = uiDecorationConfig,
                     customUiDecorationPresets = customUiDecorationPresets,
                     recentUiDecorationComponents = recentUiDecorationComponents,
@@ -204,6 +214,7 @@ class SettingsViewModel(
                     enableWebDebugging = enableWebDebugging,
                     launcherIcon = launcherIcon,
                     customManagerName = customManagerName,
+                    customHomeTitle = customHomeTitle,
                     customWallpaperUri = customWallpaperUri,
                     customWallpaperOpacity = customWallpaperOpacity,
                     customWallpaperCrop = customWallpaperCrop,
@@ -308,6 +319,11 @@ class SettingsViewModel(
                 return
             }
 
+            InterfaceStyle.Rain.value -> {
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.RAIN)
+                return
+            }
+
             InterfaceStyle.Pixel.value -> {
                 applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.PIXEL)
                 return
@@ -322,6 +338,7 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.Delta.value ||
             oldMode == InterfaceStyle.LiquidGlass.value ||
             oldMode == InterfaceStyle.Snow.value ||
+            oldMode == InterfaceStyle.Rain.value ||
             oldMode == InterfaceStyle.Pixel.value
 
         if (isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value) {
@@ -347,6 +364,11 @@ class SettingsViewModel(
         } else {
             null
         }
+        val selectedRainStyle = if (mode == InterfaceStyle.Rain.value) {
+            RainStyle.fromValue(repo.rainStyle)
+        } else {
+            null
+        }
         val selectedPixelStyle = if (mode == InterfaceStyle.Pixel.value) {
             PixelStyle.fromValue(repo.pixelStyle)
         } else {
@@ -356,6 +378,7 @@ class SettingsViewModel(
         repo.applyThemePreset(preset)
         repo.themeMode = colorMode
         selectedSeason?.let { repo.seasonStyle = it.value }
+        selectedRainStyle?.let { repo.rainStyle = it.value }
         selectedPixelStyle?.let { repo.pixelStyle = it.value }
         refresh()
     }
@@ -471,6 +494,28 @@ class SettingsViewModel(
         }
     }
 
+    fun setSeasonCardMotionEnabled(enabled: Boolean) {
+        repo.seasonCardMotionEnabled = enabled
+        _uiState.update { it.copy(seasonCardMotionEnabled = enabled) }
+    }
+
+    fun setRainStyleIndex(index: Int) {
+        val rainStyle = RainStyle.fromIndex(index)
+        repo.rainStyle = rainStyle.value
+        _uiState.update {
+            it.copy(
+                rainStyle = rainStyle.value,
+                keyColor = rainStyle.keyColor,
+                themePreset = ThemePreset.RAIN.value,
+            )
+        }
+    }
+
+    fun setRainCardMotionEnabled(enabled: Boolean) {
+        repo.rainCardMotionEnabled = enabled
+        _uiState.update { it.copy(rainCardMotionEnabled = enabled) }
+    }
+
     fun setPixelStyleIndex(index: Int) {
         val pixelStyle = PixelStyle.fromIndex(index)
         repo.pixelStyle = pixelStyle.value
@@ -481,6 +526,11 @@ class SettingsViewModel(
                 themePreset = ThemePreset.PIXEL.value,
             )
         }
+    }
+
+    fun setPixelCardMotionEnabled(enabled: Boolean) {
+        repo.pixelCardMotionEnabled = enabled
+        _uiState.update { it.copy(pixelCardMotionEnabled = enabled) }
     }
 
     fun setGlobalSnowEffectIndex(index: Int) {
@@ -525,6 +575,11 @@ class SettingsViewModel(
     fun setCustomManagerName(name: String) {
         repo.customManagerName = name
         _uiState.update { it.copy(customManagerName = repo.customManagerName) }
+    }
+
+    fun setCustomHomeTitle(title: String) {
+        repo.customHomeTitle = title
+        _uiState.update { it.copy(customHomeTitle = repo.customHomeTitle) }
     }
 
     fun setCustomWallpaperUri(uri: String?) {
@@ -812,7 +867,7 @@ class SettingsViewModel(
     }
 
     fun setEnableBlur(enabled: Boolean) {
-        if (_uiState.value.uiMode == InterfaceStyle.LiquidGlass.value && enabled) return
+        if (_uiState.value.uiMode == InterfaceStyle.LiquidGlass.value) return
         repo.enableBlur = enabled
         _uiState.update { it.copy(enableBlur = enabled, themePreset = ThemePreset.CUSTOM.value) }
     }
@@ -823,7 +878,7 @@ class SettingsViewModel(
     }
 
     fun setEnableFloatingBottomBarBlur(enabled: Boolean) {
-        if (_uiState.value.uiMode == InterfaceStyle.LiquidGlass.value && enabled) return
+        if (_uiState.value.uiMode == InterfaceStyle.LiquidGlass.value) return
         repo.enableFloatingBottomBarBlur = enabled
         _uiState.update { it.copy(enableFloatingBottomBarBlur = enabled, themePreset = ThemePreset.CUSTOM.value) }
     }

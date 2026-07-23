@@ -115,6 +115,7 @@ fun ModulePager(
             viewModel.dismissConfirmRequest()
         },
         onOpenRepo = { navigator.push(Route.ModuleRepo) },
+        onOpenWallpaperBackup = { navigator.push(Route.ModuleWallpaperBackup) },
         onToggleSortActionFirst = {
             viewModel.toggleSortActionFirst()
         },
@@ -195,6 +196,7 @@ fun ModulePager(
         }
 
         InterfaceStyle.Snow.value,
+        InterfaceStyle.Rain.value,
         InterfaceStyle.Pixel.value -> {
             ModulePagerMiuix(
                 uiState = rawUiState,

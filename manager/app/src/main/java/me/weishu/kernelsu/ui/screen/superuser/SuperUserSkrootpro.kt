@@ -27,6 +27,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -68,7 +70,12 @@ fun SuperUserPagerSkrootpro(
     SkrootproScreen(
         title = stringResource(R.string.superuser),
         showAdd = true,
-        onAddClick = actions.onRefresh,
+        onAddClick = actions.onOpenAppIdManager,
+        actionIcon = Icons.Rounded.Fingerprint,
+        actionContentDescription = stringResource(R.string.app_id_manager_open),
+        secondaryActionIcon = Icons.Rounded.Refresh,
+        onSecondaryActionClick = actions.onRefresh,
+        secondaryActionContentDescription = stringResource(R.string.refresh_refresh),
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         LazyColumn(

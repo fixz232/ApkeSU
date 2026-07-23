@@ -7,6 +7,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import me.weishu.kernelsu.R
 
 const val SEASON_STYLE_KEY = "season_style"
+const val SEASON_CARD_MOTION_ENABLED_KEY = "season_card_motion_enabled"
+const val DEFAULT_SEASON_CARD_MOTION_ENABLED = true
 
 enum class SeasonStyle(
     val value: String,

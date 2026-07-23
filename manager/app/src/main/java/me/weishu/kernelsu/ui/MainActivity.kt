@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -84,6 +85,7 @@ import me.weishu.kernelsu.ui.component.AutoHidingNavigationBar
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
+import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
@@ -106,14 +108,31 @@ import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionEnabled
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionProgress
 import me.weishu.kernelsu.ui.component.pixel.PixelBackdrop
 import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.rememberPixelCardMotionProgress
+import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
+import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionEnabled
+import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionProgress
+import me.weishu.kernelsu.ui.component.rain.LocalRainSceneProgress
+import me.weishu.kernelsu.ui.component.rain.RainBackdrop
+import me.weishu.kernelsu.ui.component.rain.RainChromeOverlay
+import me.weishu.kernelsu.ui.component.rain.RainForegroundOverlay
+import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
+import me.weishu.kernelsu.ui.component.rain.rememberRainCardMotionProgress
+import me.weishu.kernelsu.ui.component.rain.rememberRainSceneProgress
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
+import me.weishu.kernelsu.ui.component.snow.LocalSeasonCardMotionEnabled
+import me.weishu.kernelsu.ui.component.snow.LocalSeasonCardMotionProgress
 import me.weishu.kernelsu.ui.component.snow.SeasonAmbientOverlay
 import me.weishu.kernelsu.ui.component.snow.SeasonChromeOverlay
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyleWallpaper
+import me.weishu.kernelsu.ui.component.snow.rememberSeasonCardMotionProgress
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.navigation3.HandleDeepLink
@@ -131,6 +150,7 @@ import me.weishu.kernelsu.ui.screen.home.HomePager
 import me.weishu.kernelsu.ui.screen.install.InstallScreen
 import me.weishu.kernelsu.ui.screen.launchericon.LauncherIconScreen
 import me.weishu.kernelsu.ui.screen.module.ModulePager
+import me.weishu.kernelsu.ui.screen.module.ModuleWallpaperBackupScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
@@ -141,6 +161,7 @@ import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
 import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
 import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
+import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
@@ -151,9 +172,12 @@ import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationLibraryScreen
 import me.weishu.kernelsu.ui.screen.settings.VisualEffectsScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
+import me.weishu.kernelsu.ui.screen.superuser.AppIdManagerScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.templateeditor.TemplateEditorScreen
+import me.weishu.kernelsu.ui.screen.themestore.ThemeStorePage
+import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreLibraryScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreScreen
 import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
@@ -210,6 +234,9 @@ class MainActivity : ComponentActivity() {
                 Log.e(TAG, "refresh manager identity failed", it)
             }.getOrDefault(false)
             managerReadyState.value = managerReady
+            if (managerReady) {
+                KernelStatusEvents.requestRefresh()
+            }
             val kernelCompatible = runCatching { !Natives.requireNewKernel() }.getOrDefault(false)
             if (managerReady && kernelCompatible) {
                 runCatching { check(install()) { "ksud install command failed" } }
@@ -233,16 +260,35 @@ class MainActivity : ComponentActivity() {
             val backgroundMusicVolume = uiState.customBackgroundMusicVolume
             var showStartupAnimation by rememberSaveable { mutableStateOf(!startupAnimationUri.isNullOrBlank()) }
             val effectiveEnableBlur = if (isLiquidGlassInterface) {
-                false
+                true
             } else {
                 uiState.enableBlur
             }
             val effectiveEnableFloatingBottomBarBlur = if (isLiquidGlassInterface) {
-                false
+                true
             } else {
                 uiState.enableFloatingBottomBarBlur
             }
-            val darkMode = appSettings.colorMode.isDark ||
+            val selectedRainStyle = RainStyle.fromValue(uiState.rainStyle)
+            val rainInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Rain.value
+            val seasonInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
+            val pixelInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
+            val seasonCardMotionProgress = rememberSeasonCardMotionProgress(
+                enabled = seasonInterfaceActive && uiState.seasonCardMotionEnabled,
+            )
+            val rainForcesDark = rainInterfaceActive &&
+                forceRainDarkTheme(selectedRainStyle)
+            val rainCardMotionProgress = rememberRainCardMotionProgress(
+                enabled = rainInterfaceActive && uiState.rainCardMotionEnabled,
+            )
+            val rainSceneProgress = rememberRainSceneProgress(
+                enabled = rainInterfaceActive,
+                style = selectedRainStyle,
+            )
+            val pixelCardMotionProgress = rememberPixelCardMotionProgress(
+                enabled = pixelInterfaceActive && uiState.pixelCardMotionEnabled,
+            )
+            val darkMode = rainForcesDark || appSettings.colorMode.isDark ||
                 (appSettings.colorMode.isSystem && isSystemInDarkTheme())
 
             DisposableEffect(darkMode) {
@@ -305,7 +351,21 @@ class MainActivity : ComponentActivity() {
                 LocalUiMode provides uiMode,
                 LocalInterfaceStyle provides uiState.interfaceStyle,
                 LocalSeasonStyle provides SeasonStyle.fromValue(uiState.seasonStyle),
+                LocalSeasonCardMotionEnabled provides (
+                    seasonInterfaceActive && uiState.seasonCardMotionEnabled
+                    ),
+                LocalSeasonCardMotionProgress provides seasonCardMotionProgress,
+                LocalRainStyle provides selectedRainStyle,
+                LocalRainCardMotionEnabled provides (
+                    rainInterfaceActive && uiState.rainCardMotionEnabled
+                    ),
+                LocalRainCardMotionProgress provides rainCardMotionProgress,
+                LocalRainSceneProgress provides rainSceneProgress,
                 LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
+                LocalPixelCardMotionEnabled provides (
+                    pixelInterfaceActive && uiState.pixelCardMotionEnabled
+                    ),
+                LocalPixelCardMotionProgress provides pixelCardMotionProgress,
                 LocalDeltaColorVariant provides uiState.deltaColorVariant,
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
@@ -354,6 +414,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Main> { mainScreenEntry() }
                                 entry<Route.About> { AboutScreen() }
                                 entry<Route.Sulog> { SulogScreen() }
+                                entry<Route.AppIdManager> { AppIdManagerScreen() }
                                 entry<Route.ColorPalette> { ColorPaletteScreen() }
                                 entry<Route.LauncherIcon> { LauncherIconScreen() }
                                 entry<Route.NavigationIcons> { NavigationIconScreen() }
@@ -372,6 +433,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 entry<Route.SusfsPathConfig> { SusfsPathConfigScreen() }
+                                entry<Route.ForegroundToolProtection> { ForegroundToolProtectionScreen() }
                                 entry<Route.AiChat> { AiChatScreen() }
                                 entry<Route.AiModuleStudio> { AiModuleStudioScreen() }
                                 entry<Route.RescueProtection> { RescueProtectionScreen() }
@@ -379,6 +441,12 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.GraphicsRenderer> { GraphicsRendererScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
+                                entry<Route.ThemeStoreAssets> { ThemeStoreScreen(ThemeStorePage.Assets) }
+                                entry<Route.ThemeStoreBackgrounds> { ThemeStoreScreen(ThemeStorePage.Backgrounds) }
+                                entry<Route.ThemeStoreTransfer> { ThemeStoreScreen(ThemeStorePage.Transfer) }
+                                entry<Route.ThemeStoreMy> { ThemeStoreScreen(ThemeStorePage.My) }
+                                entry<Route.ThemeStoreLibrary> { ThemeStoreLibraryScreen() }
+                                entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
                                 entry<Route.AppProfile> { key -> AppProfileScreen(key.uid) }
@@ -416,13 +484,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
-                    val seasonalStyleActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
+                    val seasonalStyleActive = seasonInterfaceActive
+                    val rainStyleActive = rainInterfaceActive
                     val pixelStyleActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
                     val hasCustomBackground =
                         !effectiveBackground.wallpaperUriString.isNullOrBlank() ||
                             !effectiveBackground.videoUriString.isNullOrBlank()
                     val immersiveBackgroundActive =
                         seasonalStyleActive ||
+                            rainStyleActive ||
                             pixelStyleActive ||
                             hasCustomBackground ||
                             (
@@ -460,6 +530,9 @@ class MainActivity : ComponentActivity() {
                                     if (pixelStyleActive && !hasCustomBackground) {
                                         PixelBackdrop(modifier = Modifier.fillMaxSize())
                                     }
+                                    if (rainStyleActive && !hasCustomBackground) {
+                                        RainBackdrop(modifier = Modifier.fillMaxSize())
+                                    }
                                     if (!uiState.nightBackgroundPassthrough) {
                                         NightBackgroundEffectOverlay(
                                             enabled = darkMode,
@@ -491,6 +564,7 @@ class MainActivity : ComponentActivity() {
 
                         UiDecorationChromeOverlay(modifier = Modifier.fillMaxSize())
                         SeasonChromeOverlay(modifier = Modifier.fillMaxSize())
+                        RainChromeOverlay(modifier = Modifier.fillMaxSize())
                         PixelChromeOverlay(modifier = Modifier.fillMaxSize())
 
                         if (uiState.nightBackgroundPassthrough) {
@@ -504,7 +578,13 @@ class MainActivity : ComponentActivity() {
                         }
 
                         GlobalSnowEffectOverlay(
-                            enabled = darkMode && uiState.globalSnowEnabled,
+                            enabled = darkMode &&
+                                uiState.globalSnowEnabled &&
+                                !(
+                                    rainStyleActive &&
+                                        GlobalSnowEffect.fromValue(uiState.globalSnowEffect) ==
+                                        GlobalSnowEffect.SeasonalRain
+                                    ),
                             effectValue = uiState.globalSnowEffect,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -513,6 +593,8 @@ class MainActivity : ComponentActivity() {
                             state = globalScrollEffectState,
                             modifier = Modifier.fillMaxSize(),
                         )
+
+                        RainForegroundOverlay(modifier = Modifier.fillMaxSize())
 
                         if (showStartupAnimation && !startupAnimationUri.isNullOrBlank()) {
                             StartupAnimationOverlay(
@@ -878,11 +960,32 @@ fun MainScreen(
                 bottomBar = bottomBar,
                 containerColor = Color.Transparent,
             ) { innerPadding ->
-                pagerContent(innerPadding.calculateBottomPadding())
+                val systemNavigationPadding = WindowInsets.systemBars
+                    .asPaddingValues()
+                    .calculateBottomPadding()
+                pagerContent(
+                    resolveMainContentBottomPadding(
+                        scaffoldPadding = innerPadding.calculateBottomPadding(),
+                        systemNavigationPadding = systemNavigationPadding,
+                        floatingBarEnabled = enableFloatingBottomBar,
+                        navigationBarVisible = navigationBarVisibilityState.visible,
+                    ),
+                )
             }
         }
         }
     }
+}
+
+internal fun resolveMainContentBottomPadding(
+    scaffoldPadding: Dp,
+    systemNavigationPadding: Dp,
+    floatingBarEnabled: Boolean,
+    navigationBarVisible: Boolean,
+): Dp {
+    if (!floatingBarEnabled || !navigationBarVisible) return scaffoldPadding
+    val floatingBarClearance = 88.dp + systemNavigationPadding
+    return maxOf(scaffoldPadding, floatingBarClearance)
 }
 
 

@@ -93,6 +93,7 @@ import me.weishu.kernelsu.ui.component.ListPopupDefaults
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
+import me.weishu.kernelsu.ui.component.liquid.FrostedGlassCardStyle
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.pixel.PixelBianliangMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelCloudTownMotto
@@ -104,7 +105,10 @@ import me.weishu.kernelsu.ui.component.pixel.PixelOceanMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelThreeKingdomsMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelTribalJungleMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelVikingMotto
+import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.snow.SeasonMotto
+import me.weishu.kernelsu.ui.component.rain.RainMotto
+import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
@@ -158,6 +162,7 @@ fun HomePagerMiuix(
     installFeedbackActive: Boolean = false,
 ) {
     val enableBlur = LocalEnableBlur.current
+    val homeTitle = state.customHomeTitle.ifBlank { stringResource(R.string.app_name) }
     val backdrop = rememberBlurBackdrop(enableBlur)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else colorScheme.surface
@@ -166,6 +171,7 @@ fun HomePagerMiuix(
         containerColor = Color.Transparent,
         topBar = {
             TopBar(
+                title = homeTitle,
                 backdrop = backdrop,
                 barColor = topBarColors.container,
                 contentColor = topBarColors.content,
@@ -192,6 +198,11 @@ fun HomePagerMiuix(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         SeasonMotto(
+                            modifier = Modifier
+                                .fillMaxWidth(0.76f)
+                                .widthIn(max = 300.dp),
+                        )
+                        RainMotto(
                             modifier = Modifier
                                 .fillMaxWidth(0.76f)
                                 .widthIn(max = 300.dp),
@@ -271,6 +282,7 @@ fun HomePagerMiuix(
 
 @Composable
 private fun TopBar(
+    title: String,
     backdrop: LayerBackdrop?,
     barColor: Color,
     contentColor: Color,
@@ -288,7 +300,7 @@ private fun TopBar(
         ) {
             Text(
                 modifier = Modifier.weight(1f),
-                text = stringResource(R.string.app_name),
+                text = title,
                 color = contentColor,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -332,15 +344,32 @@ private fun ActivatedStatusCard(
     actions: HomeActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        val containerColor = when {
-            isDynamicColor -> colorScheme.secondaryContainer
-            isInDarkTheme() -> Color(0xFF1A3825)
-            else -> Color(0xFFDFFAE4)
+        val rootStateHealthy = state.rootRuntimeState == RootRuntimeState.Running
+        val rootStateWarning = state.rootRuntimeState == RootRuntimeState.ManagerUnregistered ||
+            state.rootRuntimeState == RootRuntimeState.VersionMismatch
+        val statusIcon = when {
+            rootStateHealthy -> Icons.Rounded.CheckCircleOutline
+            rootStateWarning -> Icons.Rounded.WarningAmber
+            else -> Icons.Rounded.ErrorOutline
         }
-        val accentColor = if (isDynamicColor) {
-            colorScheme.primary
-        } else {
-            Color(0xFF1FAF55)
+        val containerColor = when {
+            rootStateHealthy && isDynamicColor -> colorScheme.secondaryContainer
+            rootStateHealthy && isInDarkTheme() -> Color(0xFF1A3825)
+            rootStateHealthy -> Color(0xFFDFFAE4)
+            rootStateWarning && isDynamicColor -> colorScheme.tertiaryContainer
+            rootStateWarning && isInDarkTheme() -> Color(0xFF3B3020)
+            rootStateWarning -> Color(0xFFFFF0CF)
+            isDynamicColor -> colorScheme.errorContainer
+            isInDarkTheme() -> Color(0xFF3D2023)
+            else -> Color(0xFFFFE1E2)
+        }
+        val accentColor = when {
+            rootStateHealthy && isDynamicColor -> colorScheme.primary
+            rootStateHealthy -> Color(0xFF1FAF55)
+            rootStateWarning && isDynamicColor -> colorScheme.onTertiaryContainer
+            rootStateWarning -> Color(0xFF9A6200)
+            isDynamicColor -> colorScheme.error
+            else -> Color(0xFFD83B45)
         }
         val workingMode = state.workingModeLabel
         val wallpaperState = rememberLkmCardWallpaperState(
@@ -372,6 +401,7 @@ private fun ActivatedStatusCard(
         val iconTint = if (hasLkmWallpaper) Color.White else accentColor
 
         Card(
+            cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .homeLiquidGlassSurface(enabled = !hasLkmWallpaper),
@@ -400,7 +430,7 @@ private fun ActivatedStatusCard(
                         .size(148.dp)
                         .align(Alignment.BottomEnd)
                         .offset(24.dp, 28.dp),
-                    imageVector = Icons.Rounded.CheckCircleOutline,
+                    imageVector = statusIcon,
                     tint = iconTint.copy(alpha = if (hasLkmWallpaper) 0.18f else 0.22f),
                     contentDescription = null
                 )
@@ -418,7 +448,7 @@ private fun ActivatedStatusCard(
                     ) {
                         Icon(
                             modifier = Modifier.size(24.dp),
-                            imageVector = Icons.Rounded.CheckCircleOutline,
+                            imageVector = statusIcon,
                             tint = iconTint,
                             contentDescription = null
                         )
@@ -879,6 +909,7 @@ private fun InstallStatusCard(
     val actionContentColor = containerColor
 
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
@@ -1082,6 +1113,7 @@ private fun UnsupportedStatusCard(
     actions: HomeActions,
 ) {
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
@@ -1165,6 +1197,7 @@ private fun MetricCard(
     }
 
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = modifier.homeLiquidGlassSurface(enabled = !hasWallpaper),
         colors = homeLiquidGlassCardColors(enabled = !hasWallpaper),
         insideMargin = PaddingValues(0.dp),
@@ -1369,6 +1402,7 @@ private fun WarningSummaryCard(
     val warningContent = if (isDynamicColor) colorScheme.onErrorContainer else Color(0xFFF72727)
 
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(
@@ -1458,6 +1492,7 @@ private fun SecondaryLinksCard(
 
     val learnUrl = stringResource(R.string.home_learn_kernelsu_url)
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
             .homeLiquidGlassSurface(),
@@ -1560,6 +1595,7 @@ private fun InfoCard(
     }
 
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier.homeLiquidGlassSurface(),
         colors = snowMiuixCardColors(),
     ) {
@@ -2153,7 +2189,7 @@ private fun Modifier.homeLiquidGlassSurface(
     surfaceAlpha: Float = 0.58f,
 ): Modifier {
     if (!enabled) {
-        return if (isSnowInterfaceStyle()) {
+        return if (isSnowInterfaceStyle() || isRainInterfaceStyle()) {
             snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
         } else {
             this
@@ -2167,6 +2203,7 @@ private fun Modifier.homeLiquidGlassSurface(
         refractionHeight = 14.dp,
         refractionAmount = 9.dp,
         strokeAlpha = 0.66f,
+        cardStyle = FrostedGlassCardStyle.Ice,
     ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
 }
 

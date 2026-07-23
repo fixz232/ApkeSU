@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
@@ -58,8 +59,12 @@ fun SuperUserPagerAlpha(
     AlphaScreen(
         title = stringResource(R.string.superuser),
         bottomInnerPadding = bottomInnerPadding,
-        topActionIcon = if (studioStyle) Icons.Rounded.Refresh else null,
-        onTopActionClick = actions.onRefresh,
+        topActionIcon = Icons.Rounded.Fingerprint,
+        onTopActionClick = actions.onOpenAppIdManager,
+        topActionContentDescription = stringResource(R.string.app_id_manager_open),
+        secondaryTopActionIcon = if (studioStyle) Icons.Rounded.Refresh else null,
+        onSecondaryTopActionClick = actions.onRefresh,
+        secondaryTopActionContentDescription = stringResource(R.string.refresh_refresh),
     ) { contentPadding ->
         LazyColumn(
             contentPadding = PaddingValues(

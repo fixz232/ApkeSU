@@ -13,6 +13,9 @@ import me.weishu.kernelsu.ui.component.snow.seasonTopBarContentColor
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelPalette
+import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
+import me.weishu.kernelsu.ui.component.rain.rainTopBarContainerColor
+import me.weishu.kernelsu.ui.component.rain.rainTopBarContentColor
 
 data class TopBarColors(
     val container: Color,
@@ -21,6 +24,13 @@ data class TopBarColors(
 
 @Composable
 fun skrootproTopBarColors(defaultContainer: Color, defaultContent: Color): TopBarColors {
+    if (isRainInterfaceStyle()) {
+        return TopBarColors(
+            container = rainTopBarContainerColor(),
+            content = rainTopBarContentColor(),
+        )
+    }
+
     if (LocalInterfaceStyle.current == InterfaceStyle.Snow.value) {
         val dark = isInDarkTheme()
         val seasonalContainer = when (LocalSeasonStyle.current) {

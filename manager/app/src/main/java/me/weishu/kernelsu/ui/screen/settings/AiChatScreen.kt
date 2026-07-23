@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
@@ -56,6 +59,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.StopCircle
@@ -70,11 +74,12 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -105,6 +110,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -113,6 +119,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.markdown.GithubMarkdown
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun AiChatScreen() {
@@ -163,7 +171,23 @@ fun AiChatScreen() {
         ),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.ai_chat_title)) },
+                title = {
+                    Column {
+                        Text(
+                            text = stringResource(R.string.ai_chat_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = state.activeConversation.displayTitle(defaultConversationTitle),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navigator.pop() }) {
                         Icon(
@@ -304,17 +328,19 @@ fun AiChatScreen() {
                 AiChatEmptyState(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.52f)),
                     configured = state.config.isValid(),
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.52f)),
                     state = listState,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     items(messages, key = AiMessage::id) { message ->
                         AiMessageBubble(
@@ -541,7 +567,7 @@ private fun AiApiConfigCard(
                                 }
                                 IconButton(
                                     onClick = onLoadModels,
-                                    enabled = !state.loadingModels && !state.isSending,
+                                    enabled = !state.loadingModels && !state.testingApi && !state.isSending,
                                 ) {
                                     if (state.loadingModels) {
                                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -684,7 +710,7 @@ private fun AiApiConfigCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
-                        enabled = !state.testingApi && !state.isSending,
+                        enabled = !state.testingApi && !state.loadingModels && !state.isSending,
                         onClick = onTest,
                     ) {
                         if (state.testingApi) {
@@ -715,19 +741,48 @@ private fun AiChatEmptyState(modifier: Modifier, configured: Boolean) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            if (configured) Icons.Rounded.ChatBubbleOutline else Icons.Rounded.Key,
-            contentDescription = null,
-            modifier = Modifier.size(38.dp),
-            tint = MaterialTheme.colorScheme.primary,
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = CircleShape,
+            color = if (configured) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    if (configured) Icons.Rounded.AutoAwesome else Icons.Rounded.Key,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = if (configured) {
+                        MaterialTheme.colorScheme.onTertiaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    },
+                )
+            }
+        }
+        Text(
+            modifier = Modifier.padding(top = 18.dp),
+            text = stringResource(
+                if (configured) R.string.ai_chat_empty_title else R.string.ai_chat_setup_title
+            ),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
         )
         Text(
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .widthIn(max = 360.dp),
             text = stringResource(
                 if (configured) R.string.ai_chat_empty_ready else R.string.ai_chat_welcome
             ),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -742,94 +797,207 @@ private fun AiMessageBubble(
 ) {
     val isUser = message.role == AiRole.User
     val isError = message.status == AiMessageStatus.Error
+    val horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+    val roleLabel = stringResource(
+        if (isUser) R.string.ai_chat_role_user else R.string.ai_chat_role_assistant
+    )
+    val timeLabel = remember(message.createdAt) {
+        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.createdAt))
+    }
+    val bubbleShape = if (isUser) {
+        RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+    } else {
+        RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+    }
+    val bubbleColor = when {
+        isError -> MaterialTheme.colorScheme.errorContainer
+        isUser -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainer
+    }
+    val messageColor = when {
+        isError -> MaterialTheme.colorScheme.onErrorContainer
+        isUser -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Top,
     ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 560.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = when {
-                isError -> MaterialTheme.colorScheme.errorContainer
-                isUser -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceContainerHigh
-            },
+        if (isUser) {
+            Spacer(modifier = Modifier.weight(1f))
+        } else {
+            AiMessageAvatar(isUser = false)
+            Spacer(modifier = Modifier.size(8.dp))
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .widthIn(max = if (isUser) 560.dp else 640.dp),
+            horizontalAlignment = horizontalAlignment,
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (message.retryOfId != null) {
+                if (isUser) {
                     Text(
-                        stringResource(R.string.ai_chat_regenerated_answer),
+                        text = timeLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.size(7.dp))
+                }
+                Text(
+                    text = roleLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (!isUser) {
+                    Spacer(Modifier.size(7.dp))
+                    Text(
+                        text = timeLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                when {
-                    message.status == AiMessageStatus.Generating && message.text.isBlank() -> {
+            }
+
+            Surface(
+                modifier = Modifier
+                    .padding(top = 5.dp)
+                    .widthIn(max = if (isUser) 560.dp else 640.dp),
+                shape = bubbleShape,
+                color = bubbleColor,
+                tonalElevation = if (isUser) 0.dp else 1.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    if (message.retryOfId != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Icon(
+                                Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                            )
                             Text(
-                                modifier = Modifier.padding(start = 8.dp),
-                                text = stringResource(R.string.ai_chat_generating),
-                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 6.dp),
+                                text = stringResource(R.string.ai_chat_regenerated_answer),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                    !isUser && message.status == AiMessageStatus.Completed -> {
-                        GithubMarkdown(
-                            content = message.text,
-                            isMarkdown = true,
-                            containerColor = Color.Transparent,
-                            allowRemoteContent = false,
-                            contentPaddingDp = 0,
-                        )
+                    when {
+                        message.status == AiMessageStatus.Generating && message.text.isBlank() -> {
+                            AiGeneratingIndicator()
+                        }
+                        !isUser && message.status == AiMessageStatus.Completed -> {
+                            GithubMarkdown(
+                                content = message.text,
+                                isMarkdown = true,
+                                containerColor = Color.Transparent,
+                                allowRemoteContent = false,
+                                contentPaddingDp = 0,
+                            )
+                        }
+                        else -> SelectionContainer {
+                            Text(
+                                text = message.text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = messageColor,
+                            )
+                        }
                     }
-                    else -> SelectionContainer {
-                        Text(
-                            text = message.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = when {
-                                isError -> MaterialTheme.colorScheme.onErrorContainer
-                                isUser -> MaterialTheme.colorScheme.onPrimaryContainer
-                                else -> MaterialTheme.colorScheme.onSurface
-                            },
-                        )
+                    if (message.status == AiMessageStatus.Generating && message.text.isNotBlank()) {
+                        AiGeneratingIndicator()
+                    }
+                    AttachmentChips(message.attachments)
+                    if (!isUser) {
+                        MessageStatus(message)
+                        CodeBlockActions(message.text, onCopyCode)
                     }
                 }
-                if (message.status == AiMessageStatus.Generating) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-                AttachmentChips(message.attachments)
-                if (!isUser) {
-                    MessageStatus(message)
-                    CodeBlockActions(message.text, onCopyCode)
-                    if (message.text.isNotBlank() && message.status != AiMessageStatus.Generating) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = onCopy) {
-                                Icon(
-                                    Icons.Rounded.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.size(4.dp))
-                                Text(stringResource(R.string.ai_chat_copy))
-                            }
-                            TextButton(enabled = !sending, onClick = onRetry) {
-                                Icon(
-                                    Icons.Rounded.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.size(4.dp))
-                                Text(stringResource(R.string.ai_chat_retry))
-                            }
+            }
+
+            if (!isUser && message.text.isNotBlank() && message.status != AiMessageStatus.Generating) {
+                Surface(
+                    modifier = Modifier.padding(top = 5.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        IconButton(onClick = onCopy) {
+                            Icon(
+                                Icons.Rounded.ContentCopy,
+                                contentDescription = stringResource(R.string.ai_chat_copy),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        IconButton(enabled = !sending, onClick = onRetry) {
+                            Icon(
+                                Icons.Rounded.Refresh,
+                                contentDescription = stringResource(R.string.ai_chat_retry),
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                 }
             }
         }
+
+        if (isUser) {
+            Spacer(modifier = Modifier.size(8.dp))
+            AiMessageAvatar(isUser = true)
+        }
+    }
+}
+
+@Composable
+private fun AiMessageAvatar(isUser: Boolean) {
+    Surface(
+        modifier = Modifier.size(34.dp),
+        shape = CircleShape,
+        color = if (isUser) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.tertiaryContainer
+        },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = if (isUser) Icons.Rounded.Person else Icons.Rounded.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = if (isUser) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AiGeneratingIndicator() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 1.5.dp,
+        )
+        Text(
+            modifier = Modifier.padding(start = 7.dp),
+            text = stringResource(R.string.ai_chat_generating),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -838,8 +1006,8 @@ private fun MessageStatus(message: AiMessage) {
     val statusText = when (message.status) {
         AiMessageStatus.Ready,
         AiMessageStatus.Completed,
+        AiMessageStatus.Generating,
         -> null
-        AiMessageStatus.Generating -> stringResource(R.string.ai_chat_generating)
         AiMessageStatus.Stopped -> stringResource(R.string.ai_chat_stopped)
         AiMessageStatus.Partial -> stringResource(R.string.ai_chat_partial_response)
         AiMessageStatus.Error -> stringResource(R.string.ai_chat_failed_response)
@@ -934,15 +1102,22 @@ private fun AiChatInputBar(
     onSend: () -> Unit,
 ) {
     var toolsExpanded by rememberSaveable { mutableStateOf(false) }
-    val tokenEstimate = remember(state.config, state.activeConversation.messages, state.draft) {
-        val draftMessage = state.draft.takeIf(String::isNotBlank)?.let {
+    val tokenEstimate = remember(
+        state.config,
+        state.activeConversation.messages,
+        state.draft,
+        state.pendingAttachments,
+    ) {
+        val draftMessage = if (state.draft.isNotBlank() || state.pendingAttachments.isNotEmpty()) {
             AiMessage(
                 id = Long.MAX_VALUE,
                 role = AiRole.User,
-                text = it,
+                text = state.draft.ifBlank { "Please analyze the attached content." },
                 status = AiMessageStatus.Ready,
                 attachments = state.pendingAttachments,
             )
+        } else {
+            null
         }
         AiContextBuilder.estimateConversationTokens(
             state.config,
@@ -950,27 +1125,32 @@ private fun AiChatInputBar(
         )
     }
     Surface(
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
-        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.98f),
+        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             PendingAttachmentRow(state.pendingAttachments, onRemoveAttachment)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(
-                        R.string.ai_chat_context_usage,
-                        tokenEstimate,
-                        state.config.contextWindowTokens,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        text = stringResource(
+                            R.string.ai_chat_context_usage,
+                            tokenEstimate,
+                            state.config.contextWindowTokens,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 if (state.importingAttachment || state.analyzingModules) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -982,7 +1162,7 @@ private fun AiChatInputBar(
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Box {
-                    IconButton(
+                    FilledTonalIconButton(
                         onClick = { toolsExpanded = true },
                         enabled = !state.isSending && !state.importingAttachment,
                     ) {
@@ -1027,16 +1207,23 @@ private fun AiChatInputBar(
                     maxLines = 5,
                     placeholder = { Text(stringResource(R.string.ai_chat_input_hint)) },
                     enabled = !state.isSending,
+                    shape = RoundedCornerShape(20.dp),
                 )
                 if (state.isSending) {
-                    FilledTonalIconButton(onClick = onStop) {
+                    FilledIconButton(
+                        onClick = onStop,
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    ) {
                         Icon(
                             Icons.Rounded.StopCircle,
                             contentDescription = stringResource(R.string.ai_chat_stop),
                         )
                     }
                 } else {
-                    FilledTonalIconButton(
+                    FilledIconButton(
                         onClick = onSend,
                         enabled = state.draft.isNotBlank() || state.pendingAttachments.isNotEmpty(),
                     ) {
@@ -1065,8 +1252,8 @@ private fun PendingAttachmentRow(
     ) {
         attachments.forEach { attachment ->
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Row(
                     modifier = Modifier.padding(start = 9.dp, top = 4.dp, bottom = 4.dp),

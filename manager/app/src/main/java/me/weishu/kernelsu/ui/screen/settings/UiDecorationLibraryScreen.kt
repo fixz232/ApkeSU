@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
@@ -66,11 +69,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -139,7 +138,8 @@ import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
 
 private enum class DecorationLibraryTab(@StringRes val labelRes: Int) {
-    Library(R.string.ui_decoration_tab_library),
+    Components(R.string.ui_decoration_tab_components),
+    Presets(R.string.ui_decoration_tab_presets),
     Tuning(R.string.ui_decoration_tab_tuning),
 }
 
@@ -181,8 +181,8 @@ fun UiDecorationLibraryScreen() {
     val coroutineScope = rememberCoroutineScope()
     var appliedConfig by remember { mutableStateOf(uiState.uiDecorationConfig) }
     var draftConfig by remember { mutableStateOf(uiState.uiDecorationConfig) }
-    var selectedTab by rememberSaveable { mutableIntStateOf(DecorationLibraryTab.Library.ordinal) }
-    var selectedCategory by rememberSaveable { mutableIntStateOf(DecorationCategory.Card.ordinal) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(DecorationLibraryTab.Components.ordinal) }
+    var selectedCategory by rememberSaveable { mutableIntStateOf(NO_DECORATION_CATEGORY) }
     var showSavePresetDialog by rememberSaveable { mutableStateOf(false) }
     var presetToRename by remember { mutableStateOf<CustomUiDecorationPreset?>(null) }
     var presetToDelete by remember { mutableStateOf<CustomUiDecorationPreset?>(null) }
@@ -278,8 +278,18 @@ fun UiDecorationLibraryScreen() {
             navigator.pop()
         }
     }
-    BackHandler(enabled = hasChanges || uiState.uiDecorationSaveState == UiDecorationSaveState.Saving) {
-        closeScreen()
+    val activeCategory = DecorationCategory.entries.getOrNull(selectedCategory)
+    val navigateBack: () -> Unit = {
+        if (activeCategory != null) {
+            selectedCategory = NO_DECORATION_CATEGORY
+        } else {
+            closeScreen()
+        }
+    }
+    BackHandler(
+        enabled = activeCategory != null || hasChanges || uiState.uiDecorationSaveState == UiDecorationSaveState.Saving,
+    ) {
+        navigateBack()
     }
 
     ThemePresetNameDialog(
@@ -348,7 +358,10 @@ fun UiDecorationLibraryScreen() {
     val bodyContent: @Composable (PaddingValues) -> Unit = { innerPadding ->
         DecorationLibraryBody(
             selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it },
+            onTabSelected = {
+                selectedTab = it
+                selectedCategory = NO_DECORATION_CATEGORY
+            },
             selectedCategory = selectedCategory,
             onCategorySelected = { selectedCategory = it },
             config = draftConfig,
@@ -375,15 +388,18 @@ fun UiDecorationLibraryScreen() {
             .only(WindowInsetsSides.Horizontal),
         topBar = {
             MiuixTopAppBar(
-                title = stringResource(R.string.settings_ui_decoration_library),
+                title = activeCategory?.let { stringResource(it.labelRes) }
+                    ?: stringResource(R.string.settings_ui_decoration_library),
                 color = Color.Transparent,
                 titleColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurface,
                 navigationIcon = {
-                    MiuixIconButton(onClick = closeScreen) {
+                    MiuixIconButton(onClick = navigateBack) {
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = activeCategory?.let {
+                                stringResource(R.string.ui_decoration_back_to_categories)
+                            } ?: stringResource(R.string.close),
                         )
                     }
                 },
@@ -446,7 +462,6 @@ private fun DecorationLibraryBody(
                     onCategorySelected = onCategorySelected,
                     config = config,
                     effectiveConfig = effectiveConfig,
-                    conflicts = conflicts,
                     interfaceStyle = interfaceStyle,
                     uiState = uiState,
                     onConfigChange = onConfigChange,
@@ -486,7 +501,6 @@ private fun DecorationLibraryBody(
                     onCategorySelected = onCategorySelected,
                     config = config,
                     effectiveConfig = effectiveConfig,
-                    conflicts = conflicts,
                     interfaceStyle = interfaceStyle,
                     uiState = uiState,
                     onConfigChange = onConfigChange,
@@ -512,7 +526,6 @@ private fun DecorationEditorPane(
     onCategorySelected: (Int) -> Unit,
     config: UiDecorationConfig,
     effectiveConfig: UiDecorationConfig,
-    conflicts: List<Int>,
     interfaceStyle: String,
     uiState: SettingsUiState,
     onConfigChange: (UiDecorationConfig) -> Unit,
@@ -525,34 +538,43 @@ private fun DecorationEditorPane(
     onShowMessage: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val activeCategory = DecorationCategory.entries.getOrNull(selectedCategory)
     Column(modifier = modifier) {
-        DecorationTabBar(selectedTab = selectedTab, onTabSelected = onTabSelected)
-        when (DecorationLibraryTab.entries.getOrElse(selectedTab) { DecorationLibraryTab.Library }) {
-            DecorationLibraryTab.Library -> DecorationComponentsTab(
+        if (selectedTab == DecorationLibraryTab.Components.ordinal && activeCategory != null) {
+            DecorationCategoryDetail(
+                category = activeCategory,
                 config = config,
                 effectiveConfig = effectiveConfig,
-                conflicts = conflicts,
                 interfaceStyle = interfaceStyle,
-                selectedCategory = DecorationCategory.entries.getOrElse(selectedCategory) {
-                    DecorationCategory.Card
-                },
                 recentComponents = uiState.recentUiDecorationComponents,
-                customPresets = uiState.customUiDecorationPresets,
-                onCategorySelected = { onCategorySelected(it.ordinal) },
                 onConfigChange = onConfigChange,
-                onSaveCustomPreset = onSaveCustomPreset,
-                onRenameCustomPreset = onRenameCustomPreset,
-                onDeleteCustomPreset = onDeleteCustomPreset,
-                onImportCustomPresets = onImportCustomPresets,
-                onExportCustomPresets = onExportCustomPresets,
             )
-            DecorationLibraryTab.Tuning -> DecorationCurrentTab(
-                config = config,
-                uiState = uiState,
-                onConfigChange = onConfigChange,
-                onReset = onReset,
-                onShowMessage = onShowMessage,
-            )
+        } else {
+            DecorationTabBar(selectedTab = selectedTab, onTabSelected = onTabSelected)
+            when (DecorationLibraryTab.entries.getOrElse(selectedTab) { DecorationLibraryTab.Components }) {
+                DecorationLibraryTab.Components -> DecorationComponentsOverview(
+                    config = config,
+                    effectiveConfig = effectiveConfig,
+                    onCategorySelected = { onCategorySelected(it.ordinal) },
+                )
+                DecorationLibraryTab.Presets -> DecorationPresetsTab(
+                    config = config,
+                    customPresets = uiState.customUiDecorationPresets,
+                    onConfigChange = onConfigChange,
+                    onSaveCustomPreset = onSaveCustomPreset,
+                    onRenameCustomPreset = onRenameCustomPreset,
+                    onDeleteCustomPreset = onDeleteCustomPreset,
+                    onImportCustomPresets = onImportCustomPresets,
+                    onExportCustomPresets = onExportCustomPresets,
+                )
+                DecorationLibraryTab.Tuning -> DecorationCurrentTab(
+                    config = config,
+                    uiState = uiState,
+                    onConfigChange = onConfigChange,
+                    onReset = onReset,
+                    onShowMessage = onShowMessage,
+                )
+            }
         }
     }
 }
@@ -627,18 +649,18 @@ private fun CompactDecorationPreview(
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.94f),
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth(),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             DecorationMiniPreview(
                 config = effective.forPreview(),
-                modifier = Modifier.width(116.dp).height(76.dp),
+                modifier = Modifier.width(82.dp).height(52.dp),
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = stringResource(R.string.ui_decoration_live_preview),
                     style = MaterialTheme.typography.titleSmall,
@@ -652,7 +674,8 @@ private fun CompactDecorationPreview(
                             conflicts.size,
                             conflicts.size,
                         )
-                        else -> stringResource(R.string.ui_decoration_no_conflicts)
+                        configured.enabled -> stringResource(R.string.ui_decoration_status_on)
+                        else -> stringResource(R.string.ui_decoration_preview_only)
                     },
                     color = if (conflicts.isNotEmpty()) {
                         MaterialTheme.colorScheme.error
@@ -662,17 +685,8 @@ private fun CompactDecorationPreview(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (configured.enabled) {
-                        stringResource(R.string.ui_decoration_status_on)
-                    } else {
-                        stringResource(R.string.ui_decoration_preview_only)
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
                 )
             }
         }
@@ -745,21 +759,157 @@ private fun EffectiveConfigurationNotice(
 }
 
 @Composable
-private fun DecorationComponentsTab(
+private fun DecorationComponentsOverview(
     config: UiDecorationConfig,
     effectiveConfig: UiDecorationConfig,
-    conflicts: List<Int>,
-    interfaceStyle: String,
-    selectedCategory: DecorationCategory,
-    recentComponents: List<String>,
-    customPresets: List<CustomUiDecorationPreset>,
     onCategorySelected: (DecorationCategory) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            DecorationIntro(
+                title = stringResource(R.string.ui_decoration_component_categories),
+                summary = stringResource(R.string.ui_decoration_component_categories_summary),
+                icon = Icons.Rounded.Palette,
+            )
+        }
+        items(DecorationCategory.entries, key = { it.name }) { category ->
+            DecorationCategoryRow(
+                category = category,
+                config = config,
+                effectiveConfig = effectiveConfig,
+                onClick = { onCategorySelected(category) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DecorationCategoryRow(
+    category: DecorationCategory,
+    config: UiDecorationConfig,
+    effectiveConfig: UiDecorationConfig,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    val effective = category.isEffective(config, effectiveConfig)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.86f),
+        shape = shape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            DecorationMiniPreview(
+                config = singleSlotPreview(config, category, category.selectedValue(config)),
+                modifier = Modifier.width(76.dp).height(50.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(category.labelRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.ui_decoration_category_selected_format,
+                        stringResource(category.selectedLabelRes(config)),
+                    ),
+                    color = if (effective) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = pluralStringResource(
+                    R.plurals.ui_decoration_option_count,
+                    category.optionCount(),
+                    category.optionCount(),
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DecorationPresetsTab(
+    config: UiDecorationConfig,
+    customPresets: List<CustomUiDecorationPreset>,
     onConfigChange: (UiDecorationConfig) -> Unit,
     onSaveCustomPreset: () -> Unit,
     onRenameCustomPreset: (CustomUiDecorationPreset) -> Unit,
     onDeleteCustomPreset: (CustomUiDecorationPreset) -> Unit,
     onImportCustomPresets: () -> Unit,
     onExportCustomPresets: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            DecorationIntro(
+                title = stringResource(R.string.ui_decoration_presets),
+                summary = stringResource(R.string.ui_decoration_presets_summary),
+                icon = Icons.Rounded.AutoAwesome,
+            )
+        }
+        item {
+            PresetPicker(
+                config = config,
+                onPresetSelected = { onConfigChange(config.withPreset(it)) },
+            )
+        }
+        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)) }
+        item {
+            CustomPresetManager(
+                config = config,
+                presets = customPresets,
+                onApply = { onConfigChange(it.config) },
+                onSave = onSaveCustomPreset,
+                onRename = onRenameCustomPreset,
+                onDelete = onDeleteCustomPreset,
+                onImport = onImportCustomPresets,
+                onExport = onExportCustomPresets,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DecorationCategoryDetail(
+    category: DecorationCategory,
+    config: UiDecorationConfig,
+    effectiveConfig: UiDecorationConfig,
+    interfaceStyle: String,
+    recentComponents: List<String>,
+    onConfigChange: (UiDecorationConfig) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val normalizedQuery = query.trim()
@@ -802,40 +952,14 @@ private fun DecorationComponentsTab(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            DecorationIntro(
-                title = stringResource(R.string.ui_decoration_presets),
-                summary = stringResource(R.string.ui_decoration_presets_summary),
-                icon = Icons.Rounded.AutoAwesome,
-            )
-        }
-        item {
-            PresetPicker(
-                config = config,
-                onPresetSelected = { onConfigChange(config.withPreset(it)) },
-            )
-        }
-        item {
-            CustomPresetManager(
-                config = config,
-                presets = customPresets,
-                onApply = { onConfigChange(it.config) },
-                onSave = onSaveCustomPreset,
-                onRename = onRenameCustomPreset,
-                onDelete = onDeleteCustomPreset,
-                onImport = onImportCustomPresets,
-                onExport = onExportCustomPresets,
-            )
-        }
-        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)) }
-        item {
-            DecorationIntro(
-                title = stringResource(R.string.ui_decoration_components),
-                summary = stringResource(R.string.ui_decoration_components_summary),
-                icon = Icons.Rounded.Palette,
+            Text(
+                text = stringResource(category.summaryRes),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
         item {
@@ -860,31 +984,7 @@ private fun DecorationComponentsTab(
                 },
             )
         }
-        item {
-            DecorationCategoryPicker(
-                selected = selectedCategory,
-                onSelected = onCategorySelected,
-            )
-        }
-        item {
-            Text(
-                text = stringResource(selectedCategory.summaryRes),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        if (conflicts.isNotEmpty()) {
-            items(conflicts, key = { "conflict_$it" }) { messageRes ->
-                CompatibilityNotice(message = stringResource(messageRes), warning = true)
-            }
-        }
-        if (config != effectiveConfig) {
-            item {
-                EffectiveConfigurationNotice(configured = config, effective = effectiveConfig)
-            }
-        }
-
-        when (selectedCategory) {
+        when (category) {
             DecorationCategory.Card -> cardSections.forEach { section ->
                 item(key = "card_section_${section.labelRes}") {
                     ComponentGroupHeading(
@@ -906,7 +1006,7 @@ private fun DecorationComponentsTab(
                             option in recommendedCards -> stringResource(R.string.ui_decoration_recommended)
                             else -> null
                         },
-                        previewConfig = singleSlotPreview(config, selectedCategory, option.value),
+                        previewConfig = singleSlotPreview(config, category, option.value),
                         onClick = { onConfigChange(config.copy(card = option)) },
                     )
                 }
@@ -923,7 +1023,7 @@ private fun DecorationComponentsTab(
                     } else {
                         null
                     },
-                    previewConfig = singleSlotPreview(config, selectedCategory, option.value),
+                    previewConfig = singleSlotPreview(config, category, option.value),
                     onClick = { onConfigChange(config.copy(background = option)) },
                 )
             }
@@ -939,7 +1039,7 @@ private fun DecorationComponentsTab(
                     } else {
                         null
                     },
-                    previewConfig = singleSlotPreview(config, selectedCategory, option.value),
+                    previewConfig = singleSlotPreview(config, category, option.value),
                     onClick = { onConfigChange(config.copy(topBar = option)) },
                 )
             }
@@ -955,12 +1055,12 @@ private fun DecorationComponentsTab(
                     } else {
                         null
                     },
-                    previewConfig = singleSlotPreview(config, selectedCategory, option.value),
+                    previewConfig = singleSlotPreview(config, category, option.value),
                     onClick = { onConfigChange(config.copy(navigation = option)) },
                 )
             }
         }
-        val noResults = when (selectedCategory) {
+        val noResults = when (category) {
             DecorationCategory.Card -> cardOptions.isEmpty()
             DecorationCategory.Background -> backgroundOptions.isEmpty()
             DecorationCategory.TopBar -> topBarOptions.isEmpty()
@@ -969,47 +1069,6 @@ private fun DecorationComponentsTab(
         if (noResults) {
             item {
                 EmptyComponentSearch(query = normalizedQuery, onClear = { query = "" })
-            }
-        }
-    }
-}
-
-@Composable
-private fun DecorationCategoryPicker(
-    selected: DecorationCategory,
-    onSelected: (DecorationCategory) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().selectableGroup(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        DecorationCategory.entries.chunked(2).forEach { categories ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                categories.forEach { category ->
-                    FilterChip(
-                        selected = selected == category,
-                        onClick = { onSelected(category) },
-                        label = {
-                            Text(
-                                text = stringResource(category.labelRes),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = category.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                repeat(2 - categories.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -1216,88 +1275,72 @@ private fun PresetPicker(
     onPresetSelected: (UiDecorationPreset) -> Unit,
 ) {
     val selectedPreset = config.matchingPreset()
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val columnCount = when {
-            maxWidth >= 620.dp -> 3
-            maxWidth >= 300.dp -> 2
-            else -> 1
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth().selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            UiDecorationPreset.entries.chunked(columnCount).forEach { rowPresets ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(UiDecorationPreset.entries, key = { it.value }) { preset ->
+            val selected = selectedPreset == preset
+            val presetPreview = config.withPreset(preset).copy(motionEnabled = false)
+            val shape = RoundedCornerShape(8.dp)
+            Surface(
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+                contentColor = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                shape = shape,
+                modifier = Modifier
+                    .width(184.dp)
+                    .height(116.dp)
+                    .clip(shape)
+                    .selectable(
+                        selected = selected,
+                        onClick = { onPresetSelected(preset) },
+                        role = Role.RadioButton,
+                    ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    rowPresets.forEach { preset ->
-                        val selected = selectedPreset == preset
-                        val presetPreview = config.withPreset(preset).copy(motionEnabled = false)
-                        Surface(
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainer
-                            },
-                            contentColor = if (selected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(156.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .selectable(
-                                    selected = selected,
-                                    onClick = { onPresetSelected(preset) },
-                                    role = Role.RadioButton,
-                                ),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                DecorationMiniPreview(
-                                    config = presetPreview,
-                                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                                )
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = stringResource(preset.labelRes()),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            text = stringResource(preset.summaryRes()),
-                                            color = if (selected) {
-                                                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    if (selected) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.CheckCircle,
-                                            contentDescription = stringResource(R.string.ui_decoration_selected),
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    }
-                                }
-                            }
+                    DecorationMiniPreview(
+                        config = presetPreview,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(preset.labelRes()),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = stringResource(preset.summaryRes()),
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                    }
-                    repeat(columnCount - rowPresets.size) {
-                        Spacer(Modifier.weight(1f))
+                        if (selected) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = stringResource(R.string.ui_decoration_selected),
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -1517,19 +1560,21 @@ private fun DecorationOptionRow(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             DecorationMiniPreview(
                 config = previewConfig,
-                modifier = Modifier.width(94.dp).height(64.dp),
+                modifier = Modifier.width(76.dp).height(50.dp),
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = summary,
@@ -1539,7 +1584,7 @@ private fun DecorationOptionRow(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 badge?.let {
@@ -1561,6 +1606,7 @@ private fun DecorationOptionRow(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = stringResource(R.string.ui_decoration_selected),
                     tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -2040,6 +2086,38 @@ private fun singleSlotPreview(
     }
 }
 
+private fun DecorationCategory.selectedValue(config: UiDecorationConfig): String = when (this) {
+    DecorationCategory.Card -> config.card.value
+    DecorationCategory.Background -> config.background.value
+    DecorationCategory.TopBar -> config.topBar.value
+    DecorationCategory.Navigation -> config.navigation.value
+}
+
+@StringRes
+private fun DecorationCategory.selectedLabelRes(config: UiDecorationConfig): Int = when (this) {
+    DecorationCategory.Card -> config.card.labelRes()
+    DecorationCategory.Background -> config.background.labelRes()
+    DecorationCategory.TopBar -> config.topBar.labelRes()
+    DecorationCategory.Navigation -> config.navigation.labelRes()
+}
+
+private fun DecorationCategory.optionCount(): Int = when (this) {
+    DecorationCategory.Card -> UiCardDecoration.entries.size
+    DecorationCategory.Background -> UiBackgroundDecoration.entries.size
+    DecorationCategory.TopBar -> UiTopBarDecoration.entries.size
+    DecorationCategory.Navigation -> UiNavigationDecoration.entries.size
+}
+
+private fun DecorationCategory.isEffective(
+    configured: UiDecorationConfig,
+    effective: UiDecorationConfig,
+): Boolean = when (this) {
+    DecorationCategory.Card -> configured.card == effective.card
+    DecorationCategory.Background -> configured.background == effective.background
+    DecorationCategory.TopBar -> configured.topBar == effective.topBar
+    DecorationCategory.Navigation -> configured.navigation == effective.navigation
+}
+
 @StringRes
 private fun UiDecorationPreset.labelRes(): Int = when (this) {
     UiDecorationPreset.Refined -> R.string.ui_decoration_preset_refined
@@ -2214,8 +2292,8 @@ private fun cardDecorationSections(
         .filter { it.startsWith("card:") }
         .map { UiCardDecoration.fromValue(it.substringAfter(':')) }
     return listOfNotNull(
-        takeSection(R.string.ui_decoration_group_recommended, recommended),
-        takeSection(R.string.ui_decoration_group_recent, recent),
+        takeSection(R.string.ui_decoration_group_recommended, recommended.take(MAX_FEATURED_COMPONENTS)),
+        takeSection(R.string.ui_decoration_group_recent, recent.take(MAX_FEATURED_COMPONENTS)),
         takeSection(
             R.string.ui_decoration_group_basic,
             listOf(UiCardDecoration.None, UiCardDecoration.Highlight, UiCardDecoration.Circuit),
@@ -2298,3 +2376,5 @@ private fun decorationConflicts(
 private const val UI_DECORATION_PRESET_MIME_TYPE = "application/json"
 private const val UI_DECORATION_PRESET_EXPORT_NAME = "ApkeSU_UI_Decoration_Presets.json"
 private const val MAX_COMPONENT_SEARCH_LENGTH = 60
+private const val MAX_FEATURED_COMPONENTS = 4
+private const val NO_DECORATION_CATEGORY = -1

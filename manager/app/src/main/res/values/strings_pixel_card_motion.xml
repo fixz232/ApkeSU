@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_pixel_card_motion">Pixel card animation</string>
+    <string name="settings_pixel_card_motion_summary">Animate each pixel mode\'s signature scenery and edge details without moving cards or text.</string>
+</resources>

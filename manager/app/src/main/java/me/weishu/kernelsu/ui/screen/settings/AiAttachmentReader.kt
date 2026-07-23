@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ui.util.getFileName
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -34,7 +35,11 @@ internal class AiAttachmentReader(
         val declaredSize = querySize(uri)
         val lowerName = name.lowercase(Locale.ROOT)
         if (mimeType == "application/zip" || lowerName.endsWith(".zip")) {
-            return@withContext readArchive(uri, name, declaredSize, mimeType)
+            val bytes = readLimited(uri, MAX_ARCHIVE_BYTES + 1)
+            if (bytes.size > MAX_ARCHIVE_BYTES) {
+                throw AttachmentTooLargeException(MAX_ARCHIVE_BYTES)
+            }
+            return@withContext readArchive(bytes, name, declaredSize, mimeType)
         }
 
         val bytes = readLimited(uri, MAX_DOCUMENT_BYTES + 1)
@@ -95,20 +100,17 @@ internal class AiAttachmentReader(
     }
 
     private fun readArchive(
-        uri: Uri,
+        bytes: ByteArray,
         name: String,
         declaredSize: Long,
         mimeType: String,
     ): AiAttachment {
-        val digest = MessageDigest.getInstance("SHA-256")
         val report = StringBuilder()
         var entryCount = 0
         var textEntryCount = 0
         var totalExtracted = 0
         var truncated = false
-        val input = appContext.contentResolver.openInputStream(uri)
-            ?: throw IOException("Unable to open attachment")
-        input.use { raw ->
+        ByteArrayInputStream(bytes).use { raw ->
             ZipInputStream(raw).use { zip ->
                 while (entryCount < MAX_ARCHIVE_ENTRIES) {
                     val entry = zip.nextEntry ?: break
@@ -121,10 +123,14 @@ internal class AiAttachmentReader(
                         if (remaining <= 0) {
                             truncated = true
                         } else {
-                            val bytes = readZipEntryLimited(zip, minOf(MAX_ARCHIVE_ENTRY_BYTES, remaining))
-                            totalExtracted += bytes.size
+                            val entryLimit = minOf(MAX_ARCHIVE_ENTRY_BYTES, remaining)
+                            val entryBytes = readZipEntryLimited(zip, entryLimit + 1)
+                            val entryTruncated = entryBytes.size > entryLimit
+                            val visibleBytes = if (entryTruncated) entryBytes.copyOf(entryLimit) else entryBytes
+                            totalExtracted += visibleBytes.size
+                            if (entryTruncated) truncated = true
                             val decoded = decodeText(
-                                bytes,
+                                visibleBytes,
                                 entry.name.lowercase(Locale.ROOT),
                                 "text/plain",
                             )
@@ -149,15 +155,14 @@ internal class AiAttachmentReader(
             if (truncated) append("The archive report was truncated for safety.\n")
         }
         val reportText = (header + report).take(MAX_ATTACHMENT_TEXT_CHARS)
-        digest.update(reportText.toByteArray(Charsets.UTF_8))
         return AiAttachment(
             kind = AiAttachmentKind.Archive,
             name = name,
-            sizeBytes = declaredSize.coerceAtLeast(0L),
+            sizeBytes = declaredSize.takeIf { it >= 0 } ?: bytes.size.toLong(),
             mimeType = mimeType,
             extractedText = reportText,
             truncated = truncated || header.length + report.length > MAX_ATTACHMENT_TEXT_CHARS,
-            sha256 = digest.digest().toHex(),
+            sha256 = bytes.sha256(),
         )
     }
 
@@ -298,6 +303,7 @@ private val TEXT_EXTENSIONS = setOf(
 )
 private val IMAGE_QUALITY_STEPS = intArrayOf(84, 74, 64)
 private const val MAX_DOCUMENT_BYTES = 256 * 1024
+private const val MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
 private const val MAX_ATTACHMENT_TEXT_CHARS = 48_000
 private const val MAX_STRUCTURED_PARSE_CHARS = 128_000
 private const val MAX_BINARY_SAMPLE_BYTES = 4_096

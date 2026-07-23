@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.ui.component.liquid.InnerShadow
+import me.weishu.kernelsu.ui.component.liquid.FrostedGlassCardStyle
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.innerShadow
@@ -75,6 +76,10 @@ import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
+import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
+import me.weishu.kernelsu.ui.component.rain.rainNavigationContainerColor
+import me.weishu.kernelsu.ui.component.rain.rainNavigationIndicator
+import me.weishu.kernelsu.ui.component.rain.rainNavigationSurface
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -167,6 +172,7 @@ fun RowScope.FloatingBottomBarItem(
     val scale = LocalFloatingBottomBarTabScale.current
     val itemShape = when {
         isPixelInterfaceStyle() -> RoundedCornerShape(6.dp)
+        isRainInterfaceStyle() -> RoundedCornerShape(10.dp)
         isSnowInterfaceStyle() -> RoundedCornerShape(10.dp)
         else -> CircleShape
     }
@@ -205,10 +211,12 @@ fun FloatingBottomBar(
     val isInDark = isInDarkTheme()
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
+    val isRainStyle = isRainInterfaceStyle()
     val isPixelStyle = isPixelInterfaceStyle()
-    val pillShape: Shape = remember(isPixelStyle, isSnowStyle) {
+    val pillShape: Shape = remember(isPixelStyle, isRainStyle, isSnowStyle) {
         when {
             isPixelStyle -> RoundedCornerShape(8.dp)
+            isRainStyle -> RoundedCornerShape(14.dp)
             isSnowStyle -> RoundedCornerShape(14.dp)
             else -> CircleShape
         }
@@ -217,13 +225,20 @@ fun FloatingBottomBar(
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val containerColor = when {
         isLiquidGlass -> liquidGlassSurfaceColor().copy(alpha = if (isBlurEnabled) 0.48f else 0.76f)
+        isRainStyle -> rainNavigationContainerColor()
         isSnowStyle -> seasonNavigationContainerColor()
         isPixelStyle -> pixelNavigationContainerColor()
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
 
-    val activeBackdrop = if (isBlurEnabled && !isPixelStyle) backdrop else null
+    val activeBackdrop = if (
+        isBlurEnabled && !isPixelStyle && !isRainStyle && !isLiquidGlass
+    ) {
+        backdrop
+    } else {
+        null
+    }
     val tabsBackdrop = if (activeBackdrop != null) rememberLayerBackdrop() else null
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -390,6 +405,7 @@ fun FloatingBottomBar(
                                 surfaceColor = liquidGlassSurfaceColor(),
                                 surfaceAlpha = 0.76f,
                                 strokeAlpha = 0.62f,
+                                cardStyle = FrostedGlassCardStyle.Ice,
                             )
                         } else {
                             Modifier.background(containerColor, pillShape)
@@ -399,6 +415,10 @@ fun FloatingBottomBar(
                 .then(
                     when {
                         isPixelStyle -> Modifier.pixelNavigationSurface(pillShape)
+                        isRainStyle -> Modifier.rainNavigationSurface(
+                            shape = pillShape,
+                            paintBackground = false,
+                        )
                         isSnowStyle -> Modifier.seasonNavigationSurface(
                             shape = pillShape,
                             paintBackground = false,
@@ -502,6 +522,11 @@ fun FloatingBottomBar(
                                     shape = pillShape,
                                     paintBackground = false,
                                 )
+                            } else if (isRainStyle) {
+                                Modifier.rainNavigationIndicator(
+                                    shape = pillShape,
+                                    paintBackground = false,
+                                )
                             } else {
                                 Modifier
                             },
@@ -526,6 +551,8 @@ fun FloatingBottomBar(
                         .then(
                             if (isPixelStyle) {
                                 Modifier.pixelNavigationIndicator(pillShape)
+                            } else if (isRainStyle) {
+                                Modifier.rainNavigationIndicator(pillShape)
                             } else if (isSnowStyle) {
                                 Modifier.seasonNavigationIndicator(pillShape)
                             } else {

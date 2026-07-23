@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,7 +27,7 @@ import me.weishu.kernelsu.ui.theme.isInDarkTheme
 fun PixelBianliangMotto(modifier: Modifier = Modifier) {
     if (!isPixelInterfaceStyle() || LocalPixelStyle.current != PixelStyle.BianliangMarket) return
     val palette = pixelPalette(PixelStyle.BianliangMarket, isInDarkTheme())
-    val shape = RoundedCornerShape(5.dp)
+    val shape = pixelMottoShape
     Box(
         modifier = modifier
             .height(30.dp)

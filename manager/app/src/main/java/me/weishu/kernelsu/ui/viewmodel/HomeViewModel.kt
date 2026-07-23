@@ -21,6 +21,7 @@ import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
+import me.weishu.kernelsu.data.repository.CUSTOM_HOME_TITLE_KEY
 import me.weishu.kernelsu.data.repository.SHOW_GKI_WARNING_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_LEARN_CARD_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_SUPPORT_CARD_KEY
@@ -59,7 +60,8 @@ class HomeViewModel(
         if (key == SHOW_VERSION_MISMATCH_WARNING_KEY ||
             key == SHOW_GKI_WARNING_KEY ||
             key == SHOW_HOME_SUPPORT_CARD_KEY ||
-            key == SHOW_HOME_LEARN_CARD_KEY
+            key == SHOW_HOME_LEARN_CARD_KEY ||
+            key == CUSTOM_HOME_TITLE_KEY
         ) {
             _uiState.update {
                 it.copy(
@@ -67,6 +69,7 @@ class HomeViewModel(
                     showGkiWarningSetting = repo.showGkiWarning,
                     showHomeSupportCard = repo.showHomeSupportCard,
                     showHomeLearnCard = repo.showHomeLearnCard,
+                    customHomeTitle = repo.customHomeTitle,
                 )
             }
         }
@@ -140,7 +143,10 @@ class HomeViewModel(
         var isManager = runCatching { Natives.isManager }.getOrDefault(false)
         var ksuVersion = runCatching { Natives.version.takeIf { it > 0 } }.getOrNull()
         var ksuDaemonRoot = runCatching { ksuRootAvailable() }.getOrDefault(false)
+        val kernelModuleLoaded = runCatching { apkeSuKernelModuleLoaded() }.getOrDefault(false)
         val driverConnected = ksuVersion != null ||
+            ksuDaemonRoot ||
+            kernelModuleLoaded ||
             runCatching { apkeSuRootAvailable() }.getOrDefault(false)
         val fallbackRoot = runCatching { rootAvailable() }.getOrDefault(false)
         if (!isManager && driverConnected && fallbackRoot) {
@@ -218,6 +224,7 @@ class HomeViewModel(
             showGkiWarningSetting = repo.showGkiWarning,
             showHomeSupportCard = repo.showHomeSupportCard,
             showHomeLearnCard = repo.showHomeLearnCard,
+            customHomeTitle = repo.customHomeTitle,
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0),
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0),
             systemInfo = SystemInfo(
@@ -270,6 +277,7 @@ class HomeViewModel(
             showGkiWarningSetting = runCatching { repo.showGkiWarning }.getOrDefault(true),
             showHomeSupportCard = runCatching { repo.showHomeSupportCard }.getOrDefault(true),
             showHomeLearnCard = runCatching { repo.showHomeLearnCard }.getOrDefault(true),
+            customHomeTitle = runCatching { repo.customHomeTitle }.getOrDefault(""),
             superuserCount = 0,
             moduleCount = 0,
             systemInfo = SystemInfo(
@@ -336,6 +344,24 @@ class HomeViewModel(
             appendLine("\u5f53\u524d\u69fd\u4f4d: ${info.currentSlot.ifBlank { "\u65e0\u69fd\u4f4d" }}")
             appendLine("\u5de5\u4f5c\u6a21\u5f0f: $mode")
             appendLine("\u9690\u85cf\u8def\u5f84 LKM: ${presentLabel(info.hiddenPathLkm)}")
+            if (state == RootRuntimeState.ManagerUnregistered) {
+                appendLine()
+                if (info.driverVersion > 0 && info.driverVersion != BuildConfig.VERSION_CODE) {
+                    appendLine(
+                        "\u4fee\u590d\u5efa\u8bae: \u5f53\u524d\u9a71\u52a8 ${info.driverVersion} \u4e0e ApkeSU " +
+                            "\u7ba1\u7406\u5668 ${BuildConfig.VERSION_CODE} \u7684\u6784\u5efa\u8eab\u4efd\u4e0d\u5339\u914d\u3002"
+                    )
+                    appendLine(
+                        "\u4ec5\u91cd\u88c5 APK \u65e0\u6cd5\u4fee\u590d\uff1b\u8bf7\u4f7f\u7528\u5f53\u524d\u7ba1\u7406\u5668\u91cd\u65b0\u4fee\u8865\u5e76\u5237\u5165\u955c\u50cf\uff0c" +
+                            "\u6216\u5237\u5165\u7531\u5f53\u524d ApkeSU \u6e90\u7801\u6784\u5efa\u7684 GKI/LKM\u3002"
+                    )
+                } else {
+                    appendLine(
+                        "\u4fee\u590d\u5efa\u8bae: \u5185\u6838\u672a\u4fe1\u4efb\u5f53\u524d APK \u7684\u5305\u540d\u6216\u7b7e\u540d\uff0c" +
+                            "\u8bf7\u4f7f\u7528\u540c\u4e00\u6e90\u7801\u548c\u53d1\u5e03\u8bc1\u4e66\u91cd\u65b0\u6784\u5efa\u5185\u6838\u3002"
+                    )
+                }
+            }
         }.trimEnd()
     }
 

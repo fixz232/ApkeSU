@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -140,6 +141,11 @@ fun SkrootproScreen(
     title: String,
     showAdd: Boolean = false,
     onAddClick: () -> Unit = {},
+    actionIcon: ImageVector = Icons.Rounded.Add,
+    actionContentDescription: String? = null,
+    secondaryActionIcon: ImageVector? = null,
+    onSecondaryActionClick: () -> Unit = {},
+    secondaryActionContentDescription: String? = null,
     bottomInnerPadding: Dp,
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -157,6 +163,11 @@ fun SkrootproScreen(
             title = title,
             showAdd = showAdd,
             onAddClick = onAddClick,
+            actionIcon = actionIcon,
+            actionContentDescription = actionContentDescription,
+            secondaryActionIcon = secondaryActionIcon,
+            onSecondaryActionClick = onSecondaryActionClick,
+            secondaryActionContentDescription = secondaryActionContentDescription,
         )
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 10.dp))
@@ -169,6 +180,11 @@ fun SkrootproTopBar(
     title: String,
     showAdd: Boolean = false,
     onAddClick: () -> Unit = {},
+    actionIcon: ImageVector = Icons.Rounded.Add,
+    actionContentDescription: String? = null,
+    secondaryActionIcon: ImageVector? = null,
+    onSecondaryActionClick: () -> Unit = {},
+    secondaryActionContentDescription: String? = null,
 ) {
     val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
     val statusBarColor = immersiveTopBarColor(SkrootproColors.PurpleDark)
@@ -199,14 +215,24 @@ fun SkrootproTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
             if (showAdd) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable(onClick = onAddClick),
-                )
+                IconButton(onClick = onAddClick, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = actionIcon,
+                        contentDescription = actionContentDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            if (secondaryActionIcon != null) {
+                IconButton(onClick = onSecondaryActionClick, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = secondaryActionIcon,
+                        contentDescription = secondaryActionContentDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
         }
     }

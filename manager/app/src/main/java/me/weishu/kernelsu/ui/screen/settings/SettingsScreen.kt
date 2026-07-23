@@ -39,6 +39,7 @@ fun SettingPager(
     val showWallpaperPreview = rememberSaveable { mutableStateOf(false) }
     val showVideoBackgroundPreview = rememberSaveable { mutableStateOf(false) }
     val showWallpaperCropEditor = rememberSaveable { mutableStateOf(false) }
+    val showHomeTitleDialog = rememberSaveable { mutableStateOf(false) }
     val wallpaperLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -85,7 +86,11 @@ fun SettingPager(
         onSetDayNightMode = viewModel::setDayNightMode,
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetSeasonStyleIndex = viewModel::setSeasonStyleIndex,
+        onSetSeasonCardMotionEnabled = viewModel::setSeasonCardMotionEnabled,
+        onSetRainStyleIndex = viewModel::setRainStyleIndex,
+        onSetRainCardMotionEnabled = viewModel::setRainCardMotionEnabled,
         onSetPixelStyleIndex = viewModel::setPixelStyleIndex,
+        onSetPixelCardMotionEnabled = viewModel::setPixelCardMotionEnabled,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
         onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
         onSetNightBackgroundEffectIndex = viewModel::setNightBackgroundEffectIndex,
@@ -105,6 +110,7 @@ fun SettingPager(
             )
         },
         onOpenLauncherIcon = { navigator.push(Route.LauncherIcon) },
+        onEditHomeTitle = { showHomeTitleDialog.value = true },
         onOpenNavigationIcons = { navigator.push(Route.NavigationIcons) },
         onOpenHomeCardWallpapers = { navigator.push(Route.HomeCardWallpapers) },
         onOpenVisualEffects = { navigator.push(Route.VisualEffects) },
@@ -204,6 +210,7 @@ fun SettingPager(
         InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Snow.value,
+        InterfaceStyle.Rain.value,
         InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
         else -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
     }
@@ -216,6 +223,12 @@ fun SettingPager(
         passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
         passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
         onDismissRequest = { showWallpaperPreview.value = false },
+    )
+    HomeTitleDialog(
+        show = showHomeTitleDialog.value,
+        initialTitle = uiState.customHomeTitle,
+        onDismissRequest = { showHomeTitleDialog.value = false },
+        onConfirm = viewModel::setCustomHomeTitle,
     )
     SettingsVideoBackgroundPreviewDialog(
         show = showVideoBackgroundPreview.value,

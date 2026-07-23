@@ -302,14 +302,47 @@ jobs:
             -A "$SIGN_KEY_ALIAS" \
             -P "$SIGN_KEYSTORE_PASSWORD" \
             -S "$SIGN_KEY_PASSWORD" \
+            --manager-package io.github.fixz.apkesu \
             --strip
+
+      - name: Verify production Manager identity
+        if: ${{ github.event_name != 'pull_request' && ((github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') || github.ref_type == 'tag') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 scripts/verify_apkesu_kernel_identity.py
+          APK="$(find dist -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+
+          BUILD_TOOLS="$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          AAPT2="$BUILD_TOOLS/aapt2"
+          test -x "$APKSIGNER"
+          test -x "$AAPT2"
+
+          EXPECTED_PACKAGE="$(sed -n 's/^KSU_MANAGER_PACKAGE[[:space:]]*:=[[:space:]]*//p' dist/manager_identity.mk | head -n 1)"
+          EXPECTED_HASH="$(sed -n 's/^KSU_EXPECTED_HASH[[:space:]]*:=[[:space:]]*//p' dist/manager_identity.mk | head -n 1)"
+          VERSION_CODE="$(sed -n 's/^versionCode=//p' version.properties | head -n 1)"
+          VERSION_NAME="$(sed -n 's/^versionName=//p' version.properties | head -n 1)"
+          ACTUAL_HASH="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^.*certificate SHA-256 digest: //p' | head -n 1)"
+          BADGING="$("$AAPT2" dump badging "$APK" | head -n 1)"
+
+          test "$ACTUAL_HASH" = "$EXPECTED_HASH"
+          printf '%s\n' "$BADGING" | grep -Fq "name='$EXPECTED_PACKAGE'"
+          printf '%s\n' "$BADGING" | grep -Fq "versionCode='$VERSION_CODE'"
+          printf '%s\n' "$BADGING" | grep -Fq "versionName='$VERSION_NAME'"
+          cp -f dist/manager_identity.mk dist/manager_identity.verified.mk
+          echo "Verified production Manager: package=$EXPECTED_PACKAGE version=$VERSION_NAME ($VERSION_CODE) cert=$ACTUAL_HASH"
 
       - name: Upload build artifact
         if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
         uses: actions/upload-artifact@v7
         with:
           name: manager
-          path: dist/*.apk
+          path: |
+            dist/*.apk
+            dist/manager_identity.verified.mk
 
       - name: Bot session cache
         if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'

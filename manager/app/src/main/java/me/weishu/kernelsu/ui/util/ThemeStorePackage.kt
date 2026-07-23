@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.Locale
 import java.util.zip.ZipEntry
@@ -17,11 +18,12 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 private const val THEME_STORE_SCHEMA = "io.github.fixz.apkesu.theme"
-private const val THEME_STORE_VERSION = 2
+private const val THEME_STORE_VERSION = 4
 private const val MAX_THEME_STORE_ENTRY_COUNT = 64
 private const val MAX_THEME_STORE_JSON_BYTES = 256L * 1024L
 private const val MAX_THEME_STORE_ASSET_BYTES = 256L * 1024L * 1024L
 private const val MAX_THEME_STORE_ASSETS_BYTES = 512L * 1024L * 1024L
+private const val MAX_THEME_STORE_PREVIEW_IMAGE_BYTES = 16L * 1024L * 1024L
 const val THEME_STORE_FILE_MIME_TYPE = "application/zip"
 const val THEME_STORE_FILE_EXTENSION = "kstheme"
 
@@ -120,6 +122,20 @@ data class ThemeStoreWallpaperState(
         get() = !videoUriString.isNullOrBlank()
 }
 
+data class ThemeStoreAudioState(
+    val startupSoundUri: String?,
+    val startupSoundDurationSeconds: Int,
+    val startupSoundVolume: Float,
+    val clickSoundUri: String?,
+    val clickSoundVolume: Float,
+    val backgroundMusicUri: String?,
+    val backgroundMusicVolume: Float,
+) {
+    val configuredCount: Int
+        get() = listOf(startupSoundUri, clickSoundUri, backgroundMusicUri)
+            .count { !it.isNullOrBlank() }
+}
+
 data class ThemeStoreSummary(
     val lkmCard: ThemeStoreImageState,
     val superuserCard: ThemeStoreImageState,
@@ -130,9 +146,12 @@ data class ThemeStoreSummary(
     val navigationIcons: CustomNavigationIconSet,
     val pageBackgrounds: CustomPageBackgroundSet,
     val wallpaper: ThemeStoreWallpaperState,
-    val startupSoundUri: String?,
+    val audio: ThemeStoreAudioState,
     val startupAnimationUri: String?,
 ) {
+    val startupSoundUri: String?
+        get() = audio.startupSoundUri
+
     val selectedCount: Int
         get() = navigationIcons.selectedCount +
             CustomPageBackgroundTarget.entries.count { pageBackgrounds[it].hasMedia } +
@@ -144,16 +163,62 @@ data class ThemeStoreSummary(
                 systemInfoCard.hasSelected,
                 rebootMenuCard.hasSelected,
                 wallpaper.hasSelected,
-                !startupSoundUri.isNullOrBlank(),
                 !startupAnimationUri.isNullOrBlank(),
-            ).count { it }
+            ).count { it } + audio.configuredCount
 }
 
 data class ThemeStorePackageResult(
     val success: Boolean,
-    val warnings: List<String> = emptyList(),
+    val warnings: List<ThemeStorePackageWarning> = emptyList(),
     val error: Throwable? = null,
 )
+
+data class ThemeStorePackageWarning(
+    val assetId: String,
+    val reason: String? = null,
+)
+
+data class ThemeStorePackagePreviewImage(
+    val bytes: ByteArray,
+    val mimeType: String? = null,
+)
+
+data class ThemeStorePackageAuthor(
+    val displayName: String,
+    val realName: String,
+    val gender: ThemeAuthorGender,
+    val bio: String,
+    val avatar: ThemeStorePackagePreviewImage? = null,
+)
+
+data class ThemeStorePackagePreview(
+    val version: Int,
+    val exportedAt: Long,
+    val configuredResourceCount: Int,
+    val author: ThemeStorePackageAuthor?,
+    val cover: ThemeStorePackagePreviewImage?,
+)
+
+data class ThemeStorePackagePreviewResult(
+    val success: Boolean,
+    val preview: ThemeStorePackagePreview? = null,
+    val warnings: List<ThemeStorePackageWarning> = emptyList(),
+    val error: Throwable? = null,
+)
+
+internal data class ExtractedThemeStoreArchive(
+    val themeJson: String,
+    val assetsBytes: Long,
+)
+
+private class ThemeStoreAssetBudget(
+    var totalBytes: Long = 0L,
+)
+
+private sealed interface ImportedThemeAsset {
+    data class Resolved(val uriString: String?) : ImportedThemeAsset
+    data object Unavailable : ImportedThemeAsset
+}
 
 fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
     val prefs = themeStorePrefs(context)
@@ -187,7 +252,29 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
                 )
             ),
         ),
-        startupSoundUri = prefs.getString(CUSTOM_STARTUP_SOUND_URI_KEY, null),
+        audio = ThemeStoreAudioState(
+            startupSoundUri = prefs.getString(CUSTOM_STARTUP_SOUND_URI_KEY, null),
+            startupSoundDurationSeconds = sanitizeCustomStartupSoundDurationSeconds(
+                prefs.getInt(
+                    CUSTOM_STARTUP_SOUND_DURATION_SECONDS_KEY,
+                    DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS,
+                )
+            ),
+            startupSoundVolume = sanitizeCustomAudioVolume(
+                prefs.getFloat(CUSTOM_STARTUP_SOUND_VOLUME_KEY, DEFAULT_CUSTOM_AUDIO_VOLUME)
+            ),
+            clickSoundUri = prefs.getString(CUSTOM_CLICK_SOUND_URI_KEY, null),
+            clickSoundVolume = sanitizeCustomAudioVolume(
+                prefs.getFloat(CUSTOM_CLICK_SOUND_VOLUME_KEY, DEFAULT_CUSTOM_AUDIO_VOLUME)
+            ),
+            backgroundMusicUri = prefs.getString(CUSTOM_BACKGROUND_MUSIC_URI_KEY, null),
+            backgroundMusicVolume = sanitizeCustomBackgroundMusicVolume(
+                prefs.getFloat(
+                    CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY,
+                    DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME,
+                )
+            ),
+        ),
         startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null),
     )
 }
@@ -362,18 +449,36 @@ fun setThemeStoreStartupAnimation(context: Context, uriString: String?) {
 }
 
 fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePackageResult {
+    val warnings = mutableListOf<ThemeStorePackageWarning>()
     return runCatching {
         val appContext = context.applicationContext
         val prefs = themeStorePrefs(appContext)
-        val warnings = mutableListOf<String>()
-        val resolver = appContext.contentResolver
+        val authorProfile = readThemeAuthorProfile(appContext)
+        val assetBudget = ThemeStoreAssetBudget()
         val config = JSONObject()
             .put("schema", THEME_STORE_SCHEMA)
             .put("version", THEME_STORE_VERSION)
             .put("exportedAt", System.currentTimeMillis())
 
-        resolver.openOutputStream(destination)?.use { output ->
+        openThemeStoreUriOutputStream(appContext, destination).use { output ->
             ZipOutputStream(output.buffered()).use { zip ->
+                val authorAvatar = zip.writeUriAsset(
+                    context = appContext,
+                    uriString = authorProfile.avatarUriString,
+                    assetId = "author_avatar",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                config.put(
+                    "author",
+                    JSONObject()
+                        .put("displayName", authorProfile.displayName)
+                        .put("realName", authorProfile.realName)
+                        .put("gender", authorProfile.gender.storageValue)
+                        .put("bio", authorProfile.bio)
+                        .put("avatar", authorAvatar?.toJson()),
+                )
+
                 val cardsJson = JSONObject()
                 ThemeStoreImageSlot.entries.forEach { slot ->
                     val state = prefs.readImageSlot(slot)
@@ -382,12 +487,14 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         uriString = state.uriString,
                         assetId = "card_${slot.id}",
                         warnings = warnings,
+                        budget = assetBudget,
                     )
                     val videoAsset = zip.writeUriAsset(
                         context = appContext,
                         uriString = state.videoUriString,
                         assetId = "card_${slot.id}_video",
                         warnings = warnings,
+                        budget = assetBudget,
                     )
                     cardsJson.put(
                         slot.id,
@@ -409,6 +516,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         uriString = state.uriString,
                         assetId = "navigation_icon_${slot.id}",
                         warnings = warnings,
+                        budget = assetBudget,
                     )
                     navigationIconsJson.put(
                         slot.id,
@@ -429,12 +537,14 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         uriString = state.wallpaperUriString,
                         assetId = "page_background_${target.id}",
                         warnings = warnings,
+                        budget = assetBudget,
                     )
                     val videoAsset = zip.writeUriAsset(
                         context = appContext,
                         uriString = state.videoUriString,
                         assetId = "page_background_${target.id}_video",
                         warnings = warnings,
+                        budget = assetBudget,
                     )
                     pageBackgroundsJson.put(
                         target.id,
@@ -476,12 +586,14 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                     uriString = wallpaperState.uriString,
                     assetId = "custom_wallpaper",
                     warnings = warnings,
+                    budget = assetBudget,
                 )
                 val videoBackgroundAsset = zip.writeUriAsset(
                     context = appContext,
                     uriString = wallpaperState.videoUriString,
                     assetId = "custom_video_background",
                     warnings = warnings,
+                    budget = assetBudget,
                 )
                 config.put(
                     "wallpaper",
@@ -503,12 +615,79 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                     uriString = startupSoundUri,
                     assetId = "startup_sound",
                     warnings = warnings,
+                    budget = assetBudget,
                 )
                 config.put(
                     "startupSound",
                     JSONObject()
                         .put("asset", startupSoundAsset?.toJson())
-                        .put("uri", startupSoundUri),
+                        .put("uri", startupSoundUri)
+                        .put(
+                            "durationSeconds",
+                            sanitizeCustomStartupSoundDurationSeconds(
+                                prefs.getInt(
+                                    CUSTOM_STARTUP_SOUND_DURATION_SECONDS_KEY,
+                                    DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS,
+                                )
+                            ),
+                        )
+                        .put(
+                            "volume",
+                            sanitizeCustomAudioVolume(
+                                prefs.getFloat(
+                                    CUSTOM_STARTUP_SOUND_VOLUME_KEY,
+                                    DEFAULT_CUSTOM_AUDIO_VOLUME,
+                                )
+                            ),
+                        ),
+                )
+
+                val clickSoundUri = prefs.getString(CUSTOM_CLICK_SOUND_URI_KEY, null)
+                val clickSoundAsset = zip.writeUriAsset(
+                    context = appContext,
+                    uriString = clickSoundUri,
+                    assetId = "click_sound",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                config.put(
+                    "clickSound",
+                    JSONObject()
+                        .put("asset", clickSoundAsset?.toJson())
+                        .put("uri", clickSoundUri)
+                        .put(
+                            "volume",
+                            sanitizeCustomAudioVolume(
+                                prefs.getFloat(
+                                    CUSTOM_CLICK_SOUND_VOLUME_KEY,
+                                    DEFAULT_CUSTOM_AUDIO_VOLUME,
+                                )
+                            ),
+                        ),
+                )
+
+                val backgroundMusicUri = prefs.getString(CUSTOM_BACKGROUND_MUSIC_URI_KEY, null)
+                val backgroundMusicAsset = zip.writeUriAsset(
+                    context = appContext,
+                    uriString = backgroundMusicUri,
+                    assetId = "background_music",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                config.put(
+                    "backgroundMusic",
+                    JSONObject()
+                        .put("asset", backgroundMusicAsset?.toJson())
+                        .put("uri", backgroundMusicUri)
+                        .put(
+                            "volume",
+                            sanitizeCustomBackgroundMusicVolume(
+                                prefs.getFloat(
+                                    CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY,
+                                    DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME,
+                                )
+                            ),
+                        ),
                 )
 
                 val startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null)
@@ -517,6 +696,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                     uriString = startupAnimationUri,
                     assetId = "startup_animation",
                     warnings = warnings,
+                    budget = assetBudget,
                 )
                 config.put(
                     "startupAnimation",
@@ -525,19 +705,93 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         .put("uri", startupAnimationUri),
                 )
 
+                val configBytes = config.toString(2).toByteArray(Charsets.UTF_8)
+                require(configBytes.size <= MAX_THEME_STORE_JSON_BYTES) { "Theme package metadata is too large" }
                 zip.putNextEntry(ZipEntry("theme.json"))
-                zip.write(config.toString(2).toByteArray(Charsets.UTF_8))
+                zip.write(configBytes)
                 zip.closeEntry()
             }
-        } ?: error("Unable to open destination")
+        }
         ThemeStorePackageResult(success = true, warnings = warnings)
     }.getOrElse {
-        ThemeStorePackageResult(success = false, error = it)
+        ThemeStorePackageResult(success = false, warnings = warnings, error = it)
+    }
+}
+
+fun validateThemeStorePackage(context: Context, source: Uri): ThemeStorePackageResult {
+    val appContext = context.applicationContext
+    val warnings = mutableListOf<ThemeStorePackageWarning>()
+    val tempDir = File(
+        appContext.cacheDir,
+        "theme-store-validation-${System.nanoTime()}",
+    ).apply { mkdirs() }
+    return runCatching {
+        try {
+            val tempAssetsDir = File(tempDir, "assets").apply { mkdirs() }
+            val extracted = extractThemeStoreZip(appContext, source, tempDir, tempAssetsDir)
+            val config = JSONObject(extracted.themeJson)
+            validateThemeStoreConfig(config)
+            validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            collectLegacyThemeStoreUriWarnings(appContext, config, warnings)
+            ThemeStorePackageResult(success = true, warnings = warnings)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }.getOrElse {
+        ThemeStorePackageResult(success = false, warnings = warnings, error = it)
+    }
+}
+
+fun previewThemeStorePackage(context: Context, source: Uri): ThemeStorePackagePreviewResult {
+    val appContext = context.applicationContext
+    val warnings = mutableListOf<ThemeStorePackageWarning>()
+    val tempDir = File(
+        appContext.cacheDir,
+        "theme-store-preview-${System.nanoTime()}",
+    ).apply { mkdirs() }
+    return runCatching {
+        try {
+            val tempAssetsDir = File(tempDir, "assets").apply { mkdirs() }
+            val extracted = extractThemeStoreZip(appContext, source, tempDir, tempAssetsDir)
+            val config = JSONObject(extracted.themeJson)
+            validateThemeStoreConfig(config)
+            validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            collectLegacyThemeStoreUriWarnings(appContext, config, warnings)
+            val author = parseThemeStorePackageAuthor(config)?.let { metadata ->
+                metadata.copy(
+                    avatar = readThemeStorePreviewImage(
+                        owner = config.optJSONObject("author"),
+                        assetKey = "avatar",
+                        tempAssetsDir = tempAssetsDir,
+                    )
+                )
+            }
+            ThemeStorePackagePreviewResult(
+                success = true,
+                preview = ThemeStorePackagePreview(
+                    version = config.optInt("version", 0),
+                    exportedAt = config.optLong("exportedAt", 0L).coerceAtLeast(0L),
+                    configuredResourceCount = countConfiguredThemeStoreResources(config),
+                    author = author,
+                    cover = findThemeStorePreviewCover(config, tempAssetsDir),
+                ),
+                warnings = warnings,
+            )
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }.getOrElse { error ->
+        ThemeStorePackagePreviewResult(
+            success = false,
+            warnings = warnings,
+            error = error,
+        )
     }
 }
 
 fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageResult {
     val appContext = context.applicationContext
+    val warnings = mutableListOf<ThemeStorePackageWarning>()
     val tempDir = File(appContext.cacheDir, "theme-store-import").apply {
         deleteRecursively()
         mkdirs()
@@ -546,10 +800,11 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
     return runCatching {
         try {
             val tempAssetsDir = File(tempDir, "assets").apply { mkdirs() }
-            val themeJson = extractThemeStoreZip(appContext, source, tempDir, tempAssetsDir)
-            val config = JSONObject(themeJson)
-            require(config.optString("schema") == THEME_STORE_SCHEMA) { "Unsupported theme package" }
-            require(config.optInt("version", 0) in 1..THEME_STORE_VERSION) { "Unsupported theme package version" }
+            val extracted = extractThemeStoreZip(appContext, source, tempDir, tempAssetsDir)
+            val assetBudget = ThemeStoreAssetBudget(extracted.assetsBytes)
+            val config = JSONObject(extracted.themeJson)
+            validateThemeStoreConfig(config)
+            validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
 
             val themeStoreDir = File(appContext.filesDir, "theme-store").apply { mkdirs() }
             val targetDir = File(themeStoreDir, "current")
@@ -570,26 +825,53 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
             var pendingWallpaper: ThemeStoreWallpaperState? = null
             var hasStartupSound = false
             var pendingStartupSoundUri: String? = null
+            var pendingStartupSoundDurationSeconds: Int? = null
+            var pendingStartupSoundVolume: Float? = null
+            var hasClickSound = false
+            var pendingClickSoundUri: String? = null
+            var pendingClickSoundVolume = DEFAULT_CUSTOM_AUDIO_VOLUME
+            var hasBackgroundMusic = false
+            var pendingBackgroundMusicUri: String? = null
+            var pendingBackgroundMusicVolume = DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
             var hasStartupAnimation = false
             var pendingStartupAnimationUri: String? = null
 
             ThemeStoreImageSlot.entries.forEach { slot ->
                 val slotJson = cardsJson.optJSONObject(slot.id)
                 if (slotJson != null) {
-                    val importedUri = importAssetUri(slotJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                        ?: slotJson.optString("uri").takeIf { it.isNotBlank() }
-                    val importedVideoUri = if (slot.videoUriKey != null) {
+                    val importedImage = importAssetUri(
+                        context = appContext,
+                        assetOwnerJson = slotJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        assetId = "card_${slot.id}",
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
+                    val importedVideo = if (slot.videoUriKey != null) {
                         importAssetUri(
+                            context = appContext,
                             assetOwnerJson = slotJson,
                             tempAssetsDir = tempAssetsDir,
                             stagingAssetsDir = stagingAssetsDir,
                             targetAssetsDir = targetAssetsDir,
+                            assetId = "card_${slot.id}_video",
+                            warnings = warnings,
+                            budget = assetBudget,
                             assetKey = "videoAsset",
                             uriKey = "videoUri",
                         )
                     } else {
-                        null
+                        ImportedThemeAsset.Resolved(null)
                     }
+                    if (importedImage is ImportedThemeAsset.Unavailable ||
+                        importedVideo is ImportedThemeAsset.Unavailable
+                    ) {
+                        return@forEach
+                    }
+                    val importedUri = (importedImage as ImportedThemeAsset.Resolved).uriString
+                    val importedVideoUri = (importedVideo as ImportedThemeAsset.Resolved).uriString
                     pendingCards[slot] = ThemeStoreImageState(
                         uriString = importedUri.takeUnless { !importedVideoUri.isNullOrBlank() },
                         videoUriString = importedVideoUri,
@@ -601,9 +883,19 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
             CustomNavigationIconSlot.entries.forEach { slot ->
                 val slotJson = navigationIconsJson.optJSONObject(slot.id)
                 if (slotJson != null) {
-                    val importedUri = importAssetUri(slotJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                        ?: slotJson.optString("uri").takeIf { it.isNotBlank() }
-                    pendingNavigationIcons[slot] = importedUri to slotJson.optCrop(
+                    val importedAsset = importAssetUri(
+                        context = appContext,
+                        assetOwnerJson = slotJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        assetId = "navigation_icon_${slot.id}",
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
+                    if (importedAsset is ImportedThemeAsset.Unavailable) return@forEach
+                    pendingNavigationIcons[slot] =
+                        (importedAsset as ImportedThemeAsset.Resolved).uriString to slotJson.optCrop(
                         "crop",
                         DEFAULT_CUSTOM_NAVIGATION_ICON_CROP,
                     )
@@ -613,16 +905,35 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
             CustomPageBackgroundTarget.entries.forEach { target ->
                 val targetJson = pageBackgroundsJson.optJSONObject(target.id)
                 if (targetJson != null) {
-                    val importedUri = importAssetUri(targetJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                        ?: targetJson.optString("uri").takeIf { it.isNotBlank() }
-                    val importedVideoUri = importAssetUri(
+                    val importedImage = importAssetUri(
+                        context = appContext,
                         assetOwnerJson = targetJson,
                         tempAssetsDir = tempAssetsDir,
                         stagingAssetsDir = stagingAssetsDir,
                         targetAssetsDir = targetAssetsDir,
+                        assetId = "page_background_${target.id}",
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
+                    val importedVideo = importAssetUri(
+                        context = appContext,
+                        assetOwnerJson = targetJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        assetId = "page_background_${target.id}_video",
+                        warnings = warnings,
+                        budget = assetBudget,
                         assetKey = "videoAsset",
                         uriKey = "videoUri",
                     )
+                    if (importedImage is ImportedThemeAsset.Unavailable ||
+                        importedVideo is ImportedThemeAsset.Unavailable
+                    ) {
+                        return@forEach
+                    }
+                    val importedUri = (importedImage as ImportedThemeAsset.Resolved).uriString
+                    val importedVideoUri = (importedVideo as ImportedThemeAsset.Resolved).uriString
                     pendingPageBackgrounds[target] = CustomBackgroundState(
                         wallpaperUriString = importedUri.takeUnless { !importedVideoUri.isNullOrBlank() },
                         videoUriString = importedVideoUri,
@@ -644,16 +955,35 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
             }
 
             config.optJSONObject("wallpaper")?.let { wallpaperJson ->
-                val importedUri = importAssetUri(wallpaperJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                    ?: wallpaperJson.optString("uri").takeIf { it.isNotBlank() }
-                val importedVideoUri = importAssetUri(
+                val importedImage = importAssetUri(
+                    context = appContext,
                     assetOwnerJson = wallpaperJson,
                     tempAssetsDir = tempAssetsDir,
                     stagingAssetsDir = stagingAssetsDir,
                     targetAssetsDir = targetAssetsDir,
+                    assetId = "custom_wallpaper",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                val importedVideo = importAssetUri(
+                    context = appContext,
+                    assetOwnerJson = wallpaperJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "custom_video_background",
+                    warnings = warnings,
+                    budget = assetBudget,
                     assetKey = "videoAsset",
                     uriKey = "videoUri",
                 )
+                if (importedImage is ImportedThemeAsset.Unavailable ||
+                    importedVideo is ImportedThemeAsset.Unavailable
+                ) {
+                    return@let
+                }
+                val importedUri = (importedImage as ImportedThemeAsset.Resolved).uriString
+                val importedVideoUri = (importedVideo as ImportedThemeAsset.Resolved).uriString
                 pendingWallpaper = ThemeStoreWallpaperState(
                     uriString = importedUri,
                     videoUriString = importedVideoUri,
@@ -681,118 +1011,192 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
             }
 
             config.optJSONObject("startupSound")?.let { soundJson ->
+                val importedAsset = importAssetUri(
+                    context = appContext,
+                    assetOwnerJson = soundJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "startup_sound",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                if (importedAsset is ImportedThemeAsset.Unavailable) return@let
                 hasStartupSound = true
-                pendingStartupSoundUri = importAssetUri(soundJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                    ?: soundJson.optString("uri").takeIf { it.isNotBlank() }
+                pendingStartupSoundUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
+                if (soundJson.has("durationSeconds")) {
+                    pendingStartupSoundDurationSeconds = sanitizeCustomStartupSoundDurationSeconds(
+                        soundJson.optInt(
+                            "durationSeconds",
+                            DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS,
+                        )
+                    )
+                }
+                if (soundJson.has("volume")) {
+                    pendingStartupSoundVolume = sanitizeCustomAudioVolume(
+                        soundJson.optDouble(
+                            "volume",
+                            DEFAULT_CUSTOM_AUDIO_VOLUME.toDouble(),
+                        ).toFloat()
+                    )
+                }
+            }
+
+            config.optJSONObject("clickSound")?.let { soundJson ->
+                val importedAsset = importAssetUri(
+                    context = appContext,
+                    assetOwnerJson = soundJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "click_sound",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                if (importedAsset is ImportedThemeAsset.Unavailable) return@let
+                hasClickSound = true
+                pendingClickSoundUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
+                pendingClickSoundVolume = sanitizeCustomAudioVolume(
+                    soundJson.optDouble(
+                        "volume",
+                        DEFAULT_CUSTOM_AUDIO_VOLUME.toDouble(),
+                    ).toFloat()
+                )
+            }
+
+            config.optJSONObject("backgroundMusic")?.let { musicJson ->
+                val importedAsset = importAssetUri(
+                    context = appContext,
+                    assetOwnerJson = musicJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "background_music",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                if (importedAsset is ImportedThemeAsset.Unavailable) return@let
+                hasBackgroundMusic = true
+                pendingBackgroundMusicUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
+                pendingBackgroundMusicVolume = sanitizeCustomBackgroundMusicVolume(
+                    musicJson.optDouble(
+                        "volume",
+                        DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME.toDouble(),
+                    ).toFloat()
+                )
             }
 
             config.optJSONObject("startupAnimation")?.let { animationJson ->
+                val importedAsset = importAssetUri(
+                    context = appContext,
+                    assetOwnerJson = animationJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "startup_animation",
+                    warnings = warnings,
+                    budget = assetBudget,
+                )
+                if (importedAsset is ImportedThemeAsset.Unavailable) return@let
                 hasStartupAnimation = true
-                pendingStartupAnimationUri = importAssetUri(animationJson, tempAssetsDir, stagingAssetsDir, targetAssetsDir)
-                    ?: animationJson.optString("uri").takeIf { it.isNotBlank() }
+                pendingStartupAnimationUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
             }
 
-            replaceThemeStoreDirectory(targetDir, nextStagingDir)
+            val previousSummary = readThemeStoreSummary(appContext)
+            val directorySwap = beginThemeStoreDirectorySwap(targetDir, nextStagingDir)
             stagingDir = null
 
             val prefs = themeStorePrefs(appContext)
+            val editor = prefs.edit()
             pendingCards.forEach { (slot, pending) ->
                 val importedUri = pending.uriString.takeUnless { pending.hasVideoSelected }
                 val importedVideoUri = pending.videoUriString.takeIf { slot.videoUriKey != null }
-                val previous = prefs.getString(slot.uriKey, null)
-                val previousVideo = slot.videoUriKey?.let { prefs.getString(it, null) }
-                prefs.edit(commit = true) {
-                    if (importedUri.isNullOrBlank()) {
-                        remove(slot.uriKey)
-                        removeImageSlotCrop(slot)
+                if (importedUri.isNullOrBlank()) {
+                    editor.remove(slot.uriKey)
+                    editor.removeImageSlotCrop(slot)
+                } else {
+                    editor.putString(slot.uriKey, importedUri)
+                    editor.putImageSlotCrop(slot, pending.crop)
+                }
+                slot.videoUriKey?.let { videoUriKey ->
+                    if (importedVideoUri.isNullOrBlank()) {
+                        editor.remove(videoUriKey)
                     } else {
-                        putString(slot.uriKey, importedUri)
-                        putImageSlotCrop(slot, pending.crop)
+                        editor.remove(slot.uriKey)
+                        editor.putImageSlotCrop(slot, pending.crop)
+                        editor.putString(videoUriKey, importedVideoUri)
                     }
-                    slot.videoUriKey?.let { videoUriKey ->
-                        if (importedVideoUri.isNullOrBlank()) {
-                            remove(videoUriKey)
-                        } else {
-                            remove(slot.uriKey)
-                            putImageSlotCrop(slot, pending.crop)
-                            putString(videoUriKey, importedVideoUri)
-                        }
-                    }
-                }
-                if (previous != importedUri) {
-                    releaseCustomImageReference(appContext, previous)
-                }
-                if (previousVideo != importedVideoUri) {
-                    releasePersistableVideoBackgroundReadPermission(appContext, previousVideo)
                 }
             }
 
             pendingNavigationIcons.forEach { (slot, pending) ->
                 val (importedUri, crop) = pending
-                val previous = prefs.getString(slot.uriKey, null)
-                prefs.edit(commit = true) {
-                    if (importedUri.isNullOrBlank()) {
-                        remove(slot.uriKey)
-                        removeCustomNavigationIconCrop(slot)
-                    } else {
-                        putString(slot.uriKey, importedUri)
-                        putCustomNavigationIconCrop(slot, crop)
-                    }
-                }
-                if (previous != importedUri) {
-                    releaseCustomImageReference(appContext, previous)
+                if (importedUri.isNullOrBlank()) {
+                    editor.remove(slot.uriKey)
+                    editor.removeCustomNavigationIconCrop(slot)
+                } else {
+                    editor.putString(slot.uriKey, importedUri)
+                    editor.putCustomNavigationIconCrop(slot, crop)
                 }
             }
 
             pendingPageBackgrounds.forEach { (target, pending) ->
-                applyThemeStorePageBackground(appContext, target, pending)
+                editor.putImportedPageBackground(target, pending)
             }
 
             pendingWallpaper?.let { wallpaper ->
-                val previous = prefs.getString(CUSTOM_WALLPAPER_URI_KEY, null)
-                val previousVideo = prefs.getString(CUSTOM_VIDEO_BACKGROUND_URI_KEY, null)
-                val nextWallpaperUri = wallpaper.uriString.takeUnless { wallpaper.videoUriString != null }
-                prefs.edit(commit = true) {
-                    if (nextWallpaperUri.isNullOrBlank()) {
-                        remove(CUSTOM_WALLPAPER_URI_KEY)
-                        removeCustomWallpaperCrop()
-                    } else {
-                        putString(CUSTOM_WALLPAPER_URI_KEY, nextWallpaperUri)
-                        putCustomWallpaperCrop(wallpaper.crop)
-                    }
-                    if (wallpaper.videoUriString.isNullOrBlank()) {
-                        remove(CUSTOM_VIDEO_BACKGROUND_URI_KEY)
-                    } else {
-                        putString(CUSTOM_VIDEO_BACKGROUND_URI_KEY, wallpaper.videoUriString)
-                    }
-                    putInt(CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY, wallpaper.videoDurationSeconds)
-                    putFloat(CUSTOM_WALLPAPER_OPACITY_KEY, wallpaper.opacity)
-                    putBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, wallpaper.passthroughEnabled)
-                    putFloat(CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY, wallpaper.passthroughOpacity)
-                }
-                if (previous != nextWallpaperUri) {
-                    releaseCustomImageReference(appContext, previous)
-                }
-                if (previousVideo != wallpaper.videoUriString) {
-                    releasePersistableVideoBackgroundReadPermission(appContext, previousVideo)
-                }
+                editor.putImportedWallpaper(wallpaper)
             }
 
             if (hasStartupSound) {
-                setThemeStoreStartupSound(appContext, pendingStartupSoundUri)
+                editor.putOptionalString(CUSTOM_STARTUP_SOUND_URI_KEY, pendingStartupSoundUri)
+                pendingStartupSoundDurationSeconds?.let { durationSeconds ->
+                    editor.putInt(CUSTOM_STARTUP_SOUND_DURATION_SECONDS_KEY, durationSeconds)
+                }
+                pendingStartupSoundVolume?.let { volume ->
+                    editor.putFloat(CUSTOM_STARTUP_SOUND_VOLUME_KEY, volume)
+                }
+            }
+
+            if (hasClickSound) {
+                editor.putOptionalString(CUSTOM_CLICK_SOUND_URI_KEY, pendingClickSoundUri)
+                editor.putFloat(CUSTOM_CLICK_SOUND_VOLUME_KEY, pendingClickSoundVolume)
+            }
+
+            if (hasBackgroundMusic) {
+                editor.putOptionalString(CUSTOM_BACKGROUND_MUSIC_URI_KEY, pendingBackgroundMusicUri)
+                editor.putFloat(CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY, pendingBackgroundMusicVolume)
             }
 
             if (hasStartupAnimation) {
-                setThemeStoreStartupAnimation(appContext, pendingStartupAnimationUri)
+                editor.putOptionalString(CUSTOM_STARTUP_ANIMATION_URI_KEY, pendingStartupAnimationUri)
             }
 
-            ThemeStorePackageResult(success = true)
+            var preferencesCommitted = false
+            try {
+                require(editor.commit()) { "Unable to save imported theme settings" }
+                preferencesCommitted = true
+            } finally {
+                if (!preferencesCommitted) {
+                    directorySwap.rollback()
+                }
+            }
+            if (!directorySwap.finish()) {
+                warnings += ThemeStorePackageWarning("previous_theme_backup")
+            }
+            releaseReplacedThemeStoreReferences(
+                context = appContext,
+                previous = previousSummary,
+                current = readThemeStoreSummary(appContext),
+            )
+
+            ThemeStorePackageResult(success = true, warnings = warnings)
         } finally {
             tempDir.deleteRecursively()
             stagingDir?.deleteRecursively()
         }
     }.getOrElse {
-        ThemeStorePackageResult(success = false, error = it)
+        ThemeStorePackageResult(success = false, warnings = warnings, error = it)
     }
 }
 
@@ -800,22 +1204,146 @@ private fun themeStorePrefs(context: Context): SharedPreferences {
     return context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 }
 
-private fun applyThemeStorePageBackground(
-    context: Context,
+private fun SharedPreferences.Editor.putImportedPageBackground(
     target: CustomPageBackgroundTarget,
     state: CustomBackgroundState,
 ) {
     when {
-        state.hasVideo -> setCustomPageBackgroundVideo(context, target, state.videoUriString)
-        state.hasWallpaper -> setCustomPageBackgroundWallpaper(context, target, state.wallpaperUriString)
+        state.hasVideo -> {
+            remove(target.wallpaperUriKey)
+            putString(target.videoUriKey, state.videoUriString)
+        }
+
+        state.hasWallpaper -> {
+            putString(target.wallpaperUriKey, state.wallpaperUriString)
+            remove(target.videoUriKey)
+        }
+
         else -> {
-            clearCustomPageBackground(context, target)
+            remove(target.wallpaperUriKey)
+            remove(target.videoUriKey)
+            remove(target.opacityKey)
+            remove(target.videoDurationSecondsKey)
+            removeImportedPageBackgroundCrop(target)
             return
         }
     }
-    setCustomPageBackgroundOpacity(context, target, state.opacity)
-    setCustomPageBackgroundCrop(context, target, state.crop)
-    setCustomPageBackgroundVideoDurationSeconds(context, target, state.videoDurationSeconds)
+    putFloat(target.opacityKey, sanitizeCustomWallpaperOpacity(state.opacity))
+    putImportedPageBackgroundCrop(target, state.crop)
+    putInt(
+        target.videoDurationSecondsKey,
+        sanitizeCustomVideoBackgroundDurationSeconds(state.videoDurationSeconds),
+    )
+}
+
+private fun SharedPreferences.Editor.putImportedPageBackgroundCrop(
+    target: CustomPageBackgroundTarget,
+    crop: CustomWallpaperCrop,
+) {
+    val safeCrop = sanitizeCustomWallpaperCrop(crop)
+    putFloat(target.cropLeftKey, safeCrop.left)
+    putFloat(target.cropTopKey, safeCrop.top)
+    putFloat(target.cropRightKey, safeCrop.right)
+    putFloat(target.cropBottomKey, safeCrop.bottom)
+}
+
+private fun SharedPreferences.Editor.removeImportedPageBackgroundCrop(target: CustomPageBackgroundTarget) {
+    remove(target.cropLeftKey)
+    remove(target.cropTopKey)
+    remove(target.cropRightKey)
+    remove(target.cropBottomKey)
+}
+
+private fun SharedPreferences.Editor.putImportedWallpaper(state: ThemeStoreWallpaperState) {
+    val wallpaperUri = state.uriString.takeUnless { state.hasVideoSelected }
+    if (wallpaperUri.isNullOrBlank()) {
+        remove(CUSTOM_WALLPAPER_URI_KEY)
+        removeCustomWallpaperCrop()
+    } else {
+        putString(CUSTOM_WALLPAPER_URI_KEY, wallpaperUri)
+        putCustomWallpaperCrop(state.crop)
+    }
+    putOptionalString(CUSTOM_VIDEO_BACKGROUND_URI_KEY, state.videoUriString)
+    putInt(
+        CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
+        sanitizeCustomVideoBackgroundDurationSeconds(state.videoDurationSeconds),
+    )
+    putFloat(CUSTOM_WALLPAPER_OPACITY_KEY, sanitizeCustomWallpaperOpacity(state.opacity))
+    putBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, state.passthroughEnabled)
+    putFloat(
+        CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY,
+        sanitizeCustomWallpaperPassthroughOpacity(state.passthroughOpacity),
+    )
+}
+
+private fun SharedPreferences.Editor.putOptionalString(key: String, value: String?) {
+    if (value.isNullOrBlank()) {
+        remove(key)
+    } else {
+        putString(key, value)
+    }
+}
+
+private fun releaseReplacedThemeStoreReferences(
+    context: Context,
+    previous: ThemeStoreSummary,
+    current: ThemeStoreSummary,
+) {
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        val oldState = previous.imageState(slot)
+        val newState = current.imageState(slot)
+        if (oldState.uriString != newState.uriString) {
+            releaseCustomImageReference(context, oldState.uriString)
+        }
+        if (oldState.videoUriString != newState.videoUriString) {
+            releasePersistableVideoBackgroundReadPermission(context, oldState.videoUriString)
+        }
+    }
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        val oldUri = previous.navigationIcons[slot].uriString
+        if (oldUri != current.navigationIcons[slot].uriString) {
+            releaseCustomImageReference(context, oldUri)
+        }
+    }
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        val oldState = previous.pageBackgrounds[target]
+        val newState = current.pageBackgrounds[target]
+        if (oldState.wallpaperUriString != newState.wallpaperUriString) {
+            releaseCustomImageReference(context, oldState.wallpaperUriString)
+        }
+        if (oldState.videoUriString != newState.videoUriString) {
+            releasePersistableVideoBackgroundReadPermission(context, oldState.videoUriString)
+        }
+    }
+    if (previous.wallpaper.uriString != current.wallpaper.uriString) {
+        releaseCustomImageReference(context, previous.wallpaper.uriString)
+    }
+    if (previous.wallpaper.videoUriString != current.wallpaper.videoUriString) {
+        releasePersistableVideoBackgroundReadPermission(context, previous.wallpaper.videoUriString)
+    }
+    if (previous.startupSoundUri != current.startupSoundUri) {
+        releasePersistableAudioReadPermission(context, previous.startupSoundUri)
+    }
+    if (previous.audio.clickSoundUri != current.audio.clickSoundUri) {
+        releasePersistableAudioReadPermission(context, previous.audio.clickSoundUri)
+    }
+    if (previous.audio.backgroundMusicUri != current.audio.backgroundMusicUri) {
+        releasePersistableAudioReadPermission(context, previous.audio.backgroundMusicUri)
+    }
+    if (previous.startupAnimationUri != current.startupAnimationUri) {
+        releasePersistableStartupAnimationReadPermission(context, previous.startupAnimationUri)
+    }
+}
+
+private fun ThemeStoreSummary.imageState(slot: ThemeStoreImageSlot): ThemeStoreImageState {
+    return when (slot) {
+        ThemeStoreImageSlot.Lkm -> lkmCard
+        ThemeStoreImageSlot.Superuser -> superuserCard
+        ThemeStoreImageSlot.Module -> moduleCard
+        ThemeStoreImageSlot.StatusMonitor -> statusMonitorCard
+        ThemeStoreImageSlot.SystemInfo -> systemInfoCard
+        ThemeStoreImageSlot.RebootMenu -> rebootMenuCard
+    }
 }
 
 private fun SharedPreferences.readImageSlot(slot: ThemeStoreImageSlot): ThemeStoreImageState {
@@ -891,7 +1419,8 @@ private fun ZipOutputStream.writeUriAsset(
     context: Context,
     uriString: String?,
     assetId: String,
-    warnings: MutableList<String>,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
 ): ExportedThemeAsset? {
     if (uriString.isNullOrBlank()) return null
     val uri = Uri.parse(uriString)
@@ -900,21 +1429,50 @@ private fun ZipOutputStream.writeUriAsset(
     val extension = safeAssetExtension(displayName, mimeType)
     val path = "assets/$assetId$extension"
 
+    var entryOpen = false
     return runCatching {
-        context.contentResolver.openInputStream(uri)?.use { input ->
+        openThemeStoreUriInputStream(context, uri).use { input ->
             putNextEntry(ZipEntry(path))
-            input.copyTo(this)
+            entryOpen = true
+            input.copyThemeStoreAssetTo(this, budget)
             closeEntry()
-        } ?: error("Unable to open $uri")
+            entryOpen = false
+        }
         ExportedThemeAsset(
             path = path,
             displayName = displayName,
             mimeType = mimeType,
         )
     }.getOrElse {
-        warnings += assetId
+        if (entryOpen) {
+            runCatching { closeEntry() }
+        }
+        warnings += ThemeStorePackageWarning(
+            assetId = assetId,
+            reason = it.message?.lineSequence()?.firstOrNull()?.take(160),
+        )
         null
     }
+}
+
+private fun InputStream.copyThemeStoreAssetTo(
+    output: OutputStream,
+    budget: ThemeStoreAssetBudget,
+): Long {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var copied = 0L
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) break
+        val nextAssetBytes = copied + read
+        val nextTotalBytes = budget.totalBytes + read
+        require(nextAssetBytes <= MAX_THEME_STORE_ASSET_BYTES) { "Theme package asset is too large" }
+        require(nextTotalBytes <= MAX_THEME_STORE_ASSETS_BYTES) { "Theme package assets are too large" }
+        output.write(buffer, 0, read)
+        copied = nextAssetBytes
+        budget.totalBytes = nextTotalBytes
+    }
+    return copied
 }
 
 private fun extractThemeStoreZip(
@@ -922,43 +1480,305 @@ private fun extractThemeStoreZip(
     source: Uri,
     tempDir: File,
     tempAssetsDir: File,
-): String {
+): ExtractedThemeStoreArchive {
+    return openThemeStoreUriInputStream(context, source).use { input ->
+        extractThemeStoreArchive(input, tempDir, tempAssetsDir)
+    }
+}
+
+internal fun extractThemeStoreArchive(
+    input: InputStream,
+    tempDir: File,
+    tempAssetsDir: File,
+): ExtractedThemeStoreArchive {
     var themeJson: String? = null
     var entryCount = 0
     var totalAssetsBytes = 0L
-    context.contentResolver.openInputStream(source)?.use { input ->
-        ZipInputStream(input.buffered()).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                entryCount++
-                require(entryCount <= MAX_THEME_STORE_ENTRY_COUNT) { "Theme package has too many entries" }
-                if (entry.isDirectory) {
-                    zip.closeEntry()
-                    continue
+    val seenEntries = mutableSetOf<String>()
+    ZipInputStream(input.buffered()).use { zip ->
+        while (true) {
+            val entry = zip.nextEntry ?: break
+            entryCount++
+            require(entryCount <= MAX_THEME_STORE_ENTRY_COUNT) { "Theme package has too many entries" }
+            val entryName = validateThemeStoreArchiveEntryName(entry.name, entry.isDirectory)
+            require(seenEntries.add(entryName)) { "Theme package contains duplicate entry: $entryName" }
+            if (entry.isDirectory) {
+                zip.closeEntry()
+                continue
+            }
+            when {
+                entryName == "theme.json" -> {
+                    require(themeJson == null) { "Theme package contains duplicate theme.json" }
+                    themeJson = zip.readEntryBytes(MAX_THEME_STORE_JSON_BYTES).toString(Charsets.UTF_8)
                 }
-                when {
-                    entry.name == "theme.json" -> {
-                        themeJson = zip.readEntryBytes(MAX_THEME_STORE_JSON_BYTES).toString(Charsets.UTF_8)
-                    }
 
-                    entry.name.startsWith("assets/") -> {
-                        val outputFile = safeAssetFile(tempAssetsDir, entry.name.removePrefix("assets/"))
-                        outputFile.parentFile?.mkdirs()
-                        FileOutputStream(outputFile).use { output ->
-                            val copied = zip.copyEntryTo(output, MAX_THEME_STORE_ASSET_BYTES)
-                            totalAssetsBytes += copied
-                            require(totalAssetsBytes <= MAX_THEME_STORE_ASSETS_BYTES) {
-                                "Theme package assets are too large"
-                            }
+                entryName.startsWith("assets/") -> {
+                    val outputFile = safeAssetFile(tempAssetsDir, entryName.removePrefix("assets/"))
+                    outputFile.parentFile?.mkdirs()
+                    FileOutputStream(outputFile).use { output ->
+                        val copied = zip.copyEntryTo(output, MAX_THEME_STORE_ASSET_BYTES)
+                        totalAssetsBytes += copied
+                        require(totalAssetsBytes <= MAX_THEME_STORE_ASSETS_BYTES) {
+                            "Theme package assets are too large"
                         }
                     }
                 }
-                zip.closeEntry()
+            }
+            zip.closeEntry()
+        }
+    }
+
+    return ExtractedThemeStoreArchive(
+        themeJson = themeJson ?: error("theme.json not found in ${tempDir.name}"),
+        assetsBytes = totalAssetsBytes,
+    )
+}
+
+internal fun validateThemeStoreArchiveEntryName(entryName: String, directory: Boolean = false): String {
+    require(entryName.isNotBlank()) { "Theme package contains an empty entry name" }
+    require('\u0000' !in entryName && '\\' !in entryName) { "Theme package contains an invalid entry path" }
+    require(!entryName.startsWith('/')) { "Theme package contains an absolute entry path" }
+    val normalized = if (directory) entryName.removeSuffix("/") else entryName
+    require(normalized.isNotBlank()) { "Theme package contains an invalid entry path" }
+    val segments = normalized.split('/')
+    require(segments.all { it.isNotBlank() && it != "." && it != ".." && ':' !in it }) {
+        "Theme package contains an invalid entry path"
+    }
+    return normalized
+}
+
+internal fun validateThemeStoreConfig(config: JSONObject) {
+    require(config.optString("schema") == THEME_STORE_SCHEMA) { "Unsupported theme package" }
+    val version = config.optInt("version", 0)
+    require(version in 1..THEME_STORE_VERSION) {
+        "Unsupported theme package version"
+    }
+    if (version >= 3) {
+        listOf("startupSound", "clickSound", "backgroundMusic", "startupAnimation").forEach { key ->
+            require(config.optJSONObject(key) != null) { "Theme package is missing $key" }
+        }
+        val startupSound = config.getJSONObject("startupSound")
+        val clickSound = config.getJSONObject("clickSound")
+        val backgroundMusic = config.getJSONObject("backgroundMusic")
+        require(startupSound.opt("durationSeconds") is Number) {
+            "Theme package is missing startup sound duration"
+        }
+        require(startupSound.opt("volume") is Number) {
+            "Theme package is missing startup sound volume"
+        }
+        require(clickSound.opt("volume") is Number) {
+            "Theme package is missing click sound volume"
+        }
+        require(backgroundMusic.opt("volume") is Number) {
+            "Theme package is missing background music volume"
+        }
+    }
+    if (version >= 4) {
+        val author = config.optJSONObject("author")
+            ?: error("Theme package is missing author information")
+        listOf("displayName", "realName", "gender", "bio").forEach { key ->
+            require(author.opt(key) is String) { "Theme package has invalid author information" }
+        }
+        require(author.getString("displayName").length <= 64) { "Theme author name is too long" }
+        require(author.getString("realName").length <= 64) { "Theme author name is too long" }
+        require(author.getString("bio").length <= 512) { "Theme author bio is too long" }
+        require(
+            ThemeAuthorGender.entries.any {
+                it.storageValue == author.getString("gender")
+            }
+        ) { "Theme author gender is invalid" }
+    }
+}
+
+internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir: File) {
+    fun validateOwner(owner: JSONObject?, vararg assetKeys: String) {
+        if (owner == null) return
+        assetKeys.forEach { assetKey ->
+            val rawAsset = owner.opt(assetKey)
+            if (rawAsset == null || rawAsset === JSONObject.NULL) return@forEach
+            require(rawAsset is JSONObject) { "Invalid embedded asset metadata" }
+            val path = rawAsset.optString("path")
+            require(path.startsWith("assets/")) { "Invalid embedded asset path" }
+            val relativePath = path.removePrefix("assets/")
+            require(safeAssetFile(tempAssetsDir, relativePath).isFile) {
+                "Embedded asset is missing: $relativePath"
             }
         }
-    } ?: error("Unable to open source")
+    }
 
-    return themeJson ?: error("theme.json not found in ${tempDir.name}")
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        validateOwner(cards?.optJSONObject(slot.id), "asset", "videoAsset")
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        validateOwner(navigationIcons?.optJSONObject(slot.id), "asset")
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        validateOwner(pageBackgrounds?.optJSONObject(target.id), "asset", "videoAsset")
+    }
+    validateOwner(config.optJSONObject("wallpaper"), "asset", "videoAsset")
+    validateOwner(config.optJSONObject("startupSound"), "asset")
+    validateOwner(config.optJSONObject("clickSound"), "asset")
+    validateOwner(config.optJSONObject("backgroundMusic"), "asset")
+    validateOwner(config.optJSONObject("startupAnimation"), "asset")
+    validateOwner(config.optJSONObject("author"), "avatar")
+    config.optJSONObject("author")
+        ?.optJSONObject("avatar")
+        ?.optString("path")
+        ?.takeIf { it.startsWith("assets/") }
+        ?.let { path ->
+            val avatarFile = safeAssetFile(tempAssetsDir, path.removePrefix("assets/"))
+            require(avatarFile.length() <= MAX_THEME_STORE_PREVIEW_IMAGE_BYTES) {
+                "Theme author avatar is too large"
+            }
+        }
+}
+
+internal fun parseThemeStorePackageAuthor(config: JSONObject): ThemeStorePackageAuthor? {
+    if (config.optInt("version", 0) < 4) return null
+    val author = config.optJSONObject("author") ?: return null
+    val sanitized = sanitizeThemeAuthorProfile(
+        ThemeAuthorProfile(
+            displayName = author.optString("displayName"),
+            realName = author.optString("realName"),
+            gender = ThemeAuthorGender.fromStorageValue(author.optString("gender")),
+            bio = author.optString("bio"),
+        )
+    )
+    return ThemeStorePackageAuthor(
+        displayName = sanitized.displayName,
+        realName = sanitized.realName,
+        gender = sanitized.gender,
+        bio = sanitized.bio,
+    )
+}
+
+internal fun countConfiguredThemeStoreResources(config: JSONObject): Int {
+    fun hasResource(
+        owner: JSONObject?,
+        assetKey: String = "asset",
+        uriKey: String = "uri",
+    ): Boolean {
+        if (owner == null) return false
+        return owner.opt(assetKey) is JSONObject || owner.optString(uriKey).isNotBlank()
+    }
+
+    fun hasImageOrVideo(owner: JSONObject?): Boolean {
+        return hasResource(owner) || hasResource(owner, "videoAsset", "videoUri")
+    }
+
+    var count = 0
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        if (hasImageOrVideo(cards?.optJSONObject(slot.id))) count++
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        if (hasResource(navigationIcons?.optJSONObject(slot.id))) count++
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        if (hasImageOrVideo(pageBackgrounds?.optJSONObject(target.id))) count++
+    }
+    if (hasImageOrVideo(config.optJSONObject("wallpaper"))) count++
+    if (hasResource(config.optJSONObject("startupSound"))) count++
+    if (hasResource(config.optJSONObject("clickSound"))) count++
+    if (hasResource(config.optJSONObject("backgroundMusic"))) count++
+    if (hasResource(config.optJSONObject("startupAnimation"))) count++
+    return count
+}
+
+private fun findThemeStorePreviewCover(
+    config: JSONObject,
+    tempAssetsDir: File,
+): ThemeStorePackagePreviewImage? {
+    val owners = buildList {
+        add(config.optJSONObject("wallpaper"))
+        val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+        CustomPageBackgroundTarget.entries.forEach { target ->
+            add(pageBackgrounds?.optJSONObject(target.id))
+        }
+        val cards = config.optJSONObject("cards")
+        ThemeStoreImageSlot.entries.forEach { slot ->
+            add(cards?.optJSONObject(slot.id))
+        }
+        val navigationIcons = config.optJSONObject("navigationIcons")
+        CustomNavigationIconSlot.entries.forEach { slot ->
+            add(navigationIcons?.optJSONObject(slot.id))
+        }
+    }
+    return owners.firstNotNullOfOrNull { owner ->
+        readThemeStorePreviewImage(owner, "asset", tempAssetsDir)
+    }
+}
+
+private fun readThemeStorePreviewImage(
+    owner: JSONObject?,
+    assetKey: String,
+    tempAssetsDir: File,
+): ThemeStorePackagePreviewImage? {
+    val asset = owner?.optJSONObject(assetKey) ?: return null
+    val path = asset.optString("path")
+    if (!path.startsWith("assets/")) return null
+    val file = safeAssetFile(tempAssetsDir, path.removePrefix("assets/"))
+    if (!file.isFile || file.length() !in 1..MAX_THEME_STORE_PREVIEW_IMAGE_BYTES) return null
+    return ThemeStorePackagePreviewImage(
+        bytes = file.readBytes(),
+        mimeType = asset.optString("mimeType").takeIf(String::isNotBlank),
+    )
+}
+
+private fun collectLegacyThemeStoreUriWarnings(
+    context: Context,
+    config: JSONObject,
+    warnings: MutableList<ThemeStorePackageWarning>,
+) {
+    fun checkOwner(
+        owner: JSONObject?,
+        assetId: String,
+        assetKey: String = "asset",
+        uriKey: String = "uri",
+    ) {
+        if (owner == null) return
+        val embedded = owner.opt(assetKey)
+        if (embedded != null && embedded !== JSONObject.NULL) return
+        val uriString = owner.optString(uriKey).takeIf { it.isNotBlank() } ?: return
+        runCatching {
+            openThemeStoreUriInputStream(context, Uri.parse(uriString)).use { }
+        }.onFailure { error ->
+            warnings += ThemeStorePackageWarning(
+                assetId = assetId,
+                reason = error.message?.lineSequence()?.firstOrNull()?.take(160),
+            )
+        }
+    }
+
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        val owner = cards?.optJSONObject(slot.id)
+        checkOwner(owner, "card_${slot.id}")
+        checkOwner(owner, "card_${slot.id}_video", "videoAsset", "videoUri")
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        checkOwner(navigationIcons?.optJSONObject(slot.id), "navigation_icon_${slot.id}")
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        val owner = pageBackgrounds?.optJSONObject(target.id)
+        checkOwner(owner, "page_background_${target.id}")
+        checkOwner(owner, "page_background_${target.id}_video", "videoAsset", "videoUri")
+    }
+    config.optJSONObject("wallpaper")?.let { owner ->
+        checkOwner(owner, "custom_wallpaper")
+        checkOwner(owner, "custom_video_background", "videoAsset", "videoUri")
+    }
+    checkOwner(config.optJSONObject("startupSound"), "startup_sound")
+    checkOwner(config.optJSONObject("clickSound"), "click_sound")
+    checkOwner(config.optJSONObject("backgroundMusic"), "background_music")
+    checkOwner(config.optJSONObject("startupAnimation"), "startup_animation")
 }
 
 private fun ZipInputStream.readEntryBytes(maxBytes: Long): ByteArray {
@@ -980,20 +1800,42 @@ private fun ZipInputStream.copyEntryTo(output: OutputStream, maxBytes: Long): Lo
     return copied
 }
 
-private fun replaceThemeStoreDirectory(targetDir: File, stagingDir: File) {
-    val backupDir = File(targetDir.parentFile, "${targetDir.name}-backup").apply {
-        deleteRecursively()
+private data class ThemeStoreDirectorySwap(
+    val targetDir: File,
+    val backupDir: File,
+    val hadPreviousDirectory: Boolean,
+) {
+    fun rollback() {
+        if (targetDir.exists()) {
+            require(targetDir.deleteRecursively()) { "Unable to remove incomplete theme package" }
+        }
+        if (hadPreviousDirectory) {
+            require(backupDir.renameTo(targetDir)) { "Unable to restore previous theme package" }
+        }
     }
-    if (targetDir.exists()) {
+
+    fun finish(): Boolean {
+        return !backupDir.exists() || backupDir.deleteRecursively()
+    }
+}
+
+private fun beginThemeStoreDirectorySwap(targetDir: File, stagingDir: File): ThemeStoreDirectorySwap {
+    val backupDir = File(targetDir.parentFile, "${targetDir.name}-backup").apply {
+        if (exists()) {
+            require(deleteRecursively()) { "Unable to clear previous theme backup" }
+        }
+    }
+    val hadPreviousDirectory = targetDir.exists()
+    if (hadPreviousDirectory) {
         require(targetDir.renameTo(backupDir)) { "Unable to backup current theme package" }
     }
     if (!stagingDir.renameTo(targetDir)) {
-        if (backupDir.exists()) {
-            backupDir.renameTo(targetDir)
+        if (hadPreviousDirectory) {
+            require(backupDir.renameTo(targetDir)) { "Unable to restore current theme package" }
         }
         error("Unable to install theme package")
     }
-    backupDir.deleteRecursively()
+    return ThemeStoreDirectorySwap(targetDir, backupDir, hadPreviousDirectory)
 }
 
 private fun copyDirectoryContents(sourceDir: File, destinationDir: File) {
@@ -1015,37 +1857,96 @@ private fun copyDirectoryContents(sourceDir: File, destinationDir: File) {
 }
 
 private fun importAssetUri(
+    context: Context,
     assetOwnerJson: JSONObject,
     tempAssetsDir: File,
     stagingAssetsDir: File,
     targetAssetsDir: File,
+    assetId: String,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
     assetKey: String = "asset",
     uriKey: String = "uri",
-): String? {
-    val assetJson = assetOwnerJson.optJSONObject(assetKey)
-        ?: return assetOwnerJson.optString(uriKey).takeIf { it.isNotBlank() }
-    val path = assetJson.optString("path").takeIf { it.startsWith("assets/") } ?: return null
-    val relativePath = path.removePrefix("assets/")
-    val tempFile = safeAssetFile(tempAssetsDir, relativePath)
-    if (!tempFile.isFile) return null
-    val stagingFile = safeAssetFile(stagingAssetsDir, relativePath)
-    stagingFile.parentFile?.mkdirs()
-    FileInputStream(tempFile).use { input ->
-        FileOutputStream(stagingFile).use { output ->
-            input.copyTo(output)
+): ImportedThemeAsset {
+    val rawAsset = assetOwnerJson.opt(assetKey)
+    if (rawAsset != null && rawAsset !== JSONObject.NULL) {
+        require(rawAsset is JSONObject) { "Invalid embedded asset metadata: $assetId" }
+        val path = rawAsset.optString("path")
+        require(path.startsWith("assets/")) { "Invalid embedded asset path: $assetId" }
+        val relativePath = path.removePrefix("assets/")
+        val tempFile = safeAssetFile(tempAssetsDir, relativePath)
+        require(tempFile.isFile) { "Embedded asset is missing: $assetId" }
+        val stagingFile = safeAssetFile(stagingAssetsDir, relativePath)
+        stagingFile.parentFile?.mkdirs()
+        FileInputStream(tempFile).use { input ->
+            FileOutputStream(stagingFile).use { output ->
+                input.copyTo(output)
+            }
         }
+        val targetFile = safeAssetFile(targetAssetsDir, relativePath)
+        return ImportedThemeAsset.Resolved(Uri.fromFile(targetFile).toString())
     }
-    val targetFile = safeAssetFile(targetAssetsDir, relativePath)
-    return Uri.fromFile(targetFile).toString()
+
+    val legacyUriString = assetOwnerJson.optString(uriKey).takeIf { it.isNotBlank() }
+        ?: return ImportedThemeAsset.Resolved(null)
+    val startingBudget = budget.totalBytes
+    return runCatching {
+        val legacyUri = Uri.parse(legacyUriString)
+        val extension = safeAssetExtension(
+            displayName = queryDisplayName(context, legacyUri) ?: legacyUri.lastPathSegment,
+            mimeType = runCatching { context.contentResolver.getType(legacyUri) }.getOrNull(),
+        )
+        val safeAssetId = assetId.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        val relativePath = "legacy/$safeAssetId$extension"
+        val stagingFile = safeAssetFile(stagingAssetsDir, relativePath)
+        val temporaryFile = File(stagingFile.parentFile, "${stagingFile.name}.tmp")
+        stagingFile.parentFile?.mkdirs()
+        try {
+            openThemeStoreUriInputStream(context, legacyUri).use { input ->
+                FileOutputStream(temporaryFile).use { output ->
+                    input.copyThemeStoreAssetTo(output, budget)
+                }
+            }
+            if (!temporaryFile.renameTo(stagingFile)) {
+                temporaryFile.copyTo(stagingFile, overwrite = true)
+                temporaryFile.delete()
+            }
+        } finally {
+            temporaryFile.delete()
+        }
+        ImportedThemeAsset.Resolved(
+            Uri.fromFile(safeAssetFile(targetAssetsDir, relativePath)).toString()
+        )
+    }.getOrElse {
+        budget.totalBytes = startingBudget
+        warnings += ThemeStorePackageWarning(
+            assetId = assetId,
+            reason = it.message?.lineSequence()?.firstOrNull()?.take(160),
+        )
+        ImportedThemeAsset.Unavailable
+    }
+}
+
+private fun openThemeStoreUriInputStream(context: Context, uri: Uri): InputStream {
+    if (uri.scheme == "file") {
+        val path = uri.path ?: error("Invalid file URI")
+        return FileInputStream(File(path))
+    }
+    return context.contentResolver.openInputStream(uri) ?: error("Unable to open $uri")
+}
+
+private fun openThemeStoreUriOutputStream(context: Context, uri: Uri): OutputStream {
+    if (uri.scheme == "file") {
+        val path = uri.path ?: error("Invalid file URI")
+        val file = File(path)
+        file.parentFile?.mkdirs()
+        return FileOutputStream(file)
+    }
+    return context.contentResolver.openOutputStream(uri) ?: error("Unable to open $uri")
 }
 
 private fun safeAssetFile(root: File, relativePath: String): File {
-    val safeName = relativePath
-        .replace('\\', '/')
-        .split('/')
-        .filter { it.isNotBlank() && it != "." && it != ".." }
-        .joinToString("/")
-    require(safeName.isNotBlank()) { "Invalid asset path" }
+    val safeName = validateThemeStoreArchiveEntryName(relativePath)
     val rootFile = root.canonicalFile
     val target = File(rootFile, safeName).canonicalFile
     require(target.path == rootFile.path || target.path.startsWith(rootFile.path + File.separator)) {

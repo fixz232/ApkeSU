@@ -26,10 +26,6 @@ on:
         description: "Mark release as prerelease"
         type: boolean
         default: false
-      allow_ephemeral_key:
-        description: "Generate a temporary signing key if release secrets are missing"
-        type: boolean
-        default: false
 
 jobs:
   build-lkm:
@@ -116,39 +112,21 @@ jobs:
           PROD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           PROD_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           PROD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ALLOW_EPHEMERAL_KEY: ${{ inputs.allow_ephemeral_key || 'false' }}
         run: |
           set -euo pipefail
 
-          if [ -n "${PROD_KEYSTORE:-}" ]; then
-            echo "$PROD_KEYSTORE" | base64 -d > key.jks
-            SIGN_KEYSTORE_FILE="$GITHUB_WORKSPACE/key.jks"
-            SIGN_KEY_ALIAS="$PROD_KEY_ALIAS"
-            SIGN_KEYSTORE_PASSWORD="$PROD_KEYSTORE_PASSWORD"
-            SIGN_KEY_PASSWORD="$PROD_KEY_PASSWORD"
-            SIGNING_KIND="release-secret"
-          elif [ "$ALLOW_EPHEMERAL_KEY" = "true" ]; then
-            SIGN_KEYSTORE_FILE="$GITHUB_WORKSPACE/ephemeral-release-key.jks"
-            SIGN_KEY_ALIAS="ephemeral-release"
-            SIGN_KEYSTORE_PASSWORD="$(openssl rand -hex 32)"
-            SIGN_KEY_PASSWORD="$(openssl rand -hex 32)"
-            keytool -genkeypair \
-              -alias "$SIGN_KEY_ALIAS" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 3650 \
-              -storepass "$SIGN_KEYSTORE_PASSWORD" \
-              -keypass "$SIGN_KEY_PASSWORD" \
-              -dname "CN=ApkeSU Ephemeral Release" \
-              -storetype JKS \
-              -keystore "$SIGN_KEYSTORE_FILE"
-            SIGNING_KIND="ephemeral"
-            echo "::warning::Using an ephemeral APK signing key. Kernels built for the normal release certificate will not trust this APK as Manager."
-          else
-            echo "::error::Missing KEYSTORE signing secrets. Set KEYSTORE, KEY_ALIAS, KEYSTORE_PASSWORD, and KEY_PASSWORD, or rerun with allow_ephemeral_key=true."
+          if [ -z "${PROD_KEYSTORE:-}" ] || [ -z "${PROD_KEY_ALIAS:-}" ] || \
+             [ -z "${PROD_KEYSTORE_PASSWORD:-}" ] || [ -z "${PROD_KEY_PASSWORD:-}" ]; then
+            echo "::error::Missing release signing secrets. KEYSTORE, KEY_ALIAS, KEYSTORE_PASSWORD, and KEY_PASSWORD must match the certificate trusted by ApkeSU kernels."
             exit 1
           fi
 
+          echo "$PROD_KEYSTORE" | base64 -d > key.jks
+          SIGN_KEYSTORE_FILE="$GITHUB_WORKSPACE/key.jks"
+          SIGN_KEY_ALIAS="$PROD_KEY_ALIAS"
+          SIGN_KEYSTORE_PASSWORD="$PROD_KEYSTORE_PASSWORD"
+          SIGN_KEY_PASSWORD="$PROD_KEY_PASSWORD"
+          SIGNING_KIND="release-secret"
           {
             echo "KEYSTORE_PASSWORD=$SIGN_KEYSTORE_PASSWORD"
             echo "KEY_ALIAS=$SIGN_KEY_ALIAS"
@@ -192,6 +170,36 @@ jobs:
             -n "$OUTPUT_NAME" \
             -o release-apk \
             --strip
+
+      - name: Verify release APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 scripts/verify_apkesu_kernel_identity.py
+          APK="$(find release-apk -maxdepth 1 -type f -name 'ApkeSU_*-release.apk' | head -n 1)"
+          test -n "$APK"
+
+          BUILD_TOOLS="$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          AAPT2="$BUILD_TOOLS/aapt2"
+          test -x "$APKSIGNER"
+          test -x "$AAPT2"
+
+          EXPECTED_PACKAGE="$(sed -n 's/^KSU_MANAGER_PACKAGE[[:space:]]*:=[[:space:]]*//p' dist/manager_identity.mk | head -n 1)"
+          EXPECTED_HASH="$(sed -n 's/^KSU_EXPECTED_HASH[[:space:]]*:=[[:space:]]*//p' dist/manager_identity.mk | head -n 1)"
+          VERSION_CODE="$(sed -n 's/^versionCode=//p' version.properties | head -n 1)"
+          VERSION_NAME="$(sed -n 's/^versionName=//p' version.properties | head -n 1)"
+          ACTUAL_HASH="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^.*certificate SHA-256 digest: //p' | head -n 1)"
+          BADGING="$("$AAPT2" dump badging "$APK" | head -n 1)"
+
+          test "$ACTUAL_HASH" = "$EXPECTED_HASH"
+          printf '%s\n' "$BADGING" | grep -Fq "name='$EXPECTED_PACKAGE'"
+          printf '%s\n' "$BADGING" | grep -Fq "versionCode='$VERSION_CODE'"
+          printf '%s\n' "$BADGING" | grep -Fq "versionName='$VERSION_NAME'"
+
+          cp -f dist/manager_identity.mk release-apk/manager_identity.mk
+          echo "Verified release APK: package=$EXPECTED_PACKAGE version=$VERSION_NAME ($VERSION_CODE) cert=$ACTUAL_HASH"
 
       - name: Build release metadata
         id: meta

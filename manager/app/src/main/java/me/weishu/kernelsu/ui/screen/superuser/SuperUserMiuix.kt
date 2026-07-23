@@ -36,6 +36,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -69,12 +71,15 @@ import me.weishu.kernelsu.ui.component.ListPopupDefaults
 import me.weishu.kernelsu.ui.component.ScrollToTopOnChange
 import me.weishu.kernelsu.ui.component.SearchStatus
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
+import me.weishu.kernelsu.ui.component.liquid.FrostedGlassCardStyle
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.miuix.SearchBarFake
 import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
+import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
+import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardShape
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
@@ -148,6 +153,13 @@ fun SuperUserPagerMiuix(
                             }
                         },
                         actions = {
+                            IconButton(onClick = actions.onOpenAppIdManager) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Fingerprint,
+                                    tint = topBarColors.content,
+                                    contentDescription = stringResource(R.string.app_id_manager_open),
+                                )
+                            }
                             Box {
                                 val showSortPopup = remember { mutableStateOf(false) }
                                 OverlayListPopup(
@@ -566,6 +578,7 @@ private fun SimpleAppItem(
                 .background(if (matched) colorScheme.primary else colorScheme.primaryContainer)
         )
         Card(
+            cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
             modifier = Modifier
                 .padding(start = 6.dp, end = 12.dp, bottom = 6.dp)
                 .globalLiquidGlassSurface(
@@ -575,6 +588,7 @@ private fun SimpleAppItem(
                     refractionHeight = 12.dp,
                     refractionAmount = 8.dp,
                     strokeAlpha = 0.60f,
+                    cardStyle = FrostedGlassCardStyle.Ice,
                 )
                 .snowMiuixCardSurface(shape = RoundedCornerShape(18.dp)),
             colors = snowMiuixCardColors(),
@@ -609,7 +623,7 @@ private fun GroupItem(
     onClickPrimary: () -> Unit,
 ) {
     val isInDarkTheme = isInDarkTheme()
-    val cardShape = RoundedCornerShape(18.dp)
+    val cardShape = pixelAwareMiuixCardShape(RoundedCornerShape(18.dp))
     val cardBorder = if (isInDarkTheme) {
         Color.White.copy(alpha = 0.10f)
     } else {
@@ -640,6 +654,7 @@ private fun GroupItem(
         }
     }
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .padding(horizontal = 12.dp)
             .padding(bottom = 8.dp)
@@ -650,6 +665,7 @@ private fun GroupItem(
                 refractionHeight = 14.dp,
                 refractionAmount = 9.dp,
                 strokeAlpha = 0.66f,
+                cardStyle = FrostedGlassCardStyle.Ice,
             )
             .snowMiuixCardSurface(shape = cardShape)
             .border(width = 1.dp, color = cardBorder, shape = cardShape),

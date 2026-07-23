@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
@@ -133,6 +134,9 @@ fun ModulePagerAlpha(
             }
             selectZipLauncher.launch(intent)
         },
+        secondaryTopActionIcon = Icons.Rounded.Backup,
+        onSecondaryTopActionClick = actions.onOpenWallpaperBackup,
+        secondaryTopActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
     ) { contentPadding ->
         LazyColumn(
             contentPadding = PaddingValues(

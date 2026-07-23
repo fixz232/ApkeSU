@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -45,6 +48,9 @@ import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardColors
 import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
+import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
+import me.weishu.kernelsu.ui.component.rain.rainMiuixCardColors
+import me.weishu.kernelsu.ui.component.rain.rainMiuixCardSurface
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -57,6 +63,29 @@ import kotlin.math.sin
 @ReadOnlyComposable
 fun isSnowInterfaceStyle(): Boolean {
     return LocalInterfaceStyle.current == InterfaceStyle.Snow.value
+}
+
+val LocalSeasonCardMotionEnabled = staticCompositionLocalOf { DEFAULT_SEASON_CARD_MOTION_ENABLED }
+
+val LocalSeasonCardMotionProgress = staticCompositionLocalOf<State<Float>> {
+    mutableFloatStateOf(STATIC_SEASON_CARD_MOTION_PROGRESS)
+}
+
+@Composable
+fun rememberSeasonCardMotionProgress(enabled: Boolean): State<Float> {
+    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    if (!enabled || !animationsEnabled) {
+        return remember { mutableFloatStateOf(STATIC_SEASON_CARD_MOTION_PROGRESS) }
+    }
+    val transition = rememberInfiniteTransition(label = "seasonCardMotion")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(SEASON_CARD_MOTION_CYCLE_MILLIS, easing = LinearEasing),
+        ),
+        label = "seasonCardMotionProgress",
+    )
 }
 
 @Composable
@@ -207,6 +236,8 @@ fun SnowCapBand(
 ) {
     val season = LocalSeasonStyle.current
     val dark = isInDarkTheme()
+    val motionEnabled = LocalSeasonCardMotionEnabled.current
+    val motionProgress = LocalSeasonCardMotionProgress.current
     Canvas(modifier = modifier) {
         drawSeasonCardDecoration(
             season = season,
@@ -215,6 +246,9 @@ fun SnowCapBand(
             snowColor = snowColor,
             shadowColor = shadowColor,
         )
+        if (motionEnabled) {
+            drawSeasonCapMotion(season, dark, motionProgress.value, size.height)
+        }
     }
 }
 
@@ -226,6 +260,7 @@ fun Modifier.snowMiuixCardSurface(
 ): Modifier {
     if (!enabled) return uiDecoratedCard(shape = shape, enabled = false)
     if (isPixelInterfaceStyle()) return pixelMiuixCardSurface(shape = shape, enabled = true)
+    if (isRainInterfaceStyle()) return rainMiuixCardSurface(shape = shape, enabled = true, capHeight = capHeight)
     if (!isSnowInterfaceStyle()) return uiDecoratedCard(shape = shape, enabled = true)
 
     val dark = isInDarkTheme()
@@ -236,6 +271,8 @@ fun Modifier.snowMiuixCardSurface(
     val snowColor = if (dark) Color(0xFFE4F2F5) else Color(0xFFFFFFFF)
     val shadowColor = if (dark) Color(0xFF71919C) else Color(0xFF9CBFCB)
     val edgeColor = seasonEdgeColor(season, dark)
+    val motionEnabled = LocalSeasonCardMotionEnabled.current
+    val motionProgress = LocalSeasonCardMotionProgress.current
 
     return this
         .shadow(3.dp, shape)
@@ -243,16 +280,32 @@ fun Modifier.snowMiuixCardSurface(
         .background(glassBrush, shape)
         .border(1.dp, edgeColor, shape)
         .drawWithContent {
-            drawContent()
+            val progress = motionProgress.value
+            drawSeasonCardAtmosphere(season, dark)
+            if (motionEnabled) drawSeasonCardMotionUnderlay(season, dark, progress)
             drawSeasonCardInterior(season, dark)
+            if (motionEnabled) drawSeasonCardMotionOverlay(season, dark, progress)
+            drawContent()
             drawSeasonCardFramePolish(season, dark)
-            drawSeasonCardDecoration(
-                season = season,
-                capHeight = capHeight.toPx(),
-                dark = dark,
-                snowColor = snowColor,
-                shadowColor = shadowColor,
+            val decorationHeight = seasonCardDecorationHeight(
+                requestedHeight = capHeight.toPx(),
+                width = size.width,
+                height = size.height,
+                minimumWidth = 72.dp.toPx(),
+                minimumHeight = 48.dp.toPx(),
             )
+            if (decorationHeight > 0f) {
+                drawSeasonCardDecoration(
+                    season = season,
+                    capHeight = decorationHeight,
+                    dark = dark,
+                    snowColor = snowColor,
+                    shadowColor = shadowColor,
+                )
+                if (motionEnabled) {
+                    drawSeasonCapMotion(season, dark, progress, decorationHeight)
+                }
+            }
         }
         .uiDecoratedCard(shape = shape, enabled = enabled)
 }
@@ -263,27 +316,19 @@ fun snowMiuixCardColors(
     enabled: Boolean = true,
 ) = if (enabled && isPixelInterfaceStyle()) {
     pixelMiuixCardColors(color = color, enabled = true)
+} else if (enabled && isRainInterfaceStyle()) {
+    rainMiuixCardColors(color = color)
 } else if (enabled && isSnowInterfaceStyle()) {
-    val season = LocalSeasonStyle.current
-    val dark = isInDarkTheme()
-    val seasonalColor = if (season == SeasonStyle.Winter) {
-        color
-    } else {
-        lerp(color, seasonSurfaceTint(season), if (dark) 0.10f else 0.08f)
-    }
     CardDefaults.defaultColors(
-        color = seasonalColor.copy(
-            alpha = when {
-                season == SeasonStyle.Winter && dark -> 0.24f
-                season == SeasonStyle.Winter -> 0.30f
-                dark -> 0.32f
-                else -> 0.38f
-            },
-        ),
+        // snowMiuixCardSurface paints the seasonal glass and artwork. A second
+        // Card layer would mute or hide that artwork, especially in dark mode.
+        color = seasonCardContentLayerColor(color),
     )
 } else {
     liquidGlassMiuixCardColors(color)
 }
+
+internal fun seasonCardContentLayerColor(baseColor: Color): Color = baseColor.copy(alpha = 0f)
 
 private fun seasonWallpaperOverlay(season: SeasonStyle, dark: Boolean): List<Color> {
     return when (season) {
@@ -1117,3 +1162,6 @@ private fun DrawScope.snowCapPath(
         close()
     }
 }
+
+private const val STATIC_SEASON_CARD_MOTION_PROGRESS = 0.31f
+private const val SEASON_CARD_MOTION_CYCLE_MILLIS = 12_000

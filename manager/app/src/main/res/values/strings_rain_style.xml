@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">Rain glass</string>
+    <string name="settings_rain_style">Rain intensity</string>
+    <string name="settings_rain_card_motion">Animated rain cards</string>
+    <string name="settings_rain_card_motion_summary">Move edge droplets, condensation, and a restrained glass sheen without shifting card content.</string>
+    <string name="rain_style_light">Light rain</string>
+    <string name="rain_style_light_summary">Soft mist, sparse rain lines, and quiet ripples over pale blue glass.</string>
+    <string name="rain_style_medium">Steady rain</string>
+    <string name="rain_style_medium_summary">Denser rain, layered clouds, and clearer drops collecting along card edges.</string>
+    <string name="rain_style_heavy">Heavy rain</string>
+    <string name="rain_style_heavy_summary">A dark storm palette, stronger wind, deeper wet glass, and frequent ground ripples.</string>
+    <string name="rain_style_thunderstorm">Thunderstorm</string>
+    <string name="rain_style_thunderstorm_summary">Night-only lightning flashes every 3 to 8 seconds, with dense rain and purple storm clouds.</string>
+    <string name="rain_motto_light">Listen to rain settle on the glass</string>
+    <string name="rain_motto_medium">As rain gathers, the world grows quiet</string>
+    <string name="rain_motto_heavy">Through the storm, remain clear</string>
+    <string name="rain_motto_thunderstorm">Lightning crosses the night; the core holds</string>
+    <string name="theme_preset_rain">Rain glass</string>
+    <string name="theme_preset_rain_summary">Cool gray-blue glass, wet card edges, rain canopies, and a matching floating navigation bar.</string>
+</resources>

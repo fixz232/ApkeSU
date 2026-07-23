@@ -40,6 +40,9 @@ private const val ANDROID_16_API = 36
 private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
 const val CPU_SPOOF_PROPERTY_VALUE_LIMIT = 91
 private val managerRegistrationLock = Any()
+private const val MANAGER_REGISTRATION_RETRY_MILLIS = 30_000L
+private var lastManagerRegistrationFailureKey: String? = null
+private var lastManagerRegistrationFailureAt = 0L
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
 const val KPATCH_NEXT_MODULE_ID = "KPatch-Next"
 const val BUILTIN_MOUNT_MODE_OVERLAY = "overlay"
@@ -2319,6 +2322,8 @@ fun getInstalledKsudStatus(): InstalledKsudStatus {
 fun ensureManagerRegistered(): Boolean {
     return synchronized(managerRegistrationLock) {
         if (runCatching { Natives.refreshInfo(); Natives.isManager }.getOrDefault(false)) {
+            lastManagerRegistrationFailureKey = null
+            lastManagerRegistrationFailureAt = 0L
             return@synchronized true
         }
         if (!apkeSuRootAvailable()) {
@@ -2326,6 +2331,15 @@ fun ensureManagerRegistered(): Boolean {
         }
 
         val managerUid = Os.getuid()
+        val driverVersion = runCatching { Natives.version }.getOrDefault(0)
+        val failureKey = "$driverVersion:$managerUid"
+        val now = SystemClock.elapsedRealtime()
+        if (failureKey == lastManagerRegistrationFailureKey &&
+            now - lastManagerRegistrationFailureAt < MANAGER_REGISTRATION_RETRY_MILLIS
+        ) {
+            Log.w(TAG, "skip repeated manager registration for driver $driverVersion")
+            return@synchronized false
+        }
         val result = runCatching {
             val ksud = shellQuote(getKsuDaemonPath())
             val packageName = shellQuote(BuildConfig.APPLICATION_ID)
@@ -2338,15 +2352,26 @@ fun ensureManagerRegistered(): Boolean {
         }.getOrNull()
 
         if (result?.isSuccess != true) {
+            lastManagerRegistrationFailureKey = failureKey
+            lastManagerRegistrationFailureAt = SystemClock.elapsedRealtime()
             Log.w(TAG, "register manager appid failed: ${result?.err?.joinToString("\n")}")
             return@synchronized false
         }
 
         KsuCli.reset()
-        runCatching {
+        val registered = runCatching {
             Natives.refreshInfo()
             Natives.isManager
         }.getOrDefault(false)
+        if (registered) {
+            lastManagerRegistrationFailureKey = null
+            lastManagerRegistrationFailureAt = 0L
+        } else {
+            lastManagerRegistrationFailureKey = failureKey
+            lastManagerRegistrationFailureAt = SystemClock.elapsedRealtime()
+            Log.w(TAG, "manager registration command succeeded but kernel identity did not refresh")
+        }
+        registered
     }
 }
 

@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.screen.launchericon
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -33,9 +33,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,13 +58,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.ui.LocalInterfaceStyle
-import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.screen.settings.ManagerNameDialog
@@ -75,10 +75,20 @@ import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import androidx.compose.material3.Scaffold as MaterialScaffold
 
 private val FullImageCrop = CustomWallpaperCrop(0f, 0f, 1f, 1f)
+
+private object LauncherIdentityColors {
+    val Page = Color(0xFFF4F6FA)
+    val Surface = Color(0xFFFFFFFF)
+    val SurfaceMuted = Color(0xFFEEF2F7)
+    val Ink = Color(0xFF172033)
+    val Muted = Color(0xFF5D687A)
+    val Subtle = Color(0xFF7D8796)
+    val Border = Color(0xFFD8E0EA)
+    val Accent = Color(0xFF3568D4)
+    val AccentSoft = Color(0xFFE8EEFC)
+}
 
 @Composable
 fun LauncherIconScreen() {
@@ -94,6 +104,22 @@ fun LauncherIconScreen() {
     var showManagerNameDialog by remember { mutableStateOf(false) }
     val customIconFailedMessage = stringResource(R.string.settings_app_icon_custom_failed)
     val defaultManagerName = stringResource(R.string.app_name)
+    DisposableEffect(context) {
+        val window = (context as? Activity)?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            val previousLightStatusBars = controller.isAppearanceLightStatusBars
+            val previousLightNavigationBars = controller.isAppearanceLightNavigationBars
+            controller.isAppearanceLightStatusBars = true
+            controller.isAppearanceLightNavigationBars = true
+            onDispose {
+                controller.isAppearanceLightStatusBars = previousLightStatusBars
+                controller.isAppearanceLightNavigationBars = previousLightNavigationBars
+            }
+        }
+    }
     val customIconPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -130,27 +156,15 @@ fun LauncherIconScreen() {
         }
     }
 
-    if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
-        LauncherIconScreenSkrootpro(
-            selectedIndex = selectedIndex,
-            customManagerName = uiState.customManagerName,
-            defaultManagerName = defaultManagerName,
-            onBack = dropUnlessResumed { navigator.pop() },
-            onEditManagerName = { showManagerNameDialog = true },
-            onSelect = viewModel::setLauncherIconByIndex,
-            onPickCustomIcon = pickCustomIcon,
-        )
-    } else {
-        LauncherIconScreenMiuix(
-            selectedIndex = selectedIndex,
-            customManagerName = uiState.customManagerName,
-            defaultManagerName = defaultManagerName,
-            onBack = dropUnlessResumed { navigator.pop() },
-            onEditManagerName = { showManagerNameDialog = true },
-            onSelect = viewModel::setLauncherIconByIndex,
-            onPickCustomIcon = pickCustomIcon,
-        )
-    }
+    LauncherIconScreenMiuix(
+        selectedIndex = selectedIndex,
+        customManagerName = uiState.customManagerName,
+        defaultManagerName = defaultManagerName,
+        onBack = dropUnlessResumed { navigator.pop() },
+        onEditManagerName = { showManagerNameDialog = true },
+        onSelect = viewModel::setLauncherIconByIndex,
+        onPickCustomIcon = pickCustomIcon,
+    )
 
     SettingsWallpaperCropDialog(
         show = showCustomIconCrop,
@@ -187,19 +201,19 @@ private fun LauncherIconScreenMiuix(
     onPickCustomIcon: () -> Unit,
 ) {
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = LauncherIdentityColors.Page,
         popupHost = { },
         contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
                 title = stringResource(R.string.settings_manager_identity),
-                color = Color.Transparent,
-                titleColor = colorScheme.onSurface,
+                color = LauncherIdentityColors.Page,
+                titleColor = LauncherIdentityColors.Ink,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            tint = colorScheme.onBackground,
+                            tint = LauncherIdentityColors.Ink,
                             contentDescription = stringResource(R.string.close),
                         )
                     }
@@ -221,50 +235,6 @@ private fun LauncherIconScreenMiuix(
 }
 
 @Composable
-private fun LauncherIconScreenSkrootpro(
-    selectedIndex: Int,
-    customManagerName: String,
-    defaultManagerName: String,
-    onBack: () -> Unit,
-    onEditManagerName: () -> Unit,
-    onSelect: (Int) -> Unit,
-    onPickCustomIcon: () -> Unit,
-) {
-    SkrootproScreen(
-        title = stringResource(R.string.settings_manager_identity),
-        bottomInnerPadding = 0.dp,
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            LauncherIconPickerContent(
-                selectedIndex = selectedIndex,
-                customManagerName = customManagerName,
-                defaultManagerName = defaultManagerName,
-                onEditManagerName = onEditManagerName,
-                onSelect = onSelect,
-                onPickCustomIcon = onPickCustomIcon,
-                onRestore = { onSelect(0) },
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 14.dp)
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.12f))
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = stringResource(R.string.close),
-                    tint = Color.White,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun LauncherIconPickerContent(
     selectedIndex: Int,
     customManagerName: String,
@@ -279,27 +249,20 @@ private fun LauncherIconPickerContent(
         columns = GridCells.Fixed(4),
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(LauncherIdentityColors.Page)
             .padding(horizontal = 18.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             Column(
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.settings_manager_identity),
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Start,
-                    fontSize = skrootproSp(29f, maxScale = 1f),
-                )
-                Text(
                     text = stringResource(R.string.settings_manager_name),
-                    color = Color.White,
+                    color = LauncherIdentityColors.Ink,
                     fontWeight = FontWeight.Bold,
                     fontSize = skrootproSp(18f, maxScale = 1f),
                 )
@@ -310,13 +273,13 @@ private fun LauncherIconPickerContent(
                 )
                 Text(
                     text = stringResource(R.string.settings_app_icon_picker_header),
-                    color = Color.White,
+                    color = LauncherIdentityColors.Ink,
                     fontWeight = FontWeight.Bold,
                     fontSize = skrootproSp(18f, maxScale = 1f),
                 )
                 Text(
                     text = stringResource(R.string.settings_app_icon_picker_hint),
-                    color = Color(0xFF8E8E93),
+                    color = LauncherIdentityColors.Muted,
                     fontSize = skrootproSp(13f, maxScale = 1f),
                     lineHeight = skrootproSp(18f, maxScale = 1f),
                 )
@@ -345,28 +308,29 @@ private fun LauncherIconPickerContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color(0xFF242426))
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(LauncherIdentityColors.Surface)
+                        .border(1.dp, LauncherIdentityColors.Border, RoundedCornerShape(18.dp))
                         .clickable(onClick = onRestore)
                         .padding(horizontal = 22.dp, vertical = 20.dp),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = stringResource(R.string.settings_app_icon_restore),
-                            color = Color.White,
+                            color = LauncherIdentityColors.Ink,
                             fontSize = skrootproSp(17f, maxScale = 1f),
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = stringResource(R.string.settings_app_icon_restore_summary),
-                            color = Color(0xFF9A9AA0),
+                            color = LauncherIdentityColors.Muted,
                             fontSize = skrootproSp(14f, maxScale = 1f),
                         )
                     }
                 }
                 Text(
                     text = stringResource(R.string.settings_app_icon_only_builtin),
-                    color = Color(0xFF6F6F74),
+                    color = LauncherIdentityColors.Muted,
                     fontSize = skrootproSp(12.5f, maxScale = 1f),
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
@@ -390,8 +354,9 @@ private fun ManagerNameCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF242426))
+            .clip(RoundedCornerShape(18.dp))
+            .background(LauncherIdentityColors.Surface)
+            .border(1.dp, LauncherIdentityColors.Border, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
@@ -404,12 +369,12 @@ private fun ManagerNameCard(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE9F1FF)),
+                    .background(LauncherIdentityColors.AccentSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = displayName.take(1).ifBlank { "A" },
-                    color = Color(0xFF1D5EFF),
+                    color = LauncherIdentityColors.Accent,
                     fontSize = skrootproSp(22f, maxScale = 1f),
                     fontWeight = FontWeight.Bold,
                 )
@@ -420,7 +385,7 @@ private fun ManagerNameCard(
             ) {
                 Text(
                     text = displayName,
-                    color = Color.White,
+                    color = LauncherIdentityColors.Ink,
                     fontSize = skrootproSp(17f, maxScale = 1f),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -428,7 +393,7 @@ private fun ManagerNameCard(
                 )
                 Text(
                     text = summary,
-                    color = Color(0xFF8E8E93),
+                    color = LauncherIdentityColors.Muted,
                     fontSize = skrootproSp(12.5f, maxScale = 1f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -436,7 +401,7 @@ private fun ManagerNameCard(
             }
             Text(
                 text = stringResource(R.string.settings_manager_name_edit),
-                color = Color(0xFF3A82FF),
+                color = LauncherIdentityColors.Accent,
                 fontSize = skrootproSp(13f, maxScale = 1f),
                 fontWeight = FontWeight.SemiBold,
             )
@@ -452,8 +417,9 @@ private fun LauncherIconCustomCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(154.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF242426))
+            .clip(RoundedCornerShape(18.dp))
+            .background(LauncherIdentityColors.Surface)
+            .border(1.dp, LauncherIdentityColors.Border, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 12.dp),
     ) {
@@ -467,18 +433,18 @@ private fun LauncherIconCustomCard(
                     .size(74.dp)
                     .border(
                         width = 1.5.dp,
-                        color = Color(0xFF5A5A60),
-                        shape = CircleShape,
+                        color = LauncherIdentityColors.Border,
+                        shape = RoundedCornerShape(20.dp),
                     )
                     .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE9F1FF)),
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(LauncherIdentityColors.AccentSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.AddPhotoAlternate,
                     contentDescription = stringResource(R.string.settings_app_icon_custom_pick),
-                    tint = Color(0xFF1D5EFF),
+                    tint = LauncherIdentityColors.Accent,
                     modifier = Modifier.size(34.dp),
                 )
             }
@@ -488,7 +454,7 @@ private fun LauncherIconCustomCard(
             ) {
                 Text(
                     text = stringResource(R.string.settings_app_icon_custom),
-                    color = Color.White,
+                    color = LauncherIdentityColors.Ink,
                     fontSize = skrootproSp(13.5f, maxScale = 1f),
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
@@ -497,7 +463,7 @@ private fun LauncherIconCustomCard(
                 )
                 Text(
                     text = stringResource(R.string.settings_app_icon_custom_pick),
-                    color = Color(0xFF7C7C84),
+                    color = LauncherIdentityColors.Subtle,
                     fontSize = skrootproSp(10.5f, maxScale = 1f),
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -514,15 +480,17 @@ private fun LauncherIconOptionCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val cardColor = if (selected) Color(0xFF061227) else Color(0xFF242426)
-    val accentColor = if (selected) Color(0xFF3A82FF) else Color(0xFF5A5A60)
+    val shape = RoundedCornerShape(18.dp)
+    val cardColor = if (selected) LauncherIdentityColors.AccentSoft else LauncherIdentityColors.Surface
+    val accentColor = if (selected) LauncherIdentityColors.Accent else LauncherIdentityColors.Border
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(154.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(shape)
             .background(cardColor)
+            .border(if (selected) 2.dp else 1.dp, accentColor, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 12.dp),
     ) {
@@ -537,11 +505,11 @@ private fun LauncherIconOptionCard(
                     .border(
                         width = if (selected) 2.5.dp else 1.5.dp,
                         color = accentColor,
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(20.dp),
                     )
                     .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(LauncherIdentityColors.SurfaceMuted),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
@@ -559,22 +527,30 @@ private fun LauncherIconOptionCard(
             ) {
                 Text(
                     text = stringResource(option.labelRes),
-                    color = if (selected) Color(0xFF3A82FF) else Color.White,
+                    color = if (selected) LauncherIdentityColors.Accent else LauncherIdentityColors.Ink,
                     fontSize = skrootproSp(13.5f, maxScale = 1f),
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (selected) {
-                    Text(
-                        text = stringResource(R.string.settings_app_icon_picker_selected),
-                        color = Color(0xFF7C7C84),
-                        fontSize = skrootproSp(10.5f, maxScale = 1f),
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(14.dp))
-                }
+            }
+        }
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(LauncherIdentityColors.Accent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = stringResource(R.string.settings_app_icon_picker_selected),
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
     }

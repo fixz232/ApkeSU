@@ -97,6 +97,7 @@ data class HomeUiState(
     val showGkiWarningSetting: Boolean = true,
     val showHomeSupportCard: Boolean = true,
     val showHomeLearnCard: Boolean = true,
+    val customHomeTitle: String = "",
     val superuserCount: Int,
     val moduleCount: Int,
     val systemInfo: SystemInfo,

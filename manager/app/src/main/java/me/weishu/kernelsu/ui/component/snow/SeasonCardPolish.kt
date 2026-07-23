@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.component.snow
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -9,6 +10,38 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
+
+internal fun DrawScope.drawSeasonCardAtmosphere(season: SeasonStyle, dark: Boolean) {
+    val minimumWidth = 72.dp.toPx()
+    val minimumHeight = 48.dp.toPx()
+    if (!seasonCardFramePolishEnabled(size.width, size.height, minimumWidth, minimumHeight)) return
+    val palette = seasonFramePalette(season, dark)
+    val upperBandHeight = size.height * 0.24f
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(
+                Color.Transparent,
+                palette.highlight.copy(alpha = palette.highlight.alpha * 0.12f),
+                palette.primary.copy(alpha = palette.primary.alpha * 0.08f),
+                Color.Transparent,
+            ),
+        ),
+        topLeft = Offset(0f, size.height * 0.10f),
+        size = Size(size.width, upperBandHeight),
+    )
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                palette.shadow.copy(alpha = palette.shadow.alpha * if (dark) 0.14f else 0.09f),
+            ),
+            startY = size.height * 0.66f,
+            endY = size.height,
+        ),
+        topLeft = Offset(0f, size.height * 0.58f),
+        size = Size(size.width, size.height * 0.42f),
+    )
+}
 
 internal fun DrawScope.drawSeasonCardFramePolish(season: SeasonStyle, dark: Boolean) {
     val minimumWidth = 72.dp.toPx()
@@ -23,12 +56,41 @@ internal fun DrawScope.drawSeasonCardFramePolish(season: SeasonStyle, dark: Bool
         size = Size(size.width - inset * 2f, size.height - inset * 2f),
         style = Stroke(width = unit * 0.34f),
     )
+    drawSeasonCardDepthFrame(unit, palette)
     when (season) {
         SeasonStyle.Spring -> drawSpringFramePolish(unit, palette)
         SeasonStyle.Summer -> drawSummerFramePolish(unit, palette)
         SeasonStyle.Autumn -> drawAutumnFramePolish(unit, palette)
         SeasonStyle.Winter -> drawWinterFramePolish(unit, palette)
     }
+}
+
+private fun DrawScope.drawSeasonCardDepthFrame(unit: Float, palette: SeasonFramePalette) {
+    val inset = unit * 1.15f
+    drawLine(
+        color = palette.highlight.copy(alpha = palette.highlight.alpha * 0.54f),
+        start = Offset(size.width * 0.16f, inset),
+        end = Offset(size.width * 0.62f, inset),
+        strokeWidth = unit * 0.28f,
+    )
+    drawLine(
+        color = palette.edge.copy(alpha = palette.edge.alpha * 0.58f),
+        start = Offset(inset, size.height * 0.24f),
+        end = Offset(inset, size.height * 0.58f),
+        strokeWidth = unit * 0.26f,
+    )
+    drawLine(
+        color = palette.shadow.copy(alpha = palette.shadow.alpha * 0.60f),
+        start = Offset(size.width * 0.31f, size.height - inset),
+        end = Offset(size.width * 0.78f, size.height - inset),
+        strokeWidth = unit * 0.30f,
+    )
+    drawLine(
+        color = palette.shadow.copy(alpha = palette.shadow.alpha * 0.46f),
+        start = Offset(size.width - inset, size.height * 0.42f),
+        end = Offset(size.width - inset, size.height * 0.72f),
+        strokeWidth = unit * 0.26f,
+    )
 }
 
 internal fun seasonCardFramePolishEnabled(
@@ -38,6 +100,22 @@ internal fun seasonCardFramePolishEnabled(
     minimumHeight: Float,
 ): Boolean {
     return width >= minimumWidth && height >= minimumHeight && minimumWidth > 0f && minimumHeight > 0f
+}
+
+internal fun seasonCardDecorationHeight(
+    requestedHeight: Float,
+    width: Float,
+    height: Float,
+    minimumWidth: Float,
+    minimumHeight: Float,
+): Float {
+    if (
+        requestedHeight <= 0f ||
+        !seasonCardFramePolishEnabled(width, height, minimumWidth, minimumHeight)
+    ) {
+        return 0f
+    }
+    return minOf(requestedHeight, height * 0.16f)
 }
 
 private data class SeasonFramePalette(

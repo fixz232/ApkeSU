@@ -42,7 +42,7 @@ def merge_config(file_cfg: dict, args: argparse.Namespace) -> dict:
         "app_build_type": "debug",
         "ksud_build_type": "debug",
         "arch": [],
-        "manager_package": "me.weishu.kernelsu",
+        "manager_package": "io.github.fixz.apkesu",
         "output_name": "",
         "strip": False,
     }

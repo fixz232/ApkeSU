@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -217,6 +218,9 @@ fun DeltaScreen(
     title: String,
     icon: ImageVector,
     bottomInnerPadding: Dp,
+    topActionIcon: ImageVector? = null,
+    onTopActionClick: () -> Unit = {},
+    topActionContentDescription: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val background = if (LocalNightBackgroundEffectActive.current) {
@@ -229,7 +233,13 @@ fun DeltaScreen(
             .fillMaxSize()
             .background(background),
     ) {
-        DeltaTopBar(title = title, icon = icon)
+        DeltaTopBar(
+            title = title,
+            icon = icon,
+            actionIcon = topActionIcon,
+            onActionClick = onTopActionClick,
+            actionContentDescription = topActionContentDescription,
+        )
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
         }
@@ -241,6 +251,9 @@ fun DeltaTopBar(
     title: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    actionIcon: ImageVector? = null,
+    onActionClick: () -> Unit = {},
+    actionContentDescription: String? = null,
 ) {
     Column(
         modifier = modifier
@@ -279,6 +292,19 @@ fun DeltaTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (actionIcon != null) {
+                IconButton(
+                    onClick = onActionClick,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) {
+                    Icon(
+                        imageVector = actionIcon,
+                        contentDescription = actionContentDescription,
+                        tint = DeltaColors.Accent,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
             }
         }
         DeltaRule()

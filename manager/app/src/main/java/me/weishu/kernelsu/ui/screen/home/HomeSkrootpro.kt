@@ -58,7 +58,7 @@ fun HomePagerSkrootpro(
     }
 
     SkrootproScreen(
-        title = stringResource(R.string.skrootpro_title),
+        title = state.customHomeTitle.ifBlank { stringResource(R.string.skrootpro_title) },
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         Column(

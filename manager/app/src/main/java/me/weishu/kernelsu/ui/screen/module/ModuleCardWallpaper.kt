@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -73,6 +74,52 @@ internal data class ModuleCardWallpaperEntry(
     val uriString: String,
     val crop: CustomWallpaperCrop,
 )
+
+internal data class ModuleCardWallpaperSnapshot(
+    val entries: List<ModuleCardWallpaperEntry>,
+    val carouselEnabled: Boolean,
+)
+
+internal fun readModuleCardWallpaperSnapshot(
+    context: Context,
+    moduleId: String,
+): ModuleCardWallpaperSnapshot {
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val entries = readModuleCardWallpaperEntries(prefs, moduleId)
+    return ModuleCardWallpaperSnapshot(
+        entries = entries,
+        carouselEnabled = entries.size > 1 && prefs.getBoolean(moduleWallpaperCarouselKey(moduleId), false),
+    )
+}
+
+internal fun replaceModuleCardWallpaperSnapshot(
+    context: Context,
+    moduleId: String,
+    snapshot: ModuleCardWallpaperSnapshot,
+): Boolean {
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val previousEntries = readModuleCardWallpaperEntries(prefs, moduleId)
+    val editor = prefs.edit()
+    if (snapshot.entries.isEmpty()) {
+        editor.removeModuleCardWallpaperEntries(moduleId)
+        editor.remove(moduleWallpaperCarouselKey(moduleId))
+    } else {
+        editor.putModuleCardWallpaperEntries(moduleId, snapshot.entries)
+        editor.putBoolean(
+            moduleWallpaperCarouselKey(moduleId),
+            snapshot.carouselEnabled && snapshot.entries.size > 1,
+        )
+    }
+    if (!editor.commit()) return false
+
+    val retainedUris = snapshot.entries.mapTo(HashSet()) { it.uriString }
+    previousEntries
+        .asSequence()
+        .map { it.uriString }
+        .filterNot(retainedUris::contains)
+        .forEach { releaseCustomImageReference(context, it) }
+    return true
+}
 
 internal data class ModuleCardWallpaperState(
     val entries: List<ModuleCardWallpaperEntry>,
@@ -115,6 +162,14 @@ internal fun rememberModuleCardWallpaperState(
     }
     var carouselEnabled by remember(moduleId) {
         mutableStateOf(prefs.getBoolean(moduleWallpaperCarouselKey(moduleId), false) && entries.size > 1)
+    }
+
+    LifecycleResumeEffect(moduleId) {
+        val refreshed = readModuleCardWallpaperSnapshot(context, moduleId)
+        entries = refreshed.entries
+        selectedIndex = selectedIndex.coerceIn(0, refreshed.entries.lastIndex.coerceAtLeast(0))
+        carouselEnabled = refreshed.carouselEnabled
+        onPauseOrDispose { }
     }
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()

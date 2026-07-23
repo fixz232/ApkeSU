@@ -54,7 +54,7 @@ fun HomePagerDelta(
 ) {
     val warnings = homeWarningMessages(state)
     DeltaScreen(
-        title = stringResource(R.string.home),
+        title = state.customHomeTitle.ifBlank { stringResource(R.string.home) },
         icon = Icons.Rounded.Home,
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
@@ -120,7 +120,7 @@ private fun DeltaStatusCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.app_name),
+                    text = state.customHomeTitle.ifBlank { stringResource(R.string.app_name) },
                     color = DeltaColors.Ink,
                     fontSize = deltaSp(28f, maxScale = 1.0f),
                     lineHeight = deltaSp(32f, maxScale = 1.0f),

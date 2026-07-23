@@ -47,6 +47,10 @@ import me.weishu.kernelsu.ui.component.liquid.liquidGlassSurfaceColor
 import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelNavigationContainerColor
 import me.weishu.kernelsu.ui.component.pixel.pixelNavigationSurface
+import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
+import me.weishu.kernelsu.ui.component.rain.rainNavigationContainerColor
+import me.weishu.kernelsu.ui.component.rain.rainNavigationIndicator
+import me.weishu.kernelsu.ui.component.rain.rainNavigationSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
@@ -78,12 +82,15 @@ fun BottomBarMiuix(
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
+    val isRainStyle = isRainInterfaceStyle()
     val isPixelStyle = isPixelInterfaceStyle()
 
     val destinations = BottomBarDestination.entries.toList()
     val customIcons = LocalCustomNavigationIcons.current
     val barColor = if (isPixelStyle) {
         pixelNavigationContainerColor()
+    } else if (isRainStyle) {
+        rainNavigationContainerColor()
     } else if (blurBackdrop != null) {
         Color.Transparent
     } else if (isLiquidGlass) {
@@ -98,6 +105,7 @@ fun BottomBarMiuix(
         val navigationModifier = modifier.then(
             when {
                 isPixelStyle -> Modifier.pixelNavigationSurface(navigationShape)
+                isRainStyle -> Modifier.rainNavigationSurface(navigationShape, paintBackground = false)
                 isSnowStyle -> Modifier.seasonNavigationSurface(navigationShape, paintBackground = false)
                 else -> Modifier
             },
@@ -231,7 +239,8 @@ private fun RowScope.MiuixCustomNavigationBarItem(
 ) {
     val label = stringResource(destination.label)
     val isSnowStyle = isSnowInterfaceStyle()
-    val itemShape = if (isSnowStyle) RoundedCornerShape(10.dp) else CircleShape
+    val isRainStyle = isRainInterfaceStyle()
+    val itemShape = if (isSnowStyle || isRainStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -256,6 +265,8 @@ private fun RowScope.MiuixCustomNavigationBarItem(
                 .then(
                     if (selected && isSnowStyle) {
                         Modifier.seasonNavigationIndicator(itemShape)
+                    } else if (selected && isRainStyle) {
+                        Modifier.rainNavigationIndicator(itemShape)
                     } else {
                         Modifier.background(
                             if (selected) {

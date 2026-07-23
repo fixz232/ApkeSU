@@ -36,17 +36,29 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Build kernelsu.ko
+      shell: bash
       env:
         EXPECTED_SIZE2: ${{ inputs.expected_size2 }}
         EXPECTED_HASH2: ${{ inputs.expected_hash2 }}
       run: |
-        git config --global --add safe.directory /__w/KernelSU/KernelSU
+        set -euo pipefail
+
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        python3 scripts/verify_apkesu_kernel_identity.py
+
+        VERSION_CODE="$(sed -n 's/^versionCode=//p' version.properties | head -n 1)"
+        MANAGER_IDENTITY="$GITHUB_WORKSPACE/dist/manager_identity.mk"
+        test -n "$VERSION_CODE"
+        test -f "$MANAGER_IDENTITY"
 
         cd kernel
 
         echo "=== Building kernelsu.ko for KMI: ${{ inputs.kmi }} ==="
 
-        EXTRA_ARGS=""
+        MAKE_ARGS=(
+          "KSU_VERSION_OVERRIDE=$VERSION_CODE"
+          "KSU_MANAGER_IDENTITY=$MANAGER_IDENTITY"
+        )
         if [ -n "$EXPECTED_SIZE2" ] && [ -z "$EXPECTED_HASH2" ]; then
           echo "ERROR: expected_hash2 must be provided when expected_size2 is set."
           exit 1
@@ -56,9 +68,16 @@ jobs:
           exit 1
         fi
         if [ -n "$EXPECTED_SIZE2" ]; then
-          EXTRA_ARGS="KSU_EXPECTED_SIZE2=$EXPECTED_SIZE2 KSU_EXPECTED_HASH2=$EXPECTED_HASH2"
+          MAKE_ARGS+=(
+            "KSU_EXPECTED_SIZE2=$EXPECTED_SIZE2"
+            "KSU_EXPECTED_HASH2=$EXPECTED_HASH2"
+          )
         fi
-        CONFIG_KSU=m CC=clang make $EXTRA_ARGS
+        CONFIG_KSU=m CC=clang make "${MAKE_ARGS[@]}" 2>&1 | tee build.log
+
+        python3 ../scripts/verify_apkesu_kernel_identity.py \
+          --build-log build.log \
+          --module kernelsu.ko
         
         echo "=== Build completed ==="
 

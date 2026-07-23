@@ -106,6 +106,7 @@ import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_FILE_NAME
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_MIME_TYPE
 import me.weishu.kernelsu.ui.util.HiddenPathConfigState
@@ -458,6 +459,11 @@ fun HiddenPathConfigScreen() {
                             contentDescription = stringResource(R.string.close),
                         )
                     }
+                },
+                actions = {
+                    ForegroundToolProtectionTopBarAction(
+                        onClick = { navigator.push(Route.ForegroundToolProtection) },
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,

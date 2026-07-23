@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.SusfsPathConfigState
 import me.weishu.kernelsu.ui.util.getSusfsPathConfig
 import me.weishu.kernelsu.ui.util.normalizeSusfsPath
@@ -148,6 +149,9 @@ fun SusfsPathConfigScreen() {
                     }
                 },
                 actions = {
+                    ForegroundToolProtectionTopBarAction(
+                        onClick = { navigator.push(Route.ForegroundToolProtection) },
+                    )
                     IconButton(onClick = ::refresh, enabled = !loading && !applying) {
                         Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.susfs_path_refresh))
                     }

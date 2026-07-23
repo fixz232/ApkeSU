@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_season_card_motion">Animated seasonal cards</string>
+    <string name="settings_season_card_motion_summary">Animate petals, water glints, drifting leaves, and frost sparkle without moving card content.</string>
+</resources>

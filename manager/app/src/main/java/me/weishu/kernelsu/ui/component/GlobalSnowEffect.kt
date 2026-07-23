@@ -37,7 +37,8 @@ enum class GlobalSnowEffect(
     Starlight("starlight", R.string.settings_global_snow_effect_starlight),
     Pink("pink", R.string.settings_global_snow_effect_pink),
     Crystal("crystal", R.string.settings_global_snow_effect_crystal),
-    Starfield("starfield", R.string.settings_global_snow_effect_starfield);
+    Starfield("starfield", R.string.settings_global_snow_effect_starfield),
+    SeasonalRain("seasonal_rain", R.string.settings_global_snow_effect_seasonal_rain);
 
     companion object {
         val Default = Gentle
@@ -66,6 +67,10 @@ fun GlobalSnowEffectOverlay(
     if (!enabled || !isInDarkTheme()) return
 
     val effect = GlobalSnowEffect.fromValue(effectValue)
+    if (effect == GlobalSnowEffect.SeasonalRain) {
+        GlobalSeasonalRainEffect(modifier = modifier)
+        return
+    }
     val spec = remember(effect) { SnowSpec.forEffect(effect) }
     if (spec == null) {
         GlobalStarfieldEffect(modifier = modifier)
@@ -380,7 +385,9 @@ private data class SnowSpec(
                     accentColor = Color(0xFFBDEBFF),
                 )
 
-                GlobalSnowEffect.Starfield -> null
+                GlobalSnowEffect.Starfield,
+                GlobalSnowEffect.SeasonalRain,
+                -> null
             }
         }
     }
@@ -522,7 +529,9 @@ private fun DrawScope.drawFlake(
             drawCircle(color = color.copy(alpha = visibleAlpha), radius = radius * 0.9f, center = center)
         }
 
-        GlobalSnowEffect.Starfield -> Unit
+        GlobalSnowEffect.Starfield,
+        GlobalSnowEffect.SeasonalRain,
+        -> Unit
     }
 }
 

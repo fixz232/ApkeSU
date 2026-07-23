@@ -19,6 +19,7 @@ const val SHOW_GKI_WARNING_KEY = "show_gki_warning"
 const val SHOW_HOME_SUPPORT_CARD_KEY = "show_home_support_card"
 const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
 const val GRAPHICS_RENDERER_FEATURE_ENABLED_KEY = "graphics_renderer_feature_enabled"
+const val CUSTOM_HOME_TITLE_KEY = "custom_home_title"
 
 interface SettingsRepository {
     var uiMode: String
@@ -45,7 +46,11 @@ interface SettingsRepository {
     var blurIntensity: Float
     var switchStyle: String
     var seasonStyle: String
+    var seasonCardMotionEnabled: Boolean
+    var rainStyle: String
+    var rainCardMotionEnabled: Boolean
     var pixelStyle: String
+    var pixelCardMotionEnabled: Boolean
     val uiDecorationConfig: UiDecorationConfig
     fun saveUiDecorationConfig(config: UiDecorationConfig): Boolean
     fun getCustomUiDecorationPresets(): List<CustomUiDecorationPreset>
@@ -66,6 +71,7 @@ interface SettingsRepository {
     var autoJailbreak: Boolean
     var launcherIcon: String
     var customManagerName: String
+    var customHomeTitle: String
     var customWallpaperUri: String?
     var customWallpaperOpacity: Float
     var customWallpaperCrop: CustomWallpaperCrop

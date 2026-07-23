@@ -28,8 +28,16 @@ import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
+import me.weishu.kernelsu.ui.component.snow.SEASON_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.snow.DEFAULT_SEASON_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
+import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CUSTOM_PRESETS_KEY
@@ -285,6 +293,25 @@ class SettingsRepositoryImpl : SettingsRepository {
             }
         }
 
+    override var seasonCardMotionEnabled: Boolean
+        get() = prefs.getBoolean(SEASON_CARD_MOTION_ENABLED_KEY, DEFAULT_SEASON_CARD_MOTION_ENABLED)
+        set(value) = prefs.edit { putBoolean(SEASON_CARD_MOTION_ENABLED_KEY, value) }
+
+    override var rainStyle: String
+        get() = RainStyle.fromValue(prefs.getString(RAIN_STYLE_KEY, RainStyle.DEFAULT_VALUE)).value
+        set(value) {
+            val rainStyle = RainStyle.fromValue(value)
+            prefs.edit {
+                putString(RAIN_STYLE_KEY, rainStyle.value)
+                putInt(themeKey("key_color"), rainStyle.keyColor)
+                putString(themeKey("theme_preset"), ThemePreset.RAIN.value)
+            }
+        }
+
+    override var rainCardMotionEnabled: Boolean
+        get() = prefs.getBoolean(RAIN_CARD_MOTION_ENABLED_KEY, DEFAULT_RAIN_CARD_MOTION_ENABLED)
+        set(value) = prefs.edit { putBoolean(RAIN_CARD_MOTION_ENABLED_KEY, value) }
+
     override var pixelStyle: String
         get() = PixelStyle.fromValue(prefs.getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE)).value
         set(value) {
@@ -295,6 +322,10 @@ class SettingsRepositoryImpl : SettingsRepository {
                 putString(themeKey("theme_preset"), ThemePreset.PIXEL.value)
             }
         }
+
+    override var pixelCardMotionEnabled: Boolean
+        get() = prefs.getBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, DEFAULT_PIXEL_CARD_MOTION_ENABLED)
+        set(value) = prefs.edit { putBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, value) }
 
     override val uiDecorationConfig: UiDecorationConfig
         get() = UiDecorationConfig.fromJsonString(prefs.getString(UI_DECORATION_CONFIG_KEY, null))
@@ -510,6 +541,19 @@ class SettingsRepositoryImpl : SettingsRepository {
                     remove(CUSTOM_MANAGER_NAME_KEY)
                 } else {
                     putString(CUSTOM_MANAGER_NAME_KEY, name)
+                }
+            }
+        }
+
+    override var customHomeTitle: String
+        get() = sanitizeCustomHomeTitle(prefs.getString(CUSTOM_HOME_TITLE_KEY, null))
+        set(value) {
+            val title = sanitizeCustomHomeTitle(value)
+            prefs.edit {
+                if (title.isBlank()) {
+                    remove(CUSTOM_HOME_TITLE_KEY)
+                } else {
+                    putString(CUSTOM_HOME_TITLE_KEY, title)
                 }
             }
         }
@@ -1062,9 +1106,14 @@ class SettingsRepositoryImpl : SettingsRepository {
         return value.orEmpty().trim().take(MAX_CUSTOM_MANAGER_NAME_LENGTH)
     }
 
+    private fun sanitizeCustomHomeTitle(value: String?): String {
+        return value.orEmpty().trim().take(MAX_CUSTOM_HOME_TITLE_LENGTH)
+    }
+
     private companion object {
         const val CUSTOM_MANAGER_NAME_KEY = "custom_manager_name"
         const val MAX_CUSTOM_MANAGER_NAME_LENGTH = 40
+        const val MAX_CUSTOM_HOME_TITLE_LENGTH = 40
         const val CUSTOM_THEME_PRESET_IDS_KEY = "custom_theme_preset_ids"
         const val MAX_RECENT_UI_DECORATION_COMPONENTS = 16
         val CUSTOM_THEME_PRESET_FIELDS = listOf(

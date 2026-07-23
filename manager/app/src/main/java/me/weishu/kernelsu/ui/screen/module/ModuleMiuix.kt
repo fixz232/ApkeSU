@@ -57,13 +57,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,6 +125,7 @@ import me.weishu.kernelsu.ui.component.miuix.SearchBarFake
 import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
 import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
+import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
 import me.weishu.kernelsu.ui.screen.settings.SettingsWallpaperCropDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
@@ -266,7 +267,6 @@ fun ModulePagerMiuix(
     }
 
     val listState = rememberLazyListState()
-    var refreshTick by remember { mutableIntStateOf(0) }
     val nestedScrollConnection = remember(uiState.installButtonVisible) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -309,6 +309,13 @@ fun ModulePagerMiuix(
                         titleColor = topBarColors.content,
                         title = stringResource(R.string.module),
                         actions = {
+                            IconButton(onClick = actions.onOpenWallpaperBackup) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Backup,
+                                    tint = topBarColors.content,
+                                    contentDescription = stringResource(R.string.module_wallpaper_backup_open),
+                                )
+                            }
                             Box {
                                 val showTopPopup = remember { mutableStateOf(false) }
                                 IconButton(
@@ -563,10 +570,7 @@ fun ModulePagerMiuix(
                 PullToRefresh(
                     isRefreshing = uiState.isRefreshing,
                     pullToRefreshState = pullToRefreshState,
-                    onRefresh = {
-                        actions.onRefresh()
-                        refreshTick++
-                    },
+                    onRefresh = actions.onRefresh,
                     refreshTexts = refreshTexts,
                     contentPadding = contentPadding,
                 ) {
@@ -594,13 +598,10 @@ fun ModulePagerMiuix(
                         }
                     } else {
                         val latestModules = rememberUpdatedState(modules)
-                        val latestRefreshing = rememberUpdatedState(uiState.isRefreshing)
                         ScrollToTopOnChange(
                             listState,
                             uiState.sortEnabledFirst,
                             uiState.sortActionFirst,
-                            refreshTick,
-                            isBusy = { latestRefreshing.value },
                         ) { latestModules.value }
                         Column(modifier = Modifier.fillMaxSize()) {
                             if (uiState.loadError != null) {
@@ -881,6 +882,7 @@ fun ModuleItem(
     val hasWallpaper = wallpaperBitmap != null
 
     Card(
+        cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp)

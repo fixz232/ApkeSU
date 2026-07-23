@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">雨境</string>
+    <string name="settings_rain_style">雨势切换</string>
+    <string name="settings_rain_card_motion">卡片雨水动效</string>
+    <string name="settings_rain_card_motion_summary">让水檐雨珠、凝露与冷光缓慢流动，不移动卡片和正文。</string>
+    <string name="rain_style_light">小雨</string>
+    <string name="rain_style_light_summary">浅灰蓝薄雾、稀疏雨线与安静水波，卡片像覆着一层轻盈雨水。</string>
+    <string name="rain_style_medium">中雨</string>
+    <string name="rain_style_medium_summary">雨线渐密、云层加深，卡片水檐与凝露更加清晰。</string>
+    <string name="rain_style_heavy">暴雨</string>
+    <string name="rain_style_heavy_summary">自动进入深灰暗蓝雨夜，风雨更强，湿润玻璃与落地水波更明显。</string>
+    <string name="rain_style_thunderstorm">雷阵雨</string>
+    <string name="rain_style_thunderstorm_summary">仅在夜间每 3 至 8 秒随机闪电，搭配密集雨幕与暗紫雷云。</string>
+    <string name="rain_motto_light">听雨落在玻璃上</string>
+    <string name="rain_motto_medium">雨声渐密，世界渐静</string>
+    <string name="rain_motto_heavy">穿过风雨，仍然清醒</string>
+    <string name="rain_motto_thunderstorm">雷光划夜，守住内核</string>
+    <string name="theme_preset_rain">雨境</string>
+    <string name="theme_preset_rain_summary">冷灰蓝雨幕、湿润卡片边缘、水檐顶部装饰与联动悬浮底栏。</string>
+</resources>

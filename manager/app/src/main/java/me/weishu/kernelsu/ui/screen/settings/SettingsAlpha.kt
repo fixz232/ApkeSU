@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -180,16 +181,14 @@ fun SettingPagerAlpha(
                     onClick = actions.onOpenLauncherIcon,
                 )
                 AlphaActionRow(
-                    title = stringResource(R.string.settings_navigation_icons),
-                    summary = stringResource(R.string.settings_navigation_icons_summary),
-                    icon = Icons.Rounded.Apps,
-                    onClick = actions.onOpenNavigationIcons,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.home_card_wallpapers),
-                    summary = stringResource(R.string.home_card_wallpapers_summary),
-                    icon = Icons.Rounded.Wallpaper,
-                    onClick = actions.onOpenHomeCardWallpapers,
+                    title = stringResource(R.string.settings_home_title),
+                    summary = if (uiState.customHomeTitle.isBlank()) {
+                        stringResource(R.string.settings_home_title_default_summary)
+                    } else {
+                        stringResource(R.string.settings_home_title_custom_summary, uiState.customHomeTitle)
+                    },
+                    icon = Icons.Rounded.EditNote,
+                    onClick = actions.onEditHomeTitle,
                 )
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_show_home_support_card),
@@ -202,37 +201,6 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.settings_show_home_learn_card_summary),
                     checked = uiState.showHomeLearnCard,
                     onCheckedChange = actions.onSetShowHomeLearnCard,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_backgrounds),
-                    summary = stringResource(R.string.settings_backgrounds_summary),
-                    icon = Icons.Rounded.Wallpaper,
-                    onClick = actions.onOpenBackgrounds,
-                )
-            }
-
-            AlphaSection(
-                title = stringResource(R.string.alpha_startup_media),
-                icon = Icons.Rounded.PlayCircle,
-                collapsible = snowStyle,
-            ) {
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_sound_effects),
-                    summary = stringResource(R.string.settings_sound_effects_summary),
-                    icon = Icons.AutoMirrored.Rounded.VolumeUp,
-                    onClick = actions.onOpenSoundEffects,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_startup_animation),
-                    summary = stringResource(
-                        if (uiState.customStartupAnimationUri == null) {
-                            R.string.settings_startup_animation_summary
-                        } else {
-                            R.string.settings_startup_animation_selected_summary
-                        }
-                    ),
-                    icon = Icons.Rounded.PlayCircle,
-                    onClick = actions.onOpenStartupAnimation,
                 )
             }
 

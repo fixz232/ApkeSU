@@ -14,6 +14,9 @@ import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
+import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
 
 enum class ColorMode(val value: Int) {
     SYSTEM(0),
@@ -70,6 +73,7 @@ object ThemeController {
             InterfaceStyle.Delta.value -> ThemePreset.DELTA
             InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
             InterfaceStyle.Snow.value -> ThemePreset.SNOW
+            InterfaceStyle.Rain.value -> ThemePreset.RAIN
             InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
             else -> ThemePreset.CLEAN_TOOL
         }
@@ -129,6 +133,12 @@ fun KernelSUTheme(
 @Composable
 @ReadOnlyComposable
 fun isInDarkTheme(): Boolean {
+    if (
+        LocalInterfaceStyle.current == InterfaceStyle.Rain.value &&
+        forceRainDarkTheme(LocalRainStyle.current)
+    ) {
+        return true
+    }
     if (
         LocalInterfaceStyle.current == InterfaceStyle.Pixel.value &&
         LocalPixelStyle.current == PixelStyle.CyberHacker

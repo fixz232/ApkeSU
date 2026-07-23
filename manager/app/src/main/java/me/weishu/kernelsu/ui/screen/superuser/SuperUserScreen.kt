@@ -56,6 +56,7 @@ fun SuperUserPager(
     val actions = SuperUserActions(
         onRefresh = { viewModel.loadAppList(force = true) },
         onOpenSulog = { navigator.push(Route.Sulog) },
+        onOpenAppIdManager = { navigator.push(Route.AppIdManager) },
         onSearchTextChange = onSearchTextChange,
         onSearchStatusChange = viewModel::updateSearchStatus,
         onClearSearch = { onSearchTextChange("") },
@@ -103,6 +104,7 @@ fun SuperUserPager(
         }
 
         InterfaceStyle.Snow.value,
+        InterfaceStyle.Rain.value,
         InterfaceStyle.Pixel.value -> {
             SuperUserPagerMiuix(
                 uiState = uiState,

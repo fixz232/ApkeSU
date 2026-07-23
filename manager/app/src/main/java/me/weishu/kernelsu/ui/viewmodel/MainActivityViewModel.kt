@@ -29,8 +29,16 @@ import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
+import me.weishu.kernelsu.ui.component.snow.SEASON_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.snow.DEFAULT_SEASON_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
+import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
@@ -100,14 +108,18 @@ class MainActivityViewModel(
             pageScale = settingRepo.pageScale,
             fontScale = settingRepo.fontScale,
             blurIntensity = settingRepo.blurIntensity,
-            enableBlur = if (isLiquidGlassInterface) false else settingRepo.enableBlur,
+            enableBlur = if (isLiquidGlassInterface) true else settingRepo.enableBlur,
             enableFloatingBottomBar = settingRepo.enableFloatingBottomBar,
-            enableFloatingBottomBarBlur = if (isLiquidGlassInterface) false else settingRepo.enableFloatingBottomBarBlur,
+            enableFloatingBottomBarBlur = if (isLiquidGlassInterface) true else settingRepo.enableFloatingBottomBarBlur,
             autoHideNavigationBar = settingRepo.autoHideNavigationBar,
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
             seasonStyle = settingRepo.seasonStyle,
+            seasonCardMotionEnabled = settingRepo.seasonCardMotionEnabled,
+            rainStyle = settingRepo.rainStyle,
+            rainCardMotionEnabled = settingRepo.rainCardMotionEnabled,
             pixelStyle = settingRepo.pixelStyle,
+            pixelCardMotionEnabled = settingRepo.pixelCardMotionEnabled,
             uiDecorationConfig = settingRepo.uiDecorationConfig,
             globalSnowEnabled = settingRepo.globalSnowEnabled,
             globalSnowEffect = settingRepo.globalSnowEffect,
@@ -156,7 +168,11 @@ class MainActivityViewModel(
             scrollHideNavigationBar = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
             seasonStyle = SeasonStyle.DEFAULT_VALUE,
+            seasonCardMotionEnabled = DEFAULT_SEASON_CARD_MOTION_ENABLED,
+            rainStyle = RainStyle.DEFAULT_VALUE,
+            rainCardMotionEnabled = DEFAULT_RAIN_CARD_MOTION_ENABLED,
             pixelStyle = PixelStyle.DEFAULT_VALUE,
+            pixelCardMotionEnabled = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
             uiDecorationConfig = UiDecorationConfig(),
             globalSnowEnabled = false,
             globalSnowEffect = GlobalSnowEffect.DEFAULT_VALUE,
@@ -202,7 +218,11 @@ class MainActivityViewModel(
             "ui_mode",
             SWITCH_STYLE_KEY,
             SEASON_STYLE_KEY,
+            SEASON_CARD_MOTION_ENABLED_KEY,
+            RAIN_STYLE_KEY,
+            RAIN_CARD_MOTION_ENABLED_KEY,
             PIXEL_STYLE_KEY,
+            PIXEL_CARD_MOTION_ENABLED_KEY,
             UI_DECORATION_CONFIG_KEY,
             GLOBAL_SNOW_ENABLED_KEY,
             GLOBAL_SNOW_EFFECT_KEY,

@@ -123,7 +123,7 @@ internal class AiChatViewModel : ViewModel() {
 
     fun testConnection() {
         val state = _uiState.value
-        if (state.testingApi || state.isSending) return
+        if (state.testingApi || state.loadingModels || state.isSending) return
         val config = state.config.normalized()
         config.validationError()?.let {
             val message = validationMessage(it)

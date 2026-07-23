@@ -64,6 +64,7 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -89,12 +91,16 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.KsuIsValid
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
+import me.weishu.kernelsu.ui.component.liquid.FrostedGlassCardStyle
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardColors
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.pixel.pixelPalette
+import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.rain.rainPalette
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
@@ -260,13 +266,25 @@ fun SettingPagerMiuix(
                         if (uiState.uiMode == InterfaceStyle.Snow.value) {
                             SeasonMiuixPreference(
                                 selectedValue = uiState.seasonStyle,
+                                cardMotionEnabled = uiState.seasonCardMotionEnabled,
                                 onSelectedIndexChange = actions.onSetSeasonStyleIndex,
+                                onCardMotionEnabledChange = actions.onSetSeasonCardMotionEnabled,
+                            )
+                        }
+                        if (uiState.uiMode == InterfaceStyle.Rain.value) {
+                            RainMiuixPreference(
+                                selectedValue = uiState.rainStyle,
+                                cardMotionEnabled = uiState.rainCardMotionEnabled,
+                                onSelectedIndexChange = actions.onSetRainStyleIndex,
+                                onCardMotionEnabledChange = actions.onSetRainCardMotionEnabled,
                             )
                         }
                         if (uiState.uiMode == InterfaceStyle.Pixel.value) {
                             PixelMiuixPreference(
                                 selectedValue = uiState.pixelStyle,
+                                cardMotionEnabled = uiState.pixelCardMotionEnabled,
                                 onSelectedIndexChange = actions.onSetPixelStyleIndex,
+                                onCardMotionEnabledChange = actions.onSetPixelCardMotionEnabled,
                             )
                         }
                         DayNightMiuixPreference(
@@ -341,30 +359,24 @@ fun SettingPagerMiuix(
                             onClick = actions.onOpenLauncherIcon
                         )
                         ArrowPreference(
-                            title = stringResource(id = R.string.settings_navigation_icons),
-                            summary = stringResource(id = R.string.settings_navigation_icons_summary),
+                            title = stringResource(id = R.string.settings_home_title),
+                            summary = if (uiState.customHomeTitle.isBlank()) {
+                                stringResource(id = R.string.settings_home_title_default_summary)
+                            } else {
+                                stringResource(
+                                    id = R.string.settings_home_title_custom_summary,
+                                    uiState.customHomeTitle,
+                                )
+                            },
                             startAction = {
                                 Icon(
-                                    Icons.Rounded.Apps,
+                                    Icons.Rounded.EditNote,
                                     modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_navigation_icons),
+                                    contentDescription = stringResource(id = R.string.settings_home_title),
                                     tint = colorScheme.onBackground
                                 )
                             },
-                            onClick = actions.onOpenNavigationIcons
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.home_card_wallpapers),
-                            summary = stringResource(id = R.string.home_card_wallpapers_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Wallpaper,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.home_card_wallpapers),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenHomeCardWallpapers
+                            onClick = actions.onEditHomeTitle
                         )
                         SwitchPreference(
                             title = stringResource(id = R.string.settings_show_home_support_card),
@@ -393,51 +405,6 @@ fun SettingPagerMiuix(
                             },
                             checked = uiState.showHomeLearnCard,
                             onCheckedChange = actions.onSetShowHomeLearnCard
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_backgrounds),
-                            summary = stringResource(id = R.string.settings_backgrounds_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Wallpaper,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_backgrounds),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenBackgrounds
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_sound_effects),
-                            summary = stringResource(id = R.string.settings_sound_effects_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.AutoMirrored.Rounded.VolumeUp,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_sound_effects),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenSoundEffects
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_startup_animation),
-                            summary = stringResource(
-                                if (uiState.customStartupAnimationUri == null) {
-                                    R.string.settings_startup_animation_summary
-                                } else {
-                                    R.string.settings_startup_animation_selected_summary
-                                }
-                            ),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.PlayCircle,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_startup_animation),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenStartupAnimation
                         )
                     }
 
@@ -1040,6 +1007,7 @@ private fun CollapsibleMiuixSection(
                 fadeOut(animationSpec = tween(140, easing = FastOutSlowInEasing)),
     ) {
         Card(
+            cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
             modifier = Modifier
                 .padding(top = 6.dp, bottom = bottomPadding)
                 .fillMaxWidth()
@@ -1057,13 +1025,22 @@ private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 11
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 14 + if (uiMode == InterfaceStyle.Snow.value || uiMode == InterfaceStyle.Pixel.value) 1 else 0
+    return 15 + when (uiMode) {
+        InterfaceStyle.Rain.value,
+        InterfaceStyle.Snow.value,
+        -> 2
+        InterfaceStyle.Pixel.value,
+        -> 2
+        else -> 0
+    }
 }
 
 @Composable
 private fun SeasonMiuixPreference(
     selectedValue: String,
+    cardMotionEnabled: Boolean,
     onSelectedIndexChange: (Int) -> Unit,
+    onCardMotionEnabledChange: (Boolean) -> Unit,
 ) {
     val selectedSeason = SeasonStyle.fromValue(selectedValue)
     Row(
@@ -1129,12 +1106,180 @@ private fun SeasonMiuixPreference(
             }
         }
     }
+    SwitchPreference(
+        title = stringResource(R.string.settings_season_card_motion),
+        summary = stringResource(R.string.settings_season_card_motion_summary),
+        startAction = {
+            Icon(
+                Icons.Rounded.AutoFixHigh,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = stringResource(R.string.settings_season_card_motion),
+                tint = colorScheme.onBackground,
+            )
+        },
+        checked = cardMotionEnabled,
+        onCheckedChange = onCardMotionEnabledChange,
+    )
+}
+
+@Composable
+private fun RainMiuixPreference(
+    selectedValue: String,
+    cardMotionEnabled: Boolean,
+    onSelectedIndexChange: (Int) -> Unit,
+    onCardMotionEnabledChange: (Boolean) -> Unit,
+) {
+    val selectedStyle = RainStyle.fromValue(selectedValue)
+    val dark = isInDarkTheme()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.WaterDrop,
+            modifier = Modifier.padding(end = 12.dp).size(24.dp),
+            contentDescription = null,
+            tint = colorScheme.onBackground,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_rain_style),
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(selectedStyle.summaryRes),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
+            .selectableGroup()
+            .padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        RainStyle.entries.toList().chunked(2).forEach { styleRow ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                styleRow.forEach { rainStyle ->
+                    val index = RainStyle.entries.indexOf(rainStyle)
+                    val selected = rainStyle == selectedStyle
+                    val preview = rainPalette(rainStyle, dark)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (selected) {
+                                    colorScheme.primaryContainer.copy(alpha = 0.92f)
+                                } else {
+                                    Color.Transparent
+                                },
+                            )
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelectedIndexChange(index) },
+                            )
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 32.dp, height = 22.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(preview.backgroundTop, preview.backgroundBottom),
+                                    ),
+                                )
+                                .border(1.dp, preview.outline.copy(alpha = 0.78f), RoundedCornerShape(5.dp)),
+                        ) {
+                            Row(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                val lineCount = when (rainStyle) {
+                                    RainStyle.LightRain -> 3
+                                    RainStyle.MediumRain -> 4
+                                    RainStyle.HeavyRain -> 5
+                                    RainStyle.Thunderstorm -> 6
+                                }
+                                repeat(lineCount) { line ->
+                                    Box(
+                                        modifier = Modifier
+                                            .width(1.dp)
+                                            .height((7 + line % 3 * 3).dp)
+                                            .graphicsLayer { rotationZ = -12f }
+                                            .background(preview.rain.copy(alpha = 0.78f)),
+                                    )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 2.dp)
+                                    .width(18.dp)
+                                    .height(1.dp)
+                                    .background(preview.ripple.copy(alpha = 0.72f)),
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            text = stringResource(rainStyle.labelRes),
+                            color = if (selected) {
+                                colorScheme.onPrimaryContainer
+                            } else {
+                                colorScheme.onSurfaceVariantSummary
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                repeat(2 - styleRow.size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+    SwitchPreference(
+        title = stringResource(R.string.settings_rain_card_motion),
+        summary = stringResource(R.string.settings_rain_card_motion_summary),
+        startAction = {
+            Icon(
+                Icons.Rounded.AutoFixHigh,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = stringResource(R.string.settings_rain_card_motion),
+                tint = colorScheme.onBackground,
+            )
+        },
+        checked = cardMotionEnabled,
+        onCheckedChange = onCardMotionEnabledChange,
+    )
 }
 
 @Composable
 private fun PixelMiuixPreference(
     selectedValue: String,
+    cardMotionEnabled: Boolean,
     onSelectedIndexChange: (Int) -> Unit,
+    onCardMotionEnabledChange: (Boolean) -> Unit,
 ) {
     val selectedStyle = PixelStyle.fromValue(selectedValue)
     val dark = isInDarkTheme()
@@ -1246,6 +1391,20 @@ private fun PixelMiuixPreference(
             }
         }
     }
+    SwitchPreference(
+        title = stringResource(R.string.settings_pixel_card_motion),
+        summary = stringResource(R.string.settings_pixel_card_motion_summary),
+        startAction = {
+            Icon(
+                Icons.Rounded.AutoFixHigh,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = stringResource(R.string.settings_pixel_card_motion),
+                tint = colorScheme.onBackground,
+            )
+        },
+        checked = cardMotionEnabled,
+        onCheckedChange = onCardMotionEnabledChange,
+    )
 }
 
 @Composable
@@ -1324,5 +1483,6 @@ private fun Modifier.settingsLiquidGlassSurface(): Modifier {
         refractionHeight = 14.dp,
         refractionAmount = 9.dp,
         strokeAlpha = 0.66f,
+        cardStyle = FrostedGlassCardStyle.Pearl,
     ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
 }

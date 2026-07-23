@@ -51,7 +51,7 @@ fun HomePagerAlpha(
 ) {
     val warnings = homeWarningMessages(state)
     AlphaScreen(
-        title = stringResource(R.string.home),
+        title = state.customHomeTitle.ifBlank { stringResource(R.string.home) },
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         LazyColumn(
@@ -104,7 +104,7 @@ private fun AlphaStatusCard(
                     modifier = Modifier.size(40.dp),
                 )
                 Text(
-                    text = stringResource(R.string.app_name),
+                    text = state.customHomeTitle.ifBlank { stringResource(R.string.app_name) },
                     color = AlphaColors.Accent,
                     fontSize = alphaSp(22f, maxScale = 1.02f),
                     lineHeight = alphaSp(26f, maxScale = 1.02f),

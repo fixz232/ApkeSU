@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.Color
 import me.weishu.kernelsu.R
 
 const val PIXEL_STYLE_KEY = "pixel_style"
+const val PIXEL_CARD_MOTION_ENABLED_KEY = "pixel_card_motion_enabled"
+const val DEFAULT_PIXEL_CARD_MOTION_ENABLED = true
 
 enum class PixelStyle(
     val value: String,

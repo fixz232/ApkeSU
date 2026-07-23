@@ -11,6 +11,7 @@ class SeasonStyleTest {
         assertEquals(SeasonStyle.Winter, SeasonStyle.fromValue(null))
         assertEquals(SeasonStyle.Winter, SeasonStyle.fromValue("unknown"))
         assertEquals(SeasonStyle.Winter.value, SeasonStyle.DEFAULT_VALUE)
+        assertTrue(DEFAULT_SEASON_CARD_MOTION_ENABLED)
     }
 
     @Test
@@ -48,5 +49,14 @@ class SeasonStyleTest {
         assertEquals(false, seasonCardFramePolishEnabled(320f, 47.9f, 72f, 48f))
         assertEquals(false, seasonCardFramePolishEnabled(320f, 180f, 0f, 48f))
         assertEquals(false, seasonCardFramePolishEnabled(320f, 180f, 72f, -1f))
+    }
+
+    @Test
+    fun cardTopDecorationsScaleToUsableCardHeight() {
+        assertEquals(13f, seasonCardDecorationHeight(13f, 320f, 180f, 72f, 48f), 0.001f)
+        assertEquals(9.6f, seasonCardDecorationHeight(13f, 320f, 60f, 72f, 48f), 0.001f)
+        assertEquals(0f, seasonCardDecorationHeight(13f, 71f, 180f, 72f, 48f), 0.001f)
+        assertEquals(0f, seasonCardDecorationHeight(0f, 320f, 180f, 72f, 48f), 0.001f)
+        assertEquals(0f, seasonCardContentLayerColor(androidx.compose.ui.graphics.Color.Blue).alpha, 0f)
     }
 }

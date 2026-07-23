@@ -98,13 +98,13 @@ enum class ThemePreset(
         titleRes = me.weishu.kernelsu.R.string.theme_preset_liquid_glass,
         summaryRes = me.weishu.kernelsu.R.string.theme_preset_liquid_glass_summary,
         colorMode = ColorMode.SYSTEM,
-        keyColor = 0xFFE7F1FF.toInt(),
+        keyColor = 0xFF58758A.toInt(),
         paletteStyle = PaletteStyle.TonalSpot,
         colorSpec = ColorSpec.SpecVersion.Default,
         miuixMonet = false,
-        enableBlur = false,
+        enableBlur = true,
         enableFloatingBottomBar = true,
-        enableFloatingBottomBarBlur = false,
+        enableFloatingBottomBarBlur = true,
         pageScale = 1.0f,
     ),
 
@@ -114,6 +114,21 @@ enum class ThemePreset(
         summaryRes = me.weishu.kernelsu.R.string.theme_preset_snow_summary,
         colorMode = ColorMode.SYSTEM,
         keyColor = 0xFF287E86.toInt(),
+        paletteStyle = PaletteStyle.Fidelity,
+        colorSpec = ColorSpec.SpecVersion.SPEC_2025,
+        miuixMonet = false,
+        enableBlur = false,
+        enableFloatingBottomBar = true,
+        enableFloatingBottomBarBlur = false,
+        pageScale = 1.0f,
+    ),
+
+    RAIN(
+        value = "rain",
+        titleRes = me.weishu.kernelsu.R.string.theme_preset_rain,
+        summaryRes = me.weishu.kernelsu.R.string.theme_preset_rain_summary,
+        colorMode = ColorMode.SYSTEM,
+        keyColor = 0xFF5E84A6.toInt(),
         paletteStyle = PaletteStyle.Fidelity,
         colorSpec = ColorSpec.SpecVersion.SPEC_2025,
         miuixMonet = false,
@@ -213,6 +228,7 @@ enum class ThemePreset(
             DELTA -> InterfaceStyle.Delta.value
             LIQUID_GLASS -> InterfaceStyle.LiquidGlass.value
             SNOW -> InterfaceStyle.Snow.value
+            RAIN -> InterfaceStyle.Rain.value
             PIXEL -> InterfaceStyle.Pixel.value
             STUDIO -> InterfaceStyle.Studio.value
             PREMIUM_GLOSS -> InterfaceStyle.Miuix.value

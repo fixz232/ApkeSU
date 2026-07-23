@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -124,6 +126,9 @@ fun ModulePagerSkrootpro(
             }
             selectZipLauncher.launch(intent)
         },
+        secondaryActionIcon = Icons.Rounded.Backup,
+        onSecondaryActionClick = actions.onOpenWallpaperBackup,
+        secondaryActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         Column(

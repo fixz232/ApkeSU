@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
@@ -130,6 +131,9 @@ fun ModulePagerDelta(
         title = stringResource(R.string.module),
         icon = Icons.Rounded.Extension,
         bottomInnerPadding = bottomInnerPadding,
+        topActionIcon = Icons.Rounded.Backup,
+        onTopActionClick = actions.onOpenWallpaperBackup,
+        topActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(

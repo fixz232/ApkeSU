@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_pixel_card_motion">像素卡片动效</string>
+    <string name="settings_pixel_card_motion_summary">让每种像素模式的专属光轨、天气与场景细节缓慢流动，不移动卡片和正文。</string>
+</resources>

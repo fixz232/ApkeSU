@@ -19,6 +19,8 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
+import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.LocalContentColor
@@ -38,14 +40,18 @@ fun MiuixKernelSUTheme(
     val forcePixelCyberDark =
         LocalInterfaceStyle.current == InterfaceStyle.Pixel.value &&
             LocalPixelStyle.current == PixelStyle.CyberHacker
-    val darkTheme = forcePixelCyberDark ||
+    val forceRainDark =
+        LocalInterfaceStyle.current == InterfaceStyle.Rain.value &&
+            forceRainDarkTheme(LocalRainStyle.current)
+    val forceInterfaceDark = forcePixelCyberDark || forceRainDark
+    val darkTheme = forceInterfaceDark ||
         appSettings.colorMode.isDark ||
         (appSettings.colorMode.isSystem && systemDarkTheme)
     val colorStyle = appSettings.paletteStyle
     val colorSpec = appSettings.colorSpec
     val materialColorScheme = rememberAppColorScheme(
         appSettings = appSettings,
-        forceDark = forcePixelCyberDark,
+        forceDark = forceInterfaceDark,
     )
 
     val miuixPaletteStyle = try {
@@ -61,7 +67,7 @@ fun MiuixKernelSUTheme(
     }
 
     val controller = ThemeController(
-        if (forcePixelCyberDark) {
+        if (forceInterfaceDark) {
             ColorSchemeMode.Dark
         } else {
             when (appSettings.colorMode) {
@@ -74,7 +80,7 @@ fun MiuixKernelSUTheme(
             }
         },
         keyColor = when {
-            isLiquidGlass -> Color(0xFFE7F1FF)
+            isLiquidGlass -> Color(0xFF58758A)
             appSettings.keyColor == 0 -> null
             else -> Color(appSettings.keyColor)
         },

@@ -116,8 +116,9 @@ fun Modifier.seasonNavigationSurface(
         .then(if (paintBackground) Modifier.background(palette.container, shape) else Modifier)
         .border(1.dp, palette.outline.copy(alpha = 0.78f), shape)
         .drawWithContent {
-            drawContent()
             val unit = 2.dp.toPx().coerceAtMost(size.minDimension / 12f)
+            if (unit > 0f) drawSeasonNavigationAtmosphere(palette, unit)
+            drawContent()
             if (unit > 0f) drawSeasonNavigationFrame(season, palette, unit)
         }
 }
@@ -140,8 +141,9 @@ fun Modifier.seasonNavigationIndicator(
         )
         .border(1.dp, palette.primary.copy(alpha = 0.58f), shape)
         .drawWithContent {
-            drawContent()
             val unit = 1.8.dp.toPx().coerceAtMost(size.minDimension / 12f)
+            if (unit > 0f) drawSeasonIndicatorAtmosphere(palette, unit)
+            drawContent()
             if (unit > 0f) drawSeasonIndicatorDetail(season, palette, unit)
         }
 }
@@ -348,6 +350,51 @@ private fun DrawScope.drawSeasonNavigationFrame(
     } else {
         drawVerticalSeasonNavigationFrame(season, palette, unit)
     }
+}
+
+private fun DrawScope.drawSeasonNavigationAtmosphere(
+    palette: SeasonChromePalette,
+    unit: Float,
+) {
+    if (size.width >= size.height) {
+        drawRect(
+            color = palette.highlight.copy(alpha = 0.055f),
+            topLeft = Offset(size.width * 0.12f, unit * 0.72f),
+            size = Size(size.width * 0.50f, unit * 0.34f),
+        )
+        drawRect(
+            color = palette.primary.copy(alpha = 0.075f),
+            topLeft = Offset(size.width * 0.30f, size.height - unit * 1.08f),
+            size = Size(size.width * 0.52f, unit * 0.38f),
+        )
+    } else {
+        drawRect(
+            color = palette.highlight.copy(alpha = 0.055f),
+            topLeft = Offset(unit * 0.72f, size.height * 0.12f),
+            size = Size(unit * 0.34f, size.height * 0.48f),
+        )
+        drawRect(
+            color = palette.primary.copy(alpha = 0.075f),
+            topLeft = Offset(size.width - unit * 1.08f, size.height * 0.34f),
+            size = Size(unit * 0.38f, size.height * 0.48f),
+        )
+    }
+}
+
+private fun DrawScope.drawSeasonIndicatorAtmosphere(
+    palette: SeasonChromePalette,
+    unit: Float,
+) {
+    drawRect(
+        color = palette.highlight.copy(alpha = 0.075f),
+        topLeft = Offset(unit * 1.4f, unit * 0.75f),
+        size = Size((size.width - unit * 2.8f).coerceAtLeast(0f), unit * 0.42f),
+    )
+    drawRect(
+        color = palette.primary.copy(alpha = 0.10f),
+        topLeft = Offset(size.width * 0.28f, size.height - unit * 1.15f),
+        size = Size(size.width * 0.44f, unit * 0.42f),
+    )
 }
 
 private fun DrawScope.drawHorizontalSeasonNavigationFrame(

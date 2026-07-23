@@ -346,6 +346,10 @@ fun AlphaScreen(
     bottomInnerPadding: Dp,
     topActionIcon: ImageVector? = null,
     onTopActionClick: () -> Unit = {},
+    topActionContentDescription: String? = null,
+    secondaryTopActionIcon: ImageVector? = null,
+    onSecondaryTopActionClick: () -> Unit = {},
+    secondaryTopActionContentDescription: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val snowStyle = isSnowStyle()
@@ -369,6 +373,10 @@ fun AlphaScreen(
                 title = title,
                 actionIcon = topActionIcon,
                 onActionClick = onTopActionClick,
+                actionContentDescription = topActionContentDescription,
+                secondaryActionIcon = secondaryTopActionIcon,
+                onSecondaryActionClick = onSecondaryTopActionClick,
+                secondaryActionContentDescription = secondaryTopActionContentDescription,
             )
             Box(modifier = Modifier.weight(1f)) {
                 content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
@@ -382,6 +390,10 @@ fun AlphaTopBar(
     title: String,
     actionIcon: ImageVector? = null,
     onActionClick: () -> Unit = {},
+    actionContentDescription: String? = null,
+    secondaryActionIcon: ImageVector? = null,
+    onSecondaryActionClick: () -> Unit = {},
+    secondaryActionContentDescription: String? = null,
 ) {
     val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
     val topBarColor = immersiveTopBarColor(AlphaColors.TopBar)
@@ -418,16 +430,16 @@ fun AlphaTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (actionIcon != null) {
-                    IconButton(onClick = onActionClick) {
-                        Icon(
-                            imageVector = actionIcon,
-                            contentDescription = null,
-                            tint = AlphaColors.Text,
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
-                }
+                AlphaTopBarActions(
+                    actionIcon = actionIcon,
+                    onActionClick = onActionClick,
+                    actionContentDescription = actionContentDescription,
+                    secondaryActionIcon = secondaryActionIcon,
+                    onSecondaryActionClick = onSecondaryActionClick,
+                    secondaryActionContentDescription = secondaryActionContentDescription,
+                    tint = AlphaColors.Text,
+                    iconSize = 26.dp,
+                )
             }
             SnowCapBand(
                 snowColor = AlphaColors.Snow,
@@ -462,16 +474,16 @@ fun AlphaTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (actionIcon != null) {
-                    IconButton(onClick = onActionClick) {
-                        Icon(
-                            imageVector = actionIcon,
-                            contentDescription = null,
-                            tint = AlphaColors.Muted,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                }
+                AlphaTopBarActions(
+                    actionIcon = actionIcon,
+                    onActionClick = onActionClick,
+                    actionContentDescription = actionContentDescription,
+                    secondaryActionIcon = secondaryActionIcon,
+                    onSecondaryActionClick = onSecondaryActionClick,
+                    secondaryActionContentDescription = secondaryActionContentDescription,
+                    tint = AlphaColors.Muted,
+                    iconSize = 24.dp,
+                )
             }
             Box(
                 modifier = Modifier
@@ -507,19 +519,17 @@ fun AlphaTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (actionIcon != null) {
-                    IconButton(
-                        onClick = onActionClick,
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    ) {
-                        Icon(
-                            imageVector = actionIcon,
-                            contentDescription = null,
-                            tint = AlphaColors.Text,
-                            modifier = Modifier.size(30.dp),
-                        )
-                    }
-                }
+                AlphaTopBarActions(
+                    actionIcon = actionIcon,
+                    onActionClick = onActionClick,
+                    actionContentDescription = actionContentDescription,
+                    secondaryActionIcon = secondaryActionIcon,
+                    onSecondaryActionClick = onSecondaryActionClick,
+                    secondaryActionContentDescription = secondaryActionContentDescription,
+                    tint = AlphaColors.Text,
+                    iconSize = 30.dp,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
             }
             Row(
                 modifier = Modifier
@@ -561,13 +571,49 @@ fun AlphaTopBar(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        AlphaTopBarActions(
+            actionIcon = actionIcon,
+            onActionClick = onActionClick,
+            actionContentDescription = actionContentDescription,
+            secondaryActionIcon = secondaryActionIcon,
+            onSecondaryActionClick = onSecondaryActionClick,
+            secondaryActionContentDescription = secondaryActionContentDescription,
+            tint = AlphaColors.Text,
+            iconSize = 28.dp,
+        )
+    }
+}
+
+@Composable
+private fun AlphaTopBarActions(
+    actionIcon: ImageVector?,
+    onActionClick: () -> Unit,
+    actionContentDescription: String?,
+    secondaryActionIcon: ImageVector?,
+    onSecondaryActionClick: () -> Unit,
+    secondaryActionContentDescription: String?,
+    tint: Color,
+    iconSize: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier) {
         if (actionIcon != null) {
             IconButton(onClick = onActionClick) {
                 Icon(
                     imageVector = actionIcon,
-                    contentDescription = null,
-                    tint = AlphaColors.Text,
-                    modifier = Modifier.size(28.dp),
+                    contentDescription = actionContentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(iconSize),
+                )
+            }
+        }
+        if (secondaryActionIcon != null) {
+            IconButton(onClick = onSecondaryActionClick) {
+                Icon(
+                    imageVector = secondaryActionIcon,
+                    contentDescription = secondaryActionContentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(iconSize),
                 )
             }
         }

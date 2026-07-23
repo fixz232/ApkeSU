@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_global_snow">全局粒子特效</string>
-    <string name="settings_global_snow_summary">在所有介面顯示有遠近層次的雪花或閃爍星海。</string>
+    <string name="settings_global_snow_summary">在所有介面顯示有遠近層次的雪花、四季雨幕或閃爍星海。</string>
     <string name="settings_global_snow_effect">粒子特效樣式</string>
-    <string name="settings_global_snow_effect_summary">選擇一種下雪或星星動畫樣式。</string>
+    <string name="settings_global_snow_effect_summary">選擇一種下雪、下雨或星星動畫樣式。</string>
     <string name="settings_global_snow_effect_gentle">輕柔飄雪</string>
     <string name="settings_global_snow_effect_blizzard">風雪</string>
     <string name="settings_global_snow_effect_starlight">星光雪</string>
     <string name="settings_global_snow_effect_pink">粉色雪</string>
     <string name="settings_global_snow_effect_crystal">冰晶雪</string>
     <string name="settings_global_snow_effect_starfield">星海</string>
+    <string name="settings_global_snow_effect_seasonal_rain">四季雨幕</string>
     <string name="settings_visual_effects_dark_mode_only">僅在夜間模式下可用，切回夜間模式後會恢復目前設定。</string>
 </resources>

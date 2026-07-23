@@ -303,9 +303,18 @@ class ModuleViewModel(
                 val start = SystemClock.elapsedRealtime()
 
                 val loaded = loadModuleList(resort)
+                if (generation == fetchGeneration) {
+                    _uiState.update { it.copy(isRefreshing = false, hasLoaded = true) }
+                }
                 if (loaded) {
-                    if (checkUpdate) syncModuleUpdateInfo(_uiState.value.modules)
-                    Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: ${_uiState.value.modules}")
+                    Log.i(
+                        TAG,
+                        "local load cost: ${SystemClock.elapsedRealtime() - start}, " +
+                            "modules: ${_uiState.value.modules.size}"
+                    )
+                    if (checkUpdate) {
+                        syncModuleUpdateInfo(_uiState.value.modules)
+                    }
                 }
             } finally {
                 if (generation == fetchGeneration) {

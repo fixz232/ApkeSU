@@ -5,6 +5,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.ui.graphics.drawscope.scale
 
 internal enum class PixelCardPattern {
     Generic,
@@ -36,12 +38,7 @@ internal fun DrawScope.drawPixelCardPattern(
     shadow: Color,
     alpha: Float = 1f,
 ) {
-    drawPixelComponentFrame(
-        unit = unit,
-        primary = primary.scaledAlpha(alpha * 0.58f),
-        secondary = secondary.scaledAlpha(alpha * 0.62f),
-    )
-    drawPixelPatternFramePolish(
+    drawPixelCardPatternUnderlay(
         pattern = pattern,
         unit = unit,
         primary = primary,
@@ -50,7 +47,7 @@ internal fun DrawScope.drawPixelCardPattern(
         shadow = shadow,
         alpha = alpha,
     )
-    drawPixelCardTopDecoration(
+    drawPixelCardPatternOverlay(
         pattern = pattern,
         unit = unit,
         primary = primary,
@@ -59,7 +56,17 @@ internal fun DrawScope.drawPixelCardPattern(
         shadow = shadow,
         alpha = alpha,
     )
+}
 
+internal fun DrawScope.drawPixelCardPatternUnderlay(
+    pattern: PixelCardPattern,
+    unit: Float,
+    primary: Color,
+    secondary: Color,
+    highlight: Color,
+    shadow: Color,
+    alpha: Float = 1f,
+) {
     val primaryColor = primary.scaledAlpha(alpha * 0.72f)
     val secondaryColor = secondary.scaledAlpha(alpha * 0.74f)
     val highlightColor = highlight.scaledAlpha(alpha * 0.70f)
@@ -400,9 +407,63 @@ internal fun DrawScope.drawPixelCardPattern(
     }
 }
 
+internal fun DrawScope.drawPixelCardPatternOverlay(
+    pattern: PixelCardPattern,
+    unit: Float,
+    primary: Color,
+    secondary: Color,
+    highlight: Color,
+    shadow: Color,
+    alpha: Float = 1f,
+) {
+    val safeInset = pixelCardOverlayInset(unit, size.width, size.height)
+    inset(safeInset, safeInset, safeInset, safeInset) {
+        drawPixelCardDepthFrame(
+            unit = unit,
+            primary = primary.scaledAlpha(alpha),
+            secondary = secondary.scaledAlpha(alpha),
+            highlight = highlight.scaledAlpha(alpha),
+            shadow = shadow.scaledAlpha(alpha),
+        )
+        drawPixelComponentFrame(
+            unit = unit,
+            primary = primary.scaledAlpha(alpha * 0.64f),
+            secondary = secondary.scaledAlpha(alpha * 0.70f),
+        )
+        drawPixelPatternFramePolish(
+            pattern = pattern,
+            unit = unit,
+            primary = primary,
+            secondary = secondary,
+            highlight = highlight,
+            shadow = shadow,
+            alpha = alpha,
+        )
+        drawPixelCardTopDecoration(
+            pattern = pattern,
+            unit = unit,
+            primary = primary,
+            secondary = secondary,
+            highlight = highlight,
+            shadow = shadow,
+            alpha = alpha,
+        )
+    }
+}
+
+internal fun pixelCardOverlayInset(unit: Float, width: Float, height: Float): Float {
+    if (unit <= 0f || width <= 0f || height <= 0f) return 0f
+    return minOf(unit * 0.72f, width * 0.02f, height * 0.055f)
+}
+
 internal fun pixelCardTopDecorationHeight(unit: Float, width: Float, height: Float): Float {
     if (unit <= 0f || width < unit * 18f || height < unit * 10f) return 0f
     return minOf(unit * 4f, height * 0.16f)
+}
+
+internal fun pixelCardTopDecorationScale(unit: Float, availableHeight: Float): Float {
+    if (unit <= 0f || availableHeight <= 0f) return 0f
+    return (availableHeight / (unit * 4f)).coerceIn(0f, 1f)
 }
 
 private fun DrawScope.drawPixelCardTopDecoration(
@@ -415,14 +476,41 @@ private fun DrawScope.drawPixelCardTopDecoration(
     alpha: Float,
 ) {
     if (pattern == PixelCardPattern.Generic) return
-    val topHeight = pixelCardTopDecorationHeight(unit, size.width, size.height)
-    if (topHeight == 0f) return
+    val availableTopHeight = pixelCardTopDecorationHeight(unit, size.width, size.height)
+    if (availableTopHeight == 0f) return
+    val verticalScale = pixelCardTopDecorationScale(unit, availableTopHeight)
+    if (verticalScale == 0f) return
+    val topHeight = availableTopHeight / verticalScale
 
     val primaryColor = primary.scaledAlpha(alpha * 0.84f)
     val secondaryColor = secondary.scaledAlpha(alpha * 0.82f)
     val highlightColor = highlight.scaledAlpha(alpha * 0.76f)
     val shadowColor = shadow.scaledAlpha(alpha * 0.72f)
 
+    scale(scaleX = 1f, scaleY = verticalScale, pivot = Offset.Zero) {
+        drawPixelCardTopDecorationContent(
+            pattern = pattern,
+            unit = unit,
+            topHeight = topHeight,
+            primaryColor = primaryColor,
+            secondaryColor = secondaryColor,
+            highlightColor = highlightColor,
+            shadowColor = shadowColor,
+            alpha = alpha,
+        )
+    }
+}
+
+private fun DrawScope.drawPixelCardTopDecorationContent(
+    pattern: PixelCardPattern,
+    unit: Float,
+    topHeight: Float,
+    primaryColor: Color,
+    secondaryColor: Color,
+    highlightColor: Color,
+    shadowColor: Color,
+    alpha: Float,
+) {
     when (pattern) {
         PixelCardPattern.Generic -> Unit
         PixelCardPattern.Handheld -> {
@@ -711,6 +799,47 @@ private fun DrawScope.drawPixelCardTopDecoration(
                 )
             }
         }
+    }
+}
+
+private fun DrawScope.drawPixelCardDepthFrame(
+    unit: Float,
+    primary: Color,
+    secondary: Color,
+    highlight: Color,
+    shadow: Color,
+) {
+    if (unit <= 0f || size.width < unit * 18f || size.height < unit * 10f) return
+    val inset = unit * 1.45f
+    val frameSize = Size(size.width - inset * 2f, size.height - inset * 2f)
+    drawRect(
+        color = primary.copy(alpha = primary.alpha * 0.24f),
+        topLeft = Offset(inset, inset),
+        size = frameSize,
+        style = Stroke(width = unit * 0.28f),
+    )
+    drawRect(
+        color = highlight.copy(alpha = highlight.alpha * 0.42f),
+        topLeft = Offset(size.width * 0.19f, inset),
+        size = Size(size.width * 0.28f, unit * 0.32f),
+    )
+    drawRect(
+        color = secondary.copy(alpha = secondary.alpha * 0.46f),
+        topLeft = Offset(size.width * 0.53f, inset),
+        size = Size(size.width * 0.18f, unit * 0.32f),
+    )
+    drawRect(
+        color = shadow.copy(alpha = shadow.alpha * 0.38f),
+        topLeft = Offset(size.width * 0.28f, size.height - inset - unit * 0.32f),
+        size = Size(size.width * 0.44f, unit * 0.32f),
+    )
+    listOf(0.30f, 0.70f).forEachIndexed { index, fraction ->
+        drawRect(
+            color = if (index == 0) secondary.copy(alpha = secondary.alpha * 0.56f)
+            else highlight.copy(alpha = highlight.alpha * 0.48f),
+            topLeft = Offset(size.width * fraction - unit * 0.38f, size.height - inset - unit * 0.38f),
+            size = Size(unit * 0.76f, unit * 0.76f),
+        )
     }
 }
 

@@ -71,9 +71,15 @@ fun HomePagerStudio(
     installFeedbackActive: Boolean = false,
 ) {
     val warningMessages = homeWarningMessages(state)
+    val homeTitle = state.customHomeTitle.ifBlank { stringResource(R.string.app_name) }
     Scaffold(
         containerColor = Color.Transparent,
-        topBar = { StudioTopBar(onDiagnoseClick = actions.onDiagnoseClick) },
+        topBar = {
+            StudioTopBar(
+                title = homeTitle,
+                onDiagnoseClick = actions.onDiagnoseClick,
+            )
+        },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.statusBars)
             .only(WindowInsetsSides.Horizontal),
@@ -121,7 +127,10 @@ fun HomePagerStudio(
 }
 
 @Composable
-private fun StudioTopBar(onDiagnoseClick: () -> Unit) {
+private fun StudioTopBar(
+    title: String,
+    onDiagnoseClick: () -> Unit,
+) {
     val topBarColor = immersiveTopBarColor(colorScheme.surface)
     Row(
         modifier = Modifier
@@ -149,7 +158,7 @@ private fun StudioTopBar(onDiagnoseClick: () -> Unit) {
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.app_name),
+                text = title,
                 color = colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.SemiBold,

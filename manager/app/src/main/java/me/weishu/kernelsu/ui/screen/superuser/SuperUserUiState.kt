@@ -37,6 +37,7 @@ data class SuperUserUiState(
 data class SuperUserActions(
     val onRefresh: () -> Unit,
     val onOpenSulog: () -> Unit,
+    val onOpenAppIdManager: () -> Unit,
     val onSearchTextChange: (String) -> Unit,
     val onSearchStatusChange: (SearchStatus) -> Unit,
     val onClearSearch: () -> Unit,
