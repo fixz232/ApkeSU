@@ -1,10 +1,22 @@
-# ApkeSU
+<div align="center">
+  <img src=".github/assets/apkesu-avatar.jpg" width="180" alt="ApkeSU 项目头像">
+  <h1>ApkeSU</h1>
+  <p>面向 GKI Android 设备的内核 Root 管理器</p>
+  <p>
+    <a href="#项目说明">项目说明</a> ·
+    <a href="#上游项目信息">上游信息</a> ·
+    <a href="#开源协议遵守说明">开源协议</a> ·
+    <a href="#免责声明">免责声明</a>
+  </p>
+  <p>
+    <a href="https://t.me/+LkrMQKXtXvpmYmNl">Telegram</a> ·
+    <a href="https://qm.qq.com/q/8O7qvLM3zq">QQ 群</a>
+  </p>
+</div>
 
-ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目和[Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
+---
 
-TG 组织：https://t.me/+LkrMQKXtXvpmYmNl
-
-QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.qq.com/q/8O7qvLM3zq
+ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目和 [SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注 KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
 ## 项目说明
 
