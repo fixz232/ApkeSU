@@ -3,6 +3,15 @@
   <h1>ApkeSU</h1>
   <p>面向 GKI Android 设备的内核 Root 管理器</p>
   <p>
+    <strong>简体中文</strong> ·
+    <a href="README.en.md">English</a> ·
+    <a href="README.fr.md">Français</a> ·
+    <a href="README.ru.md">Русский</a> ·
+    <a href="README.ja.md">日本語</a> ·
+    <a href="README.ko.md">한국어</a> ·
+    <a href="README.es.md">Español</a>
+  </p>
+  <p>
     <a href="#项目说明">项目说明</a> ·
     <a href="#上游项目信息">上游信息</a> ·
     <a href="#开源协议遵守说明">开源协议</a> ·
