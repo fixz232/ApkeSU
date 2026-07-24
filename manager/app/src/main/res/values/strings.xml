@@ -24,7 +24,6 @@
     <string name="home_system_patch">System patch</string>
     <string name="home_kernel_patch_version">Kernel patch version</string>
     <string name="home_su_executable">su executable</string>
-    <string name="home_folkpatch_version">FolkPatch version</string>
     <string name="home_system_version">System version</string>
     <string name="home_header_more">More</string>
     <string name="home_lkm_wallpaper_pick">Choose LKM card wallpaper</string>
