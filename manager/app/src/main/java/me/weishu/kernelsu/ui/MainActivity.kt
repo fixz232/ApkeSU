@@ -177,6 +177,8 @@ import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.templateeditor.TemplateEditorScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStorePage
+import me.weishu.kernelsu.ui.screen.themestore.CloudThemeCreatorScreen
+import me.weishu.kernelsu.ui.screen.themestore.CloudThemeDetailScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreLibraryScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreScreen
 import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
@@ -443,6 +445,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.ThemeStoreTransfer> { ThemeStoreScreen(ThemeStorePage.Transfer) }
                                 entry<Route.ThemeStoreMy> { ThemeStoreScreen(ThemeStorePage.My) }
                                 entry<Route.ThemeStoreLibrary> { ThemeStoreLibraryScreen() }
+                                entry<Route.CloudThemeDetail> { key -> CloudThemeDetailScreen(key.themeId) }
+                                entry<Route.CloudThemeCreator> { CloudThemeCreatorScreen() }
                                 entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }

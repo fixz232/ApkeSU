@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/schemas/creator-registry-v1.schema.json",
+  "title": "ApkeSU cloud theme creator registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "generatedAt", "reviewer", "creators"],
+  "properties": {
+    "schema": { "const": "io.github.fixz.apkesu.theme-creators" },
+    "version": { "const": 1 },
+    "generatedAt": { "type": "integer", "minimum": 0 },
+    "reviewer": { "const": "fixz232" },
+    "creators": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["github", "displayName", "approvedAt", "status"],
+        "properties": {
+          "github": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 39,
+            "pattern": "^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+          },
+          "displayName": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "approvedAt": { "type": "integer", "minimum": 0 },
+          "status": { "const": "approved" }
+        }
+      }
+    }
+  }
+}

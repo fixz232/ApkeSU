@@ -1,0 +1,84 @@
+name: Publish cloud theme
+
+on:
+  workflow_dispatch:
+    inputs:
+      theme_id:
+        description: Stable lowercase theme ID
+        required: true
+        type: string
+      version_code:
+        description: Monotonic theme version code
+        required: true
+        type: string
+      package_version:
+        description: .kstheme schema version (currently 4)
+        required: true
+        default: "4"
+        type: string
+      source_url:
+        description: Public GitHub-hosted temporary .kstheme URL
+        required: true
+        type: string
+      asset_name:
+        description: Canonical release asset filename ending in .kstheme
+        required: true
+        type: string
+      sha256:
+        description: Expected lowercase SHA-256
+        required: true
+        type: string
+      size_bytes:
+        description: Exact package size in bytes
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Download and verify package
+        env:
+          THEME_ID: ${{ inputs.theme_id }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+          SOURCE_URL: ${{ inputs.source_url }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+          SIZE_BYTES: ${{ inputs.size_bytes }}
+        run: |
+          python theme-store/scripts/prepare_release.py \
+            --theme-id "$THEME_ID" \
+            --version-code "$VERSION_CODE" \
+            --package-version "$PACKAGE_VERSION" \
+            --source-url "$SOURCE_URL" \
+            --asset-name "$ASSET_NAME" \
+            --sha256 "$EXPECTED_SHA256" \
+            --size-bytes "$SIZE_BYTES" \
+            --output-dir /tmp/apkesu-theme-release
+
+      - name: Create canonical release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THEME_ID: ${{ inputs.theme_id }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          TAG="theme-${THEME_ID}-v${VERSION_CODE}"
+          ASSET="$(find /tmp/apkesu-theme-release -maxdepth 1 -type f -name '*.kstheme' -print -quit)"
+          test -n "$ASSET"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "Cloud theme ${THEME_ID} v${VERSION_CODE}" \
+              --notes "Verified ApkeSU cloud theme package."
+          fi

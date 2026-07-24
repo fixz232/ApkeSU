@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/schemas/catalog-v1.schema.json",
+  "title": "ApkeSU cloud theme catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "generatedAt", "categories", "themes"],
+  "properties": {
+    "schema": { "const": "io.github.fixz.apkesu.theme-catalog" },
+    "version": { "const": 1 },
+    "generatedAt": { "type": "integer", "minimum": 0 },
+    "categories": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,39}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 48 }
+        }
+      }
+    },
+    "themes": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/theme" }
+    }
+  },
+  "$defs": {
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 768
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "bio"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,79}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "profileUrl": { "$ref": "#/$defs/httpsUrl" },
+        "avatarUrl": { "$ref": "#/$defs/httpsUrl" },
+        "bio": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "name", "author", "description", "category", "tags",
+        "versionCode", "versionName", "packageSchema", "packageVersion",
+        "minManagerVersionCode", "coverUrl", "screenshots", "downloadUrl",
+        "sha256", "sizeBytes", "license", "changelog", "publishedAt",
+        "status", "featured", "downloadCount"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,79}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "author": { "$ref": "#/$defs/author" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "category": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,39}$" },
+        "tags": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 32 }
+        },
+        "versionCode": { "type": "integer", "minimum": 1 },
+        "versionName": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "packageSchema": { "const": "io.github.fixz.apkesu.theme" },
+        "packageVersion": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "minManagerVersionCode": { "type": "integer", "minimum": 1 },
+        "maxManagerVersionCode": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "coverUrl": { "$ref": "#/$defs/httpsUrl" },
+        "screenshots": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/httpsUrl" }
+        },
+        "downloadUrl": {
+          "allOf": [
+            { "$ref": "#/$defs/httpsUrl" },
+            { "pattern": "\\.kstheme$" }
+          ]
+        },
+        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 104857600 },
+        "license": { "type": "string", "pattern": "^[A-Za-z0-9.+-]{1,48}$" },
+        "changelog": { "type": "string", "maxLength": 4000 },
+        "publishedAt": { "type": "integer", "minimum": 0 },
+        "status": { "enum": ["published", "deprecated"] },
+        "featured": { "type": "boolean" },
+        "downloadCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

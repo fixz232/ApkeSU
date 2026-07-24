@@ -1,0 +1,47 @@
+name: Cloud theme creator application
+description: Apply for permission to submit themes to the ApkeSU cloud store
+title: "[Creator application] "
+labels: ["theme-store", "theme-creator-application"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Creator applications are reviewed by **fixz232**. Approval lets you submit themes for review; it does not publish anything automatically or grant repository write access.
+  - type: input
+    id: github_login
+    attributes:
+      label: GitHub login
+      description: This must exactly match the account opening this issue.
+      placeholder: your-github-login
+    validations:
+      required: true
+  - type: input
+    id: display_name
+    attributes:
+      label: Public creator name
+      description: The name displayed in the creator registry and cloud store.
+    validations:
+      required: true
+  - type: input
+    id: portfolio
+    attributes:
+      label: Portfolio or profile URL
+      description: Optional public page showing your design work.
+  - type: textarea
+    id: introduction
+    attributes:
+      label: Introduction
+      description: Briefly describe the themes you plan to publish and how you source assets.
+    validations:
+      required: true
+  - type: checkboxes
+    id: declarations
+    attributes:
+      label: Declarations
+      options:
+        - label: I will publish only assets I own or may redistribute under the declared license.
+          required: true
+        - label: I understand every theme still requires a separate review by fixz232.
+          required: true
+        - label: I will not include credentials, private profile data, device identifiers, or malicious content.
+          required: true

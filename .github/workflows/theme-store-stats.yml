@@ -1,0 +1,45 @@
+name: Update cloud theme statistics
+
+on:
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: theme-store-catalog-write
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ApkeSU
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Update release download counts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python theme-store/scripts/update_download_counts.py \
+            theme-store/catalog/v1/catalog.json \
+            --repository "$GITHUB_REPOSITORY"
+
+      - name: Commit changed statistics
+        run: |
+          if git diff --quiet -- theme-store/catalog/v1/catalog.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add theme-store/catalog/v1/catalog.json
+          git commit -m "theme-store: Update download statistics"
+          git pull --rebase origin ApkeSU
+          git push origin HEAD:ApkeSU

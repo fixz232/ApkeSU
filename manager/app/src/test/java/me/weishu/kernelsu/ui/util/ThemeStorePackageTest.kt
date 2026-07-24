@@ -185,6 +185,52 @@ class ThemeStorePackageTest {
         assertEquals(3, countConfiguredThemeStoreResources(config))
     }
 
+    @Test
+    fun validateThemeStoreConfigForCloud_rejectsPrivateProfileAndDeviceUri() {
+        val config = cloudUnsafeConfig()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            validateThemeStoreConfigForCloud(config)
+        }
+    }
+
+    @Test
+    fun sanitizeThemeStoreConfigForCloud_removesPrivateAndDeviceSpecificData() {
+        val config = cloudUnsafeConfig()
+
+        sanitizeThemeStoreConfigForCloud(config)
+        validateThemeStoreConfigForCloud(config)
+
+        val author = config.getJSONObject("author")
+        assertEquals("", author.getString("realName"))
+        assertEquals("unspecified", author.getString("gender"))
+        assertEquals("", config.getJSONObject("cards").getJSONObject("lkm").optString("uri"))
+    }
+
+    private fun cloudUnsafeConfig(): JSONObject {
+        return JSONObject()
+            .put("version", 4)
+            .put(
+                "author",
+                JSONObject()
+                    .put("displayName", "Creator")
+                    .put("realName", "Private Name")
+                    .put("gender", "other")
+                    .put("bio", "Bio"),
+            )
+            .put(
+                "cards",
+                JSONObject().put(
+                    "lkm",
+                    JSONObject()
+                        .put("asset", JSONObject().put("path", "assets/lkm.png"))
+                        .put("uri", "content://private/lkm.png")
+                        .put("videoAsset", JSONObject.NULL)
+                        .put("videoUri", JSONObject.NULL),
+                ),
+            )
+    }
+
     private fun createArchive(vararg entries: Pair<String, ByteArray>): ByteArray {
         return ByteArrayOutputStream().use { output ->
             ZipOutputStream(output).use { zip ->

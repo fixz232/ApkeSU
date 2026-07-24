@@ -137,7 +137,11 @@ fun importThemeToLibrary(
     }.getOrElse { ThemeLibraryOperationResult(success = false, error = it) }
 }
 
-fun applyThemeFromLibrary(context: Context, entryId: String): ThemeLibraryOperationResult =
+fun applyThemeFromLibrary(
+    context: Context,
+    entryId: String,
+    clearCloudThemeState: Boolean = true,
+): ThemeLibraryOperationResult =
     synchronized(themeLibraryLock) {
         val appContext = context.applicationContext
         runCatching {
@@ -146,7 +150,11 @@ fun applyThemeFromLibrary(context: Context, entryId: String): ThemeLibraryOperat
                 ?: error("Saved theme was not found")
             val packageFile = themeLibraryPackageFile(themeLibraryDirectory(appContext), entry.id)
             require(packageFile.isFile) { "Saved theme package is missing" }
-            val packageResult = importThemeStorePackage(appContext, Uri.fromFile(packageFile))
+            val packageResult = importThemeStorePackage(
+                appContext,
+                Uri.fromFile(packageFile),
+                clearCloudThemeState = clearCloudThemeState,
+            )
             if (!packageResult.success) {
                 return@synchronized ThemeLibraryOperationResult(
                     success = false,

@@ -718,6 +718,55 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
     }
 }
 
+fun exportCloudThemeStorePackage(context: Context, destination: Uri): ThemeStorePackageResult {
+    val appContext = context.applicationContext
+    val sourceFile = File(appContext.cacheDir, "cloud-theme-source-${System.nanoTime()}.$THEME_STORE_FILE_EXTENSION")
+    val sanitizedFile = File(
+        appContext.cacheDir,
+        "cloud-theme-sanitized-${System.nanoTime()}.$THEME_STORE_FILE_EXTENSION",
+    )
+    val extractionDir = File(appContext.cacheDir, "cloud-theme-export-${System.nanoTime()}")
+    return try {
+        val exported = exportThemeStorePackage(appContext, Uri.fromFile(sourceFile))
+        if (!exported.success) return exported
+        require(exported.warnings.isEmpty()) {
+            "Some configured theme resources could not be embedded"
+        }
+        val assetsDir = File(extractionDir, "assets").apply { mkdirs() }
+        val extracted = FileInputStream(sourceFile).use { input ->
+            extractThemeStoreArchive(input, extractionDir, assetsDir)
+        }
+        val config = JSONObject(extracted.themeJson)
+        validateThemeStoreConfig(config)
+        validateEmbeddedThemeStoreAssets(config, assetsDir)
+        sanitizeThemeStoreConfigForCloud(config)
+        validateThemeStoreConfigForCloud(config)
+
+        FileOutputStream(sanitizedFile).use { output ->
+            ZipOutputStream(output.buffered()).use { zip ->
+                writeThemeStoreAssetDirectory(zip, assetsDir, assetsDir)
+                val configBytes = config.toString(2).toByteArray(Charsets.UTF_8)
+                require(configBytes.size <= MAX_THEME_STORE_JSON_BYTES) {
+                    "Theme package metadata is too large"
+                }
+                zip.putNextEntry(ZipEntry("theme.json"))
+                zip.write(configBytes)
+                zip.closeEntry()
+            }
+        }
+        openThemeStoreUriOutputStream(appContext, destination).use { output ->
+            FileInputStream(sanitizedFile).use { input -> input.copyTo(output) }
+        }
+        ThemeStorePackageResult(success = true)
+    } catch (error: Throwable) {
+        ThemeStorePackageResult(success = false, error = error)
+    } finally {
+        sourceFile.delete()
+        sanitizedFile.delete()
+        extractionDir.deleteRecursively()
+    }
+}
+
 fun validateThemeStorePackage(context: Context, source: Uri): ThemeStorePackageResult {
     val appContext = context.applicationContext
     val warnings = mutableListOf<ThemeStorePackageWarning>()
@@ -742,7 +791,11 @@ fun validateThemeStorePackage(context: Context, source: Uri): ThemeStorePackageR
     }
 }
 
-fun previewThemeStorePackage(context: Context, source: Uri): ThemeStorePackagePreviewResult {
+fun previewThemeStorePackage(
+    context: Context,
+    source: Uri,
+    requireCloudSafe: Boolean = false,
+): ThemeStorePackagePreviewResult {
     val appContext = context.applicationContext
     val warnings = mutableListOf<ThemeStorePackageWarning>()
     val tempDir = File(
@@ -756,6 +809,9 @@ fun previewThemeStorePackage(context: Context, source: Uri): ThemeStorePackagePr
             val config = JSONObject(extracted.themeJson)
             validateThemeStoreConfig(config)
             validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            if (requireCloudSafe) {
+                validateThemeStoreConfigForCloud(config)
+            }
             collectLegacyThemeStoreUriWarnings(appContext, config, warnings)
             val author = parseThemeStorePackageAuthor(config)?.let { metadata ->
                 metadata.copy(
@@ -789,7 +845,11 @@ fun previewThemeStorePackage(context: Context, source: Uri): ThemeStorePackagePr
     }
 }
 
-fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageResult {
+fun importThemeStorePackage(
+    context: Context,
+    source: Uri,
+    clearCloudThemeState: Boolean = true,
+): ThemeStorePackageResult {
     val appContext = context.applicationContext
     val warnings = mutableListOf<ThemeStorePackageWarning>()
     val tempDir = File(appContext.cacheDir, "theme-store-import").apply {
@@ -1189,6 +1249,16 @@ fun importThemeStorePackage(context: Context, source: Uri): ThemeStorePackageRes
                 previous = previousSummary,
                 current = readThemeStoreSummary(appContext),
             )
+            if (clearCloudThemeState) {
+                runCatching {
+                    CloudThemeRepository(appContext).recordExternalThemeApplied()
+                }.onFailure { error ->
+                    warnings += ThemeStorePackageWarning(
+                        assetId = "cloud_theme_state",
+                        reason = error.safeCloudThemeMessage(),
+                    )
+                }
+            }
 
             ThemeStorePackageResult(success = true, warnings = warnings)
         } finally {
@@ -1634,6 +1704,103 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
                 "Theme author avatar is too large"
             }
         }
+}
+
+internal fun sanitizeThemeStoreConfigForCloud(config: JSONObject) {
+    fun sanitizeOwner(owner: JSONObject?, vararg assetPairs: Pair<String, String>) {
+        if (owner == null) return
+        assetPairs.forEach { (assetKey, uriKey) ->
+            val rawAsset = owner.opt(assetKey)
+            val uri = owner.optString(uriKey).trim()
+            if (uri.isNotEmpty()) {
+                require(rawAsset is JSONObject) {
+                    "Cloud theme resource is not embedded: $uriKey"
+                }
+            }
+            owner.remove(uriKey)
+        }
+    }
+
+    config.optJSONObject("author")?.apply {
+        put("realName", "")
+        put("gender", ThemeAuthorGender.Unspecified.storageValue)
+    }
+    val mediaPairs = arrayOf("asset" to "uri", "videoAsset" to "videoUri")
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        sanitizeOwner(cards?.optJSONObject(slot.id), *mediaPairs)
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        sanitizeOwner(navigationIcons?.optJSONObject(slot.id), "asset" to "uri")
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        sanitizeOwner(pageBackgrounds?.optJSONObject(target.id), *mediaPairs)
+    }
+    sanitizeOwner(config.optJSONObject("wallpaper"), *mediaPairs)
+    sanitizeOwner(config.optJSONObject("startupSound"), "asset" to "uri")
+    sanitizeOwner(config.optJSONObject("clickSound"), "asset" to "uri")
+    sanitizeOwner(config.optJSONObject("backgroundMusic"), "asset" to "uri")
+    sanitizeOwner(config.optJSONObject("startupAnimation"), "asset" to "uri")
+}
+
+internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
+    fun validateOwner(owner: JSONObject?, vararg uriKeys: String) {
+        if (owner == null) return
+        uriKeys.forEach { uriKey ->
+            require(owner.optString(uriKey).isBlank()) {
+                "Cloud theme package contains a device-specific $uriKey"
+            }
+        }
+    }
+
+    if (config.optInt("version", 0) >= 4) {
+        val author = config.optJSONObject("author")
+            ?: error("Theme package is missing author information")
+        require(author.optString("realName").isBlank()) {
+            "Cloud theme package contains a private author name"
+        }
+        require(author.optString("gender") == ThemeAuthorGender.Unspecified.storageValue) {
+            "Cloud theme package contains a private author gender"
+        }
+    }
+    val uriKeys = arrayOf("uri", "videoUri")
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        validateOwner(cards?.optJSONObject(slot.id), *uriKeys)
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        validateOwner(navigationIcons?.optJSONObject(slot.id), "uri")
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        validateOwner(pageBackgrounds?.optJSONObject(target.id), *uriKeys)
+    }
+    validateOwner(config.optJSONObject("wallpaper"), *uriKeys)
+    validateOwner(config.optJSONObject("startupSound"), "uri")
+    validateOwner(config.optJSONObject("clickSound"), "uri")
+    validateOwner(config.optJSONObject("backgroundMusic"), "uri")
+    validateOwner(config.optJSONObject("startupAnimation"), "uri")
+}
+
+private fun writeThemeStoreAssetDirectory(
+    zip: ZipOutputStream,
+    root: File,
+    directory: File,
+) {
+    directory.listFiles()?.sortedBy(File::getName)?.forEach { file ->
+        if (file.isDirectory) {
+            writeThemeStoreAssetDirectory(zip, root, file)
+        } else if (file.isFile) {
+            val relativePath = file.relativeTo(root).invariantSeparatorsPath
+            val entryName = validateThemeStoreArchiveEntryName("assets/$relativePath")
+            zip.putNextEntry(ZipEntry(entryName))
+            FileInputStream(file).use { input -> input.copyTo(zip) }
+            zip.closeEntry()
+        }
+    }
 }
 
 internal fun parseThemeStorePackageAuthor(config: JSONObject): ThemeStorePackageAuthor? {

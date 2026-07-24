@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -212,6 +213,7 @@ fun ThemeStoreMyScreen(
                 }
             },
             onOpenLibrary = dropUnlessResumed { navigator.push(Route.ThemeStoreLibrary) },
+            onOpenCreatorCenter = dropUnlessResumed { navigator.push(Route.CloudThemeCreator) },
         )
     }
 
@@ -290,6 +292,7 @@ private fun ThemeStoreProfileContent(
     onRemoveAvatar: () -> Unit,
     onSave: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenCreatorCenter: () -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -326,6 +329,12 @@ private fun ThemeStoreProfileContent(
             )
         }
         item {
+            ThemeStoreCreatorDestination(
+                enabled = !busy,
+                onClick = onOpenCreatorCenter,
+            )
+        }
+        item {
             Text(
                 text = stringResource(R.string.theme_store_profile_export_notice),
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -334,6 +343,56 @@ private fun ThemeStoreProfileContent(
             )
         }
         item { Spacer(modifier = Modifier.height(18.dp)) }
+    }
+}
+
+@Composable
+private fun ThemeStoreCreatorDestination(
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    ThemeStoreProfileSurface {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.VerifiedUser,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.cloud_theme_creator_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = themeStoreProfileTextColor(),
+                )
+                Text(
+                    text = stringResource(R.string.cloud_theme_creator_entry_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = themeStoreProfileMutedColor(),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = themeStoreProfileMutedColor(),
+            )
+        }
     }
 }
 

@@ -150,6 +150,14 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data class CloudThemeDetail(val themeId: String) : Route
+
+    @Parcelize
+    @Serializable
+    data object CloudThemeCreator : Route
+
+    @Parcelize
+    @Serializable
     data object ModuleWallpaperBackup : Route
 
     @Parcelize
