@@ -42,10 +42,11 @@ QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.q
 
 ## 致谢
 
-- [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者weishu，致敬所有贡献者。<br/>
-- [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 一些界面ui参考<br/>
-- [kowsu](https://github.com/KOWX712/KernelSU.git)感谢ko的支持
-- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): The KernelSU idea.
-- [Magisk](https://github.com/topjohnwu/Magisk): The powerful root tool.
-- [genuine](https://github.com/brevent/genuine/): APK v2 signature validation.
-- [Diamorphine](https://github.com/m0nad/Diamorphine): Some rootkit skills.
+- [KernelSU](https://github.com/tiann/KernelSU)，感谢作者weishu与全部贡献者
+- [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) SuSFS方案参考
+- [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
+- [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持
+- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): KernelSU设计灵感来源
+- [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
+- [genuine](https://github.com/brevent/genuine/): APK签名校验方案
+- [Diamorphine](https://github.com/m0nad/Diamorphine): 底层隐藏技术参考
