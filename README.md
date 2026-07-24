@@ -42,4 +42,4 @@ QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.q
 
 ## 致谢
 
-感谢 [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者weishu，致敬所有开源开发者同志。
+感谢 [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者weishu，致敬所有贡献者。
