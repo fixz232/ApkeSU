@@ -20,6 +20,7 @@ import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
@@ -76,10 +77,12 @@ class SettingsViewModel(
             val keyColor = repo.keyColor
             val enablePredictiveBack = repo.enablePredictiveBack
             val uiMode = repo.uiMode
-            val isLiquidGlassInterface = uiMode == InterfaceStyle.LiquidGlass.value
-            val enableBlur = if (isLiquidGlassInterface) true else repo.enableBlur
+            val enableBlur = resolveRealtimeBlurEnabled(uiMode, repo.enableBlur)
             val enableFloatingBottomBar = repo.enableFloatingBottomBar
-            val enableFloatingBottomBarBlur = if (isLiquidGlassInterface) true else repo.enableFloatingBottomBarBlur
+            val enableFloatingBottomBarBlur = resolveRealtimeBlurEnabled(
+                uiMode,
+                repo.enableFloatingBottomBarBlur,
+            )
             val autoHideNavigationBar = repo.autoHideNavigationBar
             val scrollHideNavigationBar = repo.scrollHideNavigationBar
             val pageScale = repo.pageScale

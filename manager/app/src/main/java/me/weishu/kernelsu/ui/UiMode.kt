@@ -50,6 +50,17 @@ enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
     }
 }
 
+internal fun resolveRealtimeBlurEnabled(
+    interfaceStyle: String,
+    requested: Boolean,
+): Boolean {
+    // Miuix LayerBackdrop can crash vendor RenderEffect implementations when every
+    // frosted card starts capturing during a live style switch. The glass style
+    // keeps its translucent fallback surfaces without entering that render path.
+    return requested &&
+        InterfaceStyle.normalizeValue(interfaceStyle) != InterfaceStyle.LiquidGlass.value
+}
+
 val LocalUiMode = staticCompositionLocalOf { UiMode.Miuix }
 
 val LocalInterfaceStyle = staticCompositionLocalOf { InterfaceStyle.Miuix.value }

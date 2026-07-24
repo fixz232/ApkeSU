@@ -40,4 +40,12 @@ class InterfaceStyleTest {
             ThemePreset.GEEK_DARK.targetUiMode(legacyMaterialValue),
         )
     }
+
+    @Test
+    fun liquidGlassUsesStableFallbackInsteadOfRealtimeBackdrop() {
+        assertFalse(resolveRealtimeBlurEnabled(InterfaceStyle.LiquidGlass.value, requested = true))
+        assertFalse(resolveRealtimeBlurEnabled(InterfaceStyle.LiquidGlass.value, requested = false))
+        assertTrue(resolveRealtimeBlurEnabled(InterfaceStyle.Miuix.value, requested = true))
+        assertFalse(resolveRealtimeBlurEnabled(InterfaceStyle.Miuix.value, requested = false))
+    }
 }

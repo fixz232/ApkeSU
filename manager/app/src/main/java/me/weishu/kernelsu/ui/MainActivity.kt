@@ -252,23 +252,20 @@ class MainActivity : ComponentActivity() {
             val managerReady by managerReadyState.collectAsStateWithLifecycle()
             val appSettings = uiState.appSettings
             val uiMode = uiState.uiMode
-            val isLiquidGlassInterface = uiState.interfaceStyle == InterfaceStyle.LiquidGlass.value
             val startupAnimationUri = uiState.customStartupAnimationUri
             val clickSoundUri = uiState.customClickSoundUri
             val clickSoundVolume = uiState.customClickSoundVolume
             val backgroundMusicUri = uiState.customBackgroundMusicUri
             val backgroundMusicVolume = uiState.customBackgroundMusicVolume
             var showStartupAnimation by rememberSaveable { mutableStateOf(!startupAnimationUri.isNullOrBlank()) }
-            val effectiveEnableBlur = if (isLiquidGlassInterface) {
-                true
-            } else {
-                uiState.enableBlur
-            }
-            val effectiveEnableFloatingBottomBarBlur = if (isLiquidGlassInterface) {
-                true
-            } else {
-                uiState.enableFloatingBottomBarBlur
-            }
+            val effectiveEnableBlur = resolveRealtimeBlurEnabled(
+                interfaceStyle = uiState.interfaceStyle,
+                requested = uiState.enableBlur,
+            )
+            val effectiveEnableFloatingBottomBarBlur = resolveRealtimeBlurEnabled(
+                interfaceStyle = uiState.interfaceStyle,
+                requested = uiState.enableFloatingBottomBarBlur,
+            )
             val selectedRainStyle = RainStyle.fromValue(uiState.rainStyle)
             val rainInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Rain.value
             val seasonInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Snow.value

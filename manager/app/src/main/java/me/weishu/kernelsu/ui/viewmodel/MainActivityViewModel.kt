@@ -13,6 +13,7 @@ import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
@@ -102,15 +103,17 @@ class MainActivityViewModel(
 
     private fun readUiState(): MainActivityUiState {
         val interfaceStyle = settingRepo.uiMode
-        val isLiquidGlassInterface = interfaceStyle == InterfaceStyle.LiquidGlass.value
         return MainActivityUiState(
             appSettings = ThemeController.getAppSettings(ksuApp),
             pageScale = settingRepo.pageScale,
             fontScale = settingRepo.fontScale,
             blurIntensity = settingRepo.blurIntensity,
-            enableBlur = if (isLiquidGlassInterface) true else settingRepo.enableBlur,
+            enableBlur = resolveRealtimeBlurEnabled(interfaceStyle, settingRepo.enableBlur),
             enableFloatingBottomBar = settingRepo.enableFloatingBottomBar,
-            enableFloatingBottomBarBlur = if (isLiquidGlassInterface) true else settingRepo.enableFloatingBottomBarBlur,
+            enableFloatingBottomBarBlur = resolveRealtimeBlurEnabled(
+                interfaceStyle,
+                settingRepo.enableFloatingBottomBarBlur,
+            ),
             autoHideNavigationBar = settingRepo.autoHideNavigationBar,
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
