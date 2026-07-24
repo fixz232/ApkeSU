@@ -399,7 +399,7 @@ private fun HomeCardWallpaperOverflowMenu(
         ) {
             Icon(
                 imageVector = Icons.Rounded.MoreVert,
-                contentDescription = stringResource(R.string.home_header_more),
+                contentDescription = stringResource(R.string.ai_chat_more_options),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

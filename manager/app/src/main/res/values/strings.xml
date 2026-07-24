@@ -18,14 +18,6 @@
     <string name="root_diagnostic_report">Root diagnostic report</string>
     <string name="root_diagnostic_copy">Copy report</string>
     <string name="root_diagnostic_copied">Diagnostic report copied</string>
-    <string name="home_active">Active</string>
-    <string name="home_inactive">Inactive</string>
-    <string name="home_kernel_patch">Kernel patch</string>
-    <string name="home_system_patch">System patch</string>
-    <string name="home_kernel_patch_version">Kernel patch version</string>
-    <string name="home_su_executable">su executable</string>
-    <string name="home_system_version">System version</string>
-    <string name="home_header_more">More</string>
     <string name="home_lkm_wallpaper_pick">Choose LKM card wallpaper</string>
     <string name="home_lkm_video_wallpaper_pick">Choose LKM card video wallpaper</string>
     <string name="home_lkm_wallpaper_crop">Crop LKM card wallpaper</string>

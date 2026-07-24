@@ -1352,14 +1352,6 @@
     <string name="theme_store_import_preview_warning_item">%1$s：%2$s</string>
     <string name="theme_store_import_preview_apply_action">导入并应用</string>
     <string name="theme_store_import_preview_add_action">加入我的主题</string>
-    <string name="home_active">Active</string>
-    <string name="home_inactive">Inactive</string>
-    <string name="home_kernel_patch">内核补丁</string>
-    <string name="home_system_patch">系统补丁</string>
-    <string name="home_kernel_patch_version">内核补丁版本</string>
-    <string name="home_su_executable">su 可执行文件</string>
-    <string name="home_system_version">系统版本</string>
-    <string name="home_header_more">更多</string>
     <string name="home_reboot_menu_wallpaper_pick">&#x9009;&#x62E9;&#x91CD;&#x542F;&#x83DC;&#x5355;&#x58C1;&#x7EB8;</string>
     <string name="home_reboot_menu_wallpaper_crop">&#x88C1;&#x526A;&#x91CD;&#x542F;&#x83DC;&#x5355;&#x58C1;&#x7EB8;</string>
     <string name="home_reboot_menu_wallpaper_preview">&#x9884;&#x89C8;&#x91CD;&#x542F;&#x83DC;&#x5355;&#x58C1;&#x7EB8;</string>
