@@ -1,6 +1,6 @@
 # ApkeSU
 
-ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目，[Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注KMI 匹配、SuSFS 配置可靠性和可恢复维护。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
+ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目和[Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
 TG 组织：https://t.me/+LkrMQKXtXvpmYmNl
 
