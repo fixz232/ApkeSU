@@ -67,6 +67,7 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 - [KernelSU](https://github.com/tiann/KernelSU)，感谢作者weishu与全部贡献者
 - [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) SuSFS方案参考
 - [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
+- [skrootpro](https://github.com/abcz316/SKRoot-linuxKernelRoot)UI框架借鉴
 - [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持
 - [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): KernelSU设计灵感来源
 - [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
