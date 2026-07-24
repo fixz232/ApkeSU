@@ -43,6 +43,7 @@ QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.q
 ## 致谢
 
 感谢 [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者weishu，致敬所有贡献者。
+  [https://github.com/SukiSU-Ultra/SukiSU-Ultra] 界面ui参考
 - [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): The KernelSU idea.
 - [Magisk](https://github.com/topjohnwu/Magisk): The powerful root tool.
 - [genuine](https://github.com/brevent/genuine/): APK v2 signature validation.
