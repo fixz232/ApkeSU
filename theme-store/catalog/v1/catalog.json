@@ -1,7 +1,50 @@
 {
   "schema": "io.github.fixz.apkesu.theme-catalog",
   "version": 1,
-  "generatedAt": 0,
-  "categories": [],
-  "themes": []
+  "generatedAt": 1784873972135,
+  "categories": [
+    {
+      "id": "anime",
+      "name": "动漫主题"
+    }
+  ],
+  "themes": [
+    {
+      "id": "rikka-takanashi",
+      "name": "小鸟游六花",
+      "author": {
+        "id": "fixz232",
+        "name": "fixz232",
+        "bio": "ApkeSU 云主题创作者",
+        "profileUrl": "https://github.com/fixz232",
+        "avatarUrl": "https://github.com/fixz232.png"
+      },
+      "description": "以小鸟游六花为核心的紫蓝动漫主题，包含 1080p 动态背景、六张主页卡片壁纸、五个页面背景和四枚表情导航图标。",
+      "category": "anime",
+      "tags": [
+        "小鸟游六花",
+        "动漫",
+        "紫色",
+        "动态壁纸",
+        "卡片壁纸"
+      ],
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "packageSchema": "io.github.fixz.apkesu.theme",
+      "packageVersion": 4,
+      "minManagerVersionCode": 32700,
+      "maxManagerVersionCode": null,
+      "coverUrl": "https://github.com/fixz232/ApkeSU/releases/download/theme-source-rikka-takanashi-v1/rikka-takanashi-cover.jpg",
+      "screenshots": [],
+      "downloadUrl": "https://github.com/fixz232/ApkeSU/releases/download/theme-rikka-takanashi-v1/rikka-takanashi-v1.kstheme",
+      "sha256": "8145a651954fcabe3051cc932a1bab56714991ce49f0797f97ebe45d3fb3e635",
+      "sizeBytes": 6665712,
+      "license": "LicenseRef-UserProvided",
+      "changelog": "首个云商店版本：加入动态背景、主页卡片、页面背景和导航图标。",
+      "publishedAt": 1784873972135,
+      "status": "published",
+      "featured": false,
+      "downloadCount": 0
+    }
+  ]
 }
