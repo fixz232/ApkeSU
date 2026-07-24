@@ -73,7 +73,7 @@ def verify_local_package(path: Path, package_version: int) -> None:
                 or author.get("gender", "unspecified") != "unspecified"
             ):
                 raise ValidationFailure("cloud package exposes private author profile fields")
-            validate_embedded_assets(metadata, archive_names, "package")
+            validate_embedded_assets(metadata, archive_names, "package", archive)
     except zipfile.BadZipFile as error:
         raise ValidationFailure("invalid ZIP package") from error
 

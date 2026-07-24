@@ -1,12 +1,12 @@
 package me.weishu.kernelsu.ui.util
 
 import android.content.Context
-import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.AtomicFile
 import androidx.core.content.edit
+import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,7 +15,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 
 private const val CREATOR_REGISTRY_CACHE_FRESH_MS = 15L * 60L * 1000L
@@ -33,6 +36,12 @@ class CloudThemeCreatorRepository(
     private val registryUrl: String = CLOUD_THEME_DEFAULT_CREATOR_REGISTRY_URL,
 ) {
     private val appContext = context.applicationContext
+
+    init {
+        synchronized(cloudThemeCreatorFileLock) {
+            cleanupStaleInspectionFiles()
+        }
+    }
 
     suspend fun loadRegistry(forceRefresh: Boolean = false): CloudThemeCreatorRegistrySnapshot =
         withContext(Dispatchers.IO) {
@@ -90,6 +99,7 @@ class CloudThemeCreatorRepository(
             output.write(encodeCloudThemeSubmissionDraft(draft).toByteArray(Charsets.UTF_8))
             output.flush()
             atomicFile.finishWrite(output)
+            cleanupInspectedPackages(keepUriString = draft.packageUri)
         } catch (error: Throwable) {
             atomicFile.failWrite(output)
             throw error
@@ -98,57 +108,83 @@ class CloudThemeCreatorRepository(
 
     fun clearDraft() = synchronized(cloudThemeCreatorFileLock) {
         draftFile().delete()
+        cleanupInspectedPackages()
+        cleanupStaleInspectionFiles()
     }
 
     suspend fun inspectPackage(uri: Uri): CloudThemeCreatorPackageInspection =
         withContext(Dispatchers.IO) {
-            runCatching {
-                appContext.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            val previewResult = previewThemeStorePackage(
-                context = appContext,
-                source = uri,
-                requireCloudSafe = true,
+            val stagingFile = File.createTempFile(
+                "selected-theme-",
+                ".tmp",
+                creatorDirectory(),
             )
-            if (!previewResult.success || previewResult.preview == null) {
-                throw previewResult.error ?: IllegalArgumentException("Invalid theme package")
-            }
-            val digest = MessageDigest.getInstance("SHA-256")
-            var copied = 0L
-            appContext.contentResolver.openInputStream(uri)?.use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    copied += read
-                    require(copied <= CLOUD_THEME_MAX_PACKAGE_BYTES) {
-                        "Theme package exceeds the cloud store limit"
+            try {
+                val fingerprint = openPackageInputStream(uri).use { input ->
+                    FileOutputStream(stagingFile).use { output ->
+                        copyAndFingerprintCloudThemePackage(input, output)
                     }
-                    digest.update(buffer, 0, read)
                 }
-            } ?: error("Unable to read the selected theme package")
-            require(copied > 0L) { "Theme package is empty" }
-            CloudThemeCreatorPackageInspection(
-                uriString = uri.toString(),
-                displayName = queryDisplayName(uri)
-                    ?.take(160)
-                    ?.takeIf(String::isNotBlank)
-                    ?: "theme.$THEME_STORE_FILE_EXTENSION",
-                sha256 = digest.digest().joinToString("") {
-                    "%02x".format(it.toInt() and 0xff)
-                },
-                sizeBytes = copied,
-                packageVersion = previewResult.preview.version,
-                configuredResourceCount = previewResult.preview.configuredResourceCount,
-                authorDisplayName = previewResult.preview.author?.displayName
-                    ?.take(64)
-                    ?.takeIf(String::isNotBlank),
-                warnings = previewResult.warnings,
-            )
+                val previewResult = previewThemeStorePackage(
+                    context = appContext,
+                    source = Uri.fromFile(stagingFile),
+                    requireCloudSafe = true,
+                )
+                if (!previewResult.success || previewResult.preview == null) {
+                    throw previewResult.error ?: IllegalArgumentException("Invalid theme package")
+                }
+                val storedPackage = commitInspectedPackage(
+                    stagingFile = stagingFile,
+                    sha256 = fingerprint.sha256,
+                )
+                CloudThemeCreatorPackageInspection(
+                    uriString = Uri.fromFile(storedPackage).toString(),
+                    displayName = queryDisplayName(uri)
+                        ?.take(160)
+                        ?.takeIf(String::isNotBlank)
+                        ?: "theme.$THEME_STORE_FILE_EXTENSION",
+                    sha256 = fingerprint.sha256,
+                    sizeBytes = fingerprint.sizeBytes,
+                    packageVersion = previewResult.preview.version,
+                    configuredResourceCount = previewResult.preview.configuredResourceCount,
+                    authorDisplayName = previewResult.preview.author?.displayName
+                        ?.take(64)
+                        ?.takeIf(String::isNotBlank),
+                    warnings = previewResult.warnings,
+                )
+            } finally {
+                stagingFile.delete()
+            }
         }
+
+    suspend fun exportInspectedPackage(
+        sourceUriString: String,
+        destination: Uri,
+        expectedSha256: String,
+        expectedSizeBytes: Long,
+    ) = withContext(Dispatchers.IO) {
+        require(expectedSizeBytes in 1..CLOUD_THEME_MAX_PACKAGE_BYTES) {
+            "Invalid expected package size"
+        }
+        require(Regex("[a-fA-F0-9]{64}").matches(expectedSha256)) {
+            "Invalid expected package hash"
+        }
+        val source = sourceUriString.toUri()
+        val verified = openPackageInputStream(source).use { input ->
+            copyAndFingerprintCloudThemePackage(input, DiscardingOutputStream)
+        }
+        require(
+            verified.sizeBytes == expectedSizeBytes &&
+                verified.sha256.equals(expectedSha256, ignoreCase = true)
+        ) { "Stored theme package no longer matches the validated package" }
+
+        val exported = openPackageInputStream(source).use { input ->
+            openPackageOutputStream(destination).use { output ->
+                copyAndFingerprintCloudThemePackage(input, output)
+            }
+        }
+        require(exported == verified) { "Exported theme package verification failed" }
+    }
 
     suspend fun verifyRemotePackage(
         packageUrl: String,
@@ -383,6 +419,59 @@ class CloudThemeCreatorRepository(
         }.getOrNull()
     }
 
+    private fun openPackageInputStream(uri: Uri): InputStream {
+        if (uri.scheme == "file") {
+            return FileInputStream(File(uri.path ?: error("Invalid file URI")))
+        }
+        return appContext.contentResolver.openInputStream(uri)
+            ?: error("Unable to read the selected theme package")
+    }
+
+    private fun openPackageOutputStream(uri: Uri): OutputStream {
+        if (uri.scheme == "file") {
+            val file = File(uri.path ?: error("Invalid file URI"))
+            file.parentFile?.mkdirs()
+            return FileOutputStream(file)
+        }
+        return appContext.contentResolver.openOutputStream(uri, "wt")
+            ?: error("Unable to export the theme package")
+    }
+
+    private fun commitInspectedPackage(stagingFile: File, sha256: String): File =
+        synchronized(cloudThemeCreatorFileLock) {
+            require(Regex("[a-f0-9]{64}").matches(sha256)) { "Invalid package hash" }
+            val target = File(creatorDirectory(), "selected-package-$sha256.kstheme")
+            if (target.exists()) {
+                require(target.length() == stagingFile.length()) {
+                    "Stored theme package is inconsistent"
+                }
+                return@synchronized target
+            }
+            require(stagingFile.renameTo(target)) { "Unable to store the selected theme package" }
+            target
+        }
+
+    private fun cleanupInspectedPackages(keepUriString: String? = null) {
+        val keepPath = keepUriString
+            ?.takeIf(String::isNotBlank)
+            ?.toUri()
+            ?.takeIf { it.scheme == "file" }
+            ?.path
+            ?.let(::File)
+            ?.absolutePath
+        creatorDirectory().listFiles { file ->
+            file.name.startsWith("selected-package-") && file.name.endsWith(".kstheme")
+        }?.forEach { file ->
+            if (file.absolutePath != keepPath) file.delete()
+        }
+    }
+
+    private fun cleanupStaleInspectionFiles() {
+        creatorDirectory().listFiles { file ->
+            file.name.startsWith("selected-theme-") && file.name.endsWith(".tmp")
+        }?.forEach { it.delete() }
+    }
+
     private fun metadataPrefs() =
         appContext.getSharedPreferences(CREATOR_METADATA_PREFS, Context.MODE_PRIVATE)
 
@@ -392,4 +481,40 @@ class CloudThemeCreatorRepository(
     private fun registryCacheFile() = AtomicFile(File(creatorDirectory(), "creators-v1.json"))
 
     private fun draftFile() = AtomicFile(File(creatorDirectory(), "submission-draft-v1.json"))
+
+}
+
+internal data class CloudThemePackageFingerprint(
+    val sha256: String,
+    val sizeBytes: Long,
+)
+
+internal fun copyAndFingerprintCloudThemePackage(
+    input: InputStream,
+    output: OutputStream,
+    maxBytes: Long = CLOUD_THEME_MAX_PACKAGE_BYTES,
+): CloudThemePackageFingerprint {
+    require(maxBytes > 0L) { "Invalid theme package size limit" }
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var copied = 0L
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        copied += read
+        require(copied <= maxBytes) { "Theme package exceeds the cloud store limit" }
+        output.write(buffer, 0, read)
+        digest.update(buffer, 0, read)
+    }
+    require(copied > 0L) { "Theme package is empty" }
+    return CloudThemePackageFingerprint(
+        sha256 = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) },
+        sizeBytes = copied,
+    )
+}
+
+private object DiscardingOutputStream : OutputStream() {
+    override fun write(value: Int) = Unit
+
+    override fun write(buffer: ByteArray, offset: Int, length: Int) = Unit
 }

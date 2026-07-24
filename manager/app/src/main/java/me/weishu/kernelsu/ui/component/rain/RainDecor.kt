@@ -52,6 +52,7 @@ import kotlinx.coroutines.delay
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
+import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import kotlin.math.PI
@@ -300,6 +301,7 @@ fun Modifier.rainMiuixCardSurface(
     shape: Shape = RoundedCornerShape(18.dp),
     enabled: Boolean = true,
     capHeight: Dp = 13.dp,
+    customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
     if (!enabled || !isRainInterfaceStyle()) return this
     val style = LocalRainStyle.current
@@ -327,7 +329,7 @@ fun Modifier.rainMiuixCardSurface(
             )
             if (height > 0f) drawRainCardCanopy(style, palette, height, progress, motionEnabled)
         }
-        .uiDecoratedCard(shape = shape, enabled = true)
+        .uiDecoratedCard(shape = shape, enabled = true, customTarget = customTarget)
 }
 
 @Composable

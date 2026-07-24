@@ -6,9 +6,11 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.res.stringResource
 import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ksuApp
 
 private const val LKM_MODE_LABEL = "LKM"
-private const val HIDDEN_PATH_LKM_MODE_LABEL = "\u9690\u85cf\u8def\u5f84LKM"
+private val HIDDEN_PATH_LKM_MODE_LABEL: String
+    get() = ksuApp.getString(R.string.home_work_mode_hidden_path_lkm)
 private const val GKI_MODE_LABEL = "GKI"
 
 enum class RootRuntimeState(@StringRes val labelRes: Int) {

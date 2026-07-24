@@ -19,6 +19,7 @@ internal const val CLOUD_THEME_GITHUB_REPOSITORY_URL =
 internal const val CLOUD_THEME_CREATOR_REVIEWER = "fixz232"
 internal const val CLOUD_THEME_MAX_CREATOR_REGISTRY_BYTES = 512L * 1024L
 internal const val CLOUD_THEME_MAX_GITHUB_ISSUES_BYTES = 2L * 1024L * 1024L
+internal const val CLOUD_THEME_CREATOR_PICKER_MIME_TYPE = "*/*"
 
 private const val CLOUD_THEME_DRAFT_SCHEMA = "io.github.fixz.apkesu.theme-submission-draft"
 private const val CLOUD_THEME_DRAFT_VERSION = 1
@@ -169,6 +170,21 @@ internal fun normalizeCloudThemeGithubLogin(value: String): String {
     val normalized = value.trim()
     require(isValidCloudThemeGithubLogin(normalized)) { "Invalid GitHub login" }
     return normalized.lowercase()
+}
+
+internal fun canonicalCloudThemePackageFileName(displayName: String): String {
+    val trimmed = displayName.trim()
+    val baseName = trimmed.substringBeforeLast('.', missingDelimiterValue = trimmed)
+    val safeBaseName = buildString {
+        baseName.forEach { character ->
+            when {
+                character in "\\/:*?\"<>|" ||
+                    Character.isISOControl(character) -> append('_')
+                else -> append(character)
+            }
+        }
+    }.trim().trimEnd('.').take(140).ifBlank { "apkesu-cloud-theme" }
+    return "$safeBaseName.$THEME_STORE_FILE_EXTENSION"
 }
 
 internal fun validateCloudThemeCreatorPackageUrl(rawUrl: String, githubLogin: String): String {
@@ -471,6 +487,12 @@ internal fun parseCloudThemeCreatorActivity(
             if (number > applicationNumber) {
                 applicationNumber = number
                 applicationUrl = url
+                val applicationBodyValid =
+                    title.equals("[Creator application] $github", ignoreCase = true) &&
+                        isValidCloudThemeCreatorApplicationBody(
+                            body = issue.optString("body"),
+                            githubLogin = github,
+                        )
                 applicationStatus = when {
                     "creator-active" in labels -> {
                         CloudThemeCreatorApplicationStatus.Approved
@@ -479,6 +501,7 @@ internal fun parseCloudThemeCreatorActivity(
                     "creator-needs-changes" in labels -> {
                         CloudThemeCreatorApplicationStatus.NeedsChanges
                     }
+                    !applicationBodyValid -> CloudThemeCreatorApplicationStatus.NeedsChanges
                     closed -> CloudThemeCreatorApplicationStatus.Rejected
                     else -> CloudThemeCreatorApplicationStatus.Pending
                 }
@@ -594,3 +617,20 @@ private fun parseCloudThemeIssueField(body: String, heading: String): String {
         .trim()
         .take(1024)
 }
+
+private fun isValidCloudThemeCreatorApplicationBody(
+    body: String,
+    githubLogin: String,
+): Boolean = runCatching {
+    val declaredLogin = normalizeCloudThemeGithubLogin(
+        parseCloudThemeIssueField(body, "GitHub login")
+    )
+    val displayName = parseCloudThemeIssueField(body, "Public creator name")
+    val introduction = parseCloudThemeIssueField(body, "Introduction")
+    val declarations = parseCloudThemeIssueField(body, "Declarations").lowercase()
+    declaredLogin == githubLogin &&
+        displayName.isNotBlank() && displayName.length <= 64 &&
+        !displayName.hasUnsafeControlCharacters() &&
+        introduction.isNotBlank() &&
+        declarations.lineSequence().count { it.trimStart().startsWith("- [x]") } >= 3
+}.getOrDefault(false)

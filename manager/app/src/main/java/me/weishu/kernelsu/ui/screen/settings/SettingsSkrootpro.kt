@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
@@ -150,6 +151,12 @@ fun SettingPagerSkrootpro(
                     title = stringResource(R.string.theme_store),
                     summary = stringResource(R.string.theme_store_settings_summary),
                     onClick = actions.onOpenThemeStore,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_language),
+                    summary = stringResource(R.string.settings_language_summary),
+                    leadingIcon = Icons.Rounded.Language,
+                    onClick = actions.onOpenLanguage,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_manager_identity),

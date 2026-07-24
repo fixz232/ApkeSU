@@ -16,8 +16,10 @@ from urllib.parse import urlparse
 
 CATALOG_SCHEMA = "io.github.fixz.apkesu.theme-catalog"
 PACKAGE_SCHEMA = "io.github.fixz.apkesu.theme"
-MAX_PACKAGE_BYTES = 100 * 1024 * 1024
-MAX_IMAGE_BYTES = 12 * 1024 * 1024
+COMPONENT_STYLE_SCHEMA = "io.github.fixz.apkesu.component-style"
+MAX_PACKAGE_BYTES = 500 * 1024 * 1024
+MAX_IMAGE_BYTES = 500 * 1024 * 1024
+MAX_COMPONENT_IMAGE_BYTES = 500 * 1024 * 1024
 MAX_ZIP_ASSET_BYTES = 512 * 1024 * 1024
 ALLOWED_EXACT_HOSTS = {
     "github.com",
@@ -30,6 +32,7 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{1,79}$")
 CATEGORY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,39}$")
 SHA_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 LICENSE_RE = re.compile(r"^[A-Za-z0-9.+-]{1,48}$")
+COMPONENT_STYLE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$")
 
 
 class ValidationFailure(Exception):
@@ -190,26 +193,23 @@ def open_remote(url: str):
     return response
 
 
-def read_remote(url: str, maximum: int) -> bytes:
+def validate_image(url: str) -> None:
+    header = bytearray()
+    total = 0
     with open_remote(url) as response:
         declared = response.headers.get("Content-Length")
-        if declared and int(declared) > maximum:
-            raise ValidationFailure(f"remote asset exceeds {maximum} bytes: {url}")
-        chunks: list[bytes] = []
-        total = 0
+        if declared and int(declared) > MAX_IMAGE_BYTES:
+            raise ValidationFailure(f"remote image exceeds {MAX_IMAGE_BYTES} bytes: {url}")
         while True:
             chunk = response.read(64 * 1024)
             if not chunk:
                 break
             total += len(chunk)
-            if total > maximum:
-                raise ValidationFailure(f"remote asset exceeds {maximum} bytes: {url}")
-            chunks.append(chunk)
-        return b"".join(chunks)
-
-
-def validate_image(url: str) -> None:
-    payload = read_remote(url, MAX_IMAGE_BYTES)
+            if total > MAX_IMAGE_BYTES:
+                raise ValidationFailure(f"remote image exceeds {MAX_IMAGE_BYTES} bytes: {url}")
+            if len(header) < 16:
+                header.extend(chunk[: 16 - len(header)])
+    payload = bytes(header)
     known = (
         payload.startswith(b"\x89PNG\r\n\x1a\n")
         or payload.startswith(b"\xff\xd8\xff")
@@ -231,7 +231,138 @@ def validate_zip_entry(name: str) -> str:
     return normalized
 
 
-def validate_embedded_assets(metadata: dict, archive_names: set[str], label: str) -> None:
+def validate_pixel_grid(value: object, width: int, height: int, label: str) -> None:
+    if not isinstance(value, dict):
+        raise ValidationFailure(f"{label}: pixel grid must be an object")
+    if value.get("width") != width or value.get("height") != height:
+        raise ValidationFailure(f"{label}: pixel grid dimensions do not match")
+    pixels = value.get("pixels")
+    if not isinstance(pixels, list) or len(pixels) != width * height:
+        raise ValidationFailure(f"{label}: pixel grid data is incomplete")
+    if any(
+        isinstance(pixel, bool) or not isinstance(pixel, int) or pixel < 0 or pixel > 0xFFFFFFFF
+        for pixel in pixels
+    ):
+        raise ValidationFailure(f"{label}: pixel grid contains an invalid color")
+
+
+def validate_component_header(style: object, kind: str, label: str) -> dict:
+    if not isinstance(style, dict):
+        raise ValidationFailure(f"{label}: component style must be an object")
+    if (
+        style.get("schema") != COMPONENT_STYLE_SCHEMA
+        or style.get("version") != 1
+        or style.get("kind") != kind
+    ):
+        raise ValidationFailure(f"{label}: unsupported component style")
+    style_id = style.get("id")
+    if not isinstance(style_id, str) or not COMPONENT_STYLE_ID_RE.fullmatch(style_id):
+        raise ValidationFailure(f"{label}: invalid component style ID")
+    if not isinstance(style.get("name"), str) or len(style["name"]) > 48:
+        raise ValidationFailure(f"{label}: invalid component style name")
+    if not isinstance(style.get("author"), str) or len(style["author"]) > 64:
+        raise ValidationFailure(f"{label}: invalid component style author")
+    palette = style.get("palette")
+    if not isinstance(palette, list) or not palette or len(palette) > 24:
+        raise ValidationFailure(f"{label}: invalid component palette")
+    if any(
+        isinstance(color, bool) or not isinstance(color, int) or color < 0 or color > 0xFFFFFFFF
+        for color in palette
+    ):
+        raise ValidationFailure(f"{label}: component palette contains an invalid color")
+    motion = style.get("motion")
+    if not isinstance(motion, dict):
+        raise ValidationFailure(f"{label}: motion rules are missing")
+    if not isinstance(motion.get("enabled"), bool):
+        raise ValidationFailure(f"{label}: invalid motion enabled state")
+    if motion.get("mode") not in {"static", "pulse", "drift", "scan"}:
+        raise ValidationFailure(f"{label}: invalid motion mode")
+    duration = motion.get("duration_ms")
+    amplitude = motion.get("amplitude_cells")
+    if isinstance(duration, bool) or not isinstance(duration, int) or not 600 <= duration <= 12000:
+        raise ValidationFailure(f"{label}: invalid motion duration")
+    if isinstance(amplitude, bool) or not isinstance(amplitude, int) or not 0 <= amplitude <= 4:
+        raise ValidationFailure(f"{label}: invalid motion amplitude")
+    if motion.get("repeat") not in {"restart", "reverse"}:
+        raise ValidationFailure(f"{label}: invalid motion repeat mode")
+    return style
+
+
+def validate_card_layers(value: object, label: str) -> None:
+    if not isinstance(value, dict):
+        raise ValidationFailure(f"{label}: card layers are missing")
+    validate_pixel_grid(value.get("top"), 24, 5, f"{label} top")
+    validate_pixel_grid(value.get("border"), 24, 12, f"{label} border")
+    validate_pixel_grid(value.get("interior"), 24, 12, f"{label} interior")
+
+
+def validate_navigation_layers(value: object, label: str) -> None:
+    if not isinstance(value, dict):
+        raise ValidationFailure(f"{label}: navigation layers are missing")
+    validate_pixel_grid(value.get("top"), 24, 4, f"{label} top")
+    validate_pixel_grid(value.get("border"), 24, 6, f"{label} border")
+
+
+def validate_component_styles(metadata: dict, label: str) -> None:
+    components = metadata.get("components", {})
+    if not isinstance(components, dict):
+        raise ValidationFailure(f"{label}: invalid components metadata")
+    if any(key not in {"cardStyle", "switchStyle"} for key in components):
+        raise ValidationFailure(f"{label}: unknown component style")
+    if metadata.get("packageType") == "component" and len(components) != 1:
+        raise ValidationFailure(f"{label}: component package must contain exactly one style")
+
+    card_style = components.get("cardStyle")
+    if card_style is not None:
+        style = validate_component_header(card_style, "card_style", f"{label} card style")
+        validate_card_layers(style.get("default"), f"{label} default card")
+        overrides = style.get("overrides")
+        if not isinstance(overrides, dict) or any(
+            key not in {"lkm", "superuser", "module", "status_monitor", "system_info", "reboot_menu"}
+            for key in overrides
+        ):
+            raise ValidationFailure(f"{label}: invalid card overrides")
+        for target, layers in overrides.items():
+            validate_card_layers(layers, f"{label} {target} card")
+        validate_navigation_layers(style.get("bottom_bar"), f"{label} bottom bar")
+        validate_navigation_layers(style.get("floating_bottom_bar"), f"{label} floating bottom bar")
+
+    switch_owner = components.get("switchStyle")
+    if switch_owner is not None:
+        if not isinstance(switch_owner, dict):
+            raise ValidationFailure(f"{label}: invalid switch style metadata")
+        style = validate_component_header(
+            switch_owner.get("style"),
+            "switch_style",
+            f"{label} switch style",
+        )
+        validate_pixel_grid(style.get("track_off"), 28, 12, f"{label} switch track off")
+        validate_pixel_grid(style.get("track_on"), 28, 12, f"{label} switch track on")
+        validate_pixel_grid(style.get("thumb_off"), 12, 12, f"{label} switch thumb off")
+        validate_pixel_grid(style.get("thumb_on"), 12, 12, f"{label} switch thumb on")
+        if style.get("source") not in {"pixel", "image"}:
+            raise ValidationFailure(f"{label}: invalid switch source")
+        if isinstance(style.get("image_uri"), str) and style["image_uri"].strip():
+            raise ValidationFailure(f"{label}: device-specific image_uri is not allowed")
+        if style.get("image_scale") not in {"crop", "fit"}:
+            raise ValidationFailure(f"{label}: invalid switch image scale")
+        opacity = style.get("image_opacity")
+        if isinstance(opacity, bool) or not isinstance(opacity, (int, float)) or not 0.1 <= opacity <= 1.0:
+            raise ValidationFailure(f"{label}: invalid switch image opacity")
+        if style.get("source") == "image":
+            if not isinstance(style.get("image_sha256"), str) or not SHA_RE.fullmatch(style["image_sha256"]):
+                raise ValidationFailure(f"{label}: invalid switch image hash")
+            if not isinstance(switch_owner.get("imageAsset"), dict):
+                raise ValidationFailure(f"{label}: image switch is missing its embedded image")
+
+
+def validate_embedded_assets(
+    metadata: dict,
+    archive_names: set[str],
+    label: str,
+    archive: zipfile.ZipFile | None = None,
+) -> None:
+    validate_component_styles(metadata, label)
     owners: list[dict] = []
     for section in ("cards", "navigationIcons", "pageBackgrounds"):
         section_value = metadata.get(section, {})
@@ -254,6 +385,43 @@ def validate_embedded_assets(metadata: dict, archive_names: set[str], label: str
             path = asset.get("path")
             if not isinstance(path, str) or not path.startswith("assets/") or path not in archive_names:
                 raise ValidationFailure(f"{label}: embedded author avatar is missing")
+
+    components = metadata.get("components", {})
+    if not isinstance(components, dict):
+        raise ValidationFailure(f"{label}: invalid components metadata")
+    switch_style = components.get("switchStyle")
+    if switch_style is not None:
+        if not isinstance(switch_style, dict):
+            raise ValidationFailure(f"{label}: invalid switch style metadata")
+        image_uri = switch_style.get("imageUri")
+        if isinstance(image_uri, str) and image_uri.strip():
+            raise ValidationFailure(f"{label}: device-specific imageUri is not allowed")
+        image_asset = switch_style.get("imageAsset")
+        if image_asset is not None:
+            if switch_style["style"]["source"] != "image":
+                raise ValidationFailure(f"{label}: pixel switch contains an unexpected image")
+            if not isinstance(image_asset, dict):
+                raise ValidationFailure(f"{label}: invalid switch style image metadata")
+            image_path = image_asset.get("path")
+            if (
+                not isinstance(image_path, str)
+                or not image_path.startswith("assets/")
+                or image_path not in archive_names
+            ):
+                raise ValidationFailure(f"{label}: embedded switch style image is missing")
+            if archive is not None:
+                info = archive.getinfo(image_path)
+                if info.is_dir() or not 0 < info.file_size <= MAX_COMPONENT_IMAGE_BYTES:
+                    raise ValidationFailure(f"{label}: invalid switch style image size")
+                digest = hashlib.sha256()
+                with archive.open(info) as image_file:
+                    while chunk := image_file.read(64 * 1024):
+                        digest.update(chunk)
+                expected_hash = switch_style["style"].get("image_sha256")
+                if not isinstance(expected_hash, str) or not SHA_RE.fullmatch(expected_hash):
+                    raise ValidationFailure(f"{label}: invalid switch style image hash")
+                if digest.hexdigest().lower() != expected_hash.lower():
+                    raise ValidationFailure(f"{label}: switch style image SHA-256 mismatch")
 
     for owner in owners:
         for asset_key, uri_key in (("asset", "uri"), ("videoAsset", "videoUri")):
@@ -330,7 +498,7 @@ def validate_package(theme: dict) -> None:
                     raise ValidationFailure(
                         f"{theme['id']}: cloud package exposes private author profile fields"
                     )
-                validate_embedded_assets(metadata, archive_names, theme["id"])
+                validate_embedded_assets(metadata, archive_names, theme["id"], archive)
         except zipfile.BadZipFile as error:
             raise ValidationFailure(f"{theme['id']}: invalid ZIP package") from error
 

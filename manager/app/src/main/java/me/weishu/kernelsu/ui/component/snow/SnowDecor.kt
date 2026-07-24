@@ -44,6 +44,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
+import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardColors
@@ -257,11 +258,23 @@ fun Modifier.snowMiuixCardSurface(
     shape: Shape = RoundedCornerShape(18.dp),
     enabled: Boolean = true,
     capHeight: Dp = 13.dp,
+    customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
-    if (!enabled) return uiDecoratedCard(shape = shape, enabled = false)
-    if (isPixelInterfaceStyle()) return pixelMiuixCardSurface(shape = shape, enabled = true)
-    if (isRainInterfaceStyle()) return rainMiuixCardSurface(shape = shape, enabled = true, capHeight = capHeight)
-    if (!isSnowInterfaceStyle()) return uiDecoratedCard(shape = shape, enabled = true)
+    if (!enabled) return uiDecoratedCard(shape = shape, enabled = false, customTarget = customTarget)
+    if (isPixelInterfaceStyle()) {
+        return pixelMiuixCardSurface(shape = shape, enabled = true, customTarget = customTarget)
+    }
+    if (isRainInterfaceStyle()) {
+        return rainMiuixCardSurface(
+            shape = shape,
+            enabled = true,
+            capHeight = capHeight,
+            customTarget = customTarget,
+        )
+    }
+    if (!isSnowInterfaceStyle()) {
+        return uiDecoratedCard(shape = shape, enabled = true, customTarget = customTarget)
+    }
 
     val dark = isInDarkTheme()
     val season = LocalSeasonStyle.current
@@ -307,7 +320,7 @@ fun Modifier.snowMiuixCardSurface(
                 }
             }
         }
-        .uiDecoratedCard(shape = shape, enabled = enabled)
+        .uiDecoratedCard(shape = shape, enabled = enabled, customTarget = customTarget)
 }
 
 @Composable

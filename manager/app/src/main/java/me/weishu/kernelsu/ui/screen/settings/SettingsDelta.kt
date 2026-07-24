@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
@@ -162,6 +163,12 @@ fun SettingPagerDelta(
                     summary = stringResource(R.string.theme_store_settings_summary),
                     icon = Icons.Rounded.Storefront,
                     onClick = actions.onOpenThemeStore,
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.settings_language),
+                    summary = stringResource(R.string.settings_language_summary),
+                    icon = Icons.Rounded.Language,
+                    onClick = actions.onOpenLanguage,
                 )
                 DeltaActionRow(
                     title = stringResource(R.string.settings_manager_identity),

@@ -94,7 +94,7 @@
           ]
         },
         "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
-        "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 104857600 },
+        "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 524288000 },
         "license": { "type": "string", "pattern": "^[A-Za-z0-9.+-]{1,48}$" },
         "changelog": { "type": "string", "maxLength": 4000 },
         "publishedAt": { "type": "integer", "minimum": 0 },

@@ -1,5 +1,8 @@
 package me.weishu.kernelsu.ui.util
 
+import me.weishu.kernelsu.ui.component.custom.CustomCardStyle
+import me.weishu.kernelsu.ui.component.custom.CustomSwitchSource
+import me.weishu.kernelsu.ui.component.custom.CustomSwitchStyle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -9,6 +12,7 @@ import org.junit.rules.TemporaryFolder
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -186,6 +190,118 @@ class ThemeStorePackageTest {
     }
 
     @Test
+    fun componentStylesAreValidatedAndCountedAsThemeResources() {
+        val config = currentThemeConfig()
+            .put(
+                "components",
+                JSONObject()
+                    .put("cardStyle", CustomCardStyle(id = "card-package-test").toJson())
+                    .put(
+                        "switchStyle",
+                        JSONObject()
+                            .put(
+                                "style",
+                                CustomSwitchStyle(id = "switch-package-test")
+                                    .toJson(includeLocalImageUri = false),
+                            )
+                            .put("imageAsset", null)
+                            .put("imageUri", null),
+                    ),
+            )
+
+        validateThemeStoreConfig(config)
+
+        assertEquals(2, countConfiguredThemeStoreResources(config))
+    }
+
+    @Test
+    fun componentOnlyPackageRequiresExactlyOneStyle() {
+        val config = currentThemeConfig()
+            .put("packageType", "component")
+            .put(
+                "components",
+                JSONObject()
+                    .put("cardStyle", CustomCardStyle(id = "card-only-test").toJson())
+                    .put(
+                        "switchStyle",
+                        JSONObject()
+                            .put(
+                                "style",
+                                CustomSwitchStyle(id = "switch-only-test")
+                                    .toJson(includeLocalImageUri = false),
+                            )
+                            .put("imageAsset", null)
+                            .put("imageUri", null),
+                    ),
+            )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            validateThemeStoreConfig(config)
+        }
+    }
+
+    @Test
+    fun imageSwitchRequiresEmbeddedOrLegacyImageReference() {
+        val config = currentThemeConfig().put(
+            "components",
+            JSONObject().put(
+                "switchStyle",
+                JSONObject()
+                    .put(
+                        "style",
+                        CustomSwitchStyle(
+                            id = "switch-image-test",
+                            source = CustomSwitchSource.Image,
+                            imageSha256 = "a".repeat(64),
+                        ).toJson(includeLocalImageUri = false),
+                    )
+                    .put("imageAsset", null)
+                    .put("imageUri", null),
+            ),
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            validateThemeStoreConfig(config)
+        }
+    }
+
+    @Test
+    fun embeddedSwitchImageMustMatchDeclaredHash() {
+        val assetsDir = temporaryFolder.newFolder("component-image-assets")
+        val imageBytes = "validated component image".toByteArray()
+        assetsDir.resolve("component_switch_image.png").writeBytes(imageBytes)
+        val expectedHash = MessageDigest.getInstance("SHA-256")
+            .digest(imageBytes)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val styleJson = CustomSwitchStyle(
+            id = "switch-image-hash-test",
+            source = CustomSwitchSource.Image,
+            imageSha256 = expectedHash,
+        ).toJson(includeLocalImageUri = false)
+        val config = currentThemeConfig().put(
+            "components",
+            JSONObject().put(
+                "switchStyle",
+                JSONObject()
+                    .put("style", styleJson)
+                    .put(
+                        "imageAsset",
+                        JSONObject().put("path", "assets/component_switch_image.png"),
+                    )
+                    .put("imageUri", null),
+            ),
+        )
+
+        validateThemeStoreConfig(config)
+        validateEmbeddedThemeStoreAssets(config, assetsDir)
+
+        styleJson.put("image_sha256", "b".repeat(64))
+        assertThrows(IllegalArgumentException::class.java) {
+            validateEmbeddedThemeStoreAssets(config, assetsDir)
+        }
+    }
+
+    @Test
     fun validateThemeStoreConfigForCloud_rejectsPrivateProfileAndDeviceUri() {
         val config = cloudUnsafeConfig()
 
@@ -205,6 +321,9 @@ class ThemeStorePackageTest {
         assertEquals("", author.getString("realName"))
         assertEquals("unspecified", author.getString("gender"))
         assertEquals("", config.getJSONObject("cards").getJSONObject("lkm").optString("uri"))
+        val switchOwner = config.getJSONObject("components").getJSONObject("switchStyle")
+        assertEquals("", switchOwner.optString("imageUri"))
+        assertEquals("", switchOwner.getJSONObject("style").optString("image_uri"))
     }
 
     private fun cloudUnsafeConfig(): JSONObject {
@@ -229,6 +348,34 @@ class ThemeStorePackageTest {
                         .put("videoUri", JSONObject.NULL),
                 ),
             )
+            .put(
+                "components",
+                JSONObject().put(
+                    "switchStyle",
+                    JSONObject()
+                        .put("imageAsset", JSONObject().put("path", "assets/component.png"))
+                        .put("imageUri", "file:///private/outer.png")
+                        .put("style", JSONObject().put("image_uri", "file:///private/inner.png")),
+                ),
+            )
+    }
+
+    private fun currentThemeConfig(): JSONObject {
+        return JSONObject()
+            .put("schema", "io.github.fixz.apkesu.theme")
+            .put("version", 4)
+            .put(
+                "author",
+                JSONObject()
+                    .put("displayName", "Creator")
+                    .put("realName", "")
+                    .put("gender", "unspecified")
+                    .put("bio", ""),
+            )
+            .put("startupSound", JSONObject().put("durationSeconds", 5).put("volume", 1.0))
+            .put("clickSound", JSONObject().put("volume", 1.0))
+            .put("backgroundMusic", JSONObject().put("volume", 0.35))
+            .put("startupAnimation", JSONObject())
     }
 
     private fun createArchive(vararg entries: Pair<String, ByteArray>): ByteArray {

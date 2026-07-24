@@ -35,6 +35,29 @@ class CloudThemeCreatorCatalogTest {
     }
 
     @Test
+    fun creatorApplicationUrl_prefillsTheIssueForm() {
+        val url = buildCloudThemeCreatorApplicationUrl("Alice-Theme", "Alice Creator")
+
+        assertTrue(url.startsWith("https://github.com/fixz232/ApkeSU/issues/new?"))
+        assertTrue(url.contains("template=cloud_theme_creator_application.yml"))
+        assertTrue(url.contains("github_login=alice-theme"))
+        assertTrue(url.contains("display_name=Alice%20Creator"))
+    }
+
+    @Test
+    fun creatorPackagePicker_acceptsEveryMimeTypeAndCanonicalizesTheName() {
+        assertEquals("*/*", CLOUD_THEME_CREATOR_PICKER_MIME_TYPE)
+        assertEquals(
+            "my.theme.kstheme",
+            canonicalCloudThemePackageFileName("my.theme.unrestricted-format"),
+        )
+        assertEquals(
+            "apkesu-cloud-theme.kstheme",
+            canonicalCloudThemePackageFileName(".unknown"),
+        )
+    }
+
+    @Test
     fun submissionDraft_roundTripsRemoteVerification() {
         val draft = validDraft()
 
@@ -125,6 +148,55 @@ class CloudThemeCreatorCatalogTest {
         assertEquals(1, activity.submissions.size)
         assertEquals(CloudThemeSubmissionReviewStatus.Published, activity.submissions.single().status)
         assertEquals("aurora-night", activity.submissions.single().themeId)
+    }
+
+    @Test
+    fun creatorActivity_marksBlankApplicationAsNeedingChanges() {
+        val activity = parseCloudThemeCreatorActivity(
+            """
+            [
+              {
+                "number": 81,
+                "title": "[Creator application] alice-theme",
+                "state": "open",
+                "html_url": "https://github.com/fixz232/ApkeSU/issues/81",
+                "updated_at": "2026-07-24T06:28:48Z",
+                "user": {"login": "alice-theme"},
+                "labels": [],
+                "body": null
+              }
+            ]
+            """.trimIndent(),
+            "alice-theme",
+        )
+
+        assertEquals(
+            CloudThemeCreatorApplicationStatus.NeedsChanges,
+            activity.applicationStatus,
+        )
+    }
+
+    @Test
+    fun creatorActivity_acceptsCompletePendingApplication() {
+        val activity = parseCloudThemeCreatorActivity(
+            """
+            [
+              {
+                "number": 82,
+                "title": "[Creator application] alice-theme",
+                "state": "open",
+                "html_url": "https://github.com/fixz232/ApkeSU/issues/82",
+                "updated_at": "2026-07-24T06:30:00Z",
+                "user": {"login": "alice-theme"},
+                "labels": [{"name": "theme-creator-application"}],
+                "body": "### GitHub login\n\nalice-theme\n\n### Public creator name\n\nAlice\n\n### Introduction\n\nOriginal themes.\n\n### Declarations\n\n- [x] one\n- [x] two\n- [x] three"
+              }
+            ]
+            """.trimIndent(),
+            "alice-theme",
+        )
+
+        assertEquals(CloudThemeCreatorApplicationStatus.Pending, activity.applicationStatus)
     }
 
     private fun validRegistryJson(): String = """

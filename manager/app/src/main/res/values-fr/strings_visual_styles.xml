@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">Pluie sur verre</string>
+    <string name="settings_rain_style">Intensité de la pluie</string>
+    <string name="settings_rain_card_motion">Cartes de pluie animées</string>
+    <string name="settings_rain_card_motion_summary">Anime les gouttes sur les bords, la condensation et un léger reflet sur le verre sans déplacer le contenu des cartes.</string>
+    <string name="rain_style_light">Pluie légère</string>
+    <string name="rain_style_light_summary">Brume douce, fines lignes de pluie et ondulations discrètes sur un verre bleu pâle.</string>
+    <string name="rain_style_medium">Pluie régulière</string>
+    <string name="rain_style_medium_summary">Pluie plus dense, nuages superposés et gouttes plus visibles sur les bords des cartes.</string>
+    <string name="rain_style_heavy">Forte pluie</string>
+    <string name="rain_style_heavy_summary">Palette sombre et orageuse, vent plus fort, verre détrempé et ondulations fréquentes au sol.</string>
+    <string name="rain_style_thunderstorm">Orage</string>
+    <string name="rain_style_thunderstorm_summary">Éclairs nocturnes toutes les 3 à 8 secondes, avec pluie dense et nuages orageux violets.</string>
+    <string name="rain_motto_light">Écoutez la pluie se poser sur le verre</string>
+    <string name="rain_motto_medium">Quand la pluie s’intensifie, le monde s’apaise</string>
+    <string name="rain_motto_heavy">Rester lucide au cœur de la tempête</string>
+    <string name="rain_motto_thunderstorm">L’éclair traverse la nuit, le cœur résiste</string>
+    <string name="theme_preset_rain">Pluie sur verre</string>
+    <string name="theme_preset_rain_summary">Verre gris-bleu froid, bords de cartes humides, auvents pluvieux et barre de navigation flottante assortie.</string>
+    <string name="settings_pixel_card_motion">Animation des cartes pixel</string>
+    <string name="settings_pixel_card_motion_summary">Anime les paysages et les détails de bord propres à chaque mode pixel sans déplacer les cartes ni le texte.</string>
+    <string name="settings_season_card_motion">Cartes saisonnières animées</string>
+    <string name="settings_season_card_motion_summary">Anime les pétales, les reflets sur l’eau, les feuilles et le givre sans déplacer le contenu des cartes.</string>
+</resources>

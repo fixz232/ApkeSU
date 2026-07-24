@@ -92,9 +92,19 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           gh label create creator-needs-changes --repo "$GITHUB_REPOSITORY" --color fbca04 --force
-          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label creator-needs-changes
+          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --remove-label creator-approved --add-label creator-needs-changes
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --body "Automated creator verification failed. Review the workflow log and correct the application before asking @fixz232 to review it again."
+
+      - name: Allow creator approval retry after workflow failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --remove-label creator-approved >/dev/null 2>&1 || true
 
   publish-theme:
     if: >-
@@ -171,6 +181,16 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           gh label create theme-needs-changes --repo "$GITHUB_REPOSITORY" --color fbca04 --force
-          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label theme-needs-changes
+          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --remove-label theme-approved --add-label theme-needs-changes
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --body "Automated verification failed. Review the workflow log, correct the package or manifest, then ask @fixz232 to review again."
+
+      - name: Allow theme approval retry after workflow failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --remove-label theme-approved >/dev/null 2>&1 || true

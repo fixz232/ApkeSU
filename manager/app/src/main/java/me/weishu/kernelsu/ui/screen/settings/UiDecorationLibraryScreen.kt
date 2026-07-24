@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BlurOn
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -109,6 +110,7 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.custom.LocalCustomCardStyle
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationScope
 import me.weishu.kernelsu.ui.component.decoration.PIXEL_CARD_DECORATIONS
@@ -128,6 +130,7 @@ import me.weishu.kernelsu.ui.component.decoration.forPreview
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.screen.colorpalette.ThemePresetNameDialog
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import top.yukonga.miuix.kmp.basic.Slider as MiuixSlider
@@ -764,6 +767,7 @@ private fun DecorationComponentsOverview(
     effectiveConfig: UiDecorationConfig,
     onCategorySelected: (DecorationCategory) -> Unit,
 ) {
+    val navigator = LocalNavigator.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
@@ -775,6 +779,40 @@ private fun DecorationComponentsOverview(
                 summary = stringResource(R.string.ui_decoration_component_categories_summary),
                 icon = Icons.Rounded.Palette,
             )
+        }
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { navigator.push(Route.CardStyleCreator) },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Rounded.Brush, contentDescription = null)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.card_style_creator_entry),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.card_style_creator_entry_summary),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                }
+            }
         }
         items(DecorationCategory.entries, key = { it.name }) { category ->
             DecorationCategoryRow(
@@ -914,8 +952,9 @@ private fun DecorationCategoryDetail(
     var query by rememberSaveable { mutableStateOf("") }
     val normalizedQuery = query.trim()
     val resources = LocalResources.current
+    val customStyleAvailable = LocalCustomCardStyle.current != null
     val cardOptions = UiCardDecoration.entries.filter { option ->
-        matchesComponentQuery(
+        (option != UiCardDecoration.Custom || customStyleAvailable) && matchesComponentQuery(
             query = normalizedQuery,
             label = resources.getString(option.labelRes()),
             summary = resources.getString(option.summaryRes()),
@@ -936,7 +975,7 @@ private fun DecorationCategoryDetail(
         )
     }
     val navigationOptions = UiNavigationDecoration.entries.filter { option ->
-        matchesComponentQuery(
+        (option != UiNavigationDecoration.Custom || customStyleAvailable) && matchesComponentQuery(
             query = normalizedQuery,
             label = resources.getString(option.labelRes()),
             summary = resources.getString(option.summaryRes()),
@@ -2143,6 +2182,7 @@ private fun UiDecorationPreset.summaryRes(): Int = when (this) {
 @StringRes
 private fun UiCardDecoration.labelRes(): Int = when (this) {
     UiCardDecoration.None -> R.string.ui_decoration_component_none
+    UiCardDecoration.Custom -> R.string.ui_decoration_card_custom
     UiCardDecoration.Highlight -> R.string.ui_decoration_card_highlight
     UiCardDecoration.Blossom -> R.string.ui_decoration_card_blossom
     UiCardDecoration.Lotus -> R.string.ui_decoration_card_lotus
@@ -2172,6 +2212,7 @@ private fun UiCardDecoration.labelRes(): Int = when (this) {
 @StringRes
 private fun UiCardDecoration.summaryRes(): Int = when (this) {
     UiCardDecoration.None -> R.string.ui_decoration_component_none_summary
+    UiCardDecoration.Custom -> R.string.ui_decoration_card_custom_summary
     UiCardDecoration.Highlight -> R.string.ui_decoration_card_highlight_summary
     UiCardDecoration.Blossom -> R.string.ui_decoration_card_blossom_summary
     UiCardDecoration.Lotus -> R.string.ui_decoration_card_lotus_summary
@@ -2241,6 +2282,7 @@ private fun UiTopBarDecoration.summaryRes(): Int = when (this) {
 @StringRes
 private fun UiNavigationDecoration.labelRes(): Int = when (this) {
     UiNavigationDecoration.None -> R.string.ui_decoration_component_none
+    UiNavigationDecoration.Custom -> R.string.ui_decoration_navigation_custom
     UiNavigationDecoration.UnderGlow -> R.string.ui_decoration_navigation_under_glow
     UiNavigationDecoration.LiquidHalo -> R.string.ui_decoration_navigation_liquid_halo
     UiNavigationDecoration.Orbit -> R.string.ui_decoration_navigation_orbit
@@ -2251,6 +2293,7 @@ private fun UiNavigationDecoration.labelRes(): Int = when (this) {
 @StringRes
 private fun UiNavigationDecoration.summaryRes(): Int = when (this) {
     UiNavigationDecoration.None -> R.string.ui_decoration_component_none_summary
+    UiNavigationDecoration.Custom -> R.string.ui_decoration_navigation_custom_summary
     UiNavigationDecoration.UnderGlow -> R.string.ui_decoration_navigation_under_glow_summary
     UiNavigationDecoration.LiquidHalo -> R.string.ui_decoration_navigation_liquid_halo_summary
     UiNavigationDecoration.Orbit -> R.string.ui_decoration_navigation_orbit_summary

@@ -22,6 +22,7 @@ enum class UiDecorationScope(val value: String) {
 
 enum class UiCardDecoration(val value: String) {
     None("none"),
+    Custom("custom"),
     Highlight("highlight"),
     Blossom("blossom"),
     Lotus("lotus"),
@@ -101,6 +102,7 @@ enum class UiTopBarDecoration(val value: String) {
 
 enum class UiNavigationDecoration(val value: String) {
     None("none"),
+    Custom("custom"),
     UnderGlow("under_glow"),
     LiquidHalo("liquid_halo"),
     Orbit("orbit"),

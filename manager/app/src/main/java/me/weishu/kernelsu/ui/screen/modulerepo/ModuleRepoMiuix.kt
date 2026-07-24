@@ -768,8 +768,11 @@ fun ReleasesPage(
                                                 else -> "$s B"
                                             }
                                         }
-                                        val sizeAndDownloads =
-                                            remember(sizeText, asset.downloadCount) { "$sizeText 路 ${asset.downloadCount} downloads" }
+                                        val sizeAndDownloads = stringResource(
+                                            R.string.module_asset_size_downloads,
+                                            sizeText,
+                                            asset.downloadCount,
+                                        )
                                         var isDownloading by remember(fileName, asset.downloadUrl) { mutableStateOf(false) }
                                         var progress by remember(fileName, asset.downloadUrl) { mutableIntStateOf(0) }
                                         var downloadedUri by remember(fileName, asset.downloadUrl) { mutableStateOf<Uri?>(null) }

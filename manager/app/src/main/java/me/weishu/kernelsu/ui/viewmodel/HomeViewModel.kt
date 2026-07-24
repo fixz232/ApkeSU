@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.data.repository.CUSTOM_HOME_TITLE_KEY
@@ -120,7 +121,10 @@ class HomeViewModel(
                 throw error
             } catch (throwable: Exception) {
                 Log.e(TAG, "root diagnostics failed", throwable)
-                _diagnosticReport.value = "Root \u8bca\u65ad\u5931\u8d25\n${throwable.message.orEmpty()}"
+                _diagnosticReport.value = ksuApp.getString(
+                    R.string.root_diagnostic_failed,
+                    throwable.message.orEmpty(),
+                )
             } finally {
                 _diagnosticRunning.value = false
             }
@@ -316,50 +320,58 @@ class HomeViewModel(
         val mode = when (info.workMode) {
             "lkm" -> "LKM"
             "gki" -> "GKI"
-            "late_load" -> "\u8d8a\u72f1\u6a21\u5f0f"
-            else -> "\u672a\u77e5"
+            "late_load" -> ksuApp.getString(R.string.root_diagnostic_mode_jailbreak)
+            else -> ksuApp.getString(R.string.root_diagnostic_unknown)
         }
 
         return buildString {
-            appendLine("ApkeSU Root \u8bca\u65ad")
-            appendLine("\u65f6\u95f4: $timestamp")
-            appendLine("\u7ed3\u8bba: ${ksuApp.getString(state.labelRes)}")
+            appendLine(ksuApp.getString(R.string.root_diagnostic_title))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_time, timestamp))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_conclusion, ksuApp.getString(state.labelRes)))
             appendLine()
-            appendLine("\u9a71\u52a8\u8fde\u63a5: ${healthLabel(info.driverVersion > 0 || info.kernelModuleLoaded || info.ksuRootShell)}")
-            appendLine("\u9a71\u52a8\u7248\u672c: ${info.driverVersion.takeIf { it > 0 } ?: "-"}")
-            appendLine("\u9a71\u52a8\u4e0e\u7ba1\u7406\u5668\u7248\u672c\u4e00\u81f4: ${healthLabel(info.driverVersion == BuildConfig.VERSION_CODE)}")
-            appendLine("\u5185\u6838\u6a21\u5757\u6807\u8bb0: ${presentLabel(info.kernelModuleLoaded)}")
-            appendLine("ApkeSU Root Shell: ${healthLabel(info.ksuRootShell)}")
-            appendLine("\u5907\u7528 su Root Shell: ${presentLabel(info.fallbackRootShell)}")
-            appendLine("\u7ba1\u7406\u5668\u6ce8\u518c: ${healthLabel(info.managerRegistered)}")
-            appendLine("\u7ba1\u7406\u5668: ${info.managerPackage} (UID ${info.managerUid})")
-            appendLine("UAPI: manager=${info.managerUapi}, kernel=${info.kernelUapi}")
+            appendLine(ksuApp.getString(R.string.root_diagnostic_driver_connection, healthLabel(driverConnected)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_driver_version, info.driverVersion.takeIf { it > 0 } ?: "-"))
+            appendLine(
+                ksuApp.getString(
+                    R.string.root_diagnostic_driver_manager_match,
+                    healthLabel(info.driverVersion == BuildConfig.VERSION_CODE),
+                )
+            )
+            appendLine(ksuApp.getString(R.string.root_diagnostic_kernel_module, presentLabel(info.kernelModuleLoaded)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_root_shell, healthLabel(info.ksuRootShell)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_fallback_shell, presentLabel(info.fallbackRootShell)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_manager_registered, healthLabel(info.managerRegistered)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_manager, info.managerPackage, info.managerUid))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_uapi, info.managerUapi, info.kernelUapi))
             appendLine()
-            appendLine("APK \u5185\u7f6e ksud: ${info.packagedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
-            appendLine("\u5df2\u5b89\u88c5 ksud: ${info.installedKsudVersion.ifBlank { "\u4e0d\u53ef\u7528" }}")
-            appendLine("APK \u5185\u7f6e ksud \u4e0e\u7ba1\u7406\u5668\u4e00\u81f4: ${healthLabel(packagedVersionMatches)}")
-            appendLine("\u5df2\u5b89\u88c5 ksud \u4e0e\u7ba1\u7406\u5668\u4e00\u81f4: ${healthLabel(installedVersionMatches)}")
-            appendLine("ksud \u6574\u4f53\u7248\u672c\u4e00\u81f4: ${healthLabel(daemonVersionMatches)}")
-            appendLine("KMI: ${info.currentKmi.ifBlank { "-" }}")
-            appendLine("\u5f53\u524d\u69fd\u4f4d: ${info.currentSlot.ifBlank { "\u65e0\u69fd\u4f4d" }}")
-            appendLine("\u5de5\u4f5c\u6a21\u5f0f: $mode")
-            appendLine("\u9690\u85cf\u8def\u5f84 LKM: ${presentLabel(info.hiddenPathLkm)}")
+            val unavailable = ksuApp.getString(R.string.root_diagnostic_unavailable)
+            appendLine(ksuApp.getString(R.string.root_diagnostic_packaged_ksud, info.packagedKsudVersion.ifBlank { unavailable }))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_installed_ksud, info.installedKsudVersion.ifBlank { unavailable }))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_packaged_match, healthLabel(packagedVersionMatches)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_installed_match, healthLabel(installedVersionMatches)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_daemon_match, healthLabel(daemonVersionMatches)))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_kmi, info.currentKmi.ifBlank { "-" }))
+            appendLine(
+                ksuApp.getString(
+                    R.string.root_diagnostic_current_slot,
+                    info.currentSlot.ifBlank { ksuApp.getString(R.string.root_diagnostic_no_slot) },
+                )
+            )
+            appendLine(ksuApp.getString(R.string.root_diagnostic_work_mode, mode))
+            appendLine(ksuApp.getString(R.string.root_diagnostic_hidden_path_lkm, presentLabel(info.hiddenPathLkm)))
             if (state == RootRuntimeState.ManagerUnregistered) {
                 appendLine()
                 if (info.driverVersion > 0 && info.driverVersion != BuildConfig.VERSION_CODE) {
                     appendLine(
-                        "\u4fee\u590d\u5efa\u8bae: \u5f53\u524d\u9a71\u52a8 ${info.driverVersion} \u4e0e ApkeSU " +
-                            "\u7ba1\u7406\u5668 ${BuildConfig.VERSION_CODE} \u7684\u6784\u5efa\u8eab\u4efd\u4e0d\u5339\u914d\u3002"
+                        ksuApp.getString(
+                            R.string.root_diagnostic_fix_version_mismatch,
+                            info.driverVersion,
+                            BuildConfig.VERSION_CODE,
+                        )
                     )
-                    appendLine(
-                        "\u4ec5\u91cd\u88c5 APK \u65e0\u6cd5\u4fee\u590d\uff1b\u8bf7\u4f7f\u7528\u5f53\u524d\u7ba1\u7406\u5668\u91cd\u65b0\u4fee\u8865\u5e76\u5237\u5165\u955c\u50cf\uff0c" +
-                            "\u6216\u5237\u5165\u7531\u5f53\u524d ApkeSU \u6e90\u7801\u6784\u5efa\u7684 GKI/LKM\u3002"
-                    )
+                    appendLine(ksuApp.getString(R.string.root_diagnostic_fix_repatch))
                 } else {
-                    appendLine(
-                        "\u4fee\u590d\u5efa\u8bae: \u5185\u6838\u672a\u4fe1\u4efb\u5f53\u524d APK \u7684\u5305\u540d\u6216\u7b7e\u540d\uff0c" +
-                            "\u8bf7\u4f7f\u7528\u540c\u4e00\u6e90\u7801\u548c\u53d1\u5e03\u8bc1\u4e66\u91cd\u65b0\u6784\u5efa\u5185\u6838\u3002"
-                    )
+                    appendLine(ksuApp.getString(R.string.root_diagnostic_fix_identity))
                 }
             }
         }.trimEnd()
@@ -369,9 +381,13 @@ class HomeViewModel(
         return runCatching { JSONObject(raw).optString("versionCode").toIntOrNull() }.getOrNull()
     }
 
-    private fun healthLabel(value: Boolean): String = if (value) "\u6b63\u5e38" else "\u5f02\u5e38"
+    private fun healthLabel(value: Boolean): String = ksuApp.getString(
+        if (value) R.string.root_diagnostic_normal else R.string.root_diagnostic_abnormal
+    )
 
-    private fun presentLabel(value: Boolean): String = if (value) "\u5b58\u5728" else "\u4e0d\u5b58\u5728"
+    private fun presentLabel(value: Boolean): String = ksuApp.getString(
+        if (value) R.string.root_diagnostic_present else R.string.root_diagnostic_absent
+    )
 
     private companion object {
         const val TAG = "HomeViewModel"

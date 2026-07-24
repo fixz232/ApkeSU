@@ -5,6 +5,25 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.content.edit
+import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
+import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_ACTIVE_ID_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_LIBRARY_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_SWITCH_STYLE_LIBRARY_KEY
+import me.weishu.kernelsu.ui.component.custom.ComponentStyleKind
+import me.weishu.kernelsu.ui.component.custom.ComponentStyleStore
+import me.weishu.kernelsu.ui.component.custom.CustomCardStyle
+import me.weishu.kernelsu.ui.component.custom.CustomSwitchSource
+import me.weishu.kernelsu.ui.component.custom.CustomSwitchStyle
+import me.weishu.kernelsu.ui.component.custom.MAX_COMPONENT_IMAGE_BYTES
+import me.weishu.kernelsu.ui.component.custom.MAX_SAVED_COMPONENT_STYLES
+import me.weishu.kernelsu.ui.component.custom.encodeCardStyleLibrary
+import me.weishu.kernelsu.ui.component.custom.encodeSwitchStyleLibrary
+import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
+import me.weishu.kernelsu.ui.component.decoration.UiCardDecoration
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.UiNavigationDecoration
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -12,6 +31,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -21,7 +41,7 @@ private const val THEME_STORE_SCHEMA = "io.github.fixz.apkesu.theme"
 private const val THEME_STORE_VERSION = 4
 private const val MAX_THEME_STORE_ENTRY_COUNT = 64
 private const val MAX_THEME_STORE_JSON_BYTES = 256L * 1024L
-private const val MAX_THEME_STORE_ASSET_BYTES = 256L * 1024L * 1024L
+private const val MAX_THEME_STORE_ASSET_BYTES = 500L * 1024L * 1024L
 private const val MAX_THEME_STORE_ASSETS_BYTES = 512L * 1024L * 1024L
 private const val MAX_THEME_STORE_PREVIEW_IMAGE_BYTES = 16L * 1024L * 1024L
 const val THEME_STORE_FILE_MIME_TYPE = "application/zip"
@@ -205,6 +225,18 @@ data class ThemeStorePackagePreviewResult(
     val warnings: List<ThemeStorePackageWarning> = emptyList(),
     val error: Throwable? = null,
 )
+
+data class ComponentStylePackageContent(
+    val cardStyle: CustomCardStyle? = null,
+    val switchStyle: CustomSwitchStyle? = null,
+) {
+    val kind: ComponentStyleKind
+        get() = when {
+            cardStyle != null && switchStyle == null -> ComponentStyleKind.Card
+            switchStyle != null && cardStyle == null -> ComponentStyleKind.Switch
+            else -> error("Component package must contain exactly one style")
+        }
+}
 
 internal data class ExtractedThemeStoreArchive(
     val themeJson: String,
@@ -705,6 +737,15 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         .put("uri", startupAnimationUri),
                 )
 
+                config.put(
+                    "components",
+                    zip.writeActiveComponentStyles(
+                        context = appContext,
+                        warnings = warnings,
+                        budget = assetBudget,
+                    ),
+                )
+
                 val configBytes = config.toString(2).toByteArray(Charsets.UTF_8)
                 require(configBytes.size <= MAX_THEME_STORE_JSON_BYTES) { "Theme package metadata is too large" }
                 zip.putNextEntry(ZipEntry("theme.json"))
@@ -715,6 +756,115 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
         ThemeStorePackageResult(success = true, warnings = warnings)
     }.getOrElse {
         ThemeStorePackageResult(success = false, warnings = warnings, error = it)
+    }
+}
+
+fun exportCardComponentStylePackage(
+    context: Context,
+    style: CustomCardStyle,
+    destination: Uri,
+): ThemeStorePackageResult = exportComponentStylePackage(
+    context = context,
+    destination = destination,
+    content = ComponentStylePackageContent(cardStyle = style.normalized()),
+)
+
+fun exportSwitchComponentStylePackage(
+    context: Context,
+    style: CustomSwitchStyle,
+    destination: Uri,
+): ThemeStorePackageResult = exportComponentStylePackage(
+    context = context,
+    destination = destination,
+    content = ComponentStylePackageContent(switchStyle = style.normalized()),
+)
+
+private fun exportComponentStylePackage(
+    context: Context,
+    destination: Uri,
+    content: ComponentStylePackageContent,
+): ThemeStorePackageResult {
+    val appContext = context.applicationContext
+    val warnings = mutableListOf<ThemeStorePackageWarning>()
+    val stagingFile = runCatching {
+        File.createTempFile(
+            "component-style-export-",
+            ".$THEME_STORE_FILE_EXTENSION",
+            appContext.cacheDir,
+        )
+    }.getOrElse { error ->
+        return ThemeStorePackageResult(success = false, error = error)
+    }
+    return runCatching {
+        val profile = readThemeAuthorProfile(appContext)
+        val styleAuthor = content.cardStyle?.author ?: content.switchStyle?.author.orEmpty()
+        val config = createEmptyThemeStoreConfig(
+            displayName = styleAuthor.ifBlank { profile.displayName },
+            bio = profile.bio,
+        )
+        val assetBudget = ThemeStoreAssetBudget()
+        FileOutputStream(stagingFile).use { output ->
+            ZipOutputStream(output.buffered()).use { zip ->
+                config.put(
+                    "components",
+                    zip.writeComponentStyles(
+                        context = appContext,
+                        content = content,
+                        warnings = warnings,
+                        budget = assetBudget,
+                    ),
+                )
+                val configBytes = config.toString(2).toByteArray(Charsets.UTF_8)
+                require(configBytes.size <= MAX_THEME_STORE_JSON_BYTES) {
+                    "Component package metadata is too large"
+                }
+                zip.putNextEntry(ZipEntry("theme.json"))
+                zip.write(configBytes)
+                zip.closeEntry()
+            }
+        }
+        require(warnings.isEmpty()) { "Component package contains an unavailable image" }
+        openThemeStoreUriOutputStream(appContext, destination).use { output ->
+            FileInputStream(stagingFile).use { input -> input.copyTo(output) }
+        }
+        ThemeStorePackageResult(success = true)
+    }.getOrElse { error ->
+        ThemeStorePackageResult(success = false, warnings = warnings, error = error)
+    }.also {
+        stagingFile.delete()
+    }
+}
+
+fun readComponentStylePackage(
+    context: Context,
+    source: Uri,
+    expectedKind: ComponentStyleKind,
+): ComponentStylePackageContent {
+    val appContext = context.applicationContext
+    val tempDir = File(
+        appContext.cacheDir,
+        "component-style-import-${System.nanoTime()}",
+    ).apply { mkdirs() }
+    return try {
+        val assetsDir = File(tempDir, "assets").apply { mkdirs() }
+        val extracted = extractThemeStoreZip(appContext, source, tempDir, assetsDir)
+        val config = JSONObject(extracted.themeJson)
+        validateThemeStoreConfig(config)
+        validateEmbeddedThemeStoreAssets(config, assetsDir)
+        val components = config.optJSONObject("components")
+            ?: error("Theme package does not contain a component style")
+        val hasCardStyle = components.optJSONObject("cardStyle") != null
+        val hasSwitchStyle = components.optJSONObject("switchStyle") != null
+        val actualKind = when {
+            hasCardStyle && !hasSwitchStyle -> ComponentStyleKind.Card
+            hasSwitchStyle && !hasCardStyle -> ComponentStyleKind.Switch
+            else -> error("Component package must contain exactly one style")
+        }
+        require(actualKind == expectedKind) { "Component package type does not match this editor" }
+        val content = parseComponentStyleContent(appContext, config, assetsDir)
+        content
+    } finally {
+        tempDir.deleteRecursively()
     }
 }
 
@@ -852,6 +1002,9 @@ fun importThemeStorePackage(
 ): ThemeStorePackageResult {
     val appContext = context.applicationContext
     val warnings = mutableListOf<ThemeStorePackageWarning>()
+    val componentStyleStore = ComponentStyleStore(appContext)
+    var pendingComponentImageUri: String? = null
+    var replacedSwitchStyles: Pair<List<CustomSwitchStyle>, List<CustomSwitchStyle>>? = null
     val tempDir = File(appContext.cacheDir, "theme-store-import").apply {
         deleteRecursively()
         mkdirs()
@@ -865,6 +1018,37 @@ fun importThemeStorePackage(
             val config = JSONObject(extracted.themeJson)
             validateThemeStoreConfig(config)
             validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+
+            val componentOnlyPackage = config.optString("packageType") == COMPONENT_ONLY_PACKAGE_TYPE
+            val componentsJson = config.optJSONObject("components")
+            val pendingComponentStyles = if (
+                componentsJson?.optJSONObject("cardStyle") != null ||
+                componentsJson?.optJSONObject("switchStyle") != null
+            ) {
+                parseComponentStyleContent(appContext, config, tempAssetsDir).also { content ->
+                    pendingComponentImageUri = content.switchStyle?.imageUri
+                }
+            } else {
+                null
+            }
+
+            if (componentOnlyPackage) {
+                val content = pendingComponentStyles
+                    ?: error("Component package does not contain a component style")
+                val prefs = themeStorePrefs(appContext)
+                val editor = prefs.edit()
+                replacedSwitchStyles = stageImportedComponentStyles(
+                    prefs = prefs,
+                    editor = editor,
+                    content = content,
+                    store = componentStyleStore,
+                )
+                require(editor.commit()) { "Unable to save imported component style" }
+                replacedSwitchStyles?.let { (previous, current) ->
+                    componentStyleStore.cleanupReplacedSwitchImages(previous, current)
+                }
+                return@runCatching ThemeStorePackageResult(success = true, warnings = warnings)
+            }
 
             val themeStoreDir = File(appContext.filesDir, "theme-store").apply { mkdirs() }
             val targetDir = File(themeStoreDir, "current")
@@ -1014,7 +1198,7 @@ fun importThemeStorePackage(
                 }
             }
 
-            config.optJSONObject("wallpaper")?.let { wallpaperJson ->
+            config.optJSONObject("wallpaper")?.takeUnless { componentOnlyPackage }?.let { wallpaperJson ->
                 val importedImage = importAssetUri(
                     context = appContext,
                     assetOwnerJson = wallpaperJson,
@@ -1070,7 +1254,7 @@ fun importThemeStorePackage(
                 )
             }
 
-            config.optJSONObject("startupSound")?.let { soundJson ->
+            config.optJSONObject("startupSound")?.takeUnless { componentOnlyPackage }?.let { soundJson ->
                 val importedAsset = importAssetUri(
                     context = appContext,
                     assetOwnerJson = soundJson,
@@ -1102,7 +1286,7 @@ fun importThemeStorePackage(
                 }
             }
 
-            config.optJSONObject("clickSound")?.let { soundJson ->
+            config.optJSONObject("clickSound")?.takeUnless { componentOnlyPackage }?.let { soundJson ->
                 val importedAsset = importAssetUri(
                     context = appContext,
                     assetOwnerJson = soundJson,
@@ -1124,7 +1308,7 @@ fun importThemeStorePackage(
                 )
             }
 
-            config.optJSONObject("backgroundMusic")?.let { musicJson ->
+            config.optJSONObject("backgroundMusic")?.takeUnless { componentOnlyPackage }?.let { musicJson ->
                 val importedAsset = importAssetUri(
                     context = appContext,
                     assetOwnerJson = musicJson,
@@ -1146,7 +1330,7 @@ fun importThemeStorePackage(
                 )
             }
 
-            config.optJSONObject("startupAnimation")?.let { animationJson ->
+            config.optJSONObject("startupAnimation")?.takeUnless { componentOnlyPackage }?.let { animationJson ->
                 val importedAsset = importAssetUri(
                     context = appContext,
                     assetOwnerJson = animationJson,
@@ -1161,10 +1345,6 @@ fun importThemeStorePackage(
                 hasStartupAnimation = true
                 pendingStartupAnimationUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
             }
-
-            val previousSummary = readThemeStoreSummary(appContext)
-            val directorySwap = beginThemeStoreDirectorySwap(targetDir, nextStagingDir)
-            stagingDir = null
 
             val prefs = themeStorePrefs(appContext)
             val editor = prefs.edit()
@@ -1232,6 +1412,18 @@ fun importThemeStorePackage(
                 editor.putOptionalString(CUSTOM_STARTUP_ANIMATION_URI_KEY, pendingStartupAnimationUri)
             }
 
+            pendingComponentStyles?.let { content ->
+                replacedSwitchStyles = stageImportedComponentStyles(
+                    prefs = prefs,
+                    editor = editor,
+                    content = content,
+                    store = componentStyleStore,
+                )
+            }
+
+            val previousSummary = readThemeStoreSummary(appContext)
+            val directorySwap = beginThemeStoreDirectorySwap(targetDir, nextStagingDir)
+            stagingDir = null
             var preferencesCommitted = false
             try {
                 require(editor.commit()) { "Unable to save imported theme settings" }
@@ -1244,12 +1436,15 @@ fun importThemeStorePackage(
             if (!directorySwap.finish()) {
                 warnings += ThemeStorePackageWarning("previous_theme_backup")
             }
+            replacedSwitchStyles?.let { (previous, current) ->
+                componentStyleStore.cleanupReplacedSwitchImages(previous, current)
+            }
             releaseReplacedThemeStoreReferences(
                 context = appContext,
                 previous = previousSummary,
                 current = readThemeStoreSummary(appContext),
             )
-            if (clearCloudThemeState) {
+            if (clearCloudThemeState && !componentOnlyPackage) {
                 runCatching {
                     CloudThemeRepository(appContext).recordExternalThemeApplied()
                 }.onFailure { error ->
@@ -1265,13 +1460,55 @@ fun importThemeStorePackage(
             tempDir.deleteRecursively()
             stagingDir?.deleteRecursively()
         }
-    }.getOrElse {
-        ThemeStorePackageResult(success = false, warnings = warnings, error = it)
+    }.getOrElse { error ->
+        componentStyleStore.discardSwitchImageIfUnreferenced(pendingComponentImageUri)
+        ThemeStorePackageResult(success = false, warnings = warnings, error = error)
     }
 }
 
 private fun themeStorePrefs(context: Context): SharedPreferences {
     return context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+}
+
+private fun stageImportedComponentStyles(
+    prefs: SharedPreferences,
+    editor: SharedPreferences.Editor,
+    content: ComponentStylePackageContent,
+    store: ComponentStyleStore,
+): Pair<List<CustomSwitchStyle>, List<CustomSwitchStyle>>? {
+    content.cardStyle?.let { style ->
+        val current = store.readCardStyles()
+        require(current.size < MAX_SAVED_COMPONENT_STYLES || current.any { it.id == style.id }) {
+            "Card style library is full"
+        }
+        val updated = ComponentStyleStore.upsertCardStyle(current, style)
+        val currentDecoration = UiDecorationConfig.fromJsonString(
+            prefs.getString(UI_DECORATION_CONFIG_KEY, null)
+        )
+        editor
+            .putString(CUSTOM_CARD_STYLE_LIBRARY_KEY, encodeCardStyleLibrary(updated))
+            .putString(CUSTOM_CARD_STYLE_ACTIVE_ID_KEY, style.id)
+            .putString(
+                UI_DECORATION_CONFIG_KEY,
+                currentDecoration.copy(
+                    enabled = true,
+                    card = UiCardDecoration.Custom,
+                    navigation = UiNavigationDecoration.Custom,
+                ).normalized().toJsonString(),
+            )
+    }
+    return content.switchStyle?.let { style ->
+        val current = store.readSwitchStyles()
+        require(current.size < MAX_SAVED_COMPONENT_STYLES || current.any { it.id == style.id }) {
+            "Switch style library is full"
+        }
+        val updated = ComponentStyleStore.upsertSwitchStyle(current, style)
+        editor
+            .putString(CUSTOM_SWITCH_STYLE_LIBRARY_KEY, encodeSwitchStyleLibrary(updated))
+            .putString(CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY, style.id)
+            .putString(SWITCH_STYLE_KEY, SwitchStyle.Custom.value)
+        current to updated
+    }
 }
 
 private fun SharedPreferences.Editor.putImportedPageBackground(
@@ -1472,6 +1709,193 @@ private fun SharedPreferences.Editor.removeCustomWallpaperCrop() {
     remove(CUSTOM_WALLPAPER_CROP_BOTTOM_KEY)
 }
 
+private fun createEmptyThemeStoreConfig(displayName: String, bio: String): JSONObject {
+    return JSONObject()
+        .put("schema", THEME_STORE_SCHEMA)
+        .put("version", THEME_STORE_VERSION)
+        .put("packageType", COMPONENT_ONLY_PACKAGE_TYPE)
+        .put("exportedAt", System.currentTimeMillis())
+        .put(
+            "author",
+            JSONObject()
+                .put("displayName", displayName.trim().take(64))
+                .put("realName", "")
+                .put("gender", ThemeAuthorGender.Unspecified.storageValue)
+                .put("bio", bio.trim().take(512))
+                .put("avatar", null),
+        )
+        .put(
+            "startupSound",
+            JSONObject()
+                .put("asset", null)
+                .put("uri", null)
+                .put("durationSeconds", DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS)
+                .put("volume", DEFAULT_CUSTOM_AUDIO_VOLUME.toDouble()),
+        )
+        .put(
+            "clickSound",
+            JSONObject()
+                .put("asset", null)
+                .put("uri", null)
+                .put("volume", DEFAULT_CUSTOM_AUDIO_VOLUME.toDouble()),
+        )
+        .put(
+            "backgroundMusic",
+            JSONObject()
+                .put("asset", null)
+                .put("uri", null)
+                .put("volume", DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME.toDouble()),
+        )
+        .put(
+            "startupAnimation",
+            JSONObject()
+                .put("asset", null)
+                .put("uri", null),
+        )
+}
+
+private fun ZipOutputStream.writeActiveComponentStyles(
+    context: Context,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
+): JSONObject {
+    val store = ComponentStyleStore(context)
+    val prefs = themeStorePrefs(context)
+    val decoration = UiDecorationConfig.fromJsonString(
+        prefs.getString(UI_DECORATION_CONFIG_KEY, null)
+    )
+    val cardStyleActive = decoration.enabled && (
+        decoration.card == UiCardDecoration.Custom ||
+            decoration.navigation == UiNavigationDecoration.Custom
+        )
+    val switchStyleActive = prefs.getString(SWITCH_STYLE_KEY, SwitchStyle.DEFAULT_VALUE) ==
+        SwitchStyle.Custom.value
+    return writeComponentStyles(
+        context = context,
+        content = ComponentStylePackageContent(
+            cardStyle = store.readActiveCardStyle().takeIf { cardStyleActive },
+            switchStyle = store.readActiveSwitchStyle().takeIf { switchStyleActive },
+        ),
+        warnings = warnings,
+        budget = budget,
+    )
+}
+
+private fun ZipOutputStream.writeComponentStyles(
+    context: Context,
+    content: ComponentStylePackageContent,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
+): JSONObject {
+    return JSONObject().apply {
+        content.cardStyle?.normalized()?.let { style ->
+            put("cardStyle", style.toJson())
+        }
+        content.switchStyle?.normalized()?.let { style ->
+            val imageAsset = if (style.source == CustomSwitchSource.Image) {
+                val imageFile = ComponentStyleStore(context).resolveImageFile(style.imageUri)
+                    ?: error("Image-based switch style is missing its image")
+                require(
+                    fileSha256(imageFile).equals(style.imageSha256, ignoreCase = true)
+                ) { "Switch style image hash does not match" }
+                writeUriAsset(
+                    context = context,
+                    uriString = style.imageUri,
+                    assetId = "component_switch_image",
+                    warnings = warnings,
+                    budget = budget,
+                )
+            } else {
+                null
+            }
+            if (style.source == CustomSwitchSource.Image && imageAsset == null) {
+                warnings += ThemeStorePackageWarning(
+                    assetId = "component_switch_image",
+                    reason = "Image-based switch style is missing its image",
+                )
+            }
+            put(
+                "switchStyle",
+                JSONObject()
+                    .put("style", style.toJson(includeLocalImageUri = false))
+                    .put("imageAsset", imageAsset?.toJson())
+                    .put("imageUri", null),
+            )
+        }
+    }
+}
+
+private fun parseComponentStyleContent(
+    context: Context,
+    config: JSONObject,
+    assetsDir: File,
+): ComponentStylePackageContent {
+    val components = config.optJSONObject("components")
+        ?: error("Theme package does not contain a component style")
+    val cardStyle = components.optJSONObject("cardStyle")?.let(CustomCardStyle::fromJson)
+    val switchOwner = components.optJSONObject("switchStyle")
+    val switchStyle = switchOwner?.let { owner ->
+        val packaged = CustomSwitchStyle.fromJson(
+            owner.optJSONObject("style") ?: error("Switch style data is missing"),
+            allowLocalImageUri = false,
+        )
+        if (packaged.source == CustomSwitchSource.Image) {
+            val asset = owner.optJSONObject("imageAsset")
+                ?: error("Image-based switch style is missing its image")
+            val path = asset.optString("path")
+            val imageFile = safeComponentAssetFile(assetsDir, path)
+            val store = ComponentStyleStore(context)
+            val stored = store.persistSwitchImage(Uri.fromFile(imageFile))
+            try {
+                require(
+                    packaged.imageSha256.isNullOrBlank() ||
+                        packaged.imageSha256.equals(stored.sha256, ignoreCase = true)
+                ) { "Switch style image hash does not match" }
+                packaged.copy(
+                    imageUri = stored.uriString,
+                    imageSha256 = stored.sha256,
+                    imageMimeType = asset.optString("mimeType").takeIf(String::isNotBlank)
+                        ?: stored.mimeType,
+                ).normalized()
+            } catch (error: Throwable) {
+                store.discardSwitchImageIfUnreferenced(stored.uriString)
+                throw error
+            }
+        } else {
+            packaged.copy(
+                imageUri = null,
+                imageSha256 = null,
+                imageMimeType = null,
+            ).normalized()
+        }
+    }
+    require(cardStyle != null || switchStyle != null) { "Component style data is empty" }
+    return ComponentStylePackageContent(cardStyle = cardStyle, switchStyle = switchStyle)
+}
+
+private fun safeComponentAssetFile(assetsDir: File, packagePath: String): File {
+    require(packagePath.startsWith("assets/")) { "Invalid component image path" }
+    val root = assetsDir.canonicalFile
+    val candidate = File(root, packagePath.removePrefix("assets/")).canonicalFile
+    require(candidate.toPath().startsWith(root.toPath()) && candidate.isFile) {
+        "Component image is missing"
+    }
+    return candidate
+}
+
+private fun fileSha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    FileInputStream(file).use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+}
+
 private data class ExportedThemeAsset(
     val path: String,
     val displayName: String?,
@@ -1619,6 +2043,17 @@ internal fun validateThemeStoreArchiveEntryName(entryName: String, directory: Bo
 
 internal fun validateThemeStoreConfig(config: JSONObject) {
     require(config.optString("schema") == THEME_STORE_SCHEMA) { "Unsupported theme package" }
+    require(config.optString("packageType").let { it.isBlank() || it == COMPONENT_ONLY_PACKAGE_TYPE }) {
+        "Unsupported theme package type"
+    }
+    if (config.optString("packageType") == COMPONENT_ONLY_PACKAGE_TYPE) {
+        val components = config.optJSONObject("components")
+            ?: error("Component package does not contain a component style")
+        val styleCount = listOf("cardStyle", "switchStyle").count { key ->
+            components.optJSONObject(key) != null
+        }
+        require(styleCount == 1) { "Component package must contain exactly one style" }
+    }
     val version = config.optInt("version", 0)
     require(version in 1..THEME_STORE_VERSION) {
         "Unsupported theme package version"
@@ -1658,6 +2093,38 @@ internal fun validateThemeStoreConfig(config: JSONObject) {
             }
         ) { "Theme author gender is invalid" }
     }
+    validateComponentStyleConfig(config)
+}
+
+private fun validateComponentStyleConfig(config: JSONObject) {
+    val components = config.optJSONObject("components") ?: return
+    val keys = components.keys().asSequence().toSet()
+    require(keys.all { it == "cardStyle" || it == "switchStyle" }) {
+        "Theme package contains an unknown component style"
+    }
+    components.optJSONObject("cardStyle")?.let { CustomCardStyle.fromJson(it) }
+    components.optJSONObject("switchStyle")?.let { owner ->
+        val styleJson = owner.optJSONObject("style") ?: error("Switch style data is missing")
+        require(styleJson.optString("image_uri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
+            "Switch style local image URI is too long"
+        }
+        val style = CustomSwitchStyle.fromJson(styleJson, allowLocalImageUri = false)
+        require(owner.optString("imageUri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
+            "Switch style image URI is too long"
+        }
+        if (style.source == CustomSwitchSource.Image) {
+            require(owner.optJSONObject("imageAsset") != null || owner.optString("imageUri").isNotBlank()) {
+                "Image-based switch style is missing its image"
+            }
+            require(COMPONENT_PACKAGE_SHA256.matches(styleJson.optString("image_sha256"))) {
+                "Switch style image hash is invalid"
+            }
+        } else {
+            require(owner.optJSONObject("imageAsset") == null && owner.optString("imageUri").isBlank()) {
+                "Pixel switch style contains an unexpected image"
+            }
+        }
+    }
 }
 
 internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir: File) {
@@ -1694,6 +2161,22 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
     validateOwner(config.optJSONObject("backgroundMusic"), "asset")
     validateOwner(config.optJSONObject("startupAnimation"), "asset")
     validateOwner(config.optJSONObject("author"), "avatar")
+    val switchOwner = config.optJSONObject("components")?.optJSONObject("switchStyle")
+    validateOwner(switchOwner, "imageAsset")
+    switchOwner?.let { owner ->
+        val style = owner.optJSONObject("style") ?: return@let
+        if (CustomSwitchSource.fromValue(style.optString("source")) == CustomSwitchSource.Image) {
+            val asset = owner.optJSONObject("imageAsset") ?: return@let
+            val path = asset.optString("path")
+            val imageFile = safeComponentAssetFile(tempAssetsDir, path)
+            require(imageFile.length() in 1..MAX_COMPONENT_IMAGE_BYTES) {
+                "Component switch image is too large"
+            }
+            require(
+                fileSha256(imageFile).equals(style.optString("image_sha256"), ignoreCase = true)
+            ) { "Switch style image hash does not match" }
+        }
+    }
     config.optJSONObject("author")
         ?.optJSONObject("avatar")
         ?.optString("path")
@@ -1743,6 +2226,14 @@ internal fun sanitizeThemeStoreConfigForCloud(config: JSONObject) {
     sanitizeOwner(config.optJSONObject("clickSound"), "asset" to "uri")
     sanitizeOwner(config.optJSONObject("backgroundMusic"), "asset" to "uri")
     sanitizeOwner(config.optJSONObject("startupAnimation"), "asset" to "uri")
+    sanitizeOwner(
+        config.optJSONObject("components")?.optJSONObject("switchStyle"),
+        "imageAsset" to "imageUri",
+    )
+    config.optJSONObject("components")
+        ?.optJSONObject("switchStyle")
+        ?.optJSONObject("style")
+        ?.put("image_uri", null)
 }
 
 internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
@@ -1783,6 +2274,14 @@ internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
     validateOwner(config.optJSONObject("clickSound"), "uri")
     validateOwner(config.optJSONObject("backgroundMusic"), "uri")
     validateOwner(config.optJSONObject("startupAnimation"), "uri")
+    validateOwner(config.optJSONObject("components")?.optJSONObject("switchStyle"), "imageUri")
+    require(
+        config.optJSONObject("components")
+            ?.optJSONObject("switchStyle")
+            ?.optJSONObject("style")
+            ?.optString("image_uri")
+            .isNullOrBlank()
+    ) { "Cloud theme package contains a device-specific image_uri" }
 }
 
 private fun writeThemeStoreAssetDirectory(
@@ -1854,6 +2353,9 @@ internal fun countConfiguredThemeStoreResources(config: JSONObject): Int {
     if (hasResource(config.optJSONObject("clickSound"))) count++
     if (hasResource(config.optJSONObject("backgroundMusic"))) count++
     if (hasResource(config.optJSONObject("startupAnimation"))) count++
+    val components = config.optJSONObject("components")
+    if (components?.optJSONObject("cardStyle") != null) count++
+    if (components?.optJSONObject("switchStyle") != null) count++
     return count
 }
 
@@ -1875,9 +2377,11 @@ private fun findThemeStorePreviewCover(
         CustomNavigationIconSlot.entries.forEach { slot ->
             add(navigationIcons?.optJSONObject(slot.id))
         }
+        add(config.optJSONObject("components")?.optJSONObject("switchStyle"))
     }
     return owners.firstNotNullOfOrNull { owner ->
         readThemeStorePreviewImage(owner, "asset", tempAssetsDir)
+            ?: readThemeStorePreviewImage(owner, "imageAsset", tempAssetsDir)
     }
 }
 
@@ -1946,7 +2450,17 @@ private fun collectLegacyThemeStoreUriWarnings(
     checkOwner(config.optJSONObject("clickSound"), "click_sound")
     checkOwner(config.optJSONObject("backgroundMusic"), "background_music")
     checkOwner(config.optJSONObject("startupAnimation"), "startup_animation")
+    checkOwner(
+        config.optJSONObject("components")?.optJSONObject("switchStyle"),
+        "component_switch_image",
+        "imageAsset",
+        "imageUri",
+    )
 }
+
+private const val MAX_COMPONENT_PACKAGE_URI_LENGTH = 1_024
+private const val COMPONENT_ONLY_PACKAGE_TYPE = "component"
+private val COMPONENT_PACKAGE_SHA256 = Regex("[a-fA-F0-9]{64}")
 
 private fun ZipInputStream.readEntryBytes(maxBytes: Long): ByteArray {
     val output = ByteArrayOutputStream()

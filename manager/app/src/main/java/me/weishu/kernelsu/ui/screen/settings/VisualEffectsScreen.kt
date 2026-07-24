@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Visibility
@@ -66,8 +67,10 @@ import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.custom.LocalCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
@@ -89,6 +92,7 @@ fun VisualEffectsScreen() {
     }
 
     val actions = VisualEffectsActions(
+        onOpenSwitchStyleCreator = { navigator.push(Route.SwitchStyleCreator) },
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
         onSetGlobalSnowEffectIndex = viewModel::setGlobalSnowEffectIndex,
@@ -173,6 +177,16 @@ private fun VisualEffectsContent(
                 selectedStyle = uiState.switchStyle,
                 onStyleSelected = actions.onSetSwitchStyleIndex,
             )
+            OutlinedButton(
+                onClick = actions.onOpenSwitchStyleCreator,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Rounded.Brush, contentDescription = null)
+                Text(
+                    text = stringResource(R.string.switch_style_creator_entry),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         VisualEffectCard(
@@ -307,6 +321,7 @@ private fun SwitchStyleButtonGroup(
     selectedStyle: String,
     onStyleSelected: (Int) -> Unit,
 ) {
+    val customStyleAvailable = LocalCustomSwitchStyle.current != null
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -324,6 +339,7 @@ private fun SwitchStyleButtonGroup(
             SwitchStyleButton(
                 style = style,
                 selected = SwitchStyle.fromValue(selectedStyle) == style,
+                enabled = style != SwitchStyle.Custom || customStyleAvailable,
                 onClick = { onStyleSelected(index) },
             )
         }
@@ -334,6 +350,7 @@ private fun SwitchStyleButtonGroup(
 private fun SwitchStyleButton(
     style: SwitchStyle,
     selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val containerColor = if (selected) {
@@ -349,6 +366,7 @@ private fun SwitchStyleButton(
 
     Card(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         border = BorderStroke(1.dp, borderColor),
@@ -546,6 +564,7 @@ private fun VisualSliderRow(
 }
 
 private data class VisualEffectsActions(
+    val onOpenSwitchStyleCreator: () -> Unit,
     val onSetSwitchStyleIndex: (Int) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEffectIndex: (Int) -> Unit,

@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -101,6 +102,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
@@ -122,66 +124,68 @@ import me.weishu.kernelsu.ui.util.unloadHiddenPathKernelPaths
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val TEXT_CONFIG = "\u914d\u7f6e"
-private const val TEXT_LOG = "\u65e5\u5fd7"
-private const val TEXT_HELP = "\u8bf4\u660e"
-private const val TEXT_SUSUF_CONFIG = "susuf\u914d\u7f6e"
-private const val TEXT_PATH_CONFIG = "\u8def\u5f84\u914d\u7f6e"
-private const val TEXT_APP_CONFIG = "\u5e94\u7528\u9009\u62e9\u914d\u7f6e"
-private const val TEXT_IMPORT_EXPORT_CONFIG = "\u914d\u7f6e\u5bfc\u5165\u5bfc\u51fa"
-private const val TEXT_TEMPLATE_CONFIG = "\u914d\u7f6e\u6a21\u677f"
-private const val TEXT_IMPORT_CONFIG = "\u5bfc\u5165\u914d\u7f6e"
-private const val TEXT_EXPORT_CONFIG = "\u5bfc\u51fa\u914d\u7f6e"
-private const val TEXT_SAVE_TEMPLATE = "\u4fdd\u5b58\u4e3a\u6a21\u677f"
-private const val TEXT_TEMPLATE_NAME = "\u6a21\u677f\u540d\u79f0"
-private const val TEXT_APPLY_TEMPLATE = "\u5957\u7528"
-private const val TEXT_ADD = "\u6dfb\u52a0"
-private const val TEXT_ADD_APP_FROM_LIST = "\u4ece\u5e94\u7528\u5217\u8868\u9009\u62e9"
-private const val TEXT_APP_PICKER_TITLE = "\u9009\u62e9\u5e94\u7528"
-private const val TEXT_APP_SEARCH = "\u641c\u7d22\u5e94\u7528\u3001\u5305\u540d\u6216 UID"
-private const val TEXT_DELETE = "\u5220\u9664"
-private const val TEXT_APPLY = "\u786e\u5b9a\u9690\u85cf"
-private const val TEXT_UNLOAD_ACTIVE = "\u5220\u9664\u5185\u6838\u6b63\u5728\u9690\u85cf\u8def\u5f84"
-private const val TEXT_REFRESH = "\u5237\u65b0"
-private const val TEXT_CLEAR = "\u6e05\u7a7a"
-private const val TEXT_COPY_LOG = "\u590d\u5236\u65e5\u5fd7"
-private const val TEXT_EXPORT_LOG = "\u5bfc\u51fa\u65e5\u5fd7"
+private fun hiddenPathText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
+
+private val TEXT_CONFIG get() = hiddenPathText(R.string.hidden_path_tab_config)
+private val TEXT_LOG get() = hiddenPathText(R.string.hidden_path_tab_log)
+private val TEXT_HELP get() = hiddenPathText(R.string.hidden_path_tab_help)
+private val TEXT_SUSUF_CONFIG get() = hiddenPathText(R.string.hidden_path_options)
+private val TEXT_PATH_CONFIG get() = hiddenPathText(R.string.hidden_path_paths)
+private val TEXT_APP_CONFIG get() = hiddenPathText(R.string.hidden_path_apps)
+private val TEXT_IMPORT_EXPORT_CONFIG get() = hiddenPathText(R.string.hidden_path_import_export)
+private val TEXT_TEMPLATE_CONFIG get() = hiddenPathText(R.string.hidden_path_templates)
+private val TEXT_IMPORT_CONFIG get() = hiddenPathText(R.string.hidden_path_import_config)
+private val TEXT_EXPORT_CONFIG get() = hiddenPathText(R.string.hidden_path_export_config)
+private val TEXT_SAVE_TEMPLATE get() = hiddenPathText(R.string.hidden_path_save_template)
+private val TEXT_TEMPLATE_NAME get() = hiddenPathText(R.string.hidden_path_template_name)
+private val TEXT_APPLY_TEMPLATE get() = hiddenPathText(R.string.hidden_path_apply_template)
+private val TEXT_ADD get() = hiddenPathText(R.string.hidden_path_add)
+private val TEXT_ADD_APP_FROM_LIST get() = hiddenPathText(R.string.hidden_path_add_app_from_list)
+private val TEXT_APP_PICKER_TITLE get() = hiddenPathText(R.string.hidden_path_app_picker_title)
+private val TEXT_APP_SEARCH get() = hiddenPathText(R.string.hidden_path_app_search)
+private val TEXT_DELETE get() = hiddenPathText(R.string.hidden_path_delete)
+private val TEXT_APPLY get() = hiddenPathText(R.string.hidden_path_apply)
+private val TEXT_UNLOAD_ACTIVE get() = hiddenPathText(R.string.hidden_path_unload_active)
+private val TEXT_REFRESH get() = hiddenPathText(R.string.hidden_path_refresh)
+private val TEXT_CLEAR get() = hiddenPathText(R.string.hidden_path_clear)
+private val TEXT_COPY_LOG get() = hiddenPathText(R.string.hidden_path_copy_log)
+private val TEXT_EXPORT_LOG get() = hiddenPathText(R.string.hidden_path_export_log)
 private const val TEXT_LOG_FILE_NAME = "pathmask-log.txt"
-private const val TEXT_EMPTY_PATH = "\u8fd8\u6ca1\u6709\u6dfb\u52a0\u8981\u9690\u85cf\u7684\u8def\u5f84"
-private const val TEXT_EMPTY_APP = "\u8fd8\u6ca1\u6709\u6dfb\u52a0\u76ee\u6807\u5e94\u7528"
-private const val TEXT_EMPTY_APP_PICKER = "\u6ca1\u6709\u627e\u5230\u5339\u914d\u5e94\u7528"
-private const val TEXT_APPLY_OK = "\u9690\u85cf\u8def\u5f84\u914d\u7f6e\u5df2\u5e94\u7528"
-private const val TEXT_APPLY_FAIL = "\u5e94\u7528\u5931\u8d25\uff0c\u8bf7\u67e5\u770b\u65e5\u5fd7"
-private const val TEXT_UNLOAD_ACTIVE_OK = "\u5df2\u5220\u9664\u5185\u6838\u6b63\u5728\u9690\u85cf\u8def\u5f84"
-private const val TEXT_UNLOAD_ACTIVE_FAIL = "\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u67e5\u770b\u65e5\u5fd7"
-private const val TEXT_IMPORT_OK = "\u914d\u7f6e\u5df2\u5bfc\u5165\uff0c\u70b9\u51fb\u786e\u5b9a\u9690\u85cf\u540e\u751f\u6548"
-private const val TEXT_IMPORT_FAIL = "\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u914d\u7f6e\u6587\u4ef6"
-private const val TEXT_EXPORT_OK = "\u914d\u7f6e\u5df2\u5bfc\u51fa"
-private const val TEXT_EXPORT_FAIL = "\u5bfc\u51fa\u5931\u8d25"
-private const val TEXT_TEMPLATE_SAVE_OK = "\u6a21\u677f\u5df2\u4fdd\u5b58"
-private const val TEXT_TEMPLATE_SAVE_FAIL = "\u6a21\u677f\u4fdd\u5b58\u5931\u8d25"
-private const val TEXT_TEMPLATE_APPLY_OK = "\u6a21\u677f\u5df2\u5957\u7528\uff0c\u70b9\u51fb\u786e\u5b9a\u9690\u85cf\u540e\u751f\u6548"
-private const val TEXT_TEMPLATE_DELETE_OK = "\u6a21\u677f\u5df2\u5220\u9664"
-private const val TEXT_LOG_COPY_OK = "\u65e5\u5fd7\u5df2\u590d\u5236"
-private const val TEXT_LOG_EXPORT_OK = "\u65e5\u5fd7\u5df2\u5bfc\u51fa"
-private const val TEXT_LOG_EXPORT_FAIL = "\u65e5\u5fd7\u5bfc\u51fa\u5931\u8d25"
-private const val TEXT_CLIPBOARD_EMPTY = "\u526a\u8d34\u677f\u91cc\u6ca1\u6709\u53ef\u7528\u8def\u5f84"
-private const val TEXT_EMPTY_TEMPLATE = "\u8fd8\u6ca1\u6709\u4fdd\u5b58\u7684\u914d\u7f6e\u6a21\u677f"
-private const val TEXT_TEMPLATE_NAME_EMPTY = "\u8bf7\u5148\u8f93\u5165\u6a21\u677f\u540d\u79f0"
-private const val TEXT_DUPLICATE_ITEM = "\u8be5\u9879\u5df2\u5b58\u5728"
-private const val TEXT_INVALID_PATH = "\u8def\u5f84\u65e0\u6548\uff1a\u9700\u8981\u4ee5 / \u5f00\u5934\uff0c\u4e0d\u80fd\u662f\u6839\u76ee\u5f55\uff0c\u4e5f\u4e0d\u80fd\u5305\u542b .\u3001..\u3001\u9017\u53f7\u3001\u53cc\u5f15\u53f7\u3001\u53cd\u659c\u6760\u6216\u63a7\u5236\u5b57\u7b26"
-private const val TEXT_INVALID_APP = "\u5305\u540d\u6216 UID \u65e0\u6548\uff1a\u53ea\u80fd\u4f7f\u7528\u6570\u5b57\u3001\u5b57\u6bcd\u3001.\u3001_\u3001-\u3001:"
-private const val TEXT_NO_PATH = "\u8def\u5f84\u5217\u8868\u4e3a\u7a7a\uff0c\u8bf7\u5148\u6dfb\u52a0\u8981\u9690\u85cf\u7684\u8def\u5f84"
-private const val TEXT_NO_APP = "\u5df2\u5f00\u542f\u6309\u5e94\u7528 UID \u9690\u85cf\uff0c\u8bf7\u6dfb\u52a0\u5305\u540d\u6216 UID\uff1b\u8981\u5168\u5c40\u751f\u6548\u5c31\u5173\u95ed\u8fd9\u4e2a\u5f00\u5173"
-private const val TEXT_MANAGED_PATH_GLOBAL_BLOCK = "\u9690\u85cf /data/adb \u6a21\u5757\u76ee\u5f55\u65f6\u5fc5\u987b\u5f00\u542f\u201c\u6309\u5e94\u7528 UID \u9690\u85cf\u201d\uff0c\u5168\u5c40\u9690\u85cf\u4f1a\u5bfc\u81f4\u6a21\u5757\u7ba1\u7406\u5931\u6548"
-private const val TEXT_WAITING_CONFIG = "\u7b49\u5f85\u914d\u7f6e"
-private const val TEXT_WAITING_LOAD = "\u5f85\u52a0\u8f7d"
-private const val TEXT_RUNNING = "\u8fd0\u884c\u4e2d"
-private const val TEXT_VISIBILITY_TEST = "UID \u53ef\u89c1\u6027\u5b9e\u6d4b"
-private const val TEXT_VISIBILITY_TEST_SUMMARY = "\u4ee5\u6307\u5b9a Android UID \u5b9e\u9645\u8bbf\u95ee\u8def\u5f84\uff0c\u7528\u4e8e\u786e\u8ba4\u5185\u6838\u9690\u85cf\u662f\u5426\u771f\u6b63\u751f\u6548\u3002"
-private const val TEXT_VISIBILITY_TEST_ACTION = "\u5f00\u59cb\u5b9e\u6d4b"
-private const val TEXT_VISIBILITY_USE_CONFIG = "\u4f7f\u7528\u5f53\u524d\u914d\u7f6e"
-private const val TEXT_VISIBILITY_UID_INVALID = "\u8bf7\u8f93\u5165\u6709\u6548\u7684 Android \u5e94\u7528 UID"
+private val TEXT_EMPTY_PATH get() = hiddenPathText(R.string.hidden_path_empty_path)
+private val TEXT_EMPTY_APP get() = hiddenPathText(R.string.hidden_path_empty_app)
+private val TEXT_EMPTY_APP_PICKER get() = hiddenPathText(R.string.hidden_path_empty_app_picker)
+private val TEXT_APPLY_OK get() = hiddenPathText(R.string.hidden_path_apply_success)
+private val TEXT_APPLY_FAIL get() = hiddenPathText(R.string.hidden_path_apply_failed)
+private val TEXT_UNLOAD_ACTIVE_OK get() = hiddenPathText(R.string.hidden_path_unload_success)
+private val TEXT_UNLOAD_ACTIVE_FAIL get() = hiddenPathText(R.string.hidden_path_unload_failed)
+private val TEXT_IMPORT_OK get() = hiddenPathText(R.string.hidden_path_import_success)
+private val TEXT_IMPORT_FAIL get() = hiddenPathText(R.string.hidden_path_import_failed)
+private val TEXT_EXPORT_OK get() = hiddenPathText(R.string.hidden_path_export_success)
+private val TEXT_EXPORT_FAIL get() = hiddenPathText(R.string.hidden_path_export_failed)
+private val TEXT_TEMPLATE_SAVE_OK get() = hiddenPathText(R.string.hidden_path_template_save_success)
+private val TEXT_TEMPLATE_SAVE_FAIL get() = hiddenPathText(R.string.hidden_path_template_save_failed)
+private val TEXT_TEMPLATE_APPLY_OK get() = hiddenPathText(R.string.hidden_path_template_apply_success)
+private val TEXT_TEMPLATE_DELETE_OK get() = hiddenPathText(R.string.hidden_path_template_delete_success)
+private val TEXT_LOG_COPY_OK get() = hiddenPathText(R.string.hidden_path_log_copy_success)
+private val TEXT_LOG_EXPORT_OK get() = hiddenPathText(R.string.hidden_path_log_export_success)
+private val TEXT_LOG_EXPORT_FAIL get() = hiddenPathText(R.string.hidden_path_log_export_failed)
+private val TEXT_CLIPBOARD_EMPTY get() = hiddenPathText(R.string.hidden_path_clipboard_empty)
+private val TEXT_EMPTY_TEMPLATE get() = hiddenPathText(R.string.hidden_path_empty_template)
+private val TEXT_TEMPLATE_NAME_EMPTY get() = hiddenPathText(R.string.hidden_path_template_name_empty)
+private val TEXT_DUPLICATE_ITEM get() = hiddenPathText(R.string.hidden_path_duplicate_item)
+private val TEXT_INVALID_PATH get() = hiddenPathText(R.string.hidden_path_invalid_path)
+private val TEXT_INVALID_APP get() = hiddenPathText(R.string.hidden_path_invalid_app)
+private val TEXT_NO_PATH get() = hiddenPathText(R.string.hidden_path_no_path)
+private val TEXT_NO_APP get() = hiddenPathText(R.string.hidden_path_no_app)
+private val TEXT_MANAGED_PATH_GLOBAL_BLOCK get() = hiddenPathText(R.string.hidden_path_managed_global_block)
+private val TEXT_WAITING_CONFIG get() = hiddenPathText(R.string.hidden_path_waiting_config)
+private val TEXT_WAITING_LOAD get() = hiddenPathText(R.string.hidden_path_waiting_load)
+private val TEXT_RUNNING get() = hiddenPathText(R.string.hidden_path_running)
+private val TEXT_VISIBILITY_TEST get() = hiddenPathText(R.string.hidden_path_visibility_test)
+private val TEXT_VISIBILITY_TEST_SUMMARY get() = hiddenPathText(R.string.hidden_path_visibility_test_summary)
+private val TEXT_VISIBILITY_TEST_ACTION get() = hiddenPathText(R.string.hidden_path_visibility_test_action)
+private val TEXT_VISIBILITY_USE_CONFIG get() = hiddenPathText(R.string.hidden_path_visibility_use_config)
+private val TEXT_VISIBILITY_UID_INVALID get() = hiddenPathText(R.string.hidden_path_visibility_uid_invalid)
 private const val PREF_HIDDEN_PATH_TEMPLATES = "hidden_path_config_templates"
 private const val PREF_KEY_TEMPLATES = "templates"
 
@@ -698,7 +702,7 @@ private fun HiddenPathConfigTab(
 
         ConfigSection(
             title = TEXT_IMPORT_EXPORT_CONFIG,
-            summary = "\u53ef\u5c06\u5f53\u524d\u9690\u85cf\u8def\u5f84\u914d\u7f6e\u5907\u4efd\u6216\u6062\u590d\u5230\u672c\u9875\u3002",
+            summary = hiddenPathText(R.string.hidden_path_import_export_summary),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -727,7 +731,7 @@ private fun HiddenPathConfigTab(
 
         ConfigSection(
             title = TEXT_TEMPLATE_CONFIG,
-            summary = "\u5c06\u5f53\u524d\u8def\u5f84\u3001UID \u548c\u5f00\u5173\u4fdd\u5b58\u4e3a\u6a21\u677f\uff0c\u9700\u8981\u65f6\u4e00\u952e\u5957\u7528\u3002",
+            summary = hiddenPathText(R.string.hidden_path_templates_summary),
         ) {
             TemplateControls(
                 templateName = templateName,
@@ -742,23 +746,23 @@ private fun HiddenPathConfigTab(
 
         ConfigSection(
             title = TEXT_SUSUF_CONFIG,
-            summary = "\u8fd9\u4e9b\u5f00\u5173\u4f1a\u4e0e\u4e0b\u9762\u7684\u8def\u5f84\u548c\u5e94\u7528\u5217\u8868\u4e00\u8d77\u5199\u5165 pathmask\u3002",
+            summary = hiddenPathText(R.string.hidden_path_options_summary),
         ) {
             ToggleRow(
-                title = "\u6309\u5e94\u7528 UID \u9690\u85cf",
-                summary = "\u5f00\u542f\u540e\u53ea\u5bf9\u4e0b\u9762\u9009\u4e2d\u7684\u5e94\u7528\u751f\u6548\uff1b\u5173\u95ed\u540e\u5168\u5c40\u751f\u6548\u3002",
+                title = hiddenPathText(R.string.hidden_path_uid_scope),
+                summary = hiddenPathText(R.string.hidden_path_uid_scope_summary),
                 checked = config.useAppScope,
                 onCheckedChange = { onConfigChange(config.copy(useAppScope = it)) },
             )
             ToggleRow(
-                title = "\u9690\u85cf\u76ee\u5f55\u5217\u8868",
-                summary = "\u540c\u65f6\u62e6\u622a getdents64\uff0c\u907f\u514d\u76ee\u5f55\u91cc\u770b\u5230\u76ee\u6807\u8def\u5f84\u3002",
+                title = hiddenPathText(R.string.hidden_path_hide_directory_entries),
+                summary = hiddenPathText(R.string.hidden_path_hide_directory_entries_summary),
                 checked = config.hideDirents,
                 onCheckedChange = { onConfigChange(config.copy(hideDirents = it)) },
             )
             ToggleRow(
-                title = "\u9690\u85cf\u9694\u79bb\u8fdb\u7a0b",
-                summary = "\u5728 deny \u8303\u56f4\u4e0b\u4e5f\u5bf9 Android isolated UID \u751f\u6548\u3002",
+                title = hiddenPathText(R.string.hidden_path_hide_isolated_processes),
+                summary = hiddenPathText(R.string.hidden_path_hide_isolated_processes_summary),
                 checked = config.hideIsolated,
                 onCheckedChange = { onConfigChange(config.copy(hideIsolated = it)) },
             )
@@ -767,7 +771,7 @@ private fun HiddenPathConfigTab(
         ConfigSection(title = "$TEXT_PATH_CONFIG (${config.targetPaths.size})") {
             AddRow(
                 value = pathInput,
-                label = "\u8def\u5f84",
+                label = hiddenPathText(R.string.hidden_path_path_label),
                 placeholder = "/data/local/tmp/pathmask",
                 onValueChange = onPathInputChange,
                 onAdd = onAddPath,
@@ -798,7 +802,7 @@ private fun HiddenPathConfigTab(
             }
             AddRow(
                 value = appInput,
-                label = "\u5305\u540d\u6216 UID",
+                label = hiddenPathText(R.string.hidden_path_package_or_uid),
                 placeholder = "com.example.app",
                 onValueChange = onAppInputChange,
                 onAdd = onAddApp,
@@ -874,7 +878,7 @@ private fun VisibilityProbeSection(
                         modifier = Modifier.weight(0.65f),
                         value = pathInput,
                         onValueChange = onPathChange,
-                        label = { Text("\u8def\u5f84") },
+                        label = { Text(hiddenPathText(R.string.hidden_path_path_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { onTest() }),
@@ -912,10 +916,13 @@ private fun VisibilityProbeSection(
         result?.let { probe ->
             HorizontalDivider()
             val resultText = when (probe.status) {
-                "not_visible" -> "\u4e0d\u53ef\u89c1\uff1a\u6307\u5b9a UID \u7684\u9690\u85cf\u5df2\u751f\u6548"
-                "visible" -> "\u4ecd\u53ef\u89c1\uff1a\u5f53\u524d\u9690\u85cf\u672a\u5bf9\u8be5 UID \u751f\u6548"
-                "missing" -> "\u76ee\u6807\u4e0d\u5b58\u5728\uff1aRoot \u89c6\u89d2\u4e5f\u627e\u4e0d\u5230\u8be5\u8def\u5f84"
-                else -> "\u63a2\u6d4b\u5931\u8d25\uff1a${probe.error.ifBlank { "\u672a\u77e5\u9519\u8bef" }}"
+                "not_visible" -> hiddenPathText(R.string.hidden_path_probe_not_visible)
+                "visible" -> hiddenPathText(R.string.hidden_path_probe_visible)
+                "missing" -> hiddenPathText(R.string.hidden_path_probe_missing)
+                else -> hiddenPathText(
+                    R.string.hidden_path_probe_failed,
+                    probe.error.ifBlank { hiddenPathText(R.string.hidden_path_unknown_error) },
+                )
             }
             Text(
                 text = resultText,
@@ -928,9 +935,15 @@ private fun VisibilityProbeSection(
                 fontWeight = FontWeight.SemiBold,
             )
             StatusLine("UID", probe.uid.toString())
-            StatusLine("\u63a2\u6d4b\u8def\u5f84", probe.path)
-            StatusLine("pathmask", if (probe.moduleLoaded) "\u5df2\u52a0\u8f7d" else "\u672a\u52a0\u8f7d")
-            StatusLine("Root \u89c6\u89d2", if (probe.rootExists) "\u8def\u5f84\u5b58\u5728" else "\u8def\u5f84\u4e0d\u5b58\u5728")
+            StatusLine(hiddenPathText(R.string.hidden_path_probe_path), probe.path)
+            StatusLine(
+                "pathmask",
+                if (probe.moduleLoaded) hiddenPathText(R.string.hidden_path_loaded) else hiddenPathText(R.string.hidden_path_not_loaded),
+            )
+            StatusLine(
+                hiddenPathText(R.string.hidden_path_root_view),
+                if (probe.rootExists) hiddenPathText(R.string.hidden_path_path_exists) else hiddenPathText(R.string.hidden_path_path_missing),
+            )
             StatusLine("resolved_count", probe.resolvedCount.ifBlank { "-" })
         }
     }
@@ -959,7 +972,7 @@ private fun VisibilityProbeFields(
         modifier = Modifier.fillMaxWidth(),
         value = pathInput,
         onValueChange = onPathChange,
-        label = { Text("\u63a2\u6d4b\u8def\u5f84") },
+        label = { Text(hiddenPathText(R.string.hidden_path_probe_path)) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onTest() }),
@@ -984,7 +997,7 @@ private fun TemplateControls(
                 value = templateName,
                 onValueChange = onTemplateNameChange,
                 label = { Text(TEXT_TEMPLATE_NAME) },
-                placeholder = { Text("\u6e38\u620f\u6a21\u677f") },
+                placeholder = { Text(hiddenPathText(R.string.hidden_path_template_example)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (enabled) onSaveTemplate() }),
@@ -1045,7 +1058,11 @@ private fun TemplateControls(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "\u8def\u5f84 ${template.config.targetPaths.size} / UID ${template.config.appPackages.size}",
+                        text = hiddenPathText(
+                            R.string.hidden_path_template_counts,
+                            template.config.targetPaths.size,
+                            template.config.appPackages.size,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1098,7 +1115,7 @@ private fun HiddenPathStatusPanel(
         config.targetPaths.isEmpty() -> TEXT_WAITING_CONFIG
         else -> TEXT_WAITING_LOAD
     }
-    ConfigSection(title = "\u5f53\u524d\u72b6\u6001") {
+    ConfigSection(title = hiddenPathText(R.string.hidden_path_current_status)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1106,7 +1123,7 @@ private fun HiddenPathStatusPanel(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (config.loaded) "\u5df2\u52a0\u8f7d" else "\u672a\u52a0\u8f7d",
+                    text = if (config.loaded) hiddenPathText(R.string.hidden_path_loaded) else hiddenPathText(R.string.hidden_path_not_loaded),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1122,16 +1139,19 @@ private fun HiddenPathStatusPanel(
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        StatusLine("\u52a0\u8f7d\u72b6\u6001", if (config.loaded) "\u5df2\u52a0\u8f7d" else "\u672a\u52a0\u8f7d")
+        StatusLine(
+            hiddenPathText(R.string.hidden_path_load_status),
+            if (config.loaded) hiddenPathText(R.string.hidden_path_loaded) else hiddenPathText(R.string.hidden_path_not_loaded),
+        )
         StatusLine("KMI", config.currentKmi.ifBlank { "-" })
-        StatusLine("\u5df2\u89e3\u6790\u8def\u5f84", config.resolvedCount.ifBlank { "-" })
+        StatusLine(hiddenPathText(R.string.hidden_path_resolved_paths), config.resolvedCount.ifBlank { "-" })
         if (!config.loaded) {
             config.blockReason()?.let { reason ->
-                StatusLine("\u539f\u56e0", reason)
+                StatusLine(hiddenPathText(R.string.hidden_path_reason), reason)
             }
         }
         if (config.activeTargetPaths.isNotBlank()) {
-            StatusLine("\u5185\u6838\u6b63\u5728\u9690\u85cf", config.activeTargetPaths)
+            StatusLine(hiddenPathText(R.string.hidden_path_kernel_active_paths), config.activeTargetPaths)
         }
         if (config.loaded || config.activeTargetPaths.isNotBlank()) {
             OutlinedButton(
@@ -1322,7 +1342,7 @@ private fun SmartPathActions(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "\u5e38\u7528\u8def\u5f84",
+            text = hiddenPathText(R.string.hidden_path_common_paths),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1340,7 +1360,7 @@ private fun SmartPathActions(
                         onUsePath(text)
                     }
                 },
-                label = { Text("\u7c98\u8d34\u8def\u5f84") },
+                label = { Text(hiddenPathText(R.string.hidden_path_paste_path)) },
                 leadingIcon = {
                     Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                 },
@@ -1349,7 +1369,7 @@ private fun SmartPathActions(
             if (trimmedCurrent.isNotBlank()) {
                 AssistChip(
                     onClick = { onAddPath(trimmedCurrent) },
-                    label = { Text("\u6dfb\u52a0\u5f53\u524d\u8f93\u5165") },
+                    label = { Text(hiddenPathText(R.string.hidden_path_add_current_input)) },
                     leadingIcon = {
                         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
@@ -1603,12 +1623,12 @@ private fun HiddenPathLogTab(
 @Composable
 private fun HiddenPathHelpTab() {
     val items = listOf(
-        "\u8fd9\u4e2a\u9875\u9762\u914d\u7f6e\u5185\u7f6e pathmask LKM\uff0c\u4e0d\u662f\u666e\u901a\u6a21\u5757 WebUI\u3002",
-        "\u8def\u5f84\u914d\u7f6e\u8981\u586b\u7edd\u5bf9\u8def\u5f84\uff0c\u591a\u4e2a\u8def\u5f84\u4f1a\u4ee5 target_paths \u53c2\u6570\u4f20\u7ed9 LKM\u3002",
-        "\u5e94\u7528\u9009\u62e9\u652f\u6301\u5305\u540d\u6216 UID\uff0c\u5e94\u7528\u8303\u56f4\u6a21\u5f0f\u4f1a\u89e3\u6790\u6210 deny_uids\u3002",
-        "\u4e3a\u9632\u6b62\u9690\u85cf\u6a21\u5757\u540e\u6a21\u5757\u7ba1\u7406\u5931\u6548\uff0c\u5982\u679c\u76ee\u6807\u8def\u5f84\u662f /data/adb/modules\u3001/data/adb/ksu\u3001/data/adb/ap \u8fd9\u7c7b\u7ba1\u7406\u76ee\u5f55\uff0c\u5fc5\u987b\u5f00\u542f\u201c\u6309\u5e94\u7528 UID \u9690\u85cf\u201d\uff0c\u4e0d\u5141\u8bb8\u5168\u5c40\u9690\u85cf\u3002",
-        "\u70b9\u51fb\u786e\u5b9a\u9690\u85cf\u540e\uff0cksud \u4f1a\u7b49\u5f85\u76ee\u6807\u8def\u5f84\u51fa\u73b0\uff0c\u518d\u70ed\u91cd\u8f7d pathmask \u5e76\u5e94\u7528\u65b0\u914d\u7f6e\u3002",
-        "\u5982\u679c\u6ca1\u6709\u9690\u85cf\u6548\u679c\uff0c\u5148\u770b\u65e5\u5fd7\u91cc\u7684 resolved_count\u3001KMI \u548c\u5185\u6838 dmesg \u8f93\u51fa\u3002",
+        hiddenPathText(R.string.hidden_path_help_builtin),
+        hiddenPathText(R.string.hidden_path_help_absolute_paths),
+        hiddenPathText(R.string.hidden_path_help_app_scope),
+        hiddenPathText(R.string.hidden_path_help_managed_paths),
+        hiddenPathText(R.string.hidden_path_help_apply),
+        hiddenPathText(R.string.hidden_path_help_debug),
     )
 
     Column(
@@ -1811,7 +1831,7 @@ private fun HiddenPathAppPickerRow(
             trailingContent = {
                 if (selected) {
                     Text(
-                        text = "\u5df2\u6dfb\u52a0",
+                        text = hiddenPathText(R.string.hidden_path_added),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
@@ -1873,7 +1893,7 @@ private fun copyTextToClipboard(context: Context, label: String, text: String) {
 }
 
 private fun displayLogText(logs: String): String {
-    return logs.ifBlank { "\u6682\u65e0\u9690\u85cf\u8def\u5f84\u65e5\u5fd7" }
+    return logs.ifBlank { hiddenPathText(R.string.hidden_path_logs_empty) }
 }
 
 private fun displayConfigItem(item: String, kind: EmptyListKind): String {

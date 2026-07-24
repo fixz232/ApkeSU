@@ -7,7 +7,7 @@ import java.net.URI
 internal const val CLOUD_THEME_CATALOG_SCHEMA = "io.github.fixz.apkesu.theme-catalog"
 internal const val CLOUD_THEME_CATALOG_VERSION = 1
 internal const val CLOUD_THEME_PACKAGE_SCHEMA = "io.github.fixz.apkesu.theme"
-internal const val CLOUD_THEME_MAX_PACKAGE_BYTES = 100L * 1024L * 1024L
+internal const val CLOUD_THEME_MAX_PACKAGE_BYTES = 500L * 1024L * 1024L
 internal const val CLOUD_THEME_MAX_CATALOG_BYTES = 2L * 1024L * 1024L
 internal const val CLOUD_THEME_DEFAULT_CATALOG_URL =
     "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/catalog/v1/catalog.json"

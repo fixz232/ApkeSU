@@ -45,11 +45,15 @@ def validate_creator_approval(event: dict, reviewer: str, approved_at: int) -> d
     if "creator-approved" not in issue_labels(issue):
         raise ValidationFailure("creator approval label is missing")
     issue_author = normalize_github_login((issue.get("user") or {}).get("login"))
+    expected_title = f"[creator application] {issue_author}"
+    if str(issue.get("title", "")).strip().lower() != expected_title:
+        raise ValidationFailure("creator application title does not match the issue author")
     fields = parse_issue_form(issue.get("body"))
     declared_login = normalize_github_login(fields.get("GitHub login"))
     if declared_login != issue_author:
         raise ValidationFailure("declared GitHub login does not match the issue author")
     display_name = clean_text(fields.get("Public creator name"), "public creator name", 64)
+    clean_text(fields.get("Introduction"), "introduction", 2000)
     declarations = fields.get("Declarations", "").lower()
     if declarations.count("- [x]") < 3:
         raise ValidationFailure("all creator declarations must be accepted")
