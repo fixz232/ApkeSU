@@ -541,9 +541,12 @@
     <string name="cloud_theme_creator_profile_url_hint">留空時使用 GitHub 個人首頁</string>
     <string name="cloud_theme_creator_avatar_url">公開頭像網址</string>
     <string name="cloud_theme_creator_local_package">本機主題套件</string>
-    <string name="cloud_theme_creator_no_package">尚未選擇並驗證 .kstheme 主題套件</string>
+    <string name="cloud_theme_creator_no_package">尚未選擇並驗證主題套件</string>
     <string name="cloud_theme_creator_choose_package">選擇並驗證主題套件</string>
     <string name="cloud_theme_creator_create_package">從目前主題產生雲端安全套件</string>
+    <string name="cloud_theme_creator_export_package">匯出標準 .kstheme 投稿套件</string>
+    <string name="cloud_theme_creator_package_exported">標準 .kstheme 投稿套件已匯出並驗證</string>
+    <string name="cloud_theme_creator_package_rules">檔案名稱和 MIME 類型不限；主題套件、圖片和影片單個最大 500 MiB，仍受裝置儲存空間和 GitHub Release 平台限制。</string>
     <string name="cloud_theme_creator_cloud_package_created">雲端安全主題套件已產生並通過驗證</string>
     <string name="cloud_theme_creator_package_meta">%1$s · 套件版本 v%2$d · %3$d 項資源</string>
     <string name="cloud_theme_creator_package_valid">主題套件驗證通過</string>
@@ -572,7 +575,7 @@
     <string name="cloud_theme_creator_screenshot_urls_hint">每行一個 GitHub 圖片網址，最多 8 張</string>
     <string name="cloud_theme_creator_remote_package">遠端發佈套件</string>
     <string name="cloud_theme_creator_package_url">GitHub Release 主題套件網址</string>
-    <string name="cloud_theme_creator_package_url_hint">先把同一個本機主題套件上傳到自己帳號的公開 Release</string>
+    <string name="cloud_theme_creator_package_url_hint">先匯出標準 .kstheme 檔案，再把完全相同的位元組上傳到自己帳號的公開 Release</string>
     <string name="cloud_theme_creator_remote_unverified">遠端檔案尚未與本機主題套件進行一致性驗證。</string>
     <string name="cloud_theme_creator_remote_match">遠端檔案大小和 SHA-256 與本機主題套件完全一致。</string>
     <string name="cloud_theme_creator_verify_remote">驗證遠端主題套件</string>

@@ -1,6 +1,7 @@
 package me.weishu.kernelsu
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.UserManager
@@ -11,6 +12,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+import me.weishu.kernelsu.ui.util.AppLanguageManager
 import java.io.File
 import java.util.Locale
 
@@ -34,12 +36,17 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     lateinit var okhttpClient: OkHttpClient
     private val appViewModelStore by lazy { ViewModelStore() }
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(AppLanguageManager.wrapContext(base))
+    }
+
     private fun isUserUnlocked(): Boolean =
         getSystemService(UserManager::class.java)?.isUserUnlocked == true
 
     override fun onCreate() {
         super.onCreate()
         ksuApp = this
+        AppLanguageManager.syncPlatformLanguage(this)
 
         runCatching { Os.setenv("TMPDIR", cacheDir.absolutePath, true) }
             .onFailure { Log.w(TAG, "set TMPDIR failed", it) }

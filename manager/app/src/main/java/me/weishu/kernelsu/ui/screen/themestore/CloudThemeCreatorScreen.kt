@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.screen.themestore
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -86,6 +87,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -98,6 +100,7 @@ import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.util.CLOUD_THEME_CREATOR_PICKER_MIME_TYPE
 import me.weishu.kernelsu.ui.util.CLOUD_THEME_CREATOR_REVIEWER
 import me.weishu.kernelsu.ui.util.CloudThemeCategory
 import me.weishu.kernelsu.ui.util.CloudThemeCreatorActivity
@@ -113,6 +116,7 @@ import me.weishu.kernelsu.ui.util.THEME_STORE_FILE_MIME_TYPE
 import me.weishu.kernelsu.ui.util.buildCloudThemeCreatorApplicationUrl
 import me.weishu.kernelsu.ui.util.buildCloudThemeSubmissionIssueUrl
 import me.weishu.kernelsu.ui.util.buildCloudThemeSubmissionManifest
+import me.weishu.kernelsu.ui.util.canonicalCloudThemePackageFileName
 import me.weishu.kernelsu.ui.util.exportCloudThemeStorePackage
 import me.weishu.kernelsu.ui.util.isValidCloudThemeGithubLogin
 import me.weishu.kernelsu.ui.util.readThemeAuthorProfile
@@ -131,7 +135,7 @@ private enum class CreatorCenterPage(@StringRes val titleRes: Int, val icon: Ima
 }
 
 @Composable
-fun CloudThemeCreatorScreen() {
+fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val navigator = LocalNavigator.current
@@ -140,7 +144,9 @@ fun CloudThemeCreatorScreen() {
     val creatorRepository = remember(context) { CloudThemeCreatorRepository(context) }
     val cloudRepository = remember(context) { CloudThemeRepository(context) }
     val localProfile = remember(context) { readThemeAuthorProfile(context) }
-    var selectedPageIndex by rememberSaveable { mutableIntStateOf(0) }
+    var selectedPageIndex by rememberSaveable {
+        mutableIntStateOf(initialPageIndex.coerceIn(0, CreatorCenterPage.entries.lastIndex))
+    }
     var draft by remember {
         mutableStateOf(
             creatorRepository.readDraft().let { saved ->
@@ -179,6 +185,20 @@ fun CloudThemeCreatorScreen() {
 
     fun showError(error: Throwable) {
         errorMessage = error.safeCloudThemeMessage()
+    }
+
+    fun openGithubIssueForm(url: String) {
+        runCatching {
+            val intent = Intent.makeMainSelectorActivity(
+                Intent.ACTION_MAIN,
+                Intent.CATEGORY_APP_BROWSER,
+            ).apply {
+                data = url.toUri()
+            }
+            context.startActivity(intent)
+        }.recoverCatching {
+            uriHandler.openUri(url)
+        }.getOrThrow()
     }
 
     fun refreshActivity() {
@@ -253,7 +273,8 @@ fun CloudThemeCreatorScreen() {
         }
     }
 
-    LaunchedEffect(draft) {
+    LaunchedEffect(draft, packageLoading) {
+        if (packageLoading) return@LaunchedEffect
         delay(400)
         runCatching {
             withContext(Dispatchers.IO) { creatorRepository.saveDraft(draft) }
@@ -284,6 +305,33 @@ fun CloudThemeCreatorScreen() {
         ).show()
     }
 
+    val canonicalPackageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(THEME_STORE_FILE_MIME_TYPE),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        if (packageLoading) return@rememberLauncherForActivityResult
+        val packageSnapshot = draft
+        packageLoading = true
+        scope.launch {
+            try {
+                creatorRepository.exportInspectedPackage(
+                    sourceUriString = packageSnapshot.packageUri,
+                    destination = uri,
+                    expectedSha256 = packageSnapshot.packageSha256,
+                    expectedSizeBytes = packageSnapshot.packageSizeBytes,
+                )
+                Toast.makeText(
+                    context,
+                    R.string.cloud_theme_creator_package_exported,
+                    Toast.LENGTH_LONG,
+                ).show()
+            } catch (error: Throwable) {
+                showError(error)
+            } finally {
+                packageLoading = false
+            }
+        }
+    }
     val packageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -330,7 +378,7 @@ fun CloudThemeCreatorScreen() {
                 displayName = draft.authorName,
             )
             creatorRepository.saveDraft(draft)
-            uriHandler.openUri(url)
+            openGithubIssueForm(url)
         }.onFailure(::showError)
     }
 
@@ -374,7 +422,7 @@ fun CloudThemeCreatorScreen() {
             val manifest = buildCloudThemeSubmissionManifest(draft)
             val url = buildCloudThemeSubmissionIssueUrl(draft, manifest)
             creatorRepository.saveDraft(draft)
-            uriHandler.openUri(url)
+            openGithubIssueForm(url)
         }.onFailure(::showError)
     }
 
@@ -436,17 +484,16 @@ fun CloudThemeCreatorScreen() {
                     remoteVerifying = remoteVerifying,
                     onDraftChange = { draft = it },
                     onSelectPackage = {
-                        packageLauncher.launch(
-                            arrayOf(
-                                THEME_STORE_FILE_MIME_TYPE,
-                                "application/octet-stream",
-                                "*/*",
-                            )
-                        )
+                        packageLauncher.launch(arrayOf(CLOUD_THEME_CREATOR_PICKER_MIME_TYPE))
                     },
                     onCreatePackage = {
                         cloudPackageLauncher.launch(
                             "apkesu-cloud-theme.$THEME_STORE_FILE_EXTENSION"
+                        )
+                    },
+                    onExportPackage = {
+                        canonicalPackageLauncher.launch(
+                            canonicalCloudThemePackageFileName(draft.packageName)
                         )
                     },
                     onVerifyRemote = ::verifyRemotePackage,
@@ -641,7 +688,8 @@ private fun CreatorQualificationPage(
                         }
                         if (
                             applicationStatus == CloudThemeCreatorApplicationStatus.NotApplied ||
-                            applicationStatus == CloudThemeCreatorApplicationStatus.Rejected
+                            applicationStatus == CloudThemeCreatorApplicationStatus.Rejected ||
+                            applicationStatus == CloudThemeCreatorApplicationStatus.NeedsChanges
                         ) {
                             Button(
                                 modifier = Modifier.weight(1f),
@@ -710,6 +758,7 @@ private fun CreatorSubmissionPage(
     onDraftChange: (CloudThemeSubmissionDraft) -> Unit,
     onSelectPackage: () -> Unit,
     onCreatePackage: () -> Unit,
+    onExportPackage: () -> Unit,
     onVerifyRemote: () -> Unit,
     onSaveDraft: () -> Unit,
     onClearDraft: () -> Unit,
@@ -795,6 +844,7 @@ private fun CreatorSubmissionPage(
                 loading = packageLoading,
                 onSelectPackage = onSelectPackage,
                 onCreatePackage = onCreatePackage,
+                onExportPackage = onExportPackage,
             )
         }
         item {
@@ -950,13 +1000,17 @@ private fun CreatorSubmissionPage(
                     ) {
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
+                            enabled = !packageLoading,
                             onClick = onSaveDraft,
                         ) {
                             Icon(Icons.Rounded.Save, contentDescription = null)
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(stringResource(R.string.cloud_theme_creator_save_draft))
                         }
-                        TextButton(onClick = onClearDraft) {
+                        TextButton(
+                            enabled = !packageLoading,
+                            onClick = onClearDraft,
+                        ) {
                             Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
                             Spacer(modifier = Modifier.size(4.dp))
                             Text(stringResource(R.string.cloud_theme_creator_clear_draft_action))
@@ -992,6 +1046,7 @@ private fun CreatorPackageCard(
     loading: Boolean,
     onSelectPackage: () -> Unit,
     onCreatePackage: () -> Unit,
+    onExportPackage: () -> Unit,
 ) {
     CreatorSurface {
         Column(
@@ -1029,6 +1084,15 @@ private fun CreatorPackageCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = creatorMutedColor(),
                 )
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loading,
+                    onClick = onExportPackage,
+                ) {
+                    Icon(Icons.Rounded.Save, contentDescription = null)
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(stringResource(R.string.cloud_theme_creator_export_package))
+                }
             } else {
                 Text(
                     text = stringResource(R.string.cloud_theme_creator_no_package),
@@ -1036,6 +1100,11 @@ private fun CreatorPackageCard(
                     color = creatorMutedColor(),
                 )
             }
+            Text(
+                text = stringResource(R.string.cloud_theme_creator_package_rules),
+                style = MaterialTheme.typography.bodySmall,
+                color = creatorMutedColor(),
+            )
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !loading,

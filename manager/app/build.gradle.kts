@@ -139,8 +139,15 @@ android {
     }
 
     androidResources {
-        generateLocaleConfig = true
+        generateLocaleConfig = false
     }
+
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     compileSdk {
         version =
             release(androidCompileSdkVersion) {

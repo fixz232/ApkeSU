@@ -1,6 +1,7 @@
 package me.weishu.kernelsu.ui
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -102,6 +103,8 @@ import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationScope
+import me.weishu.kernelsu.ui.component.custom.LocalCustomCardStyle
+import me.weishu.kernelsu.ui.component.custom.LocalCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationBackdrop
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationChromeOverlay
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
@@ -155,6 +158,7 @@ import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
 import me.weishu.kernelsu.ui.screen.settings.BackgroundSettingsScreen
+import me.weishu.kernelsu.ui.screen.settings.CardStyleCreatorScreen
 import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
 import me.weishu.kernelsu.ui.screen.settings.AiModuleStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
@@ -165,12 +169,14 @@ import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
+import me.weishu.kernelsu.ui.screen.settings.LanguageSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
 import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationLibraryScreen
 import me.weishu.kernelsu.ui.screen.settings.VisualEffectsScreen
+import me.weishu.kernelsu.ui.screen.settings.SwitchStyleCreatorScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
 import me.weishu.kernelsu.ui.screen.superuser.AppIdManagerScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
@@ -214,6 +220,7 @@ import me.weishu.kernelsu.ui.viewmodel.MainPagerConfig
 import me.weishu.kernelsu.ui.webui.WebUIActivity
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
+import me.weishu.kernelsu.ui.util.AppLanguageManager
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -223,6 +230,10 @@ class MainActivity : ComponentActivity() {
 
     private val intentState = MutableStateFlow(0)
     private val managerReadyState = MutableStateFlow(false)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguageManager.wrapContext(newBase))
+    }
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -339,6 +350,8 @@ class MainActivity : ComponentActivity() {
                 LocalNavigator provides navigator,
                 LocalUiDecorationConfig provides effectiveUiDecorationConfig,
                 LocalUiDecorationScope provides uiDecorationScope,
+                LocalCustomCardStyle provides uiState.customCardStyle,
+                LocalCustomSwitchStyle provides uiState.customSwitchStyle,
                 LocalDensity provides density,
                 LocalColorMode provides appSettings.colorMode.value,
                 LocalEnableBlur provides effectiveEnableBlur,
@@ -421,9 +434,12 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.SoundEffects> { SoundEffectsScreen() }
                                 entry<Route.StartupAnimation> { StartupAnimationScreen() }
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
+                                entry<Route.LanguageSettings> { LanguageSettingsScreen() }
                                 entry<Route.PreInstallStyleSettings> { PreInstallStyleSettingsScreen() }
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
                                 entry<Route.UiDecorationLibrary> { UiDecorationLibraryScreen() }
+                                entry<Route.CardStyleCreator> { CardStyleCreatorScreen() }
+                                entry<Route.SwitchStyleCreator> { SwitchStyleCreatorScreen() }
                                 entry<Route.HiddenPathConfig> {
                                     if (!Natives.isLkmMode && !Natives.isLateLoadMode) {
                                         SusfsPathConfigScreen()
@@ -447,6 +463,9 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.ThemeStoreLibrary> { ThemeStoreLibraryScreen() }
                                 entry<Route.CloudThemeDetail> { key -> CloudThemeDetailScreen(key.themeId) }
                                 entry<Route.CloudThemeCreator> { CloudThemeCreatorScreen() }
+                                entry<Route.CloudThemeCreatorSubmission> {
+                                    CloudThemeCreatorScreen(initialPageIndex = 1)
+                                }
                                 entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }

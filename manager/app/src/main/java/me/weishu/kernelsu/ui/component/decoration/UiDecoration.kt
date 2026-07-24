@@ -34,7 +34,14 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
+import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
+import me.weishu.kernelsu.ui.component.custom.LocalCustomCardStyle
+import me.weishu.kernelsu.ui.component.custom.drawCustomCardChrome
+import me.weishu.kernelsu.ui.component.custom.drawCustomCardInterior
+import me.weishu.kernelsu.ui.component.custom.drawCustomNavigationStyle
+import me.weishu.kernelsu.ui.component.custom.rememberComponentMotionProgress
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
+import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.PI
 import kotlin.math.cos
@@ -76,6 +83,13 @@ fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
     if (!active || (config.topBar == UiTopBarDecoration.None && config.navigation == UiNavigationDecoration.None)) return
     val palette = uiDecorationPalette()
     val progress = decorationProgress(config.motionEnabled, "uiDecorationChrome")
+    val customStyle = LocalCustomCardStyle.current
+    val customProgress = rememberComponentMotionProgress(
+        rule = customStyle?.motion ?: me.weishu.kernelsu.ui.component.custom.PixelMotionRule(),
+        enabled = config.motionEnabled,
+        label = "customNavigationStyle",
+    )
+    val floatingBottomBar = LocalEnableFloatingBottomBar.current
     val topEdge = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
     val navigationHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 82.dp
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -87,13 +101,24 @@ fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
             edgeY = topEdge.toPx().coerceAtMost(size.height * 0.24f),
             progress = progress,
         )
-        drawNavigationDecoration(
-            style = config.navigation,
-            palette = palette,
-            alpha = alpha,
-            areaHeight = navigationHeight.toPx().coerceAtMost(size.height * 0.24f),
-            progress = progress,
-        )
+        val resolvedNavigationHeight = navigationHeight.toPx().coerceAtMost(size.height * 0.24f)
+        if (config.navigation == UiNavigationDecoration.Custom && customStyle != null) {
+            drawCustomNavigationStyle(
+                style = customStyle,
+                floating = floatingBottomBar,
+                areaHeight = resolvedNavigationHeight,
+                alpha = alpha,
+                motionProgress = customProgress,
+            )
+        } else {
+            drawNavigationDecoration(
+                style = config.navigation,
+                palette = palette,
+                alpha = alpha,
+                areaHeight = resolvedNavigationHeight,
+                progress = progress,
+            )
+        }
     }
 }
 
@@ -102,6 +127,7 @@ fun Modifier.uiDecoratedCard(
     shape: Shape,
     enabled: Boolean = true,
     nativeDecorations: Set<UiCardDecoration> = emptySet(),
+    customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
     val config = LocalUiDecorationConfig.current
     val configuredStyle = config.card.withoutNativeDuplicate(nativeDecorations)
@@ -109,16 +135,41 @@ fun Modifier.uiDecoratedCard(
         return this
     }
     val palette = uiDecorationPalette()
+    val customStyle = LocalCustomCardStyle.current
+    val customProgress = rememberComponentMotionProgress(
+        rule = customStyle?.motion ?: me.weishu.kernelsu.ui.component.custom.PixelMotionRule(),
+        enabled = config.motionEnabled,
+        label = "customCardStyle",
+    )
     val seasonalInterface = LocalInterfaceStyle.current == InterfaceStyle.Snow.value
-    val style = if (seasonalInterface && configuredStyle in SEASONAL_CARD_DECORATIONS) {
+    val style = if (configuredStyle == UiCardDecoration.Custom && customStyle == null) {
+        UiCardDecoration.Highlight
+    } else if (seasonalInterface && configuredStyle in SEASONAL_CARD_DECORATIONS) {
         UiCardDecoration.Highlight
     } else {
         configuredStyle
     }
     val alpha = config.opacity * config.intensity
     return drawWithContent {
+        if (style == UiCardDecoration.Custom && customStyle != null) {
+            drawCustomCardInterior(
+                style = customStyle,
+                target = customTarget,
+                alpha = alpha,
+                motionProgress = customProgress,
+            )
+        }
         drawContent()
-        drawCardDecoration(style, shape, palette, alpha)
+        if (style == UiCardDecoration.Custom && customStyle != null) {
+            drawCustomCardChrome(
+                style = customStyle,
+                target = customTarget,
+                alpha = alpha,
+                motionProgress = customProgress,
+            )
+        } else {
+            drawCardDecoration(style, shape, palette, alpha)
+        }
     }
 }
 
@@ -383,6 +434,7 @@ private fun DrawScope.drawNavigationDecoration(
     val center = Offset(size.width / 2f, size.height - areaHeight * 0.42f)
     when (style) {
         UiNavigationDecoration.None -> Unit
+        UiNavigationDecoration.Custom -> Unit
         UiNavigationDecoration.UnderGlow -> {
             drawLine(
                 brush = Brush.horizontalGradient(
@@ -486,6 +538,7 @@ private fun DrawScope.drawCardDecoration(
 ) {
     when (style) {
         UiCardDecoration.None -> Unit
+        UiCardDecoration.Custom -> Unit
         UiCardDecoration.Highlight -> {
             val outline = shape.createOutline(size, layoutDirection, this)
             drawOutline(

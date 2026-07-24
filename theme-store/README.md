@@ -26,8 +26,8 @@ Run **Moderate cloud theme creators and submissions** once with `workflow_dispat
 
 ## Publishing a theme as an approved creator
 
-1. In Creator Center, use **Create cloud-safe package from current theme**, or select an existing package that passes cloud-safe validation. The Manager embeds every active asset, removes device-only URIs and private profile fields, validates the structure, and computes the exact byte count and SHA-256.
-2. Upload those exact bytes to a public GitHub Release under the approved creator's GitHub account. Paste the `.kstheme` Release URL into Creator Center. The app and moderation workflow reject package URLs owned by another account.
+1. In Creator Center, use **Create cloud-safe package from current theme**, or select any local file up to 500 MiB. The picker does not restrict the original filename, extension, or MIME type, but the bytes must contain a valid cloud-safe ApkeSU theme package. The Manager copies and validates one immutable snapshot, then computes its exact byte count and SHA-256. Device storage and GitHub Release limits still apply.
+2. Export the validated snapshot as a standard `.kstheme` file and upload those exact bytes to a public GitHub Release under the approved creator's GitHub account. Paste the `.kstheme` Release URL into Creator Center. The app and moderation workflow reject package URLs owned by another account.
 3. Add the public cover, screenshots, license, compatibility range, version, and an existing or custom category.
 4. Run remote verification. The Manager downloads the Release asset and requires its byte count and SHA-256 to match the selected local package.
 5. Submit the generated GitHub Issue. The Issue author must be the approved creator recorded in the manifest.
@@ -41,7 +41,7 @@ The ordinary local export remains suitable for backup and device-to-device trans
 ## Maintainer publishing
 
 1. Export a `.kstheme` package from **Theme center > Import and export**.
-2. Prepare a 16:9 cover and up to eight screenshots. Keep each image below 12 MiB.
+2. Prepare a 16:9 cover and up to eight screenshots. Each image or video asset may be up to 500 MiB.
 3. Upload the package to a temporary GitHub Release or another GitHub-hosted URL.
 4. Ask a maintainer to run **Publish cloud theme** with the temporary URL, exact size, SHA-256, and package metadata. The workflow verifies the bytes and creates the canonical release asset.
 5. Add or update the entry in `catalog/v1/catalog.json` using that canonical URL. Increase `versionCode` whenever the package bytes, URL, hash, size, or version name changes.

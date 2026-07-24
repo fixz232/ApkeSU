@@ -83,6 +83,7 @@ fun SettingPager(
         onSetGraphicsRendererFeatureEnabled = viewModel::setGraphicsRendererFeatureEnabled,
         onOpenTheme = { navigator.push(Route.ColorPalette) },
         onOpenThemeStore = { navigator.push(Route.ThemeStore) },
+        onOpenLanguage = { navigator.push(Route.LanguageSettings) },
         onSetDayNightMode = viewModel::setDayNightMode,
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetSeasonStyleIndex = viewModel::setSeasonStyleIndex,

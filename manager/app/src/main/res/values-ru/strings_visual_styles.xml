@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">Дождевое стекло</string>
+    <string name="settings_rain_style">Интенсивность дождя</string>
+    <string name="settings_rain_card_motion">Анимация дождевых карточек</string>
+    <string name="settings_rain_card_motion_summary">Анимирует капли по краям, конденсат и сдержанный блеск стекла, не двигая содержимое карточек.</string>
+    <string name="rain_style_light">Лёгкий дождь</string>
+    <string name="rain_style_light_summary">Мягкий туман, редкие струи дождя и спокойная рябь на светло-голубом стекле.</string>
+    <string name="rain_style_medium">Ровный дождь</string>
+    <string name="rain_style_medium_summary">Более плотный дождь, слоистые облака и заметные капли по краям карточек.</string>
+    <string name="rain_style_heavy">Сильный дождь</string>
+    <string name="rain_style_heavy_summary">Тёмная грозовая палитра, сильный ветер, мокрое стекло и частая рябь на поверхности.</string>
+    <string name="rain_style_thunderstorm">Гроза</string>
+    <string name="rain_style_thunderstorm_summary">Ночные вспышки молний каждые 3–8 секунд, плотный дождь и фиолетовые грозовые облака.</string>
+    <string name="rain_motto_light">Слушайте, как дождь ложится на стекло</string>
+    <string name="rain_motto_medium">Дождь усиливается, и мир затихает</string>
+    <string name="rain_motto_heavy">Сохраняйте ясность даже в бурю</string>
+    <string name="rain_motto_thunderstorm">Молния пронзает ночь, а ядро остаётся стойким</string>
+    <string name="theme_preset_rain">Дождевое стекло</string>
+    <string name="theme_preset_rain_summary">Холодное серо-синее стекло, мокрые края карточек, дождевые навесы и подходящая плавающая панель навигации.</string>
+    <string name="settings_pixel_card_motion">Анимация пиксельных карточек</string>
+    <string name="settings_pixel_card_motion_summary">Анимирует характерные сцены и детали краёв каждого пиксельного режима, не двигая карточки и текст.</string>
+    <string name="settings_season_card_motion">Анимация сезонных карточек</string>
+    <string name="settings_season_card_motion_summary">Анимирует лепестки, блики на воде, летящие листья и сияние инея, не двигая содержимое карточек.</string>
+</resources>

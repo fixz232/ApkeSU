@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.screen.settings
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +68,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.RescueConfigState
@@ -81,9 +84,14 @@ import me.weishu.kernelsu.ui.util.testRescueEnvironment
 import java.io.File
 import java.util.Locale
 
-private const val TITLE = "救砖保护"
+private fun rescueText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
 
-private val RESCUE_TABS = listOf("主页", "配置", "使用说明")
+private val rescueTabs: List<String>
+    get() = listOf(
+        rescueText(R.string.rescue_tab_home),
+        rescueText(R.string.rescue_tab_config),
+        rescueText(R.string.rescue_tab_help),
+    )
 
 @Composable
 fun RescueProtectionScreen() {
@@ -127,7 +135,7 @@ fun RescueProtectionScreen() {
             busy = false
             Toast.makeText(
                 context,
-                if (ok) "镜像已导入" else "镜像导入失败，请查看日志",
+                if (ok) rescueText(R.string.rescue_image_imported) else rescueText(R.string.rescue_image_import_failed),
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -191,7 +199,11 @@ fun RescueProtectionScreen() {
             status = getRescueStatus()
             logs = getRescueLogs()
             busy = false
-            Toast.makeText(context, if (ok) "配置已保存" else "配置保存失败", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                if (ok) rescueText(R.string.rescue_config_saved) else rescueText(R.string.rescue_config_save_failed),
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 
@@ -200,12 +212,20 @@ fun RescueProtectionScreen() {
             busy = true
             val report = testRescueEnvironment()
             testReport = report.text.ifBlank {
-                if (report.ok) "检测通过" else "检测未通过：${report.reason}"
+                if (report.ok) {
+                    rescueText(R.string.rescue_test_passed)
+                } else {
+                    rescueText(R.string.rescue_test_failed_reason, report.reason)
+                }
             }
             status = getRescueStatus()
             logs = getRescueLogs()
             busy = false
-            Toast.makeText(context, if (report.ok) "检测通过" else "检测未通过", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                if (report.ok) rescueText(R.string.rescue_test_passed) else rescueText(R.string.rescue_test_failed),
+                Toast.LENGTH_LONG,
+            ).show()
         }
     }
 
@@ -226,7 +246,7 @@ fun RescueProtectionScreen() {
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
-                title = { Text(TITLE) },
+                title = { Text(rescueText(R.string.rescue_protection)) },
                 navigationIcon = {
                     IconButton(onClick = { navigator.pop() }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
@@ -251,7 +271,7 @@ fun RescueProtectionScreen() {
                 containerColor = barContainerColor,
                 contentColor = MaterialTheme.colorScheme.primary,
             ) {
-                RESCUE_TABS.forEachIndexed { index, title ->
+                rescueTabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
@@ -286,7 +306,12 @@ fun RescueProtectionScreen() {
                         },
                         onBackup = {
                             if (status.manifestCreatedAt.isBlank()) {
-                                runAction("backup", "备份完成", "备份失败，请查看日志", timeoutMultiplier = 30)
+                                runAction(
+                                    "backup",
+                                    rescueText(R.string.rescue_backup_completed),
+                                    rescueText(R.string.rescue_backup_failed),
+                                    timeoutMultiplier = 30,
+                                )
                             } else {
                                 showBackupConfirm = true
                             }
@@ -295,13 +320,23 @@ fun RescueProtectionScreen() {
                         onToggle = { enabled ->
                             runAction(
                                 if (enabled) "enable" else "disable",
-                                if (enabled) "救砖保护已启用" else "救砖保护已关闭",
-                                "操作失败，请先检测环境并确认备份完整",
+                                if (enabled) {
+                                    rescueText(R.string.rescue_protection_enabled)
+                                } else {
+                                    rescueText(R.string.rescue_protection_disabled)
+                                },
+                                rescueText(R.string.rescue_operation_failed),
                             )
                         },
                         onRestore = { showRestoreConfirm = true },
                         onRefresh = { refresh(syncConfig = true) },
-                        onClearLogs = { runAction("clear-logs", "日志已清空", "清空日志失败") },
+                        onClearLogs = {
+                            runAction(
+                                "clear-logs",
+                                rescueText(R.string.rescue_logs_cleared),
+                                rescueText(R.string.rescue_logs_clear_failed),
+                            )
+                        },
                     )
 
                     1 -> RescueConfigCard(
@@ -337,11 +372,9 @@ fun RescueProtectionScreen() {
         AlertDialog(
             onDismissRequest = { showRestoreConfirm = false },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
-            title = { Text("确认保留数据回滚？") },
+            title = { Text(rescueText(R.string.rescue_restore_confirm_title)) },
             text = {
-                Text(
-                    "这会立即写回已备份的 boot/init_boot/vendor_boot 等启动镜像，并尝试重启；不会清空 /data，也不会删除救砖备份和配置。"
-                )
+                Text(rescueText(R.string.rescue_restore_confirm_message))
             },
             confirmButton = {
                 Button(
@@ -349,18 +382,18 @@ fun RescueProtectionScreen() {
                         showRestoreConfirm = false
                         runAction(
                             "restore",
-                            "已开始保留数据回滚",
-                            "保留数据回滚失败，请查看日志",
+                            rescueText(R.string.rescue_restore_started),
+                            rescueText(R.string.rescue_restore_failed),
                             timeoutMultiplier = 20,
                         )
                     },
                 ) {
-                    Text("确认回滚")
+                    Text(rescueText(R.string.rescue_restore_confirm_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirm = false }) {
-                    Text("取消")
+                    Text(rescueText(R.string.rescue_cancel))
                 }
             },
         )
@@ -370,21 +403,26 @@ fun RescueProtectionScreen() {
         AlertDialog(
             onDismissRequest = { showBackupConfirm = false },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
-            title = { Text("覆盖旧备份？") },
-            text = { Text("当前已经存在一份救砖备份。只有确认当前系统可以正常启动时，才建议覆盖旧备份。") },
+            title = { Text(rescueText(R.string.rescue_backup_overwrite_title)) },
+            text = { Text(rescueText(R.string.rescue_backup_overwrite_message)) },
             confirmButton = {
                 Button(
                     onClick = {
                         showBackupConfirm = false
-                        runAction("backup --force", "备份已覆盖", "覆盖备份失败，请查看日志", timeoutMultiplier = 30)
+                        runAction(
+                            "backup --force",
+                            rescueText(R.string.rescue_backup_overwritten),
+                            rescueText(R.string.rescue_backup_overwrite_failed),
+                            timeoutMultiplier = 30,
+                        )
                     },
                 ) {
-                    Text("确认覆盖")
+                    Text(rescueText(R.string.rescue_backup_overwrite_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showBackupConfirm = false }) {
-                    Text("取消")
+                    Text(rescueText(R.string.rescue_cancel))
                 }
             },
         )
@@ -394,11 +432,9 @@ fun RescueProtectionScreen() {
         AlertDialog(
             onDismissRequest = { showImportConfirmFor = null },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
-            title = { Text("覆盖 ${image.name} 备份？") },
+            title = { Text(rescueText(R.string.rescue_image_overwrite_title, image.name)) },
             text = {
-                Text(
-                    "导入本地镜像会覆盖当前 ${image.name} 救砖备份。请确认选择的是当前设备、当前槽位对应的镜像。"
-                )
+                Text(rescueText(R.string.rescue_image_overwrite_message, image.name))
             },
             confirmButton = {
                 Button(
@@ -407,12 +443,12 @@ fun RescueProtectionScreen() {
                         launchImageImport(image.name, force = true)
                     },
                 ) {
-                    Text("选择文件并覆盖")
+                    Text(rescueText(R.string.rescue_image_overwrite_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showImportConfirmFor = null }) {
-                    Text("取消")
+                    Text(rescueText(R.string.rescue_cancel))
                 }
             },
         )
@@ -446,26 +482,50 @@ private fun RescueHomePage(
         onClearLogs = onClearLogs,
     )
     if (testReport.isNotBlank()) {
-        RescueTextCard("检测报告", testReport)
+        RescueTextCard(rescueText(R.string.rescue_test_report), testReport)
     }
-    RescueTextCard("日志", logs.ifBlank { status.log }.ifBlank { "暂无救砖日志" })
+    RescueTextCard(
+        rescueText(R.string.rescue_logs),
+        logs.ifBlank { status.log }.ifBlank { rescueText(R.string.rescue_logs_empty) },
+    )
 }
 
 @Composable
 private fun RescueStatusCard(status: RescueStatus) {
-    RescueCard(title = "当前状态") {
-        StatusLine("保护状态", if (status.enabled) "已启用" else "未启用")
-        StatusLine("备份完整", if (status.requiredReady) "可用" else "不完整")
+    RescueCard(title = rescueText(R.string.rescue_current_status)) {
+        StatusLine(
+            rescueText(R.string.rescue_status_protection),
+            if (status.enabled) rescueText(R.string.rescue_value_enabled) else rescueText(R.string.rescue_value_disabled),
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_backup_complete),
+            if (status.requiredReady) rescueText(R.string.rescue_value_available) else rescueText(R.string.rescue_value_incomplete),
+        )
         if (!status.requiredReady && status.readyReason.isNotBlank()) {
-            StatusLine("原因", status.readyReason)
+            StatusLine(rescueText(R.string.rescue_status_reason), status.readyReason)
         }
-        StatusLine("当前槽位", status.currentSlot.ifBlank { "无槽位或未检测到" })
-        StatusLine("启动模式", status.bootMode.ifBlank { "未检测到" })
-        StatusLine("设备", status.device.ifBlank { "未检测到" })
-        StatusLine("备份时间", status.manifestCreatedAt.ifBlank { "未备份" })
-        StatusLine("待验证启动", if (status.pendingBoot) "是" else "否")
-        StatusLine("连续失败计数", status.bootCount.toString())
-        StatusLine("自动恢复次数", status.autoRestoreAttempts.toString())
+        StatusLine(
+            rescueText(R.string.rescue_status_current_slot),
+            status.currentSlot.ifBlank { rescueText(R.string.rescue_value_no_slot) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_boot_mode),
+            status.bootMode.ifBlank { rescueText(R.string.rescue_value_not_detected) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_device),
+            status.device.ifBlank { rescueText(R.string.rescue_value_not_detected) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_backup_time),
+            status.manifestCreatedAt.ifBlank { rescueText(R.string.rescue_value_not_backed_up) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_pending_boot),
+            if (status.pendingBoot) rescueText(R.string.rescue_value_yes) else rescueText(R.string.rescue_value_no),
+        )
+        StatusLine(rescueText(R.string.rescue_status_failure_count), status.bootCount.toString())
+        StatusLine(rescueText(R.string.rescue_status_restore_attempts), status.autoRestoreAttempts.toString())
     }
 }
 
@@ -474,7 +534,7 @@ private fun RescueImagesCard(
     status: RescueStatus,
     onImport: (RescueImageState) -> Unit,
 ) {
-    RescueCard(title = "镜像备份") {
+    RescueCard(title = rescueText(R.string.rescue_image_backups)) {
         status.images.ifEmpty {
             listOf(RescueImageState(name = "boot", required = true))
         }.forEachIndexed { index, image ->
@@ -500,10 +560,10 @@ private fun RescueImageRow(
             Text(
                 modifier = Modifier.weight(1f),
                 text = buildString {
-                    append(image.name.ifBlank { "unknown" })
+                    append(image.name.ifBlank { rescueText(R.string.rescue_value_unknown) })
                     if (image.required) append(" *")
-                    if (image.otherSlot) append(" / 另一槽")
-                    if (image.custom) append(" / 手动")
+                    if (image.otherSlot) append(" / ${rescueText(R.string.rescue_image_other_slot)}")
+                    if (image.custom) append(" / ${rescueText(R.string.rescue_image_manual)}")
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -511,12 +571,12 @@ private fun RescueImageRow(
             val ok = image.exists && image.sizeOk && image.sha256Ok
             Text(
                 text = when {
-                    ok -> "正常"
-                    image.partition.isBlank() -> "无分区"
-                    !image.exists -> "未备份"
-                    !image.sizeOk -> "大小异常"
-                    !image.sha256Ok -> "校验失败"
-                    else -> "异常"
+                    ok -> rescueText(R.string.rescue_image_status_ok)
+                    image.partition.isBlank() -> rescueText(R.string.rescue_image_status_no_partition)
+                    !image.exists -> rescueText(R.string.rescue_value_not_backed_up)
+                    !image.sizeOk -> rescueText(R.string.rescue_image_status_size_error)
+                    !image.sha256Ok -> rescueText(R.string.rescue_image_status_checksum_failed)
+                    else -> rescueText(R.string.rescue_image_status_error)
                 },
                 color = when {
                     ok -> MaterialTheme.colorScheme.primary
@@ -527,7 +587,7 @@ private fun RescueImageRow(
             )
         }
         Text(
-            text = image.partition.ifBlank { "未检测到分区" },
+            text = image.partition.ifBlank { rescueText(R.string.rescue_partition_not_detected) },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -535,7 +595,12 @@ private fun RescueImageRow(
         )
         if (image.exists) {
             Text(
-                text = "备份 ${formatSize(image.size)} / 分区 ${formatSize(image.partitionSize)} / SHA256 ${image.sha256.take(12)}...",
+                text = rescueText(
+                    R.string.rescue_image_details,
+                    formatSize(image.size),
+                    formatSize(image.partitionSize),
+                    image.sha256.take(12),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -545,7 +610,13 @@ private fun RescueImageRow(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { onImport(image) },
             ) {
-                Text(if (image.exists) "导入本地镜像并覆盖" else "导入本地镜像备份")
+                Text(
+                    if (image.exists) {
+                        rescueText(R.string.rescue_import_image_overwrite)
+                    } else {
+                        rescueText(R.string.rescue_import_image_backup)
+                    }
+                )
             }
         }
     }
@@ -574,38 +645,42 @@ private fun RescueConfigCard(
     onVbmetaPathChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
-    RescueCard(title = "配置") {
+    RescueCard(title = rescueText(R.string.rescue_tab_config)) {
         SwitchLine(
-            "双槽备份",
-            "中风险：额外备份另一槽 boot/vendor_boot/init_boot；手动分区路径不会自动推断另一槽。",
+            rescueText(R.string.rescue_dual_slot_backup),
+            rescueText(R.string.rescue_dual_slot_backup_summary),
             backupOtherSlot,
             onBackupOtherSlotChange,
         )
         SwitchLine(
-            "同时备份 dtbo",
-            "中高风险：适合刷内核时 DTBO 风险较高的设备；不确定时保持关闭。",
+            rescueText(R.string.rescue_include_dtbo),
+            rescueText(R.string.rescue_include_dtbo_summary),
             includeDtbo,
             onIncludeDtboChange,
         )
         SwitchLine(
-            "同时备份 vbmeta",
-            "高风险：只建议高级用户开启；不确定时保持关闭。",
+            rescueText(R.string.rescue_include_vbmeta),
+            rescueText(R.string.rescue_include_vbmeta_summary),
             includeVbmeta,
             onIncludeVbmetaChange,
         )
         if (includeDtbo || includeVbmeta) {
             SwitchLine(
-                "允许自动恢复高危分区",
-                "高风险：开启后卡启动自动回滚会写回 dtbo/vbmeta；不确定时保持关闭。",
+                rescueText(R.string.rescue_allow_dangerous_restore),
+                rescueText(R.string.rescue_allow_dangerous_restore_summary),
                 allowDangerousAutoRestore,
                 onAllowDangerousAutoRestoreChange,
             )
         }
-        PartitionPathField("boot 分区路径", bootPath, onBootPathChange)
-        PartitionPathField("vendor_boot 分区路径", vendorBootPath, onVendorBootPathChange)
-        PartitionPathField("init_boot 分区路径", initBootPath, onInitBootPathChange)
-        if (includeDtbo) PartitionPathField("dtbo 分区路径", dtboPath, onDtboPathChange)
-        if (includeVbmeta) PartitionPathField("vbmeta 分区路径", vbmetaPath, onVbmetaPathChange)
+        PartitionPathField(rescueText(R.string.rescue_partition_path, "boot"), bootPath, onBootPathChange)
+        PartitionPathField(rescueText(R.string.rescue_partition_path, "vendor_boot"), vendorBootPath, onVendorBootPathChange)
+        PartitionPathField(rescueText(R.string.rescue_partition_path, "init_boot"), initBootPath, onInitBootPathChange)
+        if (includeDtbo) {
+            PartitionPathField(rescueText(R.string.rescue_partition_path, "dtbo"), dtboPath, onDtboPathChange)
+        }
+        if (includeVbmeta) {
+            PartitionPathField(rescueText(R.string.rescue_partition_path, "vbmeta"), vbmetaPath, onVbmetaPathChange)
+        }
         FilledTonalButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = !busy,
@@ -613,7 +688,7 @@ private fun RescueConfigCard(
         ) {
             Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("保存配置")
+            Text(rescueText(R.string.rescue_save_config))
         }
     }
 }
@@ -629,16 +704,16 @@ private fun RescueActionCard(
     onRefresh: () -> Unit,
     onClearLogs: () -> Unit,
 ) {
-    RescueCard(title = "操作") {
+    RescueCard(title = rescueText(R.string.rescue_actions)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("启用救砖保护", style = MaterialTheme.typography.bodyLarge)
+                Text(rescueText(R.string.rescue_enable_protection), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "启用前必须先备份，并通过大小和 SHA256 校验。",
+                    rescueText(R.string.rescue_enable_protection_summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -653,12 +728,12 @@ private fun RescueActionCard(
         FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onTest) {
             Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("检测环境")
+            Text(rescueText(R.string.rescue_check_environment))
         }
         FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onBackup) {
             Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("备份当前镜像")
+            Text(rescueText(R.string.rescue_backup_current_images))
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
@@ -667,18 +742,18 @@ private fun RescueActionCard(
         ) {
             Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("保留数据回滚镜像")
+            Text(rescueText(R.string.rescue_restore_preserve_data))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy, onClick = onRefresh) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("刷新")
+                Text(rescueText(R.string.rescue_refresh))
             }
             OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy, onClick = onClearLogs) {
                 Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("清空日志")
+                Text(rescueText(R.string.rescue_clear_logs))
             }
         }
     }
@@ -686,27 +761,55 @@ private fun RescueActionCard(
 
 @Composable
 private fun RescueHelpCard() {
-    RescueCard(title = "推荐操作步骤") {
-        StepLine(1, "进入配置页", "按设备情况开启双槽备份、dtbo/vbmeta 备份，必要时填写手动分区路径。")
-        StepLine(2, "检测环境", "确认 boot 分区可识别，当前槽位、设备信息和配置可正常读取。")
-        StepLine(3, "保存配置", "保存后如果修改过分区范围或手动路径，请重新备份。")
-        StepLine(4, "备份当前镜像", "生成 boot/vendor_boot/init_boot 等备份，并记录大小与 SHA256。")
-        StepLine(5, "启用救砖保护", "只有备份完整可用时再开启；开启后刷写启动镜像会标记下一次启动待验证。")
-        StepLine(6, "刷入或修补镜像", "刷入后先正常重启一次，成功进入系统后会自动标记本次启动安全。")
-        StepLine(7, "异常时自动处理", "如果启动失败或卡 recovery，救砖保护会按规则尝试保留数据回滚。")
+    RescueCard(title = rescueText(R.string.rescue_steps_title)) {
+        StepLine(
+            1,
+            rescueText(R.string.rescue_step_config_title),
+            rescueText(R.string.rescue_step_config_summary),
+        )
+        StepLine(
+            2,
+            rescueText(R.string.rescue_step_check_title),
+            rescueText(R.string.rescue_step_check_summary),
+        )
+        StepLine(
+            3,
+            rescueText(R.string.rescue_step_save_title),
+            rescueText(R.string.rescue_step_save_summary),
+        )
+        StepLine(
+            4,
+            rescueText(R.string.rescue_step_backup_title),
+            rescueText(R.string.rescue_step_backup_summary),
+        )
+        StepLine(
+            5,
+            rescueText(R.string.rescue_step_enable_title),
+            rescueText(R.string.rescue_step_enable_summary),
+        )
+        StepLine(
+            6,
+            rescueText(R.string.rescue_step_flash_title),
+            rescueText(R.string.rescue_step_flash_summary),
+        )
+        StepLine(
+            7,
+            rescueText(R.string.rescue_step_auto_title),
+            rescueText(R.string.rescue_step_auto_summary),
+        )
     }
 
-    RescueCard(title = "什么时候会自动回滚") {
-        HelpLine("刷写 boot/init_boot/vendor_boot 后，下次启动会进入待验证状态。")
-        HelpLine("待验证状态下连续启动失败达到 2 次，会触发自动回滚。")
-        HelpLine("未处于待验证状态的普通启动不会自动回滚，避免旧备份误覆盖当前系统。")
-        HelpLine("检测到 pstore 里的 panic、watchdog、oops 等启动失败线索，会触发自动回滚。")
-        HelpLine("如果设备卡到 recovery/rec，且仍能运行 ksud recovery-check，也会尝试自动回滚。")
-        HelpLine("自动恢复最多尝试 3 次；超过限制后会关闭保护，避免循环恢复。")
-        HelpLine("默认是保留数据回滚：只恢复启动相关镜像，不会清空 /data。")
-        HelpLine("双槽设备会优先恢复当前槽匹配的备份；如果只有备份槽可用，会恢复备份槽并尝试切回备份槽。")
-        HelpLine("dtbo/vbmeta 属于高风险分区，只有在配置页允许后才会参与自动恢复。")
-        HelpLine("极早期连 /data/adb/ksud 都无法启动的硬砖场景，仍需要 fastboot 或线刷。")
+    RescueCard(title = rescueText(R.string.rescue_auto_restore_title)) {
+        HelpLine(rescueText(R.string.rescue_auto_restore_pending))
+        HelpLine(rescueText(R.string.rescue_auto_restore_failures))
+        HelpLine(rescueText(R.string.rescue_auto_restore_pending_only))
+        HelpLine(rescueText(R.string.rescue_auto_restore_pstore))
+        HelpLine(rescueText(R.string.rescue_auto_restore_recovery))
+        HelpLine(rescueText(R.string.rescue_auto_restore_limit))
+        HelpLine(rescueText(R.string.rescue_auto_restore_preserves_data))
+        HelpLine(rescueText(R.string.rescue_auto_restore_slots))
+        HelpLine(rescueText(R.string.rescue_auto_restore_dangerous))
+        HelpLine(rescueText(R.string.rescue_auto_restore_hard_brick))
     }
 }
 

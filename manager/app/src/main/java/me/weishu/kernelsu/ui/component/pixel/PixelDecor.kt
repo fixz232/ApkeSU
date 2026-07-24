@@ -49,6 +49,7 @@ import me.weishu.kernelsu.ui.component.decoration.PixelCardPattern
 import me.weishu.kernelsu.ui.component.decoration.drawPixelCardPatternOverlay
 import me.weishu.kernelsu.ui.component.decoration.drawPixelCardPatternUnderlay
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
+import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -335,6 +336,7 @@ fun Modifier.pixelMiuixCardSurface(
     shape: Shape = RoundedCornerShape(12.dp),
     enabled: Boolean = true,
     paintBackground: Boolean = true,
+    customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
     if (!enabled || !isPixelInterfaceStyle()) return this
     val style = LocalPixelStyle.current
@@ -410,6 +412,7 @@ fun Modifier.pixelMiuixCardSurface(
             shape = cardShape,
             enabled = enabled,
             nativeDecorations = PIXEL_CARD_DECORATIONS,
+            customTarget = customTarget,
         )
 }
 

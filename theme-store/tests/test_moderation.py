@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import sys
 import unittest
+import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -19,7 +23,11 @@ from process_submission import (  # noqa: E402
     update_catalog,
     validate_submission_event,
 )
-from validate_catalog import ValidationFailure, validate_embedded_assets  # noqa: E402
+from validate_catalog import (  # noqa: E402
+    ValidationFailure,
+    validate_embedded_assets,
+    validate_image,
+)
 
 
 class ModerationTest(unittest.TestCase):
@@ -60,6 +68,40 @@ class ModerationTest(unittest.TestCase):
         with self.assertRaises(ValidationFailure):
             parse_manifest(json.dumps(manifest), "alice-theme")
 
+    def test_manifest_accepts_exact_500_mib_package(self) -> None:
+        manifest = self.valid_manifest()
+        manifest["theme"]["sizeBytes"] = 500 * 1024 * 1024
+
+        parsed = parse_manifest(json.dumps(manifest), "alice-theme")
+
+        self.assertEqual(500 * 1024 * 1024, parsed["sizeBytes"])
+
+    def test_manifest_rejects_package_over_500_mib(self) -> None:
+        manifest = self.valid_manifest()
+        manifest["theme"]["sizeBytes"] = 500 * 1024 * 1024 + 1
+
+        with self.assertRaises(ValidationFailure):
+            parse_manifest(json.dumps(manifest), "alice-theme")
+
+    def test_remote_image_accepts_exact_streaming_boundary(self) -> None:
+        payload = b"\x89PNG\r\n\x1a\n" + b"x" * 24
+        response = self.remote_response(payload)
+        with patch("validate_catalog.MAX_IMAGE_BYTES", len(payload)), patch(
+            "validate_catalog.open_remote",
+            return_value=response,
+        ):
+            validate_image("https://example.com/cover.png")
+
+    def test_remote_image_rejects_first_byte_over_limit(self) -> None:
+        payload = b"\x89PNG\r\n\x1a\n" + b"x" * 25
+        response = self.remote_response(payload)
+        with patch("validate_catalog.MAX_IMAGE_BYTES", len(payload) - 1), patch(
+            "validate_catalog.open_remote",
+            return_value=response,
+        ):
+            with self.assertRaises(ValidationFailure):
+                validate_image("https://example.com/cover.png")
+
     def test_creator_approval_rejects_non_fixz232_labeler(self) -> None:
         with self.assertRaises(ValidationFailure):
             validate_creator_approval(
@@ -67,6 +109,23 @@ class ModerationTest(unittest.TestCase):
                 "fixz232",
                 100,
             )
+
+    def test_creator_approval_rejects_missing_introduction(self) -> None:
+        event = self.creator_event()
+        event["issue"]["body"] = event["issue"]["body"].replace(
+            "### Introduction\n\nOriginal themes.\n\n",
+            "",
+        )
+
+        with self.assertRaises(ValidationFailure):
+            validate_creator_approval(event, "fixz232", 100)
+
+    def test_creator_approval_rejects_title_author_mismatch(self) -> None:
+        event = self.creator_event()
+        event["issue"]["title"] = "[Creator application] another-user"
+
+        with self.assertRaises(ValidationFailure):
+            validate_creator_approval(event, "fixz232", 100)
 
     def test_submission_rejects_non_fixz232_labeler(self) -> None:
         with self.assertRaises(ValidationFailure):
@@ -92,6 +151,93 @@ class ModerationTest(unittest.TestCase):
         }
         with self.assertRaises(ValidationFailure):
             validate_embedded_assets(metadata, {"assets/lkm.png"}, "theme")
+
+    def test_cloud_package_validates_component_switch_image(self) -> None:
+        metadata = {
+            "packageType": "component",
+            "components": {
+                "switchStyle": {
+                    "style": self.valid_switch_component_style(),
+                    "imageAsset": {"path": "assets/component_switch_image.png"},
+                    "imageUri": None,
+                }
+            }
+        }
+        validate_embedded_assets(
+            metadata,
+            {"assets/component_switch_image.png"},
+            "theme",
+        )
+        metadata["components"]["switchStyle"]["imageUri"] = "file:///private/image.png"
+        with self.assertRaises(ValidationFailure):
+            validate_embedded_assets(
+                metadata,
+                {"assets/component_switch_image.png"},
+                "theme",
+            )
+        metadata["components"]["switchStyle"]["imageUri"] = None
+        metadata["components"]["switchStyle"]["style"]["image_uri"] = "file:///private/nested.png"
+        with self.assertRaises(ValidationFailure):
+            validate_embedded_assets(
+                metadata,
+                {"assets/component_switch_image.png"},
+                "theme",
+            )
+        metadata["components"]["switchStyle"]["style"]["image_uri"] = None
+        metadata["components"]["switchStyle"]["style"]["source"] = "pixel"
+        with self.assertRaises(ValidationFailure):
+            validate_embedded_assets(
+                metadata,
+                {"assets/component_switch_image.png"},
+                "theme",
+            )
+
+    def test_cloud_package_rejects_invalid_component_grid(self) -> None:
+        style = self.valid_switch_component_style()
+        style["track_on"]["width"] = 27
+        metadata = {
+            "packageType": "component",
+            "components": {
+                "switchStyle": {
+                    "style": style,
+                    "imageAsset": {"path": "assets/component_switch_image.png"},
+                    "imageUri": None,
+                }
+            },
+        }
+
+        with self.assertRaises(ValidationFailure):
+            validate_embedded_assets(
+                metadata,
+                {"assets/component_switch_image.png"},
+                "theme",
+            )
+
+    def test_cloud_package_verifies_component_image_hash(self) -> None:
+        image_path = "assets/component_switch_image.png"
+        image_bytes = b"validated component image"
+        style = self.valid_switch_component_style()
+        style["image_sha256"] = hashlib.sha256(image_bytes).hexdigest()
+        metadata = {
+            "packageType": "component",
+            "components": {
+                "switchStyle": {
+                    "style": style,
+                    "imageAsset": {"path": image_path},
+                    "imageUri": None,
+                }
+            },
+        }
+        archive_bytes = io.BytesIO()
+        with zipfile.ZipFile(archive_bytes, "w") as archive:
+            archive.writestr(image_path, image_bytes)
+        archive_bytes.seek(0)
+
+        with zipfile.ZipFile(archive_bytes) as archive:
+            validate_embedded_assets(metadata, {image_path}, "theme", archive)
+            style["image_sha256"] = "b" * 64
+            with self.assertRaises(ValidationFailure):
+                validate_embedded_assets(metadata, {image_path}, "theme", archive)
 
     def test_catalog_adds_custom_category_and_preserves_owner(self) -> None:
         catalog = {
@@ -173,6 +319,49 @@ class ModerationTest(unittest.TestCase):
             ],
         }
 
+    @staticmethod
+    def pixel_grid(width: int, height: int) -> dict:
+        return {
+            "width": width,
+            "height": height,
+            "pixels": [0] * (width * height),
+        }
+
+    @staticmethod
+    def remote_response(payload: bytes) -> io.BytesIO:
+        response = io.BytesIO(payload)
+        response.headers = {}
+        return response
+
+    def valid_switch_component_style(self) -> dict:
+        return {
+            "schema": "io.github.fixz.apkesu.component-style",
+            "version": 1,
+            "kind": "switch_style",
+            "id": "switch-test-style",
+            "name": "Test switch",
+            "author": "Alice",
+            "updated_at": 1,
+            "source": "image",
+            "track_off": self.pixel_grid(28, 12),
+            "track_on": self.pixel_grid(28, 12),
+            "thumb_off": self.pixel_grid(12, 12),
+            "thumb_on": self.pixel_grid(12, 12),
+            "image_uri": None,
+            "image_sha256": "a" * 64,
+            "image_mime": "image/png",
+            "image_scale": "crop",
+            "image_opacity": 1.0,
+            "palette": [0, 0xFFFFFFFF],
+            "motion": {
+                "enabled": False,
+                "mode": "static",
+                "duration_ms": 2400,
+                "amplitude_cells": 1,
+                "repeat": "reverse",
+            },
+        }
+
     def creator_event(self, *, sender: str = "fixz232") -> dict:
         return {
             "sender": {"login": sender},
@@ -184,6 +373,7 @@ class ModerationTest(unittest.TestCase):
                 "body": (
                     "### GitHub login\n\nalice-theme\n\n"
                     "### Public creator name\n\nAlice\n\n"
+                    "### Introduction\n\nOriginal themes.\n\n"
                     "### Declarations\n\n- [x] one\n- [x] two\n- [x] three"
                 ),
             },

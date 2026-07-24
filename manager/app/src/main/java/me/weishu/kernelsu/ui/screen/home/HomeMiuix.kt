@@ -89,6 +89,8 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.KernelVersion
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
+import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
+import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.ListPopupDefaults
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassButton
@@ -404,7 +406,10 @@ private fun ActivatedStatusCard(
             cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .homeLiquidGlassSurface(enabled = !hasLkmWallpaper),
+                .homeLiquidGlassSurface(
+                    enabled = !hasLkmWallpaper,
+                    customTarget = CustomCardTarget.Lkm,
+                ),
             colors = homeLiquidGlassCardColors(
                 color = containerColor,
                 enabled = !hasLkmWallpaper,
@@ -912,7 +917,7 @@ private fun InstallStatusCard(
         cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .homeLiquidGlassSurface(),
+            .homeLiquidGlassSurface(customTarget = CustomCardTarget.Lkm),
         colors = snowMiuixCardColors(containerColor),
         onClick = {
             if (!state.isLateLoadMode && !installFeedbackActive) {
@@ -1116,7 +1121,7 @@ private fun UnsupportedStatusCard(
         cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .homeLiquidGlassSurface(),
+            .homeLiquidGlassSurface(customTarget = CustomCardTarget.Lkm),
         colors = snowMiuixCardColors(
             if (isDynamicColor) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainer
         ),
@@ -1198,7 +1203,10 @@ private fun MetricCard(
 
     Card(
         cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
-        modifier = modifier.homeLiquidGlassSurface(enabled = !hasWallpaper),
+        modifier = modifier.homeLiquidGlassSurface(
+            enabled = !hasWallpaper,
+            customTarget = target.toCustomCardTarget(),
+        ),
         colors = homeLiquidGlassCardColors(enabled = !hasWallpaper),
         insideMargin = PaddingValues(0.dp),
         onClick = onClick,
@@ -1682,7 +1690,11 @@ private fun StatusMonitorPanelMiuix(
                     )
                 }
             )
-            .clip(RoundedCornerShape(14.dp)),
+            .clip(RoundedCornerShape(14.dp))
+            .uiDecoratedCard(
+                shape = RoundedCornerShape(14.dp),
+                customTarget = CustomCardTarget.StatusMonitor,
+            ),
     ) {
         HomeMetricCardWallpaperBackground(
             bitmap = wallpaperBitmap,
@@ -1742,7 +1754,11 @@ private fun SystemInfoPanelMiuix(
                 color = if (hasWallpaper) Color.Transparent else Color.Transparent,
                 shape = RoundedCornerShape(14.dp),
             )
-            .clip(RoundedCornerShape(14.dp)),
+            .clip(RoundedCornerShape(14.dp))
+            .uiDecoratedCard(
+                shape = RoundedCornerShape(14.dp),
+                customTarget = CustomCardTarget.SystemInfo,
+            ),
     ) {
         HomeMetricCardWallpaperBackground(
             bitmap = wallpaperBitmap,
@@ -2187,12 +2203,19 @@ private fun Modifier.homeLiquidGlassSurface(
     enabled: Boolean = true,
     surfaceColor: Color = Color.Unspecified,
     surfaceAlpha: Float = 0.58f,
+    customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
     if (!enabled) {
         return if (isSnowInterfaceStyle() || isRainInterfaceStyle()) {
-            snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
+            snowMiuixCardSurface(
+                shape = RoundedCornerShape(18.dp),
+                customTarget = customTarget,
+            )
         } else {
-            this
+            uiDecoratedCard(
+                shape = RoundedCornerShape(18.dp),
+                customTarget = customTarget,
+            )
         }
     }
     return globalLiquidGlassSurface(
@@ -2204,7 +2227,19 @@ private fun Modifier.homeLiquidGlassSurface(
         refractionAmount = 9.dp,
         strokeAlpha = 0.66f,
         cardStyle = FrostedGlassCardStyle.Ice,
-    ).snowMiuixCardSurface(shape = RoundedCornerShape(18.dp))
+    ).snowMiuixCardSurface(
+        shape = RoundedCornerShape(18.dp),
+        customTarget = customTarget,
+    )
+}
+
+private fun HomeMetricCardWallpaperTarget.toCustomCardTarget(): CustomCardTarget = when (this) {
+    HomeMetricCardWallpaperTarget.Lkm -> CustomCardTarget.Lkm
+    HomeMetricCardWallpaperTarget.Superuser -> CustomCardTarget.Superuser
+    HomeMetricCardWallpaperTarget.Module -> CustomCardTarget.Module
+    HomeMetricCardWallpaperTarget.StatusMonitor -> CustomCardTarget.StatusMonitor
+    HomeMetricCardWallpaperTarget.SystemInfo -> CustomCardTarget.SystemInfo
+    HomeMetricCardWallpaperTarget.RebootMenu -> CustomCardTarget.RebootMenu
 }
 
 @Composable

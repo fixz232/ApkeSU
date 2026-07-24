@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">雨景ガラス</string>
+    <string name="settings_rain_style">雨の強さ</string>
+    <string name="settings_rain_card_motion">雨カードのアニメーション</string>
+    <string name="settings_rain_card_motion_summary">カードの内容を動かさず、縁の雨粒、結露、控えめなガラスの光沢を動かします。</string>
+    <string name="rain_style_light">小雨</string>
+    <string name="rain_style_light_summary">淡い青色のガラスに、柔らかな霧、まばらな雨筋、静かな波紋を描きます。</string>
+    <string name="rain_style_medium">中雨</string>
+    <string name="rain_style_medium_summary">雨を濃くし、雲を重ね、カードの縁にたまる雨粒をより鮮明にします。</string>
+    <string name="rain_style_heavy">大雨</string>
+    <string name="rain_style_heavy_summary">暗い嵐の配色、強い風、濡れたガラス、頻繁に広がる水面の波紋を表現します。</string>
+    <string name="rain_style_thunderstorm">雷雨</string>
+    <string name="rain_style_thunderstorm_summary">夜間のみ3～8秒ごとに稲妻が光り、激しい雨と紫の雷雲を表示します。</string>
+    <string name="rain_motto_light">ガラスに落ち着く雨音を聴く</string>
+    <string name="rain_motto_medium">雨が重なるほど、世界は静かになる</string>
+    <string name="rain_motto_heavy">嵐の中でも、澄んだままで</string>
+    <string name="rain_motto_thunderstorm">稲妻が夜を走り、核は揺るがない</string>
+    <string name="theme_preset_rain">雨景ガラス</string>
+    <string name="theme_preset_rain_summary">冷たい灰青色のガラス、濡れたカードの縁、雨よけ装飾、連動するフローティングナビゲーションバー。</string>
+    <string name="settings_pixel_card_motion">ピクセルカードのアニメーション</string>
+    <string name="settings_pixel_card_motion_summary">カードや文字を動かさず、各ピクセルモード固有の風景と縁のディテールを動かします。</string>
+    <string name="settings_season_card_motion">四季カードのアニメーション</string>
+    <string name="settings_season_card_motion_summary">カードの内容を動かさず、花びら、水面のきらめき、舞う葉、霜の輝きを動かします。</string>
+</resources>

@@ -29,6 +29,11 @@ import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SCROLL_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_ACTIVE_ID_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_LIBRARY_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY
+import me.weishu.kernelsu.ui.component.custom.CUSTOM_SWITCH_STYLE_LIBRARY_KEY
+import me.weishu.kernelsu.ui.component.custom.ComponentStyleStore
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
 import me.weishu.kernelsu.ui.component.snow.SEASON_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.snow.DEFAULT_SEASON_CARD_MOTION_ENABLED
@@ -70,6 +75,7 @@ class MainActivityViewModel(
 
     private val prefs = ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val settingRepo: SettingsRepository = SettingsRepositoryImpl()
+    private val componentStyleStore = ComponentStyleStore(ksuApp)
     private val mainPageState = MainPageState(savedStateHandle)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == null || key in observedKeys) {
@@ -117,6 +123,8 @@ class MainActivityViewModel(
             autoHideNavigationBar = settingRepo.autoHideNavigationBar,
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
             switchStyle = settingRepo.switchStyle,
+            customCardStyle = componentStyleStore.readActiveCardStyle(),
+            customSwitchStyle = componentStyleStore.readActiveSwitchStyle(),
             seasonStyle = settingRepo.seasonStyle,
             seasonCardMotionEnabled = settingRepo.seasonCardMotionEnabled,
             rainStyle = settingRepo.rainStyle,
@@ -170,6 +178,8 @@ class MainActivityViewModel(
             autoHideNavigationBar = false,
             scrollHideNavigationBar = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
+            customCardStyle = null,
+            customSwitchStyle = null,
             seasonStyle = SeasonStyle.DEFAULT_VALUE,
             seasonCardMotionEnabled = DEFAULT_SEASON_CARD_MOTION_ENABLED,
             rainStyle = RainStyle.DEFAULT_VALUE,
@@ -220,6 +230,10 @@ class MainActivityViewModel(
                 listOf(
             "ui_mode",
             SWITCH_STYLE_KEY,
+            CUSTOM_CARD_STYLE_LIBRARY_KEY,
+            CUSTOM_CARD_STYLE_ACTIVE_ID_KEY,
+            CUSTOM_SWITCH_STYLE_LIBRARY_KEY,
+            CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY,
             SEASON_STYLE_KEY,
             SEASON_CARD_MOTION_ENABLED_KEY,
             RAIN_STYLE_KEY,

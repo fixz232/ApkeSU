@@ -27,6 +27,11 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.custom.LocalCustomSwitchStyle
+import me.weishu.kernelsu.ui.component.custom.PixelMotionRule
+import me.weishu.kernelsu.ui.component.custom.drawCustomSwitchStyle
+import me.weishu.kernelsu.ui.component.custom.rememberComponentMotionProgress
+import me.weishu.kernelsu.ui.component.custom.rememberCustomSwitchImage
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -38,6 +43,7 @@ enum class SwitchStyle(
     val labelRes: Int,
 ) {
     Original("original", R.string.settings_switch_style_original),
+    Custom("custom", R.string.settings_switch_style_custom),
     Capsule("capsule", R.string.settings_switch_style_capsule),
     CloudStar("cloud_star", R.string.settings_switch_style_cloud_star),
     Bb8("bb8", R.string.settings_switch_style_bb8),
@@ -71,7 +77,15 @@ fun StyledSwitch(
     enabled: Boolean = true,
     style: SwitchStyle = LocalSwitchStyle.current,
 ) {
-    val resolvedStyle = if (style == SwitchStyle.Original) SwitchStyle.CloudStar else style
+    val customStyle = LocalCustomSwitchStyle.current
+    val resolvedStyle = when (style) {
+        SwitchStyle.Original -> SwitchStyle.CloudStar
+        SwitchStyle.Custom -> if (customStyle == null) SwitchStyle.CloudStar else SwitchStyle.Custom
+        else -> style
+    }
+    val customImage = rememberCustomSwitchImage(
+        customStyle.takeIf { resolvedStyle == SwitchStyle.Custom }
+    )
     val progressTarget = if (checked) 1f else 0f
     val knobProgress by animateFloatAsState(
         targetValue = progressTarget,
@@ -102,6 +116,11 @@ fun StyledSwitch(
     } else {
         0f
     }
+    val customMotionProgress = rememberComponentMotionProgress(
+        rule = customStyle?.motion ?: PixelMotionRule(),
+        enabled = resolvedStyle == SwitchStyle.Custom,
+        label = "customSwitchMotion",
+    )
     val toggleModifier = if (onCheckedChange != null) {
         Modifier.toggleable(
             value = checked,
@@ -119,9 +138,20 @@ fun StyledSwitch(
             .then(toggleModifier)
     ) {
         val alpha = if (enabled) 1f else 0.45f
-        val corner = size.height / 2f
+
+        if (resolvedStyle == SwitchStyle.Custom && customStyle != null) {
+            drawCustomSwitchStyle(
+                style = customStyle,
+                checkedProgress = knobProgress,
+                enabledAlpha = alpha,
+                motionProgress = customMotionProgress,
+                image = customImage,
+            )
+            return@Canvas
+        }
 
         when (resolvedStyle) {
+            SwitchStyle.Custom -> Unit
             SwitchStyle.Capsule -> drawCapsuleTrack(trackColor, checked, alpha)
             SwitchStyle.CloudStar -> drawCloudStarTrack(
                 trackColor = trackColor,
@@ -150,6 +180,7 @@ fun StyledSwitch(
         val center = Offset(startX + (endX - startX) * knobProgress, size.height / 2f)
 
         when (resolvedStyle) {
+            SwitchStyle.Custom -> Unit
             SwitchStyle.Capsule -> drawCircle(
                 color = Color.White.copy(alpha = alpha),
                 radius = radius,
@@ -180,6 +211,7 @@ fun StyledSwitch(
 
 private fun switchTrackColor(style: SwitchStyle, checked: Boolean): Color {
     return when (style) {
+        SwitchStyle.Custom -> Color.Transparent
         SwitchStyle.Capsule -> if (checked) Color(0xFF34C77B) else Color(0xFFD8DEE8)
         SwitchStyle.CloudStar -> if (checked) Color(0xFF090B12) else Color(0xFF2196F3)
         SwitchStyle.Bb8 -> if (checked) Color(0xFF111A39) else Color(0xFF7FA9C0)

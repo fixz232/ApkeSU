@@ -38,6 +38,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object LanguageSettings : Route
+
+    @Parcelize
+    @Serializable
     data object PreInstallStyleSettings : Route
 
     @Parcelize
@@ -87,6 +91,14 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object UiDecorationLibrary : Route
+
+    @Parcelize
+    @Serializable
+    data object CardStyleCreator : Route
+
+    @Parcelize
+    @Serializable
+    data object SwitchStyleCreator : Route
 
     @Parcelize
     @Serializable
@@ -155,6 +167,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object CloudThemeCreator : Route
+
+    @Parcelize
+    @Serializable
+    data object CloudThemeCreatorSubmission : Route
 
     @Parcelize
     @Serializable

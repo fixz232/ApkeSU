@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Policy
@@ -344,6 +345,19 @@ fun SettingPagerMiuix(
                                 )
                             },
                             onClick = actions.onOpenThemeStore
+                        )
+                        ArrowPreference(
+                            title = stringResource(id = R.string.settings_language),
+                            summary = stringResource(id = R.string.settings_language_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Language,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.settings_language),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            onClick = actions.onOpenLanguage
                         )
                         ArrowPreference(
                             title = stringResource(id = R.string.settings_manager_identity),
@@ -1025,7 +1039,7 @@ private const val ROOT_FEATURES_ITEM_COUNT = 7
 private const val ADVANCED_ITEM_COUNT = 11
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 15 + when (uiMode) {
+    return 16 + when (uiMode) {
         InterfaceStyle.Rain.value,
         InterfaceStyle.Snow.value,
         -> 2

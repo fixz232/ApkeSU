@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_rain">빗속 유리</string>
+    <string name="settings_rain_style">비의 세기</string>
+    <string name="settings_rain_card_motion">비 카드 애니메이션</string>
+    <string name="settings_rain_card_motion_summary">카드 내용은 움직이지 않고 가장자리의 물방울, 응결, 은은한 유리 광택을 움직입니다.</string>
+    <string name="rain_style_light">가벼운 비</string>
+    <string name="rain_style_light_summary">옅은 푸른 유리 위에 부드러운 안개, 드문 빗줄기와 잔잔한 물결을 표현합니다.</string>
+    <string name="rain_style_medium">보통 비</string>
+    <string name="rain_style_medium_summary">더 촘촘한 비, 겹친 구름과 카드 가장자리에 맺히는 선명한 물방울을 표현합니다.</string>
+    <string name="rain_style_heavy">폭우</string>
+    <string name="rain_style_heavy_summary">어두운 폭풍 색상, 강한 바람, 짙게 젖은 유리와 자주 퍼지는 바닥 물결을 표현합니다.</string>
+    <string name="rain_style_thunderstorm">뇌우</string>
+    <string name="rain_style_thunderstorm_summary">야간에만 3~8초마다 번개가 번쩍이며 거센 비와 보라색 먹구름을 표시합니다.</string>
+    <string name="rain_motto_light">유리 위에 내려앉는 빗소리를 듣다</string>
+    <string name="rain_motto_medium">비가 짙어질수록 세상은 고요해진다</string>
+    <string name="rain_motto_heavy">폭풍 속에서도 맑음을 지키다</string>
+    <string name="rain_motto_thunderstorm">번개가 밤을 가르고, 중심은 흔들리지 않는다</string>
+    <string name="theme_preset_rain">빗속 유리</string>
+    <string name="theme_preset_rain_summary">차가운 회청색 유리, 젖은 카드 가장자리, 빗물 차양과 어울리는 플로팅 내비게이션 바입니다.</string>
+    <string name="settings_pixel_card_motion">픽셀 카드 애니메이션</string>
+    <string name="settings_pixel_card_motion_summary">카드나 글자를 움직이지 않고 각 픽셀 모드의 고유한 풍경과 가장자리 디테일을 움직입니다.</string>
+    <string name="settings_season_card_motion">계절 카드 애니메이션</string>
+    <string name="settings_season_card_motion_summary">카드 내용은 움직이지 않고 꽃잎, 물빛, 흩날리는 잎과 서리 반짝임을 움직입니다.</string>
+</resources>

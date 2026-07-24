@@ -15,8 +15,8 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
 
-private const val CLOUD_THEME_IMAGE_MAX_BYTES = 12L * 1024L * 1024L
-private const val CLOUD_THEME_IMAGE_DISK_CACHE_BYTES = 32L * 1024L * 1024L
+private const val CLOUD_THEME_IMAGE_MAX_BYTES = 500L * 1024L * 1024L
+private const val CLOUD_THEME_IMAGE_DISK_CACHE_BYTES = 512L * 1024L * 1024L
 private const val CLOUD_THEME_IMAGE_MAX_PIXELS = 80_000_000L
 private val cloudThemeImageDiskLock = Any()
 

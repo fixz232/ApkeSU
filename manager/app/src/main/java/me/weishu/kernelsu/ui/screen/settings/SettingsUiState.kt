@@ -184,6 +184,7 @@ data class SettingsScreenActions(
     val onSetGraphicsRendererFeatureEnabled: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,
     val onOpenThemeStore: () -> Unit,
+    val onOpenLanguage: () -> Unit,
     val onSetDayNightMode: (Boolean) -> Unit,
     val onSetSwitchStyleIndex: (Int) -> Unit,
     val onSetSeasonStyleIndex: (Int) -> Unit,
