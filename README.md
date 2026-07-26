@@ -25,19 +25,11 @@
 
 ---
 
-ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目和 [SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注 KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
+ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的和面向 GKI Android 设备的内核 Root 管理器，关注 KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
 ## 项目说明
 
 本项目继承 KernelSU 的开源授权结构：`kernel/` 目录遵循上游 KernelSU/Linux kernel 的 **GPL-2.0-only** 授权；除 `kernel/` 之外的 KernelSU 衍生代码遵循 **GPL-3.0-or-later** 授权；第三方依赖遵循各自上游许可证，清单见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
-
-## 上游项目信息
-
-上游主项目：KernelSU
-
-上游仓库地址：https://github.com/tiann/KernelSU
-
-本项目会不定期同步上游官方源码更新、安全补丁与功能迭代。
 
 ## 开源协议遵守说明
 
@@ -68,8 +60,8 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 - [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) SuSFS方案参考
 - [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
 - [skrootpro](https://github.com/abcz316/SKRoot-linuxKernelRoot)UI框架借鉴
-- [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持
+- [kowsu](https://github.com/KOWX712/KernelSU.git) 第三方预编译二进制来源
 - [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): KernelSU设计灵感来源
-- [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
+- [Magisk](https://github.com/topjohnwu/Magisk): magiskpolicy
 - [genuine](https://github.com/brevent/genuine/): APK签名校验方案
 - [Diamorphine](https://github.com/m0nad/Diamorphine): 底层隐藏技术参考
