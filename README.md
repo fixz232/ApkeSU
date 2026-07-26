@@ -1,6 +1,6 @@
 # ApkeSU
 
-ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目，主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
+ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓库进行二次修改的衍生开源项目和[Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 面向 GKI Android 设备的内核 Root 管理器，关注KMI 匹配、SuSFS 配置可靠性和可恢复维护进行二次修改的衍生开源项目。主要面向 KernelSU 管理器体验、界面扩展、LKM 修补与个人设备调试场景。
 
 TG 组织：https://t.me/+LkrMQKXtXvpmYmNl
 
@@ -23,7 +23,8 @@ QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.q
 1. 本项目所有修改、编译后的衍生代码全程开源，所有对外发布的编译成品（内核、APK、模块），同步提供完整修改源码；
 2. 任何人可以在对应许可证条款下自由获取、修改、分发本项目代码；二次分发时必须保留上游来源、许可证和完整对应源码；
 3. 若你对本项目代码进行二次修改并公开发布，同样需要公开你的全部修改源码，并标注上游来源。
-
+> 重要声明：本项目仅在上游基础上扩展功能，底层权限模型保持KernelSU原生实现；
+> MIUI风格主题为独立视觉实现，未使用小米官方源码。
 ## 项目用途
 
 本工具仅用于安卓设备本地技术研究、个人设备调试学习，请勿用于违规篡改应用权限、绕过风控、恶意入侵等非法场景。
@@ -42,10 +43,11 @@ QQ群：点击链接加入群聊【莫晨又菜又爱玩①群】：https://qm.q
 
 ## 致谢
 
-感谢 [KernelSU](https://github.com/tiann/KernelSU) 开源生态体系，向核心作者weishu，致敬所有贡献者。<br/>
-  [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) 一些界面ui参考
-  [kowsu](https://github.com/KOWX712/KernelSU.git)参考ko
-- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): The KernelSU idea.
-- [Magisk](https://github.com/topjohnwu/Magisk): The powerful root tool.
-- [genuine](https://github.com/brevent/genuine/): APK v2 signature validation.
-- [Diamorphine](https://github.com/m0nad/Diamorphine): Some rootkit skills.
+- [KernelSU](https://github.com/tiann/KernelSU)，感谢作者weishu与全部贡献者
+- [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) SuSFS方案参考
+- [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
+- [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持
+- [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): KernelSU设计灵感来源
+- [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
+- [genuine](https://github.com/brevent/genuine/): APK签名校验方案
+- [Diamorphine](https://github.com/m0nad/Diamorphine): 底层隐藏技术参考
