@@ -5,11 +5,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor as MaterialLocalContentColor
+import androidx.compose.material3.Typography
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
@@ -21,6 +24,8 @@ import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
+import me.weishu.kernelsu.ui.util.AppFontState
+import me.weishu.kernelsu.ui.util.resolveAppFontFamily
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.LocalContentColor
@@ -28,10 +33,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ThemePaletteStyle
+import top.yukonga.miuix.kmp.theme.defaultTextStyles
 
 @Composable
 fun MiuixKernelSUTheme(
     appSettings: AppSettings,
+    appFontState: AppFontState,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -53,6 +60,31 @@ fun MiuixKernelSUTheme(
         appSettings = appSettings,
         forceDark = forceInterfaceDark,
     )
+    val appFontFamily = remember(appFontState) {
+        resolveAppFontFamily(context, appFontState)
+    }
+    val materialTypography = remember(appFontFamily) {
+        Typography(fontFamily = appFontFamily)
+    }
+    val miuixTextStyles = remember(appFontFamily) {
+        val defaults = defaultTextStyles()
+        defaults.copy(
+            main = defaults.main.copy(fontFamily = appFontFamily),
+            paragraph = defaults.paragraph.copy(fontFamily = appFontFamily),
+            body1 = defaults.body1.copy(fontFamily = appFontFamily),
+            body2 = defaults.body2.copy(fontFamily = appFontFamily),
+            button = defaults.button.copy(fontFamily = appFontFamily),
+            footnote1 = defaults.footnote1.copy(fontFamily = appFontFamily),
+            footnote2 = defaults.footnote2.copy(fontFamily = appFontFamily),
+            headline1 = defaults.headline1.copy(fontFamily = appFontFamily),
+            headline2 = defaults.headline2.copy(fontFamily = appFontFamily),
+            subtitle = defaults.subtitle.copy(fontFamily = appFontFamily),
+            title1 = defaults.title1.copy(fontFamily = appFontFamily),
+            title2 = defaults.title2.copy(fontFamily = appFontFamily),
+            title3 = defaults.title3.copy(fontFamily = appFontFamily),
+            title4 = defaults.title4.copy(fontFamily = appFontFamily),
+        )
+    }
 
     val miuixPaletteStyle = try {
         ThemePaletteStyle.valueOf(colorStyle.name)
@@ -91,6 +123,7 @@ fun MiuixKernelSUTheme(
 
     MiuixTheme(
         controller = controller,
+        textStyles = miuixTextStyles,
         content = {
             LaunchedEffect(darkTheme) {
                 val window = (context as? Activity)?.window ?: return@LaunchedEffect
@@ -102,10 +135,15 @@ fun MiuixKernelSUTheme(
             MonetColorsProvider.UpdateCss()
             MaterialExpressiveTheme(
                 colorScheme = materialColorScheme,
+                typography = materialTypography,
                 motionScheme = MotionScheme.expressive(),
             ) {
+                val fontContentColor = MiuixTheme.colorScheme.onBackground.copy(
+                    alpha = appFontState.opacity,
+                )
                 CompositionLocalProvider(
-                    LocalContentColor provides MiuixTheme.colorScheme.onBackground,
+                    LocalContentColor provides fontContentColor,
+                    MaterialLocalContentColor provides fontContentColor,
                 ) {
                     content()
                 }

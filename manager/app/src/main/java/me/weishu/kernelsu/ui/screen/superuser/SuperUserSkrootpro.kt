@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Refresh
@@ -73,9 +74,12 @@ fun SuperUserPagerSkrootpro(
         onAddClick = actions.onOpenAppIdManager,
         actionIcon = Icons.Rounded.Fingerprint,
         actionContentDescription = stringResource(R.string.app_id_manager_open),
-        secondaryActionIcon = Icons.Rounded.Refresh,
-        onSecondaryActionClick = actions.onRefresh,
-        secondaryActionContentDescription = stringResource(R.string.refresh_refresh),
+        secondaryActionIcon = Icons.Rounded.AcUnit,
+        onSecondaryActionClick = actions.onOpenAppFreeze,
+        secondaryActionContentDescription = stringResource(R.string.app_freeze_open),
+        tertiaryActionIcon = Icons.Rounded.Refresh,
+        onTertiaryActionClick = actions.onRefresh,
+        tertiaryActionContentDescription = stringResource(R.string.refresh_refresh),
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         LazyColumn(

@@ -81,6 +81,60 @@ class CloudThemeCreatorCatalogTest {
     }
 
     @Test
+    fun submissionManifest_treatsOptionalUrlPlaceholdersAsEmpty() {
+        val draft = validDraft().copy(
+            authorProfileUrl = "\u65e0",
+            authorAvatarUrl = "none",
+            screenshotUrlsText = "\u65e0\nN/A\n-",
+        )
+
+        val theme = JSONObject(buildCloudThemeSubmissionManifest(draft)).getJSONObject("theme")
+        val author = theme.getJSONObject("author")
+
+        assertEquals(0, theme.getJSONArray("screenshots").length())
+        assertEquals("https://github.com/alice-theme", author.getString("profileUrl"))
+        assertFalse(author.has("avatarUrl"))
+    }
+
+    @Test
+    fun submissionManifest_identifiesTheInvalidMediaField() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            buildCloudThemeSubmissionManifest(
+                validDraft().copy(screenshotUrlsText = "not-a-url")
+            )
+        }
+
+        assertTrue(error.message.orEmpty().startsWith("Screenshot URL 1:"))
+    }
+
+    @Test
+    fun submissionManifest_usesFirstScreenshotWhenCoverIsBlank() {
+        val manifest = JSONObject(
+            buildCloudThemeSubmissionManifest(validDraft().copy(coverUrl = ""))
+        )
+        val theme = manifest.getJSONObject("theme")
+
+        assertEquals(
+            theme.getJSONArray("screenshots").getString(0),
+            theme.getString("coverUrl"),
+        )
+    }
+
+    @Test
+    fun submissionManifest_usesDefaultCoverWhenMediaIsBlank() {
+        val manifest = JSONObject(
+            buildCloudThemeSubmissionManifest(
+                validDraft().copy(coverUrl = "", screenshotUrlsText = "\u65e0")
+            )
+        )
+
+        assertEquals(
+            CLOUD_THEME_DEFAULT_COVER_URL,
+            manifest.getJSONObject("theme").getString("coverUrl"),
+        )
+    }
+
+    @Test
     fun submissionManifest_requiresRemotePackageMatch() {
         val unverified = validDraft().copy(remoteVerifiedSha256 = "b".repeat(64))
 
@@ -100,6 +154,23 @@ class CloudThemeCreatorCatalogTest {
 
         assertThrows(IllegalArgumentException::class.java) {
             buildCloudThemeSubmissionManifest(wrongOwner)
+        }
+    }
+
+    @Test
+    fun creatorPackageUrlRequiresTheApprovedAccountRelease() {
+        assertEquals(
+            "https://github.com/alice-theme/themes/releases/download/v1/aurora.kstheme",
+            validateCloudThemeCreatorPackageUrl(
+                "https://github.com/alice-theme/themes/releases/download/v1/aurora.kstheme",
+                "Alice-Theme",
+            ),
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            validateCloudThemeCreatorPackageUrl(
+                "https://github.com/another-user/themes/releases/download/v1/aurora.kstheme",
+                "alice-theme",
+            )
         }
     }
 

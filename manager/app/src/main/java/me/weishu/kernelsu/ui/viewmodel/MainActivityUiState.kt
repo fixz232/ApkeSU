@@ -17,6 +17,7 @@ import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.theme.AppSettings
+import me.weishu.kernelsu.ui.util.AppFontState
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
@@ -24,6 +25,7 @@ import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 @Immutable
 data class MainActivityUiState(
     val appSettings: AppSettings,
+    val appFont: AppFontState,
     val pageScale: Float,
     val fontScale: Float,
     val blurIntensity: Float,

@@ -241,6 +241,8 @@ fun RescueProtectionScreen() {
 
     val pageContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
     val barContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+    val tabs = rescueTabs
+    val activeTab = selectedTab.coerceIn(tabs.indices)
     Scaffold(
         containerColor = pageContainerColor,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
@@ -267,13 +269,13 @@ fun RescueProtectionScreen() {
                 .padding(innerPadding),
         ) {
             PrimaryTabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = activeTab,
                 containerColor = barContainerColor,
                 contentColor = MaterialTheme.colorScheme.primary,
             ) {
-                rescueTabs.forEachIndexed { index, title ->
+                tabs.forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedTab == index,
+                        selected = activeTab == index,
                         onClick = { selectedTab = index },
                         text = { Text(title) },
                     )
@@ -291,7 +293,7 @@ fun RescueProtectionScreen() {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 }
 
-                when (selectedTab) {
+                when (activeTab) {
                     0 -> RescueHomePage(
                         status = status,
                         logs = logs,

@@ -44,7 +44,7 @@ def verify_local_package(path: Path, package_version: int) -> None:
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
-            if len(infos) > 64:
+            if len(infos) > 80:
                 raise ValidationFailure("package has too many ZIP entries")
             expanded = 0
             archive_names: set[str] = set()

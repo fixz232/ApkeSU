@@ -91,6 +91,7 @@ fun PixelEditorSection(
 fun PixelGridEditor(
     grid: PixelGrid,
     selectedColor: Long,
+    gestureKey: Any,
     contentDescription: String,
     onStrokeStart: (PixelGrid) -> Unit,
     onGridChange: (PixelGrid) -> Unit,
@@ -115,10 +116,14 @@ fun PixelGridEditor(
             .border(1.dp, outerBorder, shape)
             .background(MaterialTheme.colorScheme.surface, shape)
             .semantics { this.contentDescription = contentDescription }
-            .pointerInput(grid.width, grid.height) {
+            .pointerInput(gestureKey, grid.width, grid.height) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var working = latestGrid
+                    val strokeColor = latestColor
+                    val strokeOnStart = latestOnStrokeStart
+                    val strokeOnChange = latestOnGridChange
+                    val strokeIsCellEditable = latestIsCellEditable
                     var strokeStarted = false
                     var previousCell: Pair<Int, Int>? = null
 
@@ -141,15 +146,15 @@ fun PixelGridEditor(
                     }
 
                     fun paintCell(x: Int, y: Int) {
-                        if (!latestIsCellEditable(x, y, working.width, working.height)) return
-                        val next = working.withPixel(x, y, latestColor)
+                        if (!strokeIsCellEditable(x, y, working.width, working.height)) return
+                        val next = working.withPixel(x, y, strokeColor)
                         if (next == working) return
                         if (!strokeStarted) {
-                            latestOnStrokeStart(working)
+                            strokeOnStart(working)
                             strokeStarted = true
                         }
                         working = next
-                        latestOnGridChange(next)
+                        strokeOnChange(next)
                     }
 
                     fun paint(position: Offset) {

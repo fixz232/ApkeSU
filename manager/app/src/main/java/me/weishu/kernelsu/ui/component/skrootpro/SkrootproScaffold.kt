@@ -146,6 +146,9 @@ fun SkrootproScreen(
     secondaryActionIcon: ImageVector? = null,
     onSecondaryActionClick: () -> Unit = {},
     secondaryActionContentDescription: String? = null,
+    tertiaryActionIcon: ImageVector? = null,
+    onTertiaryActionClick: () -> Unit = {},
+    tertiaryActionContentDescription: String? = null,
     bottomInnerPadding: Dp,
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -168,6 +171,9 @@ fun SkrootproScreen(
             secondaryActionIcon = secondaryActionIcon,
             onSecondaryActionClick = onSecondaryActionClick,
             secondaryActionContentDescription = secondaryActionContentDescription,
+            tertiaryActionIcon = tertiaryActionIcon,
+            onTertiaryActionClick = onTertiaryActionClick,
+            tertiaryActionContentDescription = tertiaryActionContentDescription,
         )
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 10.dp))
@@ -185,6 +191,9 @@ fun SkrootproTopBar(
     secondaryActionIcon: ImageVector? = null,
     onSecondaryActionClick: () -> Unit = {},
     secondaryActionContentDescription: String? = null,
+    tertiaryActionIcon: ImageVector? = null,
+    onTertiaryActionClick: () -> Unit = {},
+    tertiaryActionContentDescription: String? = null,
 ) {
     val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
     val statusBarColor = immersiveTopBarColor(SkrootproColors.PurpleDark)
@@ -229,6 +238,16 @@ fun SkrootproTopBar(
                     Icon(
                         imageVector = secondaryActionIcon,
                         contentDescription = secondaryActionContentDescription,
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            if (tertiaryActionIcon != null) {
+                IconButton(onClick = onTertiaryActionClick, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = tertiaryActionIcon,
+                        contentDescription = tertiaryActionContentDescription,
                         tint = contentColor,
                         modifier = Modifier.size(24.dp),
                     )

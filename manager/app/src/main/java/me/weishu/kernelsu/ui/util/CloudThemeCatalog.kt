@@ -211,7 +211,9 @@ private fun parseCloudTheme(item: JSONObject, categoryIds: Set<String>): CloudTh
         "Cloud theme $id uses an unsupported package schema"
     }
     val packageVersion = item.requiredInt("packageVersion")
-    require(packageVersion in 1..4) { "Cloud theme $id uses an unsupported package version" }
+    require(packageVersion in 1..THEME_STORE_VERSION) {
+        "Cloud theme $id uses an unsupported package version"
+    }
     val minManagerVersionCode = item.requiredLong("minManagerVersionCode", minimum = 1L)
     val maxManagerVersionCode = item.optionalLong("maxManagerVersionCode", minimum = 1L)
     require(maxManagerVersionCode == null || maxManagerVersionCode >= minManagerVersionCode) {

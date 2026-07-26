@@ -131,10 +131,23 @@ Direct external build inputs:
 | Input | Version/ref used by repo | License/source note |
 | --- | --- | --- |
 | ghcr.io/ylarod/ddk-min | `${kmi}-20260313` | Android DDK container used only to compile kernelsu.ko. Kernel headers and generated kernel build files follow the Android common kernel/Linux GPL-2.0-only model; LLVM/Clang and Android build tools keep their own upstream notices. Keep the container/upstream notices with published KO build logs where applicable. |
+| `userspace/ksud/bin/aarch64/*_kernelsu.ko` | [KOWX712/KernelSU](https://github.com/KOWX712/KernelSU), `master` at `60e7841b5ce1d0dc5aafd4d4898cd5dccacb270f` (2026-07-21) | Precompiled KernelSU LKM source reference. The exact build commit is not embedded in the `.ko` metadata and must be replaced with the actual build ref when known. |
 | GitHub Actions official actions | checkout, upload-artifact | Build-service actions used at CI time; not vendored into release artifacts. |
 
 The repository does not vendor the DDK container. It is fetched by CI at build
 time and remains governed by its upstream licenses.
+
+The KOWX712 KernelSU source uses GPL-2.0-only for `kernel/` (see
+`kernel/LICENSE`) and GPL-3.0-or-later for the remaining project code (see
+`LICENSE`). Redistribution of the referenced `.ko` files is permitted under
+those applicable GPL terms, provided that the corresponding license texts,
+copyright notices, and complete corresponding source (or the GPL-required
+source offer) are preserved with the redistributed artifact.
+
+The `.ko` ELF metadata reports `license=GPL`, but does not contain a Git
+commit. The commit above is the audited upstream `master` reference, not a
+claim that it is the exact build commit; record the exact build ref before
+publishing a release when it is available.
 
 When publishing a KO package, include:
 

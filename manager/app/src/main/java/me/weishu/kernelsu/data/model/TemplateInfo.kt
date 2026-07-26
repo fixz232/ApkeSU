@@ -125,7 +125,10 @@ data class TemplateInfo(
             if (template.author.isNotEmpty()) {
                 put("author", template.author)
             }
-            put("namespace", Natives.Profile.Namespace.entries[template.namespace].name)
+            val namespace = Natives.Profile.Namespace.entries.getOrElse(template.namespace) {
+                Natives.Profile.Namespace.INHERITED
+            }
+            put("namespace", namespace.name)
             put("uid", template.uid)
             put("gid", template.gid)
 

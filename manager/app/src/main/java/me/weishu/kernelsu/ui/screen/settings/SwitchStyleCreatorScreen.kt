@@ -104,6 +104,7 @@ import me.weishu.kernelsu.ui.component.custom.SwitchImageScale
 import me.weishu.kernelsu.ui.component.custom.TRANSPARENT_PIXEL
 import me.weishu.kernelsu.ui.component.custom.drawCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.custom.filled
+import me.weishu.kernelsu.ui.component.custom.hasSameDimensionsAs
 import me.weishu.kernelsu.ui.component.custom.mirroredHorizontally
 import me.weishu.kernelsu.ui.component.custom.rememberComponentMotionProgress
 import me.weishu.kernelsu.ui.component.custom.rememberCustomSwitchImage
@@ -185,6 +186,7 @@ fun SwitchStyleCreatorScreen() {
     } else {
         requestedLayer
     }
+    val editorKey = "${draft.source.name}:${currentLayer.name}"
 
     fun currentGrid(): PixelGrid = when (currentLayer) {
         SwitchPixelLayer.TrackOff -> draft.trackOff
@@ -194,6 +196,11 @@ fun SwitchStyleCreatorScreen() {
     }
 
     fun updateGrid(grid: PixelGrid) {
+        if (!grid.hasSameDimensionsAs(currentGrid())) {
+            undoStack = emptyList()
+            redoStack = emptyList()
+            return
+        }
         draft = when (currentLayer) {
             SwitchPixelLayer.TrackOff -> draft.copy(trackOff = grid)
             SwitchPixelLayer.TrackOn -> draft.copy(trackOn = grid)
@@ -456,10 +463,14 @@ fun SwitchStyleCreatorScreen() {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            SwitchCreatorTabs(selectedPage) { selectedPage = it }
-            when (SwitchCreatorPage.entries.getOrElse(selectedPage) { SwitchCreatorPage.Design }) {
+            val currentPage = SwitchCreatorPage.entries.getOrElse(selectedPage) {
+                SwitchCreatorPage.Design
+            }
+            SwitchCreatorTabs(currentPage.ordinal) { selectedPage = it }
+            when (currentPage) {
                 SwitchCreatorPage.Design -> SwitchDesignPage(
                     draft = draft,
+                    editorKey = editorKey,
                     selectedLayer = currentLayer,
                     selectedColor = selectedColor,
                     currentGrid = currentGrid(),
@@ -483,19 +494,29 @@ fun SwitchStyleCreatorScreen() {
                     onStrokeStart = ::pushUndo,
                     onGridChange = ::updateGrid,
                     onUndo = {
+                        val current = currentGrid()
                         val previous = undoStack.lastOrNull()
+                            ?.takeIf { it.hasSameDimensionsAs(current) }
                         if (previous != null) {
-                            redoStack = (redoStack + currentGrid()).takeLast(MAX_SWITCH_PIXEL_HISTORY)
+                            redoStack = (redoStack + current).takeLast(MAX_SWITCH_PIXEL_HISTORY)
                             undoStack = undoStack.dropLast(1)
                             updateGrid(previous)
+                        } else {
+                            undoStack = emptyList()
+                            redoStack = emptyList()
                         }
                     },
                     onRedo = {
+                        val current = currentGrid()
                         val next = redoStack.lastOrNull()
+                            ?.takeIf { it.hasSameDimensionsAs(current) }
                         if (next != null) {
-                            undoStack = (undoStack + currentGrid()).takeLast(MAX_SWITCH_PIXEL_HISTORY)
+                            undoStack = (undoStack + current).takeLast(MAX_SWITCH_PIXEL_HISTORY)
                             redoStack = redoStack.dropLast(1)
                             updateGrid(next)
+                        } else {
+                            undoStack = emptyList()
+                            redoStack = emptyList()
                         }
                     },
                     onFill = {
@@ -589,6 +610,7 @@ private fun SwitchCreatorTabs(selected: Int, onSelected: (Int) -> Unit) {
 @Composable
 private fun SwitchDesignPage(
     draft: CustomSwitchStyle,
+    editorKey: String,
     selectedLayer: SwitchPixelLayer,
     selectedColor: Long,
     currentGrid: PixelGrid,
@@ -729,6 +751,7 @@ private fun SwitchDesignPage(
                     contentDescription = stringResource(R.string.component_creator_pixel_canvas),
                     onStrokeStart = onStrokeStart,
                     onGridChange = onGridChange,
+                    gestureKey = editorKey,
                     modifier = Modifier.height(if (currentGrid.width == currentGrid.height) 260.dp else 190.dp),
                 )
                 PixelEditToolbar(

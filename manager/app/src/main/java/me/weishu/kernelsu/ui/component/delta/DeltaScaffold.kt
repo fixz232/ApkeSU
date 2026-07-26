@@ -221,6 +221,9 @@ fun DeltaScreen(
     topActionIcon: ImageVector? = null,
     onTopActionClick: () -> Unit = {},
     topActionContentDescription: String? = null,
+    secondaryTopActionIcon: ImageVector? = null,
+    onSecondaryTopActionClick: () -> Unit = {},
+    secondaryTopActionContentDescription: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val background = if (LocalNightBackgroundEffectActive.current) {
@@ -239,6 +242,9 @@ fun DeltaScreen(
             actionIcon = topActionIcon,
             onActionClick = onTopActionClick,
             actionContentDescription = topActionContentDescription,
+            secondaryActionIcon = secondaryTopActionIcon,
+            onSecondaryActionClick = onSecondaryTopActionClick,
+            secondaryActionContentDescription = secondaryTopActionContentDescription,
         )
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
@@ -254,7 +260,12 @@ fun DeltaTopBar(
     actionIcon: ImageVector? = null,
     onActionClick: () -> Unit = {},
     actionContentDescription: String? = null,
+    secondaryActionIcon: ImageVector? = null,
+    onSecondaryActionClick: () -> Unit = {},
+    secondaryActionContentDescription: String? = null,
 ) {
+    val actionCount = listOfNotNull(actionIcon, secondaryActionIcon).size
+    val titleHorizontalPadding = 36 + (actionCount - 1).coerceAtLeast(0) * 40
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -272,7 +283,7 @@ fun DeltaTopBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 36.dp),
+                    .padding(horizontal = titleHorizontalPadding.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -293,17 +304,26 @@ fun DeltaTopBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (actionIcon != null) {
-                IconButton(
-                    onClick = onActionClick,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                ) {
-                    Icon(
-                        imageVector = actionIcon,
-                        contentDescription = actionContentDescription,
-                        tint = DeltaColors.Accent,
-                        modifier = Modifier.size(26.dp),
-                    )
+            Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                if (actionIcon != null) {
+                    IconButton(onClick = onActionClick) {
+                        Icon(
+                            imageVector = actionIcon,
+                            contentDescription = actionContentDescription,
+                            tint = DeltaColors.Accent,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                }
+                if (secondaryActionIcon != null) {
+                    IconButton(onClick = onSecondaryActionClick) {
+                        Icon(
+                            imageVector = secondaryActionIcon,
+                            contentDescription = secondaryActionContentDescription,
+                            tint = DeltaColors.Accent,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
                 }
             }
         }

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Rule
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudUpload
@@ -100,6 +101,7 @@ import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.CLOUD_THEME_CREATOR_PICKER_MIME_TYPE
 import me.weishu.kernelsu.ui.util.CLOUD_THEME_CREATOR_REVIEWER
 import me.weishu.kernelsu.ui.util.CloudThemeCategory
@@ -164,6 +166,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
     var knownCategories by remember { mutableStateOf<List<CloudThemeCategory>>(emptyList()) }
     var registryLoading by remember { mutableStateOf(true) }
     var activityLoading by remember { mutableStateOf(false) }
+    var activityErrorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var packageLoading by remember { mutableStateOf(false) }
     var remoteVerifying by remember { mutableStateOf(false) }
     var clearDraftDialog by rememberSaveable { mutableStateOf(false) }
@@ -179,6 +182,8 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
         CloudThemeCreatorApplicationStatus.Approved
     } else if (currentActivity?.applicationStatus == CloudThemeCreatorApplicationStatus.Approved) {
         CloudThemeCreatorApplicationStatus.RegistryPending
+    } else if (activityErrorMessage != null && currentActivity == null) {
+        CloudThemeCreatorApplicationStatus.Unavailable
     } else {
         currentActivity?.applicationStatus ?: CloudThemeCreatorApplicationStatus.NotApplied
     }
@@ -198,22 +203,24 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
             context.startActivity(intent)
         }.recoverCatching {
             uriHandler.openUri(url)
-        }.getOrThrow()
+        }.onFailure(::showError)
     }
 
     fun refreshActivity() {
         if (activityLoading || !isValidCloudThemeGithubLogin(draft.githubLogin)) return
         val requestedLogin = draft.githubLogin.trim()
         activityLoading = true
+        activityErrorMessage = null
         scope.launch {
             try {
                 val loaded = creatorRepository.loadCreatorActivity(requestedLogin)
                 if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
                     creatorActivity = loaded
+                    activityErrorMessage = null
                 }
             } catch (error: Throwable) {
                 if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
-                    showError(error)
+                    activityErrorMessage = error.safeCloudThemeMessage()
                 }
             } finally {
                 activityLoading = false
@@ -233,13 +240,14 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                         creatorRepository.loadCreatorActivity(requestedLogin)
                     }.onFailure {
                         if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
-                            showError(it)
+                            activityErrorMessage = it.safeCloudThemeMessage()
                         }
                     }.getOrNull()
                     if (loaded != null &&
                         draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)
                     ) {
                         creatorActivity = loaded
+                        activityErrorMessage = null
                     }
                 }
             } catch (error: Throwable) {
@@ -259,11 +267,16 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
             if (isValidCloudThemeGithubLogin(requestedLogin)) {
                 val loaded = runCatching {
                     creatorRepository.loadCreatorActivity(requestedLogin)
+                }.onFailure {
+                    if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
+                        activityErrorMessage = it.safeCloudThemeMessage()
+                    }
                 }.getOrNull()
                 if (loaded != null &&
                     draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)
                 ) {
                     creatorActivity = loaded
+                    activityErrorMessage = null
                 }
             }
         } catch (error: Throwable) {
@@ -392,6 +405,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                 }
                 val result = creatorRepository.verifyRemotePackage(
                     packageUrl = draft.packageUrl,
+                    githubLogin = draft.githubLogin,
                     expectedSha256 = draft.packageSha256,
                     expectedSizeBytes = draft.packageSizeBytes,
                 )
@@ -427,16 +441,19 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
     }
 
     val onBack = dropUnlessResumed { navigator.pop() }
+    val currentPage = CreatorCenterPage.entries.getOrElse(selectedPageIndex) {
+        CreatorCenterPage.Qualification
+    }
     val content: @Composable (PaddingValues) -> Unit = { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedPageIndex) {
+            PrimaryTabRow(selectedTabIndex = currentPage.ordinal) {
                 CreatorCenterPage.entries.forEachIndexed { index, page ->
                     Tab(
-                        selected = selectedPageIndex == index,
+                        selected = currentPage.ordinal == index,
                         onClick = { selectedPageIndex = index },
                         text = {
                             Text(
@@ -455,7 +472,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                     )
                 }
             }
-            when (CreatorCenterPage.entries[selectedPageIndex]) {
+            when (currentPage) {
                 CreatorCenterPage.Qualification -> CreatorQualificationPage(
                     draft = draft,
                     registrySnapshot = registrySnapshot,
@@ -465,7 +482,9 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                     activityLoading = activityLoading,
                     onGithubLoginChange = {
                         draft = draft.copy(githubLogin = it.take(39))
+                            .invalidateRemoteVerification()
                         creatorActivity = null
+                        activityErrorMessage = null
                     },
                     onCreatorNameChange = { draft = draft.copy(authorName = it.take(64)) },
                     onRefresh = { refreshRegistry(force = true) },
@@ -510,6 +529,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                     },
                     onClearDraft = { clearDraftDialog = true },
                     onSubmit = ::submitForReview,
+                    onOpenGuide = { navigator.push(Route.CloudThemeCreatorGuide) },
                     onShowQualification = { selectedPageIndex = CreatorCenterPage.Qualification.ordinal },
                 )
 
@@ -519,6 +539,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                     applicationStatus = applicationStatus,
                     activity = currentActivity,
                     loading = activityLoading,
+                    errorMessage = activityErrorMessage,
                     onRefresh = ::refreshActivity,
                     onOpenIssue = { url ->
                         runCatching { uriHandler.openUri(url) }.onFailure(::showError)
@@ -763,10 +784,14 @@ private fun CreatorSubmissionPage(
     onSaveDraft: () -> Unit,
     onClearDraft: () -> Unit,
     onSubmit: () -> Unit,
+    onOpenGuide: () -> Unit,
     onShowQualification: () -> Unit,
 ) {
     if (!approved) {
-        CreatorLockedSubmission(onShowQualification)
+        CreatorLockedSubmission(
+            onOpenGuide = onOpenGuide,
+            onShowQualification = onShowQualification,
+        )
         return
     }
     val selectedExistingCategory = knownCategories.firstOrNull {
@@ -803,6 +828,14 @@ private fun CreatorSubmissionPage(
                         }
                     }
                     HorizontalDivider(color = creatorMutedColor().copy(alpha = 0.18f))
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onOpenGuide,
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null)
+                        Spacer(modifier = Modifier.size(7.dp))
+                        Text(stringResource(R.string.cloud_theme_creator_open_guide))
+                    }
                     OutlinedTextField(
                         value = draft.authorName,
                         onValueChange = { onDraftChange(draft.copy(authorName = it.take(64))) },
@@ -1239,6 +1272,9 @@ private fun CreatorMediaCard(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text(stringResource(R.string.cloud_theme_creator_cover_url)) },
+                supportingText = {
+                    Text(stringResource(R.string.cloud_theme_creator_cover_url_hint))
+                },
             )
             OutlinedTextField(
                 value = draft.screenshotUrlsText,
@@ -1336,7 +1372,10 @@ private fun CreatorRemotePackageCard(
 }
 
 @Composable
-private fun CreatorLockedSubmission(onShowQualification: () -> Unit) {
+private fun CreatorLockedSubmission(
+    onOpenGuide: () -> Unit,
+    onShowQualification: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1361,7 +1400,18 @@ private fun CreatorLockedSubmission(onShowQualification: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = creatorMutedColor(),
                 )
-                Button(onClick = onShowQualification) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onOpenGuide,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null)
+                    Spacer(modifier = Modifier.size(7.dp))
+                    Text(stringResource(R.string.cloud_theme_creator_open_guide))
+                }
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onShowQualification,
+                ) {
                     Text(stringResource(R.string.cloud_theme_creator_go_qualification))
                 }
             }
@@ -1376,6 +1426,7 @@ private fun CreatorRecordsPage(
     applicationStatus: CloudThemeCreatorApplicationStatus,
     activity: CloudThemeCreatorActivity?,
     loading: Boolean,
+    errorMessage: String?,
     onRefresh: () -> Unit,
     onOpenIssue: (String) -> Unit,
 ) {
@@ -1434,8 +1485,17 @@ private fun CreatorRecordsPage(
         if (loading && activity == null) {
             item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
         }
+        if (errorMessage != null) {
+            item {
+                CreatorActivityErrorCard(
+                    message = errorMessage,
+                    loading = loading,
+                    onRetry = onRefresh,
+                )
+            }
+        }
         val submissions = activity?.submissions.orEmpty()
-        if (!loading && submissions.isEmpty()) {
+        if (!loading && errorMessage == null && submissions.isEmpty()) {
             item {
                 CreatorEmptyRecords()
             }
@@ -1445,6 +1505,57 @@ private fun CreatorRecordsPage(
             }
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+}
+
+@Composable
+private fun CreatorActivityErrorCard(
+    message: String,
+    loading: Boolean,
+    onRetry: () -> Unit,
+) {
+    CreatorSurface {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.cloud_theme_creator_activity_failed),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = creatorTextColor(),
+                    )
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = creatorMutedColor(),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading,
+                onClick = onRetry,
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(stringResource(R.string.cloud_theme_creator_retry))
+            }
+        }
     }
 }
 
@@ -1564,6 +1675,7 @@ private fun CreatorStatusCard(
         CloudThemeCreatorApplicationStatus.NeedsChanges -> Icons.Rounded.WarningAmber
         CloudThemeCreatorApplicationStatus.Rejected -> Icons.Rounded.ErrorOutline
         CloudThemeCreatorApplicationStatus.RegistryPending -> Icons.Rounded.Refresh
+        CloudThemeCreatorApplicationStatus.Unavailable -> Icons.Rounded.ErrorOutline
         CloudThemeCreatorApplicationStatus.NotApplied -> Icons.Rounded.Person
     }
     val tint = when (status) {
@@ -1572,6 +1684,7 @@ private fun CreatorStatusCard(
         CloudThemeCreatorApplicationStatus.NeedsChanges -> MaterialTheme.colorScheme.tertiary
         CloudThemeCreatorApplicationStatus.Rejected -> MaterialTheme.colorScheme.error
         CloudThemeCreatorApplicationStatus.RegistryPending -> MaterialTheme.colorScheme.tertiary
+        CloudThemeCreatorApplicationStatus.Unavailable -> MaterialTheme.colorScheme.error
         CloudThemeCreatorApplicationStatus.NotApplied -> creatorMutedColor()
     }
     CreatorSurface {
@@ -1626,6 +1739,7 @@ private fun creatorApplicationStatusLabel(status: CloudThemeCreatorApplicationSt
         CloudThemeCreatorApplicationStatus.NeedsChanges -> R.string.cloud_theme_creator_status_changes
         CloudThemeCreatorApplicationStatus.Rejected -> R.string.cloud_theme_creator_status_rejected
         CloudThemeCreatorApplicationStatus.RegistryPending -> R.string.cloud_theme_creator_status_registry_pending
+        CloudThemeCreatorApplicationStatus.Unavailable -> R.string.cloud_theme_creator_status_unavailable
         CloudThemeCreatorApplicationStatus.Approved -> R.string.cloud_theme_creator_status_approved
     }
 
@@ -1638,6 +1752,9 @@ private fun creatorApplicationStatusSummary(status: CloudThemeCreatorApplication
         CloudThemeCreatorApplicationStatus.Rejected -> R.string.cloud_theme_creator_status_rejected_summary
         CloudThemeCreatorApplicationStatus.RegistryPending -> {
             R.string.cloud_theme_creator_status_registry_pending_summary
+        }
+        CloudThemeCreatorApplicationStatus.Unavailable -> {
+            R.string.cloud_theme_creator_status_unavailable_summary
         }
         CloudThemeCreatorApplicationStatus.Approved -> R.string.cloud_theme_creator_status_approved_summary
     }

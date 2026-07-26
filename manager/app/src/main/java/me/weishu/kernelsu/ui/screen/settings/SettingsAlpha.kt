@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.EditNote
@@ -197,6 +198,12 @@ fun SettingPagerAlpha(
                     icon = Icons.Rounded.EditNote,
                     onClick = actions.onEditHomeTitle,
                 )
+                AlphaActionRow(
+                    title = stringResource(R.string.home_layout_title),
+                    summary = stringResource(R.string.home_layout_settings_summary),
+                    icon = Icons.Rounded.Apps,
+                    onClick = actions.onOpenHomeLayout,
+                )
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_show_home_support_card),
                     summary = stringResource(R.string.settings_show_home_support_card_summary),
@@ -305,6 +312,12 @@ fun SettingPagerAlpha(
                     icon = Icons.Rounded.DeveloperMode,
                     onClick = actions.onOpenCpuSpoof,
                 )
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_device_identity),
+                    summary = stringResource(R.string.settings_device_identity_summary),
+                    icon = Icons.Rounded.Badge,
+                    onClick = actions.onOpenDeviceIdentity,
+                )
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_graphics_renderer_tool),
                     summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
@@ -324,6 +337,12 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.rescue_protection_summary),
                     icon = Icons.Rounded.Security,
                     onClick = actions.onOpenRescueProtection,
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.image_tool_title),
+                    summary = stringResource(R.string.image_tool_settings_summary),
+                    icon = Icons.Rounded.ImageSearch,
+                    onClick = actions.onOpenImageTool,
                 )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_ai_chat),

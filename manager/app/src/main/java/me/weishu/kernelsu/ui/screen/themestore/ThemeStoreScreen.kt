@@ -36,8 +36,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.FontDownload
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.ImageSearch
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SaveAlt
@@ -86,6 +88,7 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.THEME_STORE_FILE_EXTENSION
 import me.weishu.kernelsu.ui.util.THEME_STORE_FILE_MIME_TYPE
 import me.weishu.kernelsu.ui.util.ThemeStoreImageSlot
+import me.weishu.kernelsu.ui.util.ThemeStoreImageGroup
 import me.weishu.kernelsu.ui.util.ThemeStorePackageResult
 import me.weishu.kernelsu.ui.util.ThemeStorePackageWarning
 import me.weishu.kernelsu.ui.util.ThemeStoreSummary
@@ -203,7 +206,9 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
             navigator.push(Route.CloudThemeDetail(themeId))
         },
         onOpenHomeCardWallpapers = dropUnlessResumed { navigator.push(Route.HomeCardWallpapers) },
+        onOpenInstallCardWallpapers = dropUnlessResumed { navigator.push(Route.InstallCardWallpapers) },
         onOpenNavigationIcons = dropUnlessResumed { navigator.push(Route.NavigationIcons) },
+        onOpenFonts = dropUnlessResumed { navigator.push(Route.ThemeStoreFonts) },
         onOpenBackgroundSettings = dropUnlessResumed { navigator.push(Route.Backgrounds) },
         onOpenSoundEffects = dropUnlessResumed { navigator.push(Route.SoundEffects) },
         onOpenStartupAnimation = dropUnlessResumed { navigator.push(Route.StartupAnimation) },
@@ -409,10 +414,21 @@ private fun ThemeStoreAssetsContent(
             status = stringResource(
                 R.string.theme_store_configured_count,
                 summary.cardConfiguredCount,
-                ThemeStoreImageSlot.entries.size,
+                ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Home },
             ),
             icon = Icons.Rounded.ImageSearch,
             onClick = actions.onOpenHomeCardWallpapers,
+        )
+        ThemeStoreDestinationItem(
+            title = stringResource(R.string.install_card_wallpapers),
+            summary = stringResource(R.string.install_card_wallpapers_summary),
+            status = stringResource(
+                R.string.theme_store_configured_count,
+                summary.installCardConfiguredCount,
+                ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Install },
+            ),
+            icon = Icons.Rounded.AutoFixHigh,
+            onClick = actions.onOpenInstallCardWallpapers,
         )
         ThemeStoreDestinationItem(
             title = stringResource(R.string.theme_store_navigation_icons),
@@ -424,6 +440,13 @@ private fun ThemeStoreAssetsContent(
             ),
             icon = Icons.Rounded.Settings,
             onClick = actions.onOpenNavigationIcons,
+        )
+        ThemeStoreDestinationItem(
+            title = stringResource(R.string.app_font_title),
+            summary = stringResource(R.string.theme_store_fonts_summary),
+            status = appFontStateName(summary.appFont),
+            icon = Icons.Rounded.FontDownload,
+            onClick = actions.onOpenFonts,
         )
         ThemeStoreNotice(stringResource(R.string.theme_store_assets_full_editor_notice))
     }
@@ -722,6 +745,12 @@ private fun themeStoreWarningText(warning: ThemeStorePackageWarning): String {
     if (warning.assetId == "previous_theme_backup") {
         return stringResource(R.string.theme_store_warning_backup_cleanup)
     }
+    if (warning.assetId == "app_font") {
+        val base = stringResource(R.string.theme_store_warning_font)
+        return warning.reason?.takeIf(String::isNotBlank)?.let { reason ->
+            stringResource(R.string.theme_store_warning_with_reason, base, reason)
+        } ?: base
+    }
     val base = stringResource(R.string.theme_store_warning_media, warning.assetId)
     return warning.reason?.takeIf(String::isNotBlank)?.let { reason ->
         stringResource(R.string.theme_store_warning_with_reason, base, reason)
@@ -795,7 +824,9 @@ private data class ThemeStoreActions(
     val onBack: () -> Unit,
     val onOpenCloudTheme: (String) -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
+    val onOpenInstallCardWallpapers: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
+    val onOpenFonts: () -> Unit,
     val onOpenBackgroundSettings: () -> Unit,
     val onOpenSoundEffects: () -> Unit,
     val onOpenStartupAnimation: () -> Unit,
@@ -837,6 +868,13 @@ private val ThemeStoreSummary.cardConfiguredCount: Int
         statusMonitorCard,
         systemInfoCard,
         rebootMenuCard,
+    ).count { it.hasSelected }
+
+private val ThemeStoreSummary.installCardConfiguredCount: Int
+    get() = listOf(
+        installImageCard,
+        installMethodsCard,
+        installOptionsCard,
     ).count { it.hasSelected }
 
 private val ThemeStoreSummary.mediaConfiguredCount: Int

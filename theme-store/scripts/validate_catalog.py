@@ -20,6 +20,7 @@ COMPONENT_STYLE_SCHEMA = "io.github.fixz.apkesu.component-style"
 MAX_PACKAGE_BYTES = 500 * 1024 * 1024
 MAX_IMAGE_BYTES = 500 * 1024 * 1024
 MAX_COMPONENT_IMAGE_BYTES = 500 * 1024 * 1024
+MAX_CUSTOM_FONT_BYTES = 32 * 1024 * 1024
 MAX_ZIP_ASSET_BYTES = 512 * 1024 * 1024
 ALLOWED_EXACT_HOSTS = {
     "github.com",
@@ -33,6 +34,8 @@ CATEGORY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,39}$")
 SHA_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 LICENSE_RE = re.compile(r"^[A-Za-z0-9.+-]{1,48}$")
 COMPONENT_STYLE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$")
+FONT_PRESETS = {"system", "sans_serif", "serif", "monospace", "cursive", "custom"}
+FONT_KEYS = {"preset", "name", "asset", "sha256", "sizeBytes"}
 
 
 class ValidationFailure(Exception):
@@ -363,6 +366,7 @@ def validate_embedded_assets(
     archive: zipfile.ZipFile | None = None,
 ) -> None:
     validate_component_styles(metadata, label)
+    validate_font_asset(metadata, archive_names, label, archive)
     owners: list[dict] = []
     for section in ("cards", "navigationIcons", "pageBackgrounds"):
         section_value = metadata.get(section, {})
@@ -438,6 +442,66 @@ def validate_embedded_assets(
                 raise ValidationFailure(f"{label}: embedded asset is missing: {path}")
 
 
+def validate_font_asset(
+    metadata: dict,
+    archive_names: set[str],
+    label: str,
+    archive: zipfile.ZipFile | None,
+) -> None:
+    if "font" not in metadata:
+        return
+    font = metadata.get("font")
+    if not isinstance(font, dict) or not set(font).issubset(FONT_KEYS):
+        raise ValidationFailure(f"{label}: invalid font settings")
+    preset = font.get("preset")
+    if preset not in FONT_PRESETS:
+        raise ValidationFailure(f"{label}: invalid font preset")
+    asset = font.get("asset")
+    if preset != "custom":
+        if asset is not None:
+            raise ValidationFailure(f"{label}: built-in font contains an unexpected file")
+        return
+
+    name = font.get("name")
+    expected_hash = font.get("sha256")
+    expected_size = font.get("sizeBytes")
+    if (
+        not isinstance(name, str)
+        or not 1 <= len(name) <= 96
+        or not name.lower().endswith(".ttf")
+    ):
+        raise ValidationFailure(f"{label}: invalid custom font name")
+    if not isinstance(expected_hash, str) or not SHA_RE.fullmatch(expected_hash):
+        raise ValidationFailure(f"{label}: invalid custom font SHA-256")
+    if (
+        isinstance(expected_size, bool)
+        or not isinstance(expected_size, int)
+        or not 1 <= expected_size <= MAX_CUSTOM_FONT_BYTES
+    ):
+        raise ValidationFailure(f"{label}: invalid custom font size")
+    if not isinstance(asset, dict):
+        raise ValidationFailure(f"{label}: custom font is not embedded")
+    path = asset.get("path")
+    if not isinstance(path, str) or not path.startswith("assets/") or path not in archive_names:
+        raise ValidationFailure(f"{label}: embedded custom font is missing")
+    if archive is None:
+        return
+
+    info = archive.getinfo(path)
+    if info.is_dir() or info.file_size != expected_size:
+        raise ValidationFailure(f"{label}: custom font size mismatch")
+    digest = hashlib.sha256()
+    with archive.open(info) as font_file:
+        header = font_file.read(4)
+        digest.update(header)
+        while chunk := font_file.read(64 * 1024):
+            digest.update(chunk)
+    if header not in (b"\x00\x01\x00\x00", b"true"):
+        raise ValidationFailure(f"{label}: unsupported custom font format")
+    if digest.hexdigest().lower() != expected_hash.lower():
+        raise ValidationFailure(f"{label}: custom font SHA-256 mismatch")
+
+
 def validate_package(theme: dict) -> None:
     expected_size = theme["sizeBytes"]
     with tempfile.NamedTemporaryFile(suffix=".kstheme") as package_file:
@@ -465,7 +529,7 @@ def validate_package(theme: dict) -> None:
         try:
             with zipfile.ZipFile(package_file) as archive:
                 infos = archive.infolist()
-                if len(infos) > 64:
+                if len(infos) > 80:
                     raise ValidationFailure(f"{theme['id']}: package has too many ZIP entries")
                 expanded = 0
                 archive_names: set[str] = set()

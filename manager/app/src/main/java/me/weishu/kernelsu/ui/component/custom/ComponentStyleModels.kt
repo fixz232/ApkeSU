@@ -548,6 +548,9 @@ fun parseArgbHex(value: String): Long? {
 
 fun formatArgbHex(argb: Long): String = "#%08X".format(argb and MAX_ARGB)
 
+fun PixelGrid.hasSameDimensionsAs(other: PixelGrid): Boolean =
+    width == other.width && height == other.height
+
 private fun PixelGrid.requireSize(expectedWidth: Int, expectedHeight: Int): PixelGrid {
     require(width == expectedWidth && height == expectedHeight) { "Pixel grid does not match this layer" }
     return this

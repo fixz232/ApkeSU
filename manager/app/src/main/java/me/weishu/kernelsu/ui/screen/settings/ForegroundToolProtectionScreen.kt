@@ -134,6 +134,9 @@ fun ForegroundToolProtectionScreen() {
     var toolQuery by rememberSaveable { mutableStateOf("") }
     var showTargetSystemApps by rememberSaveable { mutableStateOf(false) }
     var showToolSystemApps by rememberSaveable { mutableStateOf(false) }
+    val currentPage = ForegroundToolPage.entries.getOrElse(selectedPage) {
+        ForegroundToolPage.Status
+    }
 
     LaunchedEffect(state.notice) {
         val message = when (state.notice) {
@@ -188,10 +191,10 @@ fun ForegroundToolProtectionScreen() {
                 .fillMaxSize()
                 .padding(contentPadding),
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedPage) {
+            PrimaryTabRow(selectedTabIndex = currentPage.ordinal) {
                 ForegroundToolPage.entries.forEachIndexed { index, page ->
                     Tab(
-                        selected = selectedPage == index,
+                        selected = currentPage.ordinal == index,
                         onClick = { selectedPage = index },
                         text = {
                             Text(
@@ -209,7 +212,7 @@ fun ForegroundToolProtectionScreen() {
                 Spacer(Modifier.height(4.dp))
             }
 
-            when (ForegroundToolPage.entries[selectedPage]) {
+            when (currentPage) {
                 ForegroundToolPage.Status -> ForegroundToolStatusPage(
                     state = state,
                     onEnabledChange = viewModel::setEnabled,

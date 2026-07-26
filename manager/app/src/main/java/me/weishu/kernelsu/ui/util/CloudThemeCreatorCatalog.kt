@@ -16,6 +16,8 @@ internal const val CLOUD_THEME_DEFAULT_CREATOR_REGISTRY_URL =
     "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/creators/v1/creators.json"
 internal const val CLOUD_THEME_GITHUB_REPOSITORY_URL =
     "https://github.com/fixz232/ApkeSU"
+internal const val CLOUD_THEME_DEFAULT_COVER_URL =
+    "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/manager/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
 internal const val CLOUD_THEME_CREATOR_REVIEWER = "fixz232"
 internal const val CLOUD_THEME_MAX_CREATOR_REGISTRY_BYTES = 512L * 1024L
 internal const val CLOUD_THEME_MAX_GITHUB_ISSUES_BYTES = 2L * 1024L * 1024L
@@ -29,6 +31,18 @@ private val cloudThemeSubmissionIdPattern = Regex("[a-z0-9][a-z0-9._-]{1,79}")
 private val cloudThemeSubmissionCategoryPattern = Regex("[a-z0-9][a-z0-9_-]{1,39}")
 private val cloudThemeSubmissionHashPattern = Regex("[a-fA-F0-9]{64}")
 private val cloudThemeSubmissionLicensePattern = Regex("[A-Za-z0-9.+-]{1,48}")
+private val cloudThemeOptionalUrlPlaceholders = setOf(
+    "-",
+    "--",
+    "none",
+    "null",
+    "n/a",
+    "na",
+    "\u65e0",
+    "\u6ca1\u6709",
+    "\u65e0\u9700",
+    "\u4e0d\u9002\u7528",
+)
 
 data class CloudThemeCreator(
     val github: String,
@@ -69,6 +83,7 @@ enum class CloudThemeCreatorApplicationStatus {
     NeedsChanges,
     Rejected,
     RegistryPending,
+    Unavailable,
     Approved,
 }
 
@@ -130,7 +145,7 @@ data class CloudThemeSubmissionDraft(
     val hasInspectedPackage: Boolean
         get() = packageUri.isNotBlank() &&
             packageSizeBytes in 1..CLOUD_THEME_MAX_PACKAGE_BYTES &&
-            packageVersion in 1..4 &&
+            packageVersion in 1..THEME_STORE_VERSION &&
             cloudThemeSubmissionHashPattern.matches(packageSha256)
 
     val isRemoteVerified: Boolean
@@ -189,7 +204,11 @@ internal fun canonicalCloudThemePackageFileName(displayName: String): String {
 
 internal fun validateCloudThemeCreatorPackageUrl(rawUrl: String, githubLogin: String): String {
     val github = normalizeCloudThemeGithubLogin(githubLogin)
-    val validated = validateCloudThemeUrl(rawUrl.trim(), allowPackage = true)
+    val validated = validateCloudThemeSubmissionUrl(
+        rawUrl = rawUrl,
+        fieldName = "Theme package URL",
+        allowPackage = true,
+    )
     val uri = URI(validated)
     require(uri.host.equals("github.com", ignoreCase = true)) {
         "Theme package must use a GitHub Release URL"
@@ -283,18 +302,32 @@ internal fun buildCloudThemeSubmissionManifest(draft: CloudThemeSubmissionDraft)
     require(draft.hasInspectedPackage) { "Select and verify a .kstheme package first" }
     val packageUrl = validateCloudThemeCreatorPackageUrl(draft.packageUrl, github)
     require(draft.isRemoteVerified) { "Verify that the remote package matches the local package" }
-    val coverUrl = validateCloudThemeUrl(draft.coverUrl.trim(), allowPackage = false)
     val screenshots = draft.screenshotUrlsText
         .lineSequence()
         .map(String::trim)
-        .filter(String::isNotBlank)
+        .filterNot(String::isCloudThemeOptionalUrlPlaceholder)
         .toList()
     require(screenshots.size <= 8 && screenshots.distinct().size == screenshots.size) {
         "Use at most eight unique screenshot URLs"
     }
-    val validatedScreenshots = screenshots.map {
-        validateCloudThemeUrl(it, allowPackage = false)
+    val validatedScreenshots = screenshots.mapIndexed { index, url ->
+        validateCloudThemeSubmissionUrl(
+            rawUrl = url,
+            fieldName = "Screenshot URL ${index + 1}",
+            allowPackage = false,
+        )
     }
+    val coverUrl = draft.coverUrl
+        .takeUnless(String::isCloudThemeOptionalUrlPlaceholder)
+        ?.let {
+            validateCloudThemeSubmissionUrl(
+                rawUrl = it,
+                fieldName = "Cover image URL",
+                allowPackage = false,
+            )
+        }
+        ?: validatedScreenshots.firstOrNull()
+        ?: CLOUD_THEME_DEFAULT_COVER_URL
     val tags = draft.tagsText
         .split(Regex("[,，\\n]"))
         .map(String::trim)
@@ -303,11 +336,23 @@ internal fun buildCloudThemeSubmissionManifest(draft: CloudThemeSubmissionDraft)
     require(tags.size <= 12 && tags.all { it.length <= 32 }) { "Invalid theme tags" }
     val license = draft.license.requiredDraftText("Asset license", 48)
     require(cloudThemeSubmissionLicensePattern.matches(license)) { "Invalid asset license" }
-    val profileUrl = draft.authorProfileUrl.trim().ifBlank { "https://github.com/$github" }
-    val validatedProfileUrl = validateCloudThemeUrl(profileUrl, allowPackage = false)
+    val profileUrl = draft.authorProfileUrl
+        .takeUnless(String::isCloudThemeOptionalUrlPlaceholder)
+        ?: "https://github.com/$github"
+    val validatedProfileUrl = validateCloudThemeSubmissionUrl(
+        rawUrl = profileUrl,
+        fieldName = "Creator profile URL",
+        allowPackage = false,
+    )
     val validatedAvatarUrl = draft.authorAvatarUrl.trim()
-        .takeIf(String::isNotBlank)
-        ?.let { validateCloudThemeUrl(it, allowPackage = false) }
+        .takeUnless(String::isCloudThemeOptionalUrlPlaceholder)
+        ?.let {
+            validateCloudThemeSubmissionUrl(
+                rawUrl = it,
+                fieldName = "Creator avatar URL",
+                allowPackage = false,
+            )
+        }
 
     val author = JSONObject()
         .put("github", github)
@@ -342,6 +387,28 @@ internal fun buildCloudThemeSubmissionManifest(draft: CloudThemeSubmissionDraft)
         .put("version", CLOUD_THEME_SUBMISSION_VERSION)
         .put("theme", theme)
         .toString(2)
+}
+
+private fun String.isCloudThemeOptionalUrlPlaceholder(): Boolean {
+    val normalized = trim().lowercase()
+    return normalized.isEmpty() || normalized in cloudThemeOptionalUrlPlaceholders
+}
+
+private fun validateCloudThemeSubmissionUrl(
+    rawUrl: String,
+    fieldName: String,
+    allowPackage: Boolean,
+): String {
+    val normalized = rawUrl.trim()
+    require(normalized.isNotEmpty()) { "$fieldName is required" }
+    return try {
+        validateCloudThemeUrl(normalized, allowPackage)
+    } catch (error: RuntimeException) {
+        throw IllegalArgumentException(
+            "$fieldName: ${error.message ?: "invalid URL"}",
+            error,
+        )
+    }
 }
 
 internal fun buildCloudThemeCreatorApplicationUrl(
@@ -430,7 +497,7 @@ internal fun decodeCloudThemeSubmissionDraft(json: String): CloudThemeSubmission
         packageName = root.safeDraftString("packageName", 160),
         packageSha256 = root.safeDraftString("packageSha256", 64),
         packageSizeBytes = root.optLong("packageSizeBytes", 0L).coerceAtLeast(0L),
-        packageVersion = root.optInt("packageVersion", 0).coerceIn(0, 4),
+        packageVersion = root.optInt("packageVersion", 0).coerceIn(0, THEME_STORE_VERSION),
         packageResourceCount = root.optInt("packageResourceCount", 0).coerceAtLeast(0),
         themeId = root.safeDraftString("themeId", 80),
         themeName = root.safeDraftString("themeName", 80),

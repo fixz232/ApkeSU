@@ -35,6 +35,7 @@ fun RebootListPopupMiuix(
     modifier: Modifier = Modifier,
     alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
     tint: Color = colorScheme.onBackground,
+    enabled: Boolean = true,
 ) {
     val showTopPopup = remember { mutableStateOf(false) }
     val wallpaperState = rememberHomeMetricCardWallpaperState(
@@ -58,6 +59,7 @@ fun RebootListPopupMiuix(
     KsuIsValid {
         IconButton(
             modifier = modifier,
+            enabled = enabled,
             onClick = { showTopPopup.value = true },
             holdDownState = showTopPopup.value
         ) {

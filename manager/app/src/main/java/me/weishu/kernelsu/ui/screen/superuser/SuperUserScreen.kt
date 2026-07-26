@@ -57,6 +57,7 @@ fun SuperUserPager(
         onRefresh = { viewModel.loadAppList(force = true) },
         onOpenSulog = { navigator.push(Route.Sulog) },
         onOpenAppIdManager = { navigator.push(Route.AppIdManager) },
+        onOpenAppFreeze = { navigator.push(Route.AppFreeze) },
         onSearchTextChange = onSearchTextChange,
         onSearchStatusChange = viewModel::updateSearchStatus,
         onClearSearch = { onSearchTextChange("") },

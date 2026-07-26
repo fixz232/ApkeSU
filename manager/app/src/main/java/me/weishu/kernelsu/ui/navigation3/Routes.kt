@@ -58,6 +58,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object AppFreeze : Route
+
+    @Parcelize
+    @Serializable
     data object ColorPalette : Route
 
     @Parcelize
@@ -83,6 +87,14 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object HomeCardWallpapers : Route
+
+    @Parcelize
+    @Serializable
+    data object HomeLayout : Route
+
+    @Parcelize
+    @Serializable
+    data object InstallCardWallpapers : Route
 
     @Parcelize
     @Serializable
@@ -130,7 +142,15 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object DeviceIdentity : Route
+
+    @Parcelize
+    @Serializable
     data object GraphicsRenderer : Route
+
+    @Parcelize
+    @Serializable
+    data object ImageTool : Route
 
     @Parcelize
     @Serializable
@@ -143,6 +163,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object ThemeStoreAssets : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreFonts : Route
 
     @Parcelize
     @Serializable
@@ -171,6 +195,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object CloudThemeCreatorSubmission : Route
+
+    @Parcelize
+    @Serializable
+    data object CloudThemeCreatorGuide : Route
 
     @Parcelize
     @Serializable

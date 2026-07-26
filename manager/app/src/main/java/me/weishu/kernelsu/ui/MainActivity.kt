@@ -163,12 +163,16 @@ import me.weishu.kernelsu.ui.screen.settings.AiChatScreen
 import me.weishu.kernelsu.ui.screen.settings.AiModuleStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
 import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
+import me.weishu.kernelsu.ui.screen.settings.DeviceIdentityScreen
 import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
+import me.weishu.kernelsu.ui.screen.settings.ImageToolScreen
 import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
+import me.weishu.kernelsu.ui.screen.settings.HomeLayoutScreen
+import me.weishu.kernelsu.ui.screen.settings.InstallCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.LanguageSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
@@ -179,13 +183,16 @@ import me.weishu.kernelsu.ui.screen.settings.VisualEffectsScreen
 import me.weishu.kernelsu.ui.screen.settings.SwitchStyleCreatorScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
 import me.weishu.kernelsu.ui.screen.superuser.AppIdManagerScreen
+import me.weishu.kernelsu.ui.screen.superuser.AppFreezeScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.templateeditor.TemplateEditorScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStorePage
 import me.weishu.kernelsu.ui.screen.themestore.CloudThemeCreatorScreen
+import me.weishu.kernelsu.ui.screen.themestore.CloudThemeCreatorGuideScreen
 import me.weishu.kernelsu.ui.screen.themestore.CloudThemeDetailScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreLibraryScreen
+import me.weishu.kernelsu.ui.screen.themestore.AppFontScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreScreen
 import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
@@ -389,7 +396,11 @@ class MainActivity : ComponentActivity() {
                 LocalScrollAnimation provides uiState.globalScrollEffectEnabled,
                 LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(uiState.globalScrollEffect),
             ) {
-                KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
+                KernelSUTheme(
+                    appSettings = appSettings,
+                    appFontState = uiState.appFont,
+                    uiMode = uiMode,
+                ) {
                     HandleDeepLink(intentState = intentState.collectAsStateWithLifecycle())
                     ManagerUpdatePrompt()
                     ZipFileIntentHandler(intentState = intentState, isManager = managerReady)
@@ -427,6 +438,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.About> { AboutScreen() }
                                 entry<Route.Sulog> { SulogScreen() }
                                 entry<Route.AppIdManager> { AppIdManagerScreen() }
+                                entry<Route.AppFreeze> { AppFreezeScreen() }
                                 entry<Route.ColorPalette> { ColorPaletteScreen() }
                                 entry<Route.LauncherIcon> { LauncherIconScreen() }
                                 entry<Route.NavigationIcons> { NavigationIconScreen() }
@@ -434,6 +446,8 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.SoundEffects> { SoundEffectsScreen() }
                                 entry<Route.StartupAnimation> { StartupAnimationScreen() }
                                 entry<Route.HomeCardWallpapers> { HomeCardWallpaperScreen() }
+                                entry<Route.HomeLayout> { HomeLayoutScreen() }
+                                entry<Route.InstallCardWallpapers> { InstallCardWallpaperScreen() }
                                 entry<Route.LanguageSettings> { LanguageSettingsScreen() }
                                 entry<Route.PreInstallStyleSettings> { PreInstallStyleSettingsScreen() }
                                 entry<Route.VisualEffects> { VisualEffectsScreen() }
@@ -453,10 +467,13 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.AiModuleStudio> { AiModuleStudioScreen() }
                                 entry<Route.RescueProtection> { RescueProtectionScreen() }
                                 entry<Route.CpuSpoof> { CpuSpoofScreen() }
+                                entry<Route.DeviceIdentity> { DeviceIdentityScreen() }
                                 entry<Route.GraphicsRenderer> { GraphicsRendererScreen() }
+                                entry<Route.ImageTool> { ImageToolScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
                                 entry<Route.ThemeStoreAssets> { ThemeStoreScreen(ThemeStorePage.Assets) }
+                                entry<Route.ThemeStoreFonts> { AppFontScreen() }
                                 entry<Route.ThemeStoreBackgrounds> { ThemeStoreScreen(ThemeStorePage.Backgrounds) }
                                 entry<Route.ThemeStoreTransfer> { ThemeStoreScreen(ThemeStorePage.Transfer) }
                                 entry<Route.ThemeStoreMy> { ThemeStoreScreen(ThemeStorePage.My) }
@@ -466,6 +483,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.CloudThemeCreatorSubmission> {
                                     CloudThemeCreatorScreen(initialPageIndex = 1)
                                 }
+                                entry<Route.CloudThemeCreatorGuide> { CloudThemeCreatorGuideScreen() }
                                 entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
@@ -1008,6 +1026,9 @@ internal fun resolveMainContentBottomPadding(
     return maxOf(scaffoldPadding, floatingBarClearance)
 }
 
+internal fun shouldReturnMainPagerBackToHome(selectedPage: Int): Boolean =
+    selectedPage in 2 until MainPagerConfig.PAGE_COUNT
+
 
 @Composable
 private fun MainScreenBackHandler(
@@ -1016,7 +1037,9 @@ private fun MainScreenBackHandler(
 ) {
     val isPagerBackHandlerEnabled by remember {
         derivedStateOf {
-            navController.current() is Route.Main && navController.backStackSize() == 1 && mainState.selectedPage != 0
+            navController.current() is Route.Main &&
+                navController.backStackSize() == 1 &&
+                shouldReturnMainPagerBackToHome(mainState.selectedPage)
         }
     }
 

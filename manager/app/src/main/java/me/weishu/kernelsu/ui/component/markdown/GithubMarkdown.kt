@@ -220,6 +220,8 @@ fun GithubMarkdown(
                                 context.startActivity(intent)
                             } catch (_: ActivityNotFoundException) {
                                 Log.w("GithubMarkdown", "No activity to handle: ${request.url}")
+                            } catch (error: SecurityException) {
+                                Log.w("GithubMarkdown", "Unable to open: ${request.url}", error)
                             }
                             return true
                         }

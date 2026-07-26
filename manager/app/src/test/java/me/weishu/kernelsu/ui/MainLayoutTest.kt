@@ -2,6 +2,8 @@ package me.weishu.kernelsu.ui
 
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainLayoutTest {
@@ -47,5 +49,13 @@ class MainLayoutTest {
                 navigationBarVisible = true,
             ),
         )
+    }
+
+    @Test
+    fun superuserBackIsNotRedirectedToHome() {
+        assertFalse(shouldReturnMainPagerBackToHome(selectedPage = 0))
+        assertFalse(shouldReturnMainPagerBackToHome(selectedPage = 1))
+        assertTrue(shouldReturnMainPagerBackToHome(selectedPage = 2))
+        assertTrue(shouldReturnMainPagerBackToHome(selectedPage = 3))
     }
 }

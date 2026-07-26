@@ -22,12 +22,14 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -173,6 +175,12 @@ fun SettingPagerSkrootpro(
                     },
                     leadingIcon = Icons.Rounded.EditNote,
                     onClick = actions.onEditHomeTitle,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.home_layout_title),
+                    summary = stringResource(R.string.home_layout_settings_summary),
+                    leadingIcon = Icons.Rounded.Apps,
+                    onClick = actions.onOpenHomeLayout,
                 )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_show_home_support_card),
@@ -357,6 +365,12 @@ fun SettingPagerSkrootpro(
                     leadingIcon = Icons.Rounded.DeveloperMode,
                     onClick = actions.onOpenCpuSpoof,
                 )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_device_identity),
+                    summary = stringResource(R.string.settings_device_identity_summary),
+                    leadingIcon = Icons.Rounded.Badge,
+                    onClick = actions.onOpenDeviceIdentity,
+                )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_graphics_renderer_tool),
                     summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
@@ -376,6 +390,12 @@ fun SettingPagerSkrootpro(
                     summary = stringResource(R.string.rescue_protection_summary),
                     leadingIcon = Icons.Rounded.Security,
                     onClick = actions.onOpenRescueProtection,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.image_tool_title),
+                    summary = stringResource(R.string.image_tool_settings_summary),
+                    leadingIcon = Icons.Rounded.ImageSearch,
+                    onClick = actions.onOpenImageTool,
                 )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_ai_chat),

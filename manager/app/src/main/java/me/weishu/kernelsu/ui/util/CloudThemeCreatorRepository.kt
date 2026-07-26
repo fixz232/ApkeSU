@@ -188,6 +188,7 @@ class CloudThemeCreatorRepository(
 
     suspend fun verifyRemotePackage(
         packageUrl: String,
+        githubLogin: String,
         expectedSha256: String,
         expectedSizeBytes: Long,
     ): CloudThemeRemotePackageVerification = withContext(Dispatchers.IO) {
@@ -197,7 +198,7 @@ class CloudThemeCreatorRepository(
         require(Regex("[a-fA-F0-9]{64}").matches(expectedSha256)) {
             "Invalid expected package hash"
         }
-        val validatedUrl = validateCloudThemeUrl(packageUrl.trim(), allowPackage = true)
+        val validatedUrl = validateCloudThemeCreatorPackageUrl(packageUrl, githubLogin)
         val request = Request.Builder()
             .url(validatedUrl)
             .header("Accept", "application/octet-stream")

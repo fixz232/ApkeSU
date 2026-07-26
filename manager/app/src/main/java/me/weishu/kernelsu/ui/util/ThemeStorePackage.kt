@@ -38,17 +38,24 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 private const val THEME_STORE_SCHEMA = "io.github.fixz.apkesu.theme"
-private const val THEME_STORE_VERSION = 4
-private const val MAX_THEME_STORE_ENTRY_COUNT = 64
+internal const val THEME_STORE_VERSION = 4
+private const val MAX_THEME_STORE_ENTRY_COUNT = 80
 private const val MAX_THEME_STORE_JSON_BYTES = 256L * 1024L
 private const val MAX_THEME_STORE_ASSET_BYTES = 500L * 1024L * 1024L
 private const val MAX_THEME_STORE_ASSETS_BYTES = 512L * 1024L * 1024L
 private const val MAX_THEME_STORE_PREVIEW_IMAGE_BYTES = 16L * 1024L * 1024L
+private val APP_FONT_PACKAGE_SHA256 = Regex("[a-fA-F0-9]{64}")
 const val THEME_STORE_FILE_MIME_TYPE = "application/zip"
 const val THEME_STORE_FILE_EXTENSION = "kstheme"
 
+enum class ThemeStoreImageGroup {
+    Home,
+    Install,
+}
+
 enum class ThemeStoreImageSlot(
     val id: String,
+    val group: ThemeStoreImageGroup,
     val uriKey: String,
     val videoUriKey: String?,
     val cropLeftKey: String,
@@ -58,6 +65,7 @@ enum class ThemeStoreImageSlot(
 ) {
     Lkm(
         id = "lkm",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_lkm_card_wallpaper_uri",
         videoUriKey = "home_lkm_card_wallpaper_video_uri",
         cropLeftKey = "home_lkm_card_wallpaper_crop_left",
@@ -67,6 +75,7 @@ enum class ThemeStoreImageSlot(
     ),
     Superuser(
         id = "superuser",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_superuser_card_wallpaper_uri",
         videoUriKey = null,
         cropLeftKey = "home_superuser_card_wallpaper_crop_left",
@@ -76,6 +85,7 @@ enum class ThemeStoreImageSlot(
     ),
     Module(
         id = "module",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_module_card_wallpaper_uri",
         videoUriKey = null,
         cropLeftKey = "home_module_card_wallpaper_crop_left",
@@ -85,6 +95,7 @@ enum class ThemeStoreImageSlot(
     ),
     StatusMonitor(
         id = "status_monitor",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_status_monitor_wallpaper_uri",
         videoUriKey = null,
         cropLeftKey = "home_status_monitor_wallpaper_crop_left",
@@ -94,6 +105,7 @@ enum class ThemeStoreImageSlot(
     ),
     SystemInfo(
         id = "system_info",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_system_info_wallpaper_uri",
         videoUriKey = null,
         cropLeftKey = "home_system_info_wallpaper_crop_left",
@@ -103,6 +115,7 @@ enum class ThemeStoreImageSlot(
     ),
     RebootMenu(
         id = "reboot_menu",
+        group = ThemeStoreImageGroup.Home,
         uriKey = "home_reboot_menu_wallpaper_uri",
         videoUriKey = "home_reboot_menu_wallpaper_video_uri",
         cropLeftKey = "home_reboot_menu_wallpaper_crop_left",
@@ -110,6 +123,46 @@ enum class ThemeStoreImageSlot(
         cropRightKey = "home_reboot_menu_wallpaper_crop_right",
         cropBottomKey = "home_reboot_menu_wallpaper_crop_bottom",
     ),
+    InstallImage(
+        id = "install_image",
+        group = ThemeStoreImageGroup.Install,
+        uriKey = "install_image_card_wallpaper_uri",
+        videoUriKey = "install_image_card_wallpaper_video_uri",
+        cropLeftKey = "install_image_card_wallpaper_crop_left",
+        cropTopKey = "install_image_card_wallpaper_crop_top",
+        cropRightKey = "install_image_card_wallpaper_crop_right",
+        cropBottomKey = "install_image_card_wallpaper_crop_bottom",
+    ),
+    InstallMethods(
+        id = "install_methods",
+        group = ThemeStoreImageGroup.Install,
+        uriKey = "install_methods_card_wallpaper_uri",
+        videoUriKey = "install_methods_card_wallpaper_video_uri",
+        cropLeftKey = "install_methods_card_wallpaper_crop_left",
+        cropTopKey = "install_methods_card_wallpaper_crop_top",
+        cropRightKey = "install_methods_card_wallpaper_crop_right",
+        cropBottomKey = "install_methods_card_wallpaper_crop_bottom",
+    ),
+    InstallOptions(
+        id = "install_options",
+        group = ThemeStoreImageGroup.Install,
+        uriKey = "install_options_card_wallpaper_uri",
+        videoUriKey = "install_options_card_wallpaper_video_uri",
+        cropLeftKey = "install_options_card_wallpaper_crop_left",
+        cropTopKey = "install_options_card_wallpaper_crop_top",
+        cropRightKey = "install_options_card_wallpaper_crop_right",
+        cropBottomKey = "install_options_card_wallpaper_crop_bottom",
+    );
+
+    val preferenceKeys: Set<String>
+        get() = buildSet {
+            add(uriKey)
+            videoUriKey?.let(::add)
+            add(cropLeftKey)
+            add(cropTopKey)
+            add(cropRightKey)
+            add(cropBottomKey)
+        }
 }
 
 data class ThemeStoreImageState(
@@ -163,11 +216,15 @@ data class ThemeStoreSummary(
     val statusMonitorCard: ThemeStoreImageState,
     val systemInfoCard: ThemeStoreImageState,
     val rebootMenuCard: ThemeStoreImageState,
+    val installImageCard: ThemeStoreImageState,
+    val installMethodsCard: ThemeStoreImageState,
+    val installOptionsCard: ThemeStoreImageState,
     val navigationIcons: CustomNavigationIconSet,
     val pageBackgrounds: CustomPageBackgroundSet,
     val wallpaper: ThemeStoreWallpaperState,
     val audio: ThemeStoreAudioState,
     val startupAnimationUri: String?,
+    val appFont: AppFontState,
 ) {
     val startupSoundUri: String?
         get() = audio.startupSoundUri
@@ -182,9 +239,13 @@ data class ThemeStoreSummary(
                 statusMonitorCard.hasSelected,
                 systemInfoCard.hasSelected,
                 rebootMenuCard.hasSelected,
+                installImageCard.hasSelected,
+                installMethodsCard.hasSelected,
+                installOptionsCard.hasSelected,
                 wallpaper.hasSelected,
                 !startupAnimationUri.isNullOrBlank(),
-            ).count { it } + audio.configuredCount
+            ).count { it } + audio.configuredCount +
+            if (appFont.preset != AppFontPreset.System) 1 else 0
 }
 
 data class ThemeStorePackageResult(
@@ -261,6 +322,9 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
         statusMonitorCard = prefs.readImageSlot(ThemeStoreImageSlot.StatusMonitor),
         systemInfoCard = prefs.readImageSlot(ThemeStoreImageSlot.SystemInfo),
         rebootMenuCard = prefs.readImageSlot(ThemeStoreImageSlot.RebootMenu),
+        installImageCard = prefs.readImageSlot(ThemeStoreImageSlot.InstallImage),
+        installMethodsCard = prefs.readImageSlot(ThemeStoreImageSlot.InstallMethods),
+        installOptionsCard = prefs.readImageSlot(ThemeStoreImageSlot.InstallOptions),
         navigationIcons = prefs.readCustomNavigationIconSet(),
         pageBackgrounds = prefs.readCustomPageBackgroundSet(),
         wallpaper = ThemeStoreWallpaperState(
@@ -308,8 +372,14 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
             ),
         ),
         startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null),
+        appFont = readAppFontState(context),
     )
 }
+
+fun readThemeStoreImageState(
+    context: Context,
+    slot: ThemeStoreImageSlot,
+): ThemeStoreImageState = themeStorePrefs(context).readImageSlot(slot)
 
 fun setThemeStoreImageSlot(context: Context, slot: ThemeStoreImageSlot, uriString: String?) {
     val prefs = themeStorePrefs(context)
@@ -738,6 +808,16 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                 )
 
                 config.put(
+                    "font",
+                    zip.writeAppFont(
+                        context = appContext,
+                        state = readAppFontState(appContext),
+                        warnings = warnings,
+                        budget = assetBudget,
+                    ),
+                )
+
+                config.put(
                     "components",
                     zip.writeActiveComponentStyles(
                         context = appContext,
@@ -1079,6 +1159,7 @@ fun importThemeStorePackage(
             var pendingBackgroundMusicVolume = DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
             var hasStartupAnimation = false
             var pendingStartupAnimationUri: String? = null
+            var pendingAppFont: AppFontState? = null
 
             ThemeStoreImageSlot.entries.forEach { slot ->
                 val slotJson = cardsJson.optJSONObject(slot.id)
@@ -1346,6 +1427,20 @@ fun importThemeStorePackage(
                 pendingStartupAnimationUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
             }
 
+            config.optJSONObject("font")?.let { fontJson ->
+                val preset = AppFontPreset.fromValue(fontJson.getString("preset"))
+                pendingAppFont = if (preset == AppFontPreset.Custom) {
+                    importPackagedAppFont(
+                        fontJson = fontJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                    )
+                } else {
+                    safeAssetFile(stagingAssetsDir, APP_FONT_CUSTOM_FILE_NAME).delete()
+                    AppFontState(preset = preset)
+                }
+            }
+
             val prefs = themeStorePrefs(appContext)
             val editor = prefs.edit()
             pendingCards.forEach { (slot, pending) ->
@@ -1411,6 +1506,8 @@ fun importThemeStorePackage(
             if (hasStartupAnimation) {
                 editor.putOptionalString(CUSTOM_STARTUP_ANIMATION_URI_KEY, pendingStartupAnimationUri)
             }
+
+            pendingAppFont?.let(editor::putAppFontState)
 
             pendingComponentStyles?.let { content ->
                 replacedSwitchStyles = stageImportedComponentStyles(
@@ -1650,6 +1747,9 @@ private fun ThemeStoreSummary.imageState(slot: ThemeStoreImageSlot): ThemeStoreI
         ThemeStoreImageSlot.StatusMonitor -> statusMonitorCard
         ThemeStoreImageSlot.SystemInfo -> systemInfoCard
         ThemeStoreImageSlot.RebootMenu -> rebootMenuCard
+        ThemeStoreImageSlot.InstallImage -> installImageCard
+        ThemeStoreImageSlot.InstallMethods -> installMethodsCard
+        ThemeStoreImageSlot.InstallOptions -> installOptionsCard
     }
 }
 
@@ -1752,6 +1852,7 @@ private fun createEmptyThemeStoreConfig(displayName: String, bio: String): JSONO
                 .put("asset", null)
                 .put("uri", null),
         )
+        .put("font", appFontConfigJson(AppFontPreset.System))
 }
 
 private fun ZipOutputStream.writeActiveComponentStyles(
@@ -1907,6 +2008,65 @@ private fun ExportedThemeAsset.toJson(): JSONObject {
         .put("path", path)
         .put("displayName", displayName)
         .put("mimeType", mimeType)
+}
+
+private fun ZipOutputStream.writeAppFont(
+    context: Context,
+    state: AppFontState,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
+): JSONObject {
+    if (state.preset != AppFontPreset.Custom) {
+        return appFontConfigJson(state.preset)
+    }
+
+    val file = appFontFile(context)
+    var entryOpen = false
+    return runCatching {
+        val metadata = validateAppFontFile(file)
+        require(budget.totalBytes + metadata.sizeBytes <= MAX_THEME_STORE_ASSETS_BYTES) {
+            "Theme package assets are too large"
+        }
+        val path = "assets/$APP_FONT_CUSTOM_FILE_NAME"
+        putNextEntry(ZipEntry(path))
+        entryOpen = true
+        FileInputStream(file).use { input -> input.copyTo(this) }
+        closeEntry()
+        entryOpen = false
+        budget.totalBytes += metadata.sizeBytes
+        JSONObject()
+            .put("preset", AppFontPreset.Custom.value)
+            .put(
+                "name",
+                sanitizeAppFontDisplayName(state.customDisplayName) ?: APP_FONT_CUSTOM_FILE_NAME,
+            )
+            .put(
+                "asset",
+                ExportedThemeAsset(
+                    path = path,
+                    displayName = state.customDisplayName,
+                    mimeType = "font/ttf",
+                ).toJson(),
+            )
+            .put("sha256", metadata.sha256)
+            .put("sizeBytes", metadata.sizeBytes)
+    }.getOrElse { error ->
+        if (entryOpen) runCatching { closeEntry() }
+        warnings += ThemeStorePackageWarning(
+            assetId = "app_font",
+            reason = error.message?.lineSequence()?.firstOrNull()?.take(160),
+        )
+        appFontConfigJson(AppFontPreset.System)
+    }
+}
+
+private fun appFontConfigJson(preset: AppFontPreset): JSONObject {
+    return JSONObject()
+        .put("preset", preset.value)
+        .put("name", null)
+        .put("asset", null)
+        .put("sha256", null)
+        .put("sizeBytes", 0L)
 }
 
 private fun ZipOutputStream.writeUriAsset(
@@ -2093,6 +2253,45 @@ internal fun validateThemeStoreConfig(config: JSONObject) {
             }
         ) { "Theme author gender is invalid" }
     }
+    if (config.has("font")) {
+        val font = config.optJSONObject("font")
+            ?: error("Theme package font settings are invalid")
+        val fontKeys = font.keys().asSequence().toSet()
+        require(fontKeys.all { it in APP_FONT_PACKAGE_KEYS }) {
+            "Theme package contains unknown font settings"
+        }
+        val presetValue = font.optString("preset")
+        require(AppFontPreset.entries.any { it.value == presetValue }) {
+            "Theme package font preset is invalid"
+        }
+        val preset = AppFontPreset.fromValue(presetValue)
+        if (preset == AppFontPreset.Custom) {
+            require(font.opt("name") is String) { "Theme package font name is invalid" }
+            val name = sanitizeAppFontDisplayName(font.getString("name"))
+            require(
+                !name.isNullOrBlank() &&
+                    name.length <= 96 &&
+                    name.endsWith(".ttf", ignoreCase = true)
+            ) { "Theme package font name is invalid" }
+            require(font.optJSONObject("asset") != null) {
+                "Theme package custom font is missing"
+            }
+            require(APP_FONT_PACKAGE_SHA256.matches(font.optString("sha256"))) {
+                "Theme package font checksum is invalid"
+            }
+            require(font.opt("sizeBytes") is Number) {
+                "Theme package font size is invalid"
+            }
+            require(font.getLong("sizeBytes") in 1..MAX_CUSTOM_APP_FONT_BYTES) {
+                "Theme package font is too large"
+            }
+        } else {
+            val rawAsset = font.opt("asset")
+            require(rawAsset == null || rawAsset === JSONObject.NULL) {
+                "Built-in font preset contains an unexpected font file"
+            }
+        }
+    }
     validateComponentStyleConfig(config)
 }
 
@@ -2161,6 +2360,20 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
     validateOwner(config.optJSONObject("backgroundMusic"), "asset")
     validateOwner(config.optJSONObject("startupAnimation"), "asset")
     validateOwner(config.optJSONObject("author"), "avatar")
+    val fontOwner = config.optJSONObject("font")
+    validateOwner(fontOwner, "asset")
+    if (AppFontPreset.fromValue(fontOwner?.optString("preset")) == AppFontPreset.Custom) {
+        val fontAsset = fontOwner?.getJSONObject("asset")
+            ?: error("Theme package custom font is missing")
+        val path = fontAsset.getString("path")
+        val fontFile = safeAssetFile(tempAssetsDir, path.removePrefix("assets/"))
+        validateAppFontFile(
+            file = fontFile,
+            expectedSha256 = fontOwner.getString("sha256"),
+            expectedSizeBytes = fontOwner.getLong("sizeBytes"),
+            validateTypeface = false,
+        )
+    }
     val switchOwner = config.optJSONObject("components")?.optJSONObject("switchStyle")
     validateOwner(switchOwner, "imageAsset")
     switchOwner?.let { owner ->
@@ -2356,6 +2569,8 @@ internal fun countConfiguredThemeStoreResources(config: JSONObject): Int {
     val components = config.optJSONObject("components")
     if (components?.optJSONObject("cardStyle") != null) count++
     if (components?.optJSONObject("switchStyle") != null) count++
+    val fontPreset = config.optJSONObject("font")?.optString("preset")
+    if (!fontPreset.isNullOrBlank() && fontPreset != AppFontPreset.System.value) count++
     return count
 }
 
@@ -2461,6 +2676,7 @@ private fun collectLegacyThemeStoreUriWarnings(
 private const val MAX_COMPONENT_PACKAGE_URI_LENGTH = 1_024
 private const val COMPONENT_ONLY_PACKAGE_TYPE = "component"
 private val COMPONENT_PACKAGE_SHA256 = Regex("[a-fA-F0-9]{64}")
+private val APP_FONT_PACKAGE_KEYS = setOf("preset", "name", "asset", "sha256", "sizeBytes")
 
 private fun ZipInputStream.readEntryBytes(maxBytes: Long): ByteArray {
     val output = ByteArrayOutputStream()
@@ -2605,6 +2821,45 @@ private fun importAssetUri(
             reason = it.message?.lineSequence()?.firstOrNull()?.take(160),
         )
         ImportedThemeAsset.Unavailable
+    }
+}
+
+private fun importPackagedAppFont(
+    fontJson: JSONObject,
+    tempAssetsDir: File,
+    stagingAssetsDir: File,
+): AppFontState {
+    val asset = fontJson.getJSONObject("asset")
+    val packagePath = asset.getString("path")
+    require(packagePath.startsWith("assets/")) { "Invalid embedded font path" }
+    val source = safeAssetFile(tempAssetsDir, packagePath.removePrefix("assets/"))
+    val destination = safeAssetFile(stagingAssetsDir, APP_FONT_CUSTOM_FILE_NAME)
+    destination.parentFile?.mkdirs()
+    val temporary = File(destination.parentFile, "$APP_FONT_CUSTOM_FILE_NAME.importing")
+    temporary.delete()
+    try {
+        FileInputStream(source).use { input ->
+            FileOutputStream(temporary).use { output -> input.copyTo(output) }
+        }
+        val metadata = validateAppFontFile(
+            file = temporary,
+            expectedSha256 = fontJson.getString("sha256"),
+            expectedSizeBytes = fontJson.getLong("sizeBytes"),
+        )
+        if (!temporary.renameTo(destination)) {
+            temporary.copyTo(destination, overwrite = true)
+            temporary.delete()
+        }
+        return AppFontState(
+            preset = AppFontPreset.Custom,
+            customDisplayName = sanitizeAppFontDisplayName(fontJson.optString("name"))
+                ?: APP_FONT_CUSTOM_FILE_NAME,
+            customSha256 = metadata.sha256,
+            customSizeBytes = metadata.sizeBytes,
+            customFileAvailable = true,
+        )
+    } finally {
+        temporary.delete()
     }
 }
 

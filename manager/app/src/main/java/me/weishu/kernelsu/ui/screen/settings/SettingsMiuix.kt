@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContactPage
@@ -392,6 +393,19 @@ fun SettingPagerMiuix(
                             },
                             onClick = actions.onEditHomeTitle
                         )
+                        ArrowPreference(
+                            title = stringResource(id = R.string.home_layout_title),
+                            summary = stringResource(id = R.string.home_layout_settings_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Dashboard,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(id = R.string.home_layout_title),
+                                    tint = colorScheme.onBackground
+                                )
+                            },
+                            onClick = actions.onOpenHomeLayout
+                        )
                         SwitchPreference(
                             title = stringResource(id = R.string.settings_show_home_support_card),
                             summary = stringResource(id = R.string.settings_show_home_support_card_summary),
@@ -725,6 +739,20 @@ fun SettingPagerMiuix(
                                 onClick = actions.onOpenCpuSpoof
                             )
 
+                            ArrowPreference(
+                                title = stringResource(id = R.string.settings_device_identity),
+                                summary = stringResource(id = R.string.settings_device_identity_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Badge,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_device_identity),
+                                        tint = colorScheme.onBackground,
+                                    )
+                                },
+                                onClick = actions.onOpenDeviceIdentity,
+                            )
+
                             SwitchPreference(
                                 title = stringResource(R.string.settings_graphics_renderer_tool),
                                 summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
@@ -768,6 +796,20 @@ fun SettingPagerMiuix(
                                     )
                                 },
                                 onClick = actions.onOpenRescueProtection
+                            )
+
+                            ArrowPreference(
+                                title = stringResource(id = R.string.image_tool_title),
+                                summary = stringResource(id = R.string.image_tool_settings_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.ImageSearch,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.image_tool_title),
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                onClick = actions.onOpenImageTool
                             )
 
                             ArrowPreference(
@@ -1036,10 +1078,10 @@ private fun CollapsibleMiuixSection(
 
 private const val UPDATES_ITEM_COUNT = 3
 private const val ROOT_FEATURES_ITEM_COUNT = 7
-private const val ADVANCED_ITEM_COUNT = 11
+private const val ADVANCED_ITEM_COUNT = 12
 
 private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 16 + when (uiMode) {
+    return 17 + when (uiMode) {
         InterfaceStyle.Rain.value,
         InterfaceStyle.Snow.value,
         -> 2

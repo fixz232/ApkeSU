@@ -55,8 +55,13 @@ THEME_KEYS = {
     "changelog",
     "author",
 }
+THEME_REQUIRED_KEYS = THEME_KEYS - {"coverUrl"}
 AUTHOR_KEYS = {"github", "name", "profileUrl", "avatarUrl", "bio"}
 CATEGORY_KEYS = {"id", "name"}
+DEFAULT_COVER_URL = (
+    "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/"
+    "manager/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -129,7 +134,7 @@ def parse_manifest(raw: str, issue_author: str) -> dict:
     theme = manifest.get("theme")
     if not isinstance(theme, dict):
         raise ValidationFailure("manifest theme must be an object")
-    require_exact_keys(theme, THEME_KEYS, THEME_KEYS, "manifest theme")
+    require_exact_keys(theme, THEME_KEYS, THEME_REQUIRED_KEYS, "manifest theme")
 
     theme_id = clean_text(theme.get("id"), "theme id", 80)
     if not ID_RE.fullmatch(theme_id):
@@ -176,7 +181,6 @@ def parse_manifest(raw: str, issue_author: str) -> dict:
         minimum,
     )
 
-    cover_url = validate_url(theme.get("coverUrl"), "cover URL")
     screenshots_value = theme.get("screenshots")
     if not isinstance(screenshots_value, list) or len(screenshots_value) > 8:
         raise ValidationFailure("screenshots are invalid")
@@ -186,6 +190,11 @@ def parse_manifest(raw: str, issue_author: str) -> dict:
     ]
     if len(set(screenshots)) != len(screenshots):
         raise ValidationFailure("screenshot URLs must be unique")
+    cover_value = theme.get("coverUrl")
+    if cover_value is None or (isinstance(cover_value, str) and not cover_value.strip()):
+        cover_url = screenshots[0] if screenshots else DEFAULT_COVER_URL
+    else:
+        cover_url = validate_url(cover_value, "cover URL")
     package_url = validate_url(theme.get("packageUrl"), "package URL", package=True)
     sha256 = clean_text(theme.get("sha256"), "SHA-256", 64).lower()
     if not SHA_RE.fullmatch(sha256):

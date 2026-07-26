@@ -585,9 +585,10 @@ private fun DecorationEditorPane(
 @Composable
 private fun DecorationTabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     val labels = DecorationLibraryTab.entries.map { stringResource(it.labelRes) }
+    val activeTab = selectedTab.coerceIn(labels.indices)
     MiuixTabRow(
         tabs = labels,
-        selectedTabIndex = selectedTab,
+        selectedTabIndex = activeTab,
         onTabSelected = onTabSelected,
         height = 48.dp,
     )

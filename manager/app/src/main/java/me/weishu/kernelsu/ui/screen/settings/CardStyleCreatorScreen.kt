@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.FileOpen
@@ -58,6 +59,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -77,10 +79,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.LocalInterfaceStyle
+import me.weishu.kernelsu.ui.component.HomeLayoutCanvas
 import me.weishu.kernelsu.ui.component.custom.CARD_BODY_GRID_HEIGHT
 import me.weishu.kernelsu.ui.component.custom.CARD_BORDER_GRID_CELLS
 import me.weishu.kernelsu.ui.component.custom.CARD_GRID_WIDTH
@@ -98,6 +106,7 @@ import me.weishu.kernelsu.ui.component.custom.NAVIGATION_BORDER_GRID_CELLS
 import me.weishu.kernelsu.ui.component.custom.NAVIGATION_GRID_WIDTH
 import me.weishu.kernelsu.ui.component.custom.NAVIGATION_TOP_GRID_HEIGHT
 import me.weishu.kernelsu.ui.component.custom.NavigationPixelLayer
+import me.weishu.kernelsu.ui.component.custom.LocalCustomCardStyle
 import me.weishu.kernelsu.ui.component.custom.PixelEditToolbar
 import me.weishu.kernelsu.ui.component.custom.PixelEditorSection
 import me.weishu.kernelsu.ui.component.custom.PixelGrid
@@ -109,15 +118,29 @@ import me.weishu.kernelsu.ui.component.custom.drawCustomCardChrome
 import me.weishu.kernelsu.ui.component.custom.drawCustomCardInterior
 import me.weishu.kernelsu.ui.component.custom.drawCustomNavigationStyle
 import me.weishu.kernelsu.ui.component.custom.filledWhere
+import me.weishu.kernelsu.ui.component.custom.hasSameDimensionsAs
 import me.weishu.kernelsu.ui.component.custom.mirroredHorizontally
 import me.weishu.kernelsu.ui.component.custom.rememberComponentMotionProgress
+import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationScope
+import me.weishu.kernelsu.ui.component.decoration.UiCardDecoration
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
+import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
+import me.weishu.kernelsu.ui.component.decoration.UiNavigationDecoration
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.screen.home.HomeActions
+import me.weishu.kernelsu.ui.screen.home.HomeLayoutCardContent
+import me.weishu.kernelsu.ui.screen.home.HomeUiState
+import me.weishu.kernelsu.ui.util.HomeLayoutCard
+import me.weishu.kernelsu.ui.util.HomeLayoutState
 import me.weishu.kernelsu.ui.util.THEME_STORE_FILE_MIME_TYPE
 import me.weishu.kernelsu.ui.util.canonicalCloudThemePackageFileName
 import me.weishu.kernelsu.ui.util.exportCardComponentStylePackage
 import me.weishu.kernelsu.ui.util.prepareCardStyleCloudSubmission
+import me.weishu.kernelsu.ui.util.readHomeLayoutState
 import me.weishu.kernelsu.ui.util.readComponentStylePackage
+import me.weishu.kernelsu.ui.viewmodel.HomeViewModel
 
 private enum class CardCreatorPage {
     Design,
@@ -131,6 +154,16 @@ private enum class CardEditorScope {
     FloatingBottomBar,
 }
 
+private enum class CardPreviewSurface {
+    Home,
+    Chrome,
+}
+
+private enum class CardPreviewLayout {
+    Xiaomi,
+    Current,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardStyleCreatorScreen() {
@@ -138,6 +171,9 @@ fun CardStyleCreatorScreen() {
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
     val store = remember(context) { ComponentStyleStore(context) }
+    val homeViewModel = viewModel<HomeViewModel>()
+    val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    var mappedHomeLayout by remember(context) { mutableStateOf(readHomeLayoutState(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val defaultName = stringResource(R.string.card_style_creator_default_name)
     val saveSuccess = stringResource(R.string.component_creator_saved)
@@ -174,6 +210,12 @@ fun CardStyleCreatorScreen() {
     var deleteCandidate by remember { mutableStateOf<CustomCardStyle?>(null) }
     var busy by remember { mutableStateOf(false) }
 
+    LifecycleResumeEffect(Unit) {
+        mappedHomeLayout = readHomeLayoutState(context)
+        homeViewModel.refresh()
+        onPauseOrDispose { }
+    }
+
     val currentScope = CardEditorScope.entries.getOrElse(editorScope) { CardEditorScope.Card }
     val currentTarget = CustomCardTarget.entries.getOrElse(selectedTarget) { CustomCardTarget.Default }
     val currentCardLayer = CardPixelLayer.entries.getOrElse(selectedCardLayer) { CardPixelLayer.Top }
@@ -189,6 +231,11 @@ fun CardStyleCreatorScreen() {
     }
 
     fun updateGrid(grid: PixelGrid) {
+        if (!grid.hasSameDimensionsAs(currentGrid())) {
+            undoStack = emptyList()
+            redoStack = emptyList()
+            return
+        }
         draft = when (currentScope) {
             CardEditorScope.Card -> draft.withLayers(
                 currentTarget,
@@ -413,13 +460,19 @@ fun CardStyleCreatorScreen() {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            val currentPage = CardCreatorPage.entries.getOrElse(selectedPage) {
+                CardCreatorPage.Design
+            }
             CreatorTabs(
-                selected = selectedPage,
+                selected = currentPage.ordinal,
                 onSelected = { selectedPage = it },
             )
-            when (CardCreatorPage.entries.getOrElse(selectedPage) { CardCreatorPage.Design }) {
+            when (currentPage) {
                 CardCreatorPage.Design -> CardDesignPage(
                     draft = draft,
+                    homeUiState = homeUiState,
+                    mappedHomeLayout = mappedHomeLayout,
+                    editorKey = editorKey,
                     editorScope = currentScope,
                     selectedTarget = currentTarget,
                     selectedCardLayer = currentCardLayer,
@@ -441,14 +494,28 @@ fun CardStyleCreatorScreen() {
                     onStrokeStart = ::pushUndo,
                     onGridChange = ::updateGrid,
                     onUndo = {
-                        val previous = undoStack.lastOrNull() ?: return@CardDesignPage
-                        redoStack = (redoStack + currentGrid()).takeLast(MAX_PIXEL_HISTORY)
+                        val current = currentGrid()
+                        val previous = undoStack.lastOrNull()
+                            ?.takeIf { it.hasSameDimensionsAs(current) }
+                            ?: run {
+                                undoStack = emptyList()
+                                redoStack = emptyList()
+                                return@CardDesignPage
+                            }
+                        redoStack = (redoStack + current).takeLast(MAX_PIXEL_HISTORY)
                         undoStack = undoStack.dropLast(1)
                         updateGrid(previous)
                     },
                     onRedo = {
-                        val next = redoStack.lastOrNull() ?: return@CardDesignPage
-                        undoStack = (undoStack + currentGrid()).takeLast(MAX_PIXEL_HISTORY)
+                        val current = currentGrid()
+                        val next = redoStack.lastOrNull()
+                            ?.takeIf { it.hasSameDimensionsAs(current) }
+                            ?: run {
+                                undoStack = emptyList()
+                                redoStack = emptyList()
+                                return@CardDesignPage
+                            }
+                        undoStack = (undoStack + current).takeLast(MAX_PIXEL_HISTORY)
                         redoStack = redoStack.dropLast(1)
                         updateGrid(next)
                     },
@@ -476,12 +543,16 @@ fun CardStyleCreatorScreen() {
                         pushUndo(currentGrid())
                         updateGrid(currentGrid().cleared())
                     },
+                    onOpenHomeLayout = { navigator.push(Route.HomeLayout) },
                 )
                 CardCreatorPage.Motion -> CardMotionPage(
                     draft = draft,
+                    homeUiState = homeUiState,
+                    mappedHomeLayout = mappedHomeLayout,
                     selectedTarget = currentTarget,
                     onTargetSelected = { selectedTarget = it.ordinal },
                     onDraftChange = { draft = it },
+                    onOpenHomeLayout = { navigator.push(Route.HomeLayout) },
                 )
                 CardCreatorPage.Library -> CardStyleLibraryPage(
                     styles = styles,
@@ -554,6 +625,9 @@ private fun CreatorTabs(selected: Int, onSelected: (Int) -> Unit) {
 @Composable
 private fun CardDesignPage(
     draft: CustomCardStyle,
+    homeUiState: HomeUiState,
+    mappedHomeLayout: HomeLayoutState,
+    editorKey: String,
     editorScope: CardEditorScope,
     selectedTarget: CustomCardTarget,
     selectedCardLayer: CardPixelLayer,
@@ -576,6 +650,7 @@ private fun CardDesignPage(
     onFill: () -> Unit,
     onMirror: () -> Unit,
     onClear: () -> Unit,
+    onOpenHomeLayout: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -604,10 +679,13 @@ private fun CardDesignPage(
             PixelEditorSection(stringResource(R.string.card_style_creator_xiaomi_preview)) {
                 XiaomiCardStylePreview(
                     style = draft,
+                    homeUiState = homeUiState,
+                    mappedHomeLayout = mappedHomeLayout,
                     selectedTarget = selectedTarget,
                     selectedScope = editorScope,
                     onTargetSelected = onTargetSelected,
                     onScopeSelected = onScopeSelected,
+                    onOpenHomeLayout = onOpenHomeLayout,
                 )
             }
         }
@@ -669,6 +747,7 @@ private fun CardDesignPage(
                     contentDescription = stringResource(R.string.component_creator_pixel_canvas),
                     onStrokeStart = onStrokeStart,
                     onGridChange = onGridChange,
+                    gestureKey = editorKey,
                     isCellEditable = { x, y, width, height ->
                         isCardCreatorCellEditable(
                             editorScope,
@@ -708,9 +787,12 @@ private fun CardDesignPage(
 @Composable
 private fun CardMotionPage(
     draft: CustomCardStyle,
+    homeUiState: HomeUiState,
+    mappedHomeLayout: HomeLayoutState,
     selectedTarget: CustomCardTarget,
     onTargetSelected: (CustomCardTarget) -> Unit,
     onDraftChange: (CustomCardStyle) -> Unit,
+    onOpenHomeLayout: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -720,10 +802,13 @@ private fun CardMotionPage(
         item {
             XiaomiCardStylePreview(
                 style = draft,
+                homeUiState = homeUiState,
+                mappedHomeLayout = mappedHomeLayout,
                 selectedTarget = selectedTarget,
                 selectedScope = CardEditorScope.Card,
                 onTargetSelected = onTargetSelected,
                 onScopeSelected = {},
+                onOpenHomeLayout = onOpenHomeLayout,
             )
         }
         item {
@@ -740,11 +825,26 @@ private fun CardMotionPage(
 @Composable
 private fun XiaomiCardStylePreview(
     style: CustomCardStyle,
+    homeUiState: HomeUiState,
+    mappedHomeLayout: HomeLayoutState,
     selectedTarget: CustomCardTarget,
     selectedScope: CardEditorScope,
     onTargetSelected: (CustomCardTarget) -> Unit,
     onScopeSelected: (CardEditorScope) -> Unit,
+    onOpenHomeLayout: () -> Unit,
 ) {
+    var previewSurfaceIndex by rememberSaveable(style.id) {
+        mutableIntStateOf(CardPreviewSurface.Home.ordinal)
+    }
+    var previewLayoutIndex by rememberSaveable(style.id) {
+        mutableIntStateOf(CardPreviewLayout.Xiaomi.ordinal)
+    }
+    val previewSurface = CardPreviewSurface.entries.getOrElse(previewSurfaceIndex) {
+        CardPreviewSurface.Home
+    }
+    val previewLayout = CardPreviewLayout.entries.getOrElse(previewLayoutIndex) {
+        CardPreviewLayout.Xiaomi
+    }
     val motionProgress = rememberComponentMotionProgress(
         rule = style.motion,
         enabled = true,
@@ -774,64 +874,154 @@ private fun XiaomiCardStylePreview(
                 }
                 FilterChip(
                     selected = selectedTarget == CustomCardTarget.Default && selectedScope == CardEditorScope.Card,
-                    onClick = { onTargetSelected(CustomCardTarget.Default) },
+                    onClick = {
+                        onScopeSelected(CardEditorScope.Card)
+                        onTargetSelected(CustomCardTarget.Default)
+                    },
                     label = { Text(stringResource(R.string.card_style_creator_target_default)) },
                 )
             }
-            PreviewTargetCard(
-                style = style,
-                target = CustomCardTarget.Lkm,
-                selected = selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.Lkm,
-                motionProgress = motionProgress,
-                height = 88.dp,
-                onClick = { onTargetSelected(CustomCardTarget.Lkm) },
+            ChoiceChipRow(
+                options = CardPreviewSurface.entries,
+                selected = previewSurface,
+                label = { stringResource(it.labelRes()) },
+                onSelected = { previewSurfaceIndex = it.ordinal },
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                PreviewTargetCard(
-                    style, CustomCardTarget.Superuser,
-                    selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.Superuser,
-                    motionProgress, 76.dp, { onTargetSelected(CustomCardTarget.Superuser) }, Modifier.weight(1f),
-                )
-                PreviewTargetCard(
-                    style, CustomCardTarget.Module,
-                    selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.Module,
-                    motionProgress, 76.dp, { onTargetSelected(CustomCardTarget.Module) }, Modifier.weight(1f),
+            when (previewSurface) {
+                CardPreviewSurface.Home -> {
+                    ChoiceChipRow(
+                        options = CardPreviewLayout.entries,
+                        selected = previewLayout,
+                        label = { stringResource(it.labelRes()) },
+                        onSelected = { previewLayoutIndex = it.ordinal },
+                    )
+                    HomeMappedCardStylePreview(
+                        style = style,
+                        homeUiState = homeUiState,
+                        layout = when (previewLayout) {
+                            CardPreviewLayout.Xiaomi -> HomeLayoutState(enabled = true)
+                            CardPreviewLayout.Current -> mappedHomeLayout.copy(enabled = true)
+                        },
+                        selectedTarget = selectedTarget.takeIf { selectedScope == CardEditorScope.Card },
+                        onTargetSelected = { target ->
+                            onScopeSelected(CardEditorScope.Card)
+                            onTargetSelected(target)
+                        },
+                    )
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onOpenHomeLayout,
+                    ) {
+                        Icon(Icons.Rounded.DashboardCustomize, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.card_style_creator_edit_home_layout))
+                    }
+                }
+
+                CardPreviewSurface.Chrome -> {
+                    PreviewTargetCard(
+                        style = style,
+                        target = CustomCardTarget.RebootMenu,
+                        selected = selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.RebootMenu,
+                        motionProgress = motionProgress,
+                        height = 72.dp,
+                        onClick = {
+                            onScopeSelected(CardEditorScope.Card)
+                            onTargetSelected(CustomCardTarget.RebootMenu)
+                        },
+                    )
+                    NavigationStylePreview(
+                        style = style,
+                        floating = false,
+                        selected = selectedScope == CardEditorScope.BottomBar,
+                        motionProgress = motionProgress,
+                        onClick = { onScopeSelected(CardEditorScope.BottomBar) },
+                    )
+                    NavigationStylePreview(
+                        style = style,
+                        floating = true,
+                        selected = selectedScope == CardEditorScope.FloatingBottomBar,
+                        motionProgress = motionProgress,
+                        onClick = { onScopeSelected(CardEditorScope.FloatingBottomBar) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeMappedCardStylePreview(
+    style: CustomCardStyle,
+    homeUiState: HomeUiState,
+    layout: HomeLayoutState,
+    selectedTarget: CustomCardTarget?,
+    onTargetSelected: (CustomCardTarget) -> Unit,
+) {
+    val previewActions = remember {
+        HomeActions(
+            onInstallClick = {},
+            onSuperuserClick = {},
+            onModuleClick = {},
+            onOpenUrl = {},
+        )
+    }
+    val previewDecoration = remember {
+        UiDecorationConfig(
+            enabled = true,
+            card = UiCardDecoration.Custom,
+            navigation = UiNavigationDecoration.Custom,
+            intensity = 1f,
+            opacity = 1f,
+            motionEnabled = true,
+            scopes = setOf(UiDecorationScope.Home),
+        )
+    }
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.app_name),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.card_style_creator_live_mapping),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        CompositionLocalProvider(
+            LocalInterfaceStyle provides InterfaceStyle.Miuix.value,
+            LocalUiDecorationConfig provides previewDecoration,
+            LocalUiDecorationScope provides UiDecorationScope.Home,
+            LocalCustomCardStyle provides style,
+        ) {
+            HomeLayoutCanvas(
+                state = layout,
+                modifier = Modifier.fillMaxWidth(),
+                selectedCard = selectedTarget?.toHomeLayoutCard(),
+                onCardSelected = { card -> onTargetSelected(card.toCustomCardTarget()) },
+            ) { item ->
+                HomeLayoutCardContent(
+                    item = item,
+                    state = homeUiState,
+                    actions = previewActions,
+                    installFeedbackActive = false,
+                    forceLkmPreview = true,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                PreviewTargetCard(
-                    style, CustomCardTarget.StatusMonitor,
-                    selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.StatusMonitor,
-                    motionProgress, 68.dp, { onTargetSelected(CustomCardTarget.StatusMonitor) }, Modifier.weight(1f),
-                )
-                PreviewTargetCard(
-                    style, CustomCardTarget.SystemInfo,
-                    selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.SystemInfo,
-                    motionProgress, 68.dp, { onTargetSelected(CustomCardTarget.SystemInfo) }, Modifier.weight(1f),
-                )
-            }
-            PreviewTargetCard(
-                style = style,
-                target = CustomCardTarget.RebootMenu,
-                selected = selectedScope == CardEditorScope.Card && selectedTarget == CustomCardTarget.RebootMenu,
-                motionProgress = motionProgress,
-                height = 62.dp,
-                onClick = { onTargetSelected(CustomCardTarget.RebootMenu) },
-            )
-            NavigationStylePreview(
-                style = style,
-                floating = false,
-                selected = selectedScope == CardEditorScope.BottomBar,
-                motionProgress = motionProgress,
-                onClick = { onScopeSelected(CardEditorScope.BottomBar) },
-            )
-            NavigationStylePreview(
-                style = style,
-                floating = true,
-                selected = selectedScope == CardEditorScope.FloatingBottomBar,
-                motionProgress = motionProgress,
-                onClick = { onScopeSelected(CardEditorScope.FloatingBottomBar) },
-            )
         }
     }
 }
@@ -1159,6 +1349,34 @@ private fun CardEditorScope.labelRes(): Int = when (this) {
     CardEditorScope.Card -> R.string.card_style_creator_scope_card
     CardEditorScope.BottomBar -> R.string.card_style_creator_scope_bottom_bar
     CardEditorScope.FloatingBottomBar -> R.string.card_style_creator_scope_floating_bar
+}
+
+private fun CardPreviewSurface.labelRes(): Int = when (this) {
+    CardPreviewSurface.Home -> R.string.card_style_creator_preview_home
+    CardPreviewSurface.Chrome -> R.string.card_style_creator_preview_chrome
+}
+
+private fun CardPreviewLayout.labelRes(): Int = when (this) {
+    CardPreviewLayout.Xiaomi -> R.string.card_style_creator_layout_xiaomi
+    CardPreviewLayout.Current -> R.string.card_style_creator_layout_current
+}
+
+private fun CustomCardTarget.toHomeLayoutCard(): HomeLayoutCard? = when (this) {
+    CustomCardTarget.Lkm -> HomeLayoutCard.Lkm
+    CustomCardTarget.Superuser -> HomeLayoutCard.Superuser
+    CustomCardTarget.Module -> HomeLayoutCard.Module
+    CustomCardTarget.StatusMonitor -> HomeLayoutCard.StatusMonitor
+    CustomCardTarget.SystemInfo -> HomeLayoutCard.SystemInfo
+    CustomCardTarget.Default,
+    CustomCardTarget.RebootMenu -> null
+}
+
+private fun HomeLayoutCard.toCustomCardTarget(): CustomCardTarget = when (this) {
+    HomeLayoutCard.Lkm -> CustomCardTarget.Lkm
+    HomeLayoutCard.Superuser -> CustomCardTarget.Superuser
+    HomeLayoutCard.Module -> CustomCardTarget.Module
+    HomeLayoutCard.StatusMonitor -> CustomCardTarget.StatusMonitor
+    HomeLayoutCard.SystemInfo -> CustomCardTarget.SystemInfo
 }
 
 private fun CustomCardTarget.labelRes(): Int = when (this) {

@@ -17,6 +17,8 @@ import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
+import me.weishu.kernelsu.ui.util.AppFontState
+import me.weishu.kernelsu.ui.util.readAppFontState
 
 enum class ColorMode(val value: Int) {
     SYSTEM(0),
@@ -118,14 +120,17 @@ object ThemeController {
 @Composable
 fun KernelSUTheme(
     appSettings: AppSettings? = null,
+    appFontState: AppFontState? = null,
     uiMode: UiMode = LocalUiMode.current,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     val currentAppSettings = appSettings ?: ThemeController.getAppSettings(context)
+    val currentAppFontState = appFontState ?: readAppFontState(context)
 
     MiuixKernelSUTheme(
         appSettings = currentAppSettings,
+        appFontState = currentAppFontState,
         content = content
     )
 }

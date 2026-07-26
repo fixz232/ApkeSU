@@ -6,6 +6,7 @@ import me.weishu.kernelsu.ui.component.custom.CustomSwitchStyle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -123,6 +124,58 @@ class ThemeStorePackageTest {
     }
 
     @Test
+    fun validateEmbeddedThemeStoreAssets_validatesCustomFontHashAndSize() {
+        val assetsDir = temporaryFolder.newFolder("font-assets")
+        val fontBytes = byteArrayOf(0, 1, 0, 0, 10, 20, 30, 40)
+        val fontFile = assetsDir.resolve("font_custom.ttf").apply { writeBytes(fontBytes) }
+        val sha256 = MessageDigest.getInstance("SHA-256")
+            .digest(fontBytes)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val config = themeConfigWithFont(
+            JSONObject()
+                .put("preset", "custom")
+                .put("name", "Example.ttf")
+                .put("asset", JSONObject().put("path", "assets/font_custom.ttf"))
+                .put("sha256", sha256)
+                .put("sizeBytes", fontFile.length())
+        )
+
+        validateThemeStoreConfig(config)
+        validateEmbeddedThemeStoreAssets(config, assetsDir)
+
+        config.getJSONObject("font").put("sha256", "b".repeat(64))
+        assertThrows(IllegalArgumentException::class.java) {
+            validateEmbeddedThemeStoreAssets(config, assetsDir)
+        }
+    }
+
+    @Test
+    fun validateThemeStoreConfig_rejectsCustomFontWithoutEmbeddedAsset() {
+        val config = themeConfigWithFont(
+            JSONObject()
+                .put("preset", "custom")
+                .put("name", "Example.ttf")
+                .put("asset", null)
+                .put("sha256", "a".repeat(64))
+                .put("sizeBytes", 8L)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            validateThemeStoreConfig(config)
+        }
+    }
+
+    @Test
+    fun countConfiguredThemeStoreResources_countsNonDefaultFont() {
+        val config = JSONObject().put(
+            "font",
+            JSONObject().put("preset", "monospace"),
+        )
+
+        assertEquals(1, countConfiguredThemeStoreResources(config))
+    }
+
+    @Test
     fun validateThemeStoreConfig_rejectsIncompleteV3AudioState() {
         assertThrows(IllegalArgumentException::class.java) {
             validateThemeStoreConfig(
@@ -180,13 +233,32 @@ class ThemeStorePackageTest {
                 "cards",
                 JSONObject()
                     .put("lkm", JSONObject().put("videoUri", "content://card-video"))
+                    .put(
+                        "install_options",
+                        JSONObject().put("asset", JSONObject().put("path", "assets/options.png")),
+                    )
                     .put("module", JSONObject()),
             )
             .put("wallpaper", JSONObject().put("asset", JSONObject().put("path", "assets/wallpaper.png")))
             .put("startupSound", JSONObject().put("uri", "content://sound"))
             .put("clickSound", JSONObject())
 
-        assertEquals(3, countConfiguredThemeStoreResources(config))
+        assertEquals(4, countConfiguredThemeStoreResources(config))
+    }
+
+    @Test
+    fun themeStoreImageSlots_defineThreeVideoCapableInstallCards() {
+        val slots = ThemeStoreImageSlot.entries.filter { it.group == ThemeStoreImageGroup.Install }
+
+        assertEquals(
+            listOf(
+                ThemeStoreImageSlot.InstallImage,
+                ThemeStoreImageSlot.InstallMethods,
+                ThemeStoreImageSlot.InstallOptions,
+            ),
+            slots,
+        )
+        assertTrue(slots.all { !it.videoUriKey.isNullOrBlank() })
     }
 
     @Test
@@ -321,6 +393,10 @@ class ThemeStorePackageTest {
         assertEquals("", author.getString("realName"))
         assertEquals("unspecified", author.getString("gender"))
         assertEquals("", config.getJSONObject("cards").getJSONObject("lkm").optString("uri"))
+        assertEquals(
+            "",
+            config.getJSONObject("cards").getJSONObject("install_methods").optString("videoUri"),
+        )
         val switchOwner = config.getJSONObject("components").getJSONObject("switchStyle")
         assertEquals("", switchOwner.optString("imageUri"))
         assertEquals("", switchOwner.getJSONObject("style").optString("image_uri"))
@@ -339,14 +415,23 @@ class ThemeStorePackageTest {
             )
             .put(
                 "cards",
-                JSONObject().put(
-                    "lkm",
-                    JSONObject()
-                        .put("asset", JSONObject().put("path", "assets/lkm.png"))
-                        .put("uri", "content://private/lkm.png")
-                        .put("videoAsset", JSONObject.NULL)
-                        .put("videoUri", JSONObject.NULL),
-                ),
+                JSONObject()
+                    .put(
+                        "lkm",
+                        JSONObject()
+                            .put("asset", JSONObject().put("path", "assets/lkm.png"))
+                            .put("uri", "content://private/lkm.png")
+                            .put("videoAsset", JSONObject.NULL)
+                            .put("videoUri", JSONObject.NULL),
+                    )
+                    .put(
+                        "install_methods",
+                        JSONObject()
+                            .put("asset", JSONObject.NULL)
+                            .put("uri", JSONObject.NULL)
+                            .put("videoAsset", JSONObject().put("path", "assets/install.mp4"))
+                            .put("videoUri", "content://private/install.mp4"),
+                    ),
             )
             .put(
                 "components",
@@ -376,6 +461,11 @@ class ThemeStorePackageTest {
             .put("clickSound", JSONObject().put("volume", 1.0))
             .put("backgroundMusic", JSONObject().put("volume", 0.35))
             .put("startupAnimation", JSONObject())
+    }
+
+    private fun themeConfigWithFont(font: JSONObject): JSONObject {
+        return currentThemeConfig()
+            .put("font", font)
     }
 
     private fun createArchive(vararg entries: Pair<String, ByteArray>): ByteArray {

@@ -65,6 +65,7 @@ import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.LkmSelection
+import me.weishu.kernelsu.ui.util.ThemeStoreImageSlot
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -177,11 +178,11 @@ private fun InstallMethodOptionsCard(
 ) {
     if (options.isEmpty()) return
 
-    Card(
+    InstallWallpaperCard(
+        slot = ThemeStoreImageSlot.InstallMethods,
         modifier = Modifier
             .fillMaxWidth()
             .installLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
             options.forEach { option ->
@@ -214,11 +215,11 @@ private fun OptionalSettingsCard(
 ) {
     if (state.installMethod is InstallMethod.AnyKernel) return
 
-    Card(
+    InstallWallpaperCard(
+        slot = ThemeStoreImageSlot.InstallOptions,
         modifier = Modifier
             .fillMaxWidth()
             .installLiquidGlassSurface(),
-        colors = liquidGlassMiuixCardColors(colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
             AnimatedVisibility(
@@ -500,15 +501,15 @@ private fun SelectFileCard(
     val statusColor = if (hasFile) Color(0xFF1FAF55) else colorScheme.primary
     val summary = option.summary
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val shape = RoundedCornerShape(18.dp)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .then(
                 if (isLiquidGlassTheme()) {
                     Modifier.globalLiquidGlassSurface(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = shape,
                         surfaceAlpha = 0.60f,
                         blurRadius = 10.dp,
                         refractionHeight = 14.dp,
@@ -519,7 +520,7 @@ private fun SelectFileCard(
                     Modifier.background(colorScheme.surfaceContainerHigh.copy(alpha = 0.96f))
                 }
             )
-            .border(1.dp, colorScheme.primary.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+            .border(1.dp, colorScheme.primary.copy(alpha = 0.22f), shape)
             .toggleable(
                 value = selected,
                 onValueChange = { onClick() },
@@ -527,52 +528,76 @@ private fun SelectFileCard(
                 indication = LocalIndication.current,
                 interactionSource = interactionSource
             )
-            .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
-        Box(
+        InstallCardWallpaperBackground(ThemeStoreImageSlot.InstallImage)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .size(46.dp)
-                .background(colorScheme.primary.copy(alpha = 0.14f), CircleShape),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
         ) {
-            Icon(
-                imageVector = if (hasFile) Icons.Rounded.CheckCircleOutline else Icons.Rounded.AutoFixHigh,
-                tint = statusColor,
-                modifier = Modifier.size(25.dp),
-                contentDescription = null
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                text = stringResource(id = option.label),
-                modifier = Modifier.fillMaxWidth(),
-                color = colorScheme.onSurface,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            StatusPill(
-                text = statusText,
-                color = statusColor,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            summary?.let {
-                Text(
-                    text = it,
-                    color = colorScheme.onSurfaceVariantSummary,
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(colorScheme.primary.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (hasFile) Icons.Rounded.CheckCircleOutline else Icons.Rounded.AutoFixHigh,
+                    tint = statusColor,
+                    modifier = Modifier.size(25.dp),
+                    contentDescription = null
                 )
             }
-            BootImageTip()
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Text(
+                    text = stringResource(id = option.label),
+                    modifier = Modifier.fillMaxWidth(),
+                    color = colorScheme.onSurface,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                StatusPill(
+                    text = statusText,
+                    color = statusColor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                summary?.let {
+                    Text(
+                        text = it,
+                        color = colorScheme.onSurfaceVariantSummary,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BootImageTip()
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstallWallpaperCard(
+    slot: ThemeStoreImageSlot,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = modifier,
+        colors = liquidGlassMiuixCardColors(colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            InstallCardWallpaperBackground(slot)
+            content()
         }
     }
 }

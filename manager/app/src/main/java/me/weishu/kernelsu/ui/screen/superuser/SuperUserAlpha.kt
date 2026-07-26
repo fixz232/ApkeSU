@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Refresh
@@ -62,9 +63,12 @@ fun SuperUserPagerAlpha(
         topActionIcon = Icons.Rounded.Fingerprint,
         onTopActionClick = actions.onOpenAppIdManager,
         topActionContentDescription = stringResource(R.string.app_id_manager_open),
-        secondaryTopActionIcon = if (studioStyle) Icons.Rounded.Refresh else null,
-        onSecondaryTopActionClick = actions.onRefresh,
-        secondaryTopActionContentDescription = stringResource(R.string.refresh_refresh),
+        secondaryTopActionIcon = Icons.Rounded.AcUnit,
+        onSecondaryTopActionClick = actions.onOpenAppFreeze,
+        secondaryTopActionContentDescription = stringResource(R.string.app_freeze_open),
+        tertiaryTopActionIcon = if (studioStyle) Icons.Rounded.Refresh else null,
+        onTertiaryTopActionClick = actions.onRefresh,
+        tertiaryTopActionContentDescription = stringResource(R.string.refresh_refresh),
     ) { contentPadding ->
         LazyColumn(
             contentPadding = PaddingValues(

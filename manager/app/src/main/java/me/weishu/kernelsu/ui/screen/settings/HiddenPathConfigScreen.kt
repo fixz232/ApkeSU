@@ -491,10 +491,11 @@ fun HiddenPathConfigScreen() {
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
+            val activeTab = selectedTab.coerceIn(0, 2)
+            PrimaryTabRow(selectedTabIndex = activeTab) {
                 listOf(TEXT_CONFIG, TEXT_LOG, TEXT_HELP).forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedTab == index,
+                        selected = activeTab == index,
                         onClick = { selectedTab = index },
                         text = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     )
@@ -504,7 +505,7 @@ fun HiddenPathConfigScreen() {
             if (loading) {
                 LoadingContent()
             } else {
-                when (selectedTab) {
+                when (activeTab) {
                     0 -> HiddenPathConfigTab(
                         config = config,
                         pathInput = pathInput,

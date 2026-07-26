@@ -350,6 +350,9 @@ fun AlphaScreen(
     secondaryTopActionIcon: ImageVector? = null,
     onSecondaryTopActionClick: () -> Unit = {},
     secondaryTopActionContentDescription: String? = null,
+    tertiaryTopActionIcon: ImageVector? = null,
+    onTertiaryTopActionClick: () -> Unit = {},
+    tertiaryTopActionContentDescription: String? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val snowStyle = isSnowStyle()
@@ -377,6 +380,9 @@ fun AlphaScreen(
                 secondaryActionIcon = secondaryTopActionIcon,
                 onSecondaryActionClick = onSecondaryTopActionClick,
                 secondaryActionContentDescription = secondaryTopActionContentDescription,
+                tertiaryActionIcon = tertiaryTopActionIcon,
+                onTertiaryActionClick = onTertiaryTopActionClick,
+                tertiaryActionContentDescription = tertiaryTopActionContentDescription,
             )
             Box(modifier = Modifier.weight(1f)) {
                 content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
@@ -394,6 +400,9 @@ fun AlphaTopBar(
     secondaryActionIcon: ImageVector? = null,
     onSecondaryActionClick: () -> Unit = {},
     secondaryActionContentDescription: String? = null,
+    tertiaryActionIcon: ImageVector? = null,
+    onTertiaryActionClick: () -> Unit = {},
+    tertiaryActionContentDescription: String? = null,
 ) {
     val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
     val topBarColor = immersiveTopBarColor(AlphaColors.TopBar)
@@ -437,6 +446,9 @@ fun AlphaTopBar(
                     secondaryActionIcon = secondaryActionIcon,
                     onSecondaryActionClick = onSecondaryActionClick,
                     secondaryActionContentDescription = secondaryActionContentDescription,
+                    tertiaryActionIcon = tertiaryActionIcon,
+                    onTertiaryActionClick = onTertiaryActionClick,
+                    tertiaryActionContentDescription = tertiaryActionContentDescription,
                     tint = AlphaColors.Text,
                     iconSize = 26.dp,
                 )
@@ -481,6 +493,9 @@ fun AlphaTopBar(
                     secondaryActionIcon = secondaryActionIcon,
                     onSecondaryActionClick = onSecondaryActionClick,
                     secondaryActionContentDescription = secondaryActionContentDescription,
+                    tertiaryActionIcon = tertiaryActionIcon,
+                    onTertiaryActionClick = onTertiaryActionClick,
+                    tertiaryActionContentDescription = tertiaryActionContentDescription,
                     tint = AlphaColors.Muted,
                     iconSize = 24.dp,
                 )
@@ -526,6 +541,9 @@ fun AlphaTopBar(
                     secondaryActionIcon = secondaryActionIcon,
                     onSecondaryActionClick = onSecondaryActionClick,
                     secondaryActionContentDescription = secondaryActionContentDescription,
+                    tertiaryActionIcon = tertiaryActionIcon,
+                    onTertiaryActionClick = onTertiaryActionClick,
+                    tertiaryActionContentDescription = tertiaryActionContentDescription,
                     tint = AlphaColors.Text,
                     iconSize = 30.dp,
                     modifier = Modifier.align(Alignment.CenterEnd),
@@ -578,6 +596,9 @@ fun AlphaTopBar(
             secondaryActionIcon = secondaryActionIcon,
             onSecondaryActionClick = onSecondaryActionClick,
             secondaryActionContentDescription = secondaryActionContentDescription,
+            tertiaryActionIcon = tertiaryActionIcon,
+            onTertiaryActionClick = onTertiaryActionClick,
+            tertiaryActionContentDescription = tertiaryActionContentDescription,
             tint = AlphaColors.Text,
             iconSize = 28.dp,
         )
@@ -592,6 +613,9 @@ private fun AlphaTopBarActions(
     secondaryActionIcon: ImageVector?,
     onSecondaryActionClick: () -> Unit,
     secondaryActionContentDescription: String?,
+    tertiaryActionIcon: ImageVector?,
+    onTertiaryActionClick: () -> Unit,
+    tertiaryActionContentDescription: String?,
     tint: Color,
     iconSize: Dp,
     modifier: Modifier = Modifier,
@@ -612,6 +636,16 @@ private fun AlphaTopBarActions(
                 Icon(
                     imageVector = secondaryActionIcon,
                     contentDescription = secondaryActionContentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(iconSize),
+                )
+            }
+        }
+        if (tertiaryActionIcon != null) {
+            IconButton(onClick = onTertiaryActionClick) {
+                Icon(
+                    imageVector = tertiaryActionIcon,
+                    contentDescription = tertiaryActionContentDescription,
                     tint = tint,
                     modifier = Modifier.size(iconSize),
                 )

@@ -19,6 +19,7 @@ from moderation_common import (  # noqa: E402
 )
 from approve_creator import validate_creator_approval  # noqa: E402
 from process_submission import (  # noqa: E402
+    DEFAULT_COVER_URL,
     parse_manifest,
     update_catalog,
     validate_submission_event,
@@ -82,6 +83,34 @@ class ModerationTest(unittest.TestCase):
 
         with self.assertRaises(ValidationFailure):
             parse_manifest(json.dumps(manifest), "alice-theme")
+
+    def test_manifest_accepts_v4_package_but_rejects_v5(self) -> None:
+        manifest = self.valid_manifest()
+        parsed = parse_manifest(json.dumps(manifest), "alice-theme")
+        self.assertEqual(4, parsed["packageVersion"])
+
+        manifest["theme"]["packageVersion"] = 5
+        with self.assertRaises(ValidationFailure):
+            parse_manifest(json.dumps(manifest), "alice-theme")
+
+    def test_manifest_uses_first_screenshot_when_cover_is_blank(self) -> None:
+        manifest = self.valid_manifest()
+        manifest["theme"]["coverUrl"] = ""
+        manifest["theme"]["screenshots"] = [
+            "https://raw.githubusercontent.com/alice-theme/themes/main/screen.png"
+        ]
+
+        parsed = parse_manifest(json.dumps(manifest), "alice-theme")
+
+        self.assertEqual(parsed["screenshots"][0], parsed["coverUrl"])
+
+    def test_manifest_uses_default_cover_when_cover_is_missing(self) -> None:
+        manifest = self.valid_manifest()
+        del manifest["theme"]["coverUrl"]
+
+        parsed = parse_manifest(json.dumps(manifest), "alice-theme")
+
+        self.assertEqual(DEFAULT_COVER_URL, parsed["coverUrl"])
 
     def test_remote_image_accepts_exact_streaming_boundary(self) -> None:
         payload = b"\x89PNG\r\n\x1a\n" + b"x" * 24
@@ -238,6 +267,34 @@ class ModerationTest(unittest.TestCase):
             style["image_sha256"] = "b" * 64
             with self.assertRaises(ValidationFailure):
                 validate_embedded_assets(metadata, {image_path}, "theme", archive)
+
+    def test_cloud_package_validates_embedded_font(self) -> None:
+        font_path = "assets/font_custom.ttf"
+        font_bytes = b"\x00\x01\x00\x00validated-font"
+        font_hash = hashlib.sha256(font_bytes).hexdigest()
+        metadata = {
+            "version": 4,
+            "font": {
+                "preset": "custom",
+                "name": "Example.ttf",
+                "asset": {"path": font_path},
+                "sha256": font_hash,
+                "sizeBytes": len(font_bytes),
+            },
+        }
+        archive_bytes = io.BytesIO()
+        with zipfile.ZipFile(archive_bytes, "w") as archive:
+            archive.writestr(font_path, font_bytes)
+        archive_bytes.seek(0)
+
+        with zipfile.ZipFile(archive_bytes) as archive:
+            validate_embedded_assets(metadata, {font_path}, "theme", archive)
+
+        metadata["font"]["sha256"] = "b" * 64
+        archive_bytes.seek(0)
+        with zipfile.ZipFile(archive_bytes) as archive:
+            with self.assertRaises(ValidationFailure):
+                validate_embedded_assets(metadata, {font_path}, "theme", archive)
 
     def test_catalog_adds_custom_category_and_preserves_owner(self) -> None:
         catalog = {

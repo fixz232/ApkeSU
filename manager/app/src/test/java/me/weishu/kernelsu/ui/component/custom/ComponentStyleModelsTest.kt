@@ -9,6 +9,16 @@ import org.junit.Test
 
 class ComponentStyleModelsTest {
     @Test
+    fun pixelGridDimensionCompatibilityRejectsCrossLayerUpdates() {
+        val top = PixelGrid.blank(CARD_GRID_WIDTH, CARD_TOP_GRID_HEIGHT)
+        val body = PixelGrid.blank(CARD_GRID_WIDTH, CARD_BODY_GRID_HEIGHT)
+        val anotherTop = PixelGrid.blank(CARD_GRID_WIDTH, CARD_TOP_GRID_HEIGHT)
+
+        assertTrue(top.hasSameDimensionsAs(anotherTop))
+        assertFalse(top.hasSameDimensionsAs(body))
+    }
+
+    @Test
     fun cardStyleRoundTripsAllTargetsAndMotion() {
         val top = PixelGrid.blank(CARD_GRID_WIDTH, CARD_TOP_GRID_HEIGHT)
             .withPixel(2, 1, 0xFF42B9F5L)

@@ -59,6 +59,9 @@ import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.APP_FONT_PREFERENCE_KEYS
+import me.weishu.kernelsu.ui.util.AppFontState
+import me.weishu.kernelsu.ui.util.readAppFontState
 import me.weishu.kernelsu.ui.util.CUSTOM_PAGE_BACKGROUND_PREFERENCE_KEYS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_AUDIO_VOLUME
@@ -111,6 +114,7 @@ class MainActivityViewModel(
         val interfaceStyle = settingRepo.uiMode
         return MainActivityUiState(
             appSettings = ThemeController.getAppSettings(ksuApp),
+            appFont = readAppFontState(ksuApp),
             pageScale = settingRepo.pageScale,
             fontScale = settingRepo.fontScale,
             blurIntensity = settingRepo.blurIntensity,
@@ -169,6 +173,7 @@ class MainActivityViewModel(
                 paletteStyle = preset.paletteStyle,
                 colorSpec = preset.colorSpec,
             ),
+            appFont = AppFontState.Default,
             pageScale = 1f,
             fontScale = 1f,
             blurIntensity = 1f,
@@ -221,6 +226,7 @@ class MainActivityViewModel(
         val observedKeys = buildSet {
             add(THEME_SYNC_STRATEGY_KEY)
             addAll(ThemePreferenceKeys)
+            addAll(APP_FONT_PREFERENCE_KEYS)
             InterfaceStyle.entries.forEach { style ->
                 ThemePreferenceKeys.forEach { key ->
                     add("${key}_${style.value}")
