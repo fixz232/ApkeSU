@@ -1,7 +1,7 @@
 {
   "schema": "io.github.fixz.apkesu.theme-catalog",
   "version": 1,
-  "generatedAt": 1784947544709,
+  "generatedAt": 1785159060291,
   "categories": [
     {
       "id": "anime",
@@ -44,7 +44,7 @@
       "publishedAt": 1784947544709,
       "status": "published",
       "featured": false,
-      "downloadCount": 0
+      "downloadCount": 15
     },
     {
       "id": "miku-nakano",
@@ -81,7 +81,7 @@
       "publishedAt": 1784947544709,
       "status": "published",
       "featured": false,
-      "downloadCount": 0
+      "downloadCount": 19
     },
     {
       "id": "rikka-takanashi",
@@ -118,7 +118,7 @@
       "publishedAt": 1784873972135,
       "status": "published",
       "featured": false,
-      "downloadCount": 0
+      "downloadCount": 29
     },
     {
       "id": "yosuga-no-sora",
@@ -155,7 +155,7 @@
       "publishedAt": 1784947544709,
       "status": "published",
       "featured": false,
-      "downloadCount": 0
+      "downloadCount": 20
     }
   ]
 }
