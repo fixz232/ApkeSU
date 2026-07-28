@@ -1,7 +1,7 @@
 {
   "schema": "io.github.fixz.apkesu.theme-catalog",
   "version": 1,
-  "generatedAt": 1785159060291,
+  "generatedAt": 1785219369094,
   "categories": [
     {
       "id": "anime",
@@ -9,6 +9,42 @@
     }
   ],
   "themes": [
+    {
+      "id": "hoshinotakanashibluearchiveblue101",
+      "name": "蔚蓝档案_小鸟游星野_蓝_1.0.1\n\n名称:蔚蓝档案_小鸟游星野_蓝_1.0.1\n作者:回忆里的海平线\n时间:20260728124800\n简介:无",
+      "author": {
+        "id": "hyldhpx",
+        "name": "回忆里的海平线",
+        "bio": "无",
+        "profileUrl": "https://github.com/hyldhpx",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/207416886?v=4"
+      },
+      "description": "ApkeSU主题\n名称:蔚蓝档案_小鸟游星野_蓝_1.0.1\n作者:回忆里的海平线\n时间:20260728124800\n简介:无",
+      "category": "anime",
+      "tags": [
+        "蔚蓝档案",
+        "小鸟游星野"
+      ],
+      "versionCode": 1,
+      "versionName": "1.0.1",
+      "packageSchema": "io.github.fixz.apkesu.theme",
+      "packageVersion": 4,
+      "minManagerVersionCode": 32710,
+      "maxManagerVersionCode": null,
+      "coverUrl": "https://github.com/HYLDHPX/Theme/releases/download/ApkeSU/HoshinoTakanashi_BlueArchive_Blue_1.0.1.jpg",
+      "screenshots": [
+        "https://github.com/HYLDHPX/Theme/releases/download/ApkeSU/HoshinoTakanashi_BlueArchive_Blue_1.0.1.jpg"
+      ],
+      "downloadUrl": "https://github.com/fixz232/ApkeSU/releases/download/theme-hoshinotakanashibluearchiveblue101-v1/hoshinotakanashibluearchiveblue101-v1.kstheme",
+      "sha256": "2ffb2da2a4e099f53e0766ab2fb52662beb5a2023ec944edb1a806e581406a48",
+      "sizeBytes": 2598168,
+      "license": "MTK",
+      "changelog": "ApkeSU主题\n名称:蔚蓝档案_小鸟游星野_蓝_1.0.1\n作者:回忆里的海平线\n时间:20260728124800\n简介:无",
+      "publishedAt": 1785219369094,
+      "status": "published",
+      "featured": false,
+      "downloadCount": 0
+    },
     {
       "id": "kaguya-hime",
       "name": "超时空辉夜姬",
