@@ -34,7 +34,7 @@ class CloudThemeCatalogTest {
     @Test
     fun parseCatalog_rejectsNonGithubDownloadHost() {
         val unsafe = validCatalogJson().replace(
-            "https://github.com/fixz232/ApkeSU/releases/download/theme-1/aurora.kstheme",
+            "https://github.com/fixz232/ApkeSU-ThemeStore/releases/download/theme-1/aurora.kstheme",
             "https://example.com/aurora.kstheme",
         )
 
@@ -58,7 +58,7 @@ class CloudThemeCatalogTest {
     @Test
     fun parseCatalog_rejectsDuplicateScreenshots() {
         val screenshot =
-            "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora-1.png"
+            "https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora-1.png"
         val duplicateScreenshots = validCatalogJson().replace(
             "\"screenshots\":[\"$screenshot\"]",
             "\"screenshots\":[\"$screenshot\",\"$screenshot\"]",
@@ -166,9 +166,9 @@ class CloudThemeCatalogTest {
           "packageVersion":4,
           "minManagerVersionCode":32700,
           "maxManagerVersionCode":33000,
-          "coverUrl":"https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora.png",
-          "screenshots":["https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora-1.png"],
-          "downloadUrl":"https://github.com/fixz232/ApkeSU/releases/download/theme-1/aurora.kstheme",
+          "coverUrl":"https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora.png",
+          "screenshots":["https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora-1.png"],
+          "downloadUrl":"https://github.com/fixz232/ApkeSU-ThemeStore/releases/download/theme-1/aurora.kstheme",
           "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "sizeBytes":1024,
           "license":"CC-BY-4.0",
