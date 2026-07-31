@@ -73,3 +73,5 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 - [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
 - [genuine](https://github.com/brevent/genuine/): APK签名校验方案
 - [Diamorphine](https://github.com/m0nad/Diamorphine): 底层隐藏技术参考
+
+##频道https://t.me/ApkeSu
