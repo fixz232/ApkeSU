@@ -602,4 +602,5 @@
     <string name="cloud_theme_creator_review_published">已發佈</string>
     <string name="cloud_theme_creator_review_meta">Issue #%1$d · %2$s</string>
     <string name="cloud_theme_creator_operation_failed">創作者操作失敗</string>
+    <string name="interface_style_material">上游預設風格</string>
 </resources>

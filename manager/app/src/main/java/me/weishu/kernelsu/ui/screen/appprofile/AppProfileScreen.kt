@@ -21,6 +21,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
@@ -38,6 +40,7 @@ fun AppProfileScreen(uid: Int) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     val viewModel: SuperUserViewModel = viewModel()
     val appGroupState = remember(uid) {
         derivedStateOf {
@@ -164,8 +167,8 @@ fun AppProfileScreen(uid: Int) {
         },
     )
 
-    AppProfileScreenMiuix(
-        state = state,
-        actions = actions,
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> AppProfileScreenMiuix(state, actions)
+        UiMode.Material -> AppProfileScreenMaterial(state, actions, materialSnackbarHost)
+    }
 }

@@ -926,6 +926,7 @@
     <string name="settings_ui_mode">Стиль пользовательского интерфейса</string>
     <string name="settings_ui_mode_summary">Выберите стиль интерфейса.</string>
     <string name="interface_style_miuix">Миуикс</string>
+    <string name="interface_style_material">Стиль по умолчанию</string>
     <string name="interface_style_studio">Обсидиановая консоль</string>
     <string name="interface_style_liquid_glass">Матовое стекло</string>
     <string name="interface_style_snow">Четыре сезона</string>

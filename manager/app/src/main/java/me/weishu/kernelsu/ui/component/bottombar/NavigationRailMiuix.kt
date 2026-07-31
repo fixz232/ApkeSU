@@ -35,6 +35,7 @@ import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
+import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
@@ -45,6 +46,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun NavigationRailMiuix(
     blurBackdrop: LayerBackdrop?,
+    navigationBadge: NavigationBadgeState,
     modifier: Modifier = Modifier,
 ) {
     val mainState = LocalMainPagerState.current
@@ -62,6 +64,7 @@ fun NavigationRailMiuix(
                 blurBackdrop = blurBackdrop,
                 modifier = modifier,
                 selectedIndex = mainState.selectedPage,
+                navigationBadge = navigationBadge,
                 onSelected = mainState::animateToPage,
             )
         } else {
@@ -83,6 +86,7 @@ fun NavigationRailMiuix(
                         onClick = {
                             mainState.animateToPage(index)
                         },
+                        badge = navigationBadgeFor(index, navigationBadge),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -97,6 +101,7 @@ private fun MiuixCustomNavigationRail(
     blurBackdrop: LayerBackdrop?,
     modifier: Modifier,
     selectedIndex: Int,
+    navigationBadge: NavigationBadgeState,
     onSelected: (Int) -> Unit,
 ) {
     val customIcons = LocalCustomNavigationIcons.current
@@ -121,6 +126,7 @@ private fun MiuixCustomNavigationRail(
                 destination = destination,
                 state = customIcons[destination.slot],
                 selected = selectedIndex == index,
+                badge = navigationBadgeFor(index, navigationBadge),
                 onClick = { onSelected(index) },
             )
         }
@@ -133,6 +139,7 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
     destination: BottomBarDestination,
     state: CustomNavigationIconState,
     selected: Boolean,
+    badge: (@Composable () -> Unit)?,
     onClick: () -> Unit,
 ) {
     val label = stringResource(destination.label)
@@ -176,18 +183,25 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            CustomNavigationIconImage(
-                state = state,
-                contentDescription = label,
-                modifier = Modifier.size(24.dp),
-                alpha = if (selected) 1f else 0.72f,
-            ) {
-                Icon(
-                    imageVector = destination.icon,
+            val icon: @Composable () -> Unit = {
+                CustomNavigationIconImage(
+                    state = state,
                     contentDescription = label,
                     modifier = Modifier.size(24.dp),
-                    tint = iconTint,
-                )
+                    alpha = if (selected) 1f else 0.72f,
+                ) {
+                    Icon(
+                        imageVector = destination.icon,
+                        contentDescription = label,
+                        modifier = Modifier.size(24.dp),
+                        tint = iconTint,
+                    )
+                }
+            }
+            if (badge != null) {
+                BadgedBox(badge = { badge() }) { icon() }
+            } else {
+                icon()
             }
         }
         Text(

@@ -18,7 +18,6 @@ import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperBackground
 import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperTarget
 import me.weishu.kernelsu.ui.screen.home.rememberHomeMetricCardWallpaperBitmap
 import me.weishu.kernelsu.ui.screen.home.rememberHomeMetricCardWallpaperState
-import me.weishu.kernelsu.ui.util.reboot
 import top.yukonga.miuix.kmp.basic.DropdownColors
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -57,6 +56,7 @@ fun RebootListPopupMiuix(
     }
 
     KsuIsValid {
+        val onReboot = rememberRebootAction()
         IconButton(
             modifier = modifier,
             enabled = enabled,
@@ -97,6 +97,7 @@ fun RebootListPopupMiuix(
                                 index = idx,
                                 modifier = Modifier.fillMaxWidth(),
                                 dropdownColors = dropdownColors,
+                                onReboot = onReboot,
                             )
                         }
                     }
@@ -114,6 +115,7 @@ fun RebootDropdownItem(
     index: Int,
     modifier: Modifier = Modifier,
     dropdownColors: DropdownColors = DropdownDefaults.dropdownColors(),
+    onReboot: (String) -> Unit,
 ) {
     me.weishu.kernelsu.ui.component.miuix.DropdownItem(
         text = stringResource(option.labelRes),
@@ -121,8 +123,8 @@ fun RebootDropdownItem(
         modifier = modifier,
         dropdownColors = dropdownColors,
         onSelectedIndexChange = {
-            reboot(option.reason)
             showTopPopup.value = false
+            onReboot(option.reason)
         },
         index = index
     )

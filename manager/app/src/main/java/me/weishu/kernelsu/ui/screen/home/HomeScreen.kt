@@ -154,6 +154,12 @@ fun HomePager(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (LocalInterfaceStyle.current) {
+            InterfaceStyle.Material.value -> HomePagerMaterial(
+                state = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+
             InterfaceStyle.Studio.value -> HomePagerStudio(
                 state = uiState,
                 actions = actions,

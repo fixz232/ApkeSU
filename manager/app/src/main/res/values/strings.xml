@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ApkeSU</string>
-    <string name="home_title" translatable="false">KernelSU</string>
+    <string name="home_title" translatable="false">ApkeSU</string>
+    <string name="module_shortcut_copy_scheme">Copy shortcut link</string>
+    <string name="module_shortcut_scheme_copied">Shortcut link copied</string>
+    <string name="jailbreak_reboot_warning">You are in Jailbreak mode. Rebooting will lose root access, and you will have to jailbreak again after the device starts up. Reboot anyway?</string>
     <string name="home">Home</string>
     <string name="home_not_installed">Ready to install</string>
     <string name="home_click_to_install">Tap to install</string>
@@ -929,6 +932,7 @@
     <string name="settings_ui_mode">UI Style</string>
     <string name="settings_ui_mode_summary">Choose the interface style.</string>
     <string name="interface_style_miuix">Miuix</string>
+    <string name="interface_style_material">Upstream default</string>
     <string name="interface_style_studio">Obsidian console</string>
     <string name="interface_style_liquid_glass">Frosted glass</string>
     <string name="interface_style_snow">Four seasons</string>
@@ -2541,4 +2545,6 @@
     <string name="image_tool_log_title">Operation log</string>
     <string name="image_tool_log_empty">No operation has run yet.</string>
     <string name="theme_store_fonts_summary">Manage built-in fonts and validated custom TTF files. Font choices are included in theme packages.</string>
+    <string name="nav_rail_expand">Expand navigation rail</string>
+    <string name="nav_rail_collapse">Collapse navigation rail</string>
 </resources>

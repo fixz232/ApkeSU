@@ -11,6 +11,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.screen.flash.FlashIt
@@ -56,7 +58,10 @@ fun ModuleRepoScreen() {
         },
     )
 
-    ModuleRepoScreenMiuix(uiState, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> ModuleRepoScreenMiuix(uiState, actions)
+        UiMode.Material -> ModuleRepoScreenMaterial(uiState, actions)
+    }
 }
 
 @Composable
@@ -121,5 +126,8 @@ fun ModuleRepoDetailScreen(module: RepoModuleArg) {
         onInstallModule = { uri -> navigator.push(Route.Flash(FlashIt.FlashModules(listOf(uri)))) },
     )
 
-    ModuleRepoDetailScreenMiuix(state, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> ModuleRepoDetailScreenMiuix(state, actions)
+        UiMode.Material -> ModuleRepoDetailScreenMaterial(state, actions)
+    }
 }

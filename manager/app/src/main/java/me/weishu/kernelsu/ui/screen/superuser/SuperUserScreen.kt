@@ -68,6 +68,15 @@ fun SuperUserPager(
     )
 
     when (LocalInterfaceStyle.current) {
+        InterfaceStyle.Material.value -> {
+            SuperUserPagerMaterial(
+                uiState = uiState,
+                actions = actions,
+                bottomInnerPadding = bottomInnerPadding,
+            )
+            return
+        }
+
         InterfaceStyle.Studio.value -> {
             SuperUserPagerStudio(
                 uiState = uiState,

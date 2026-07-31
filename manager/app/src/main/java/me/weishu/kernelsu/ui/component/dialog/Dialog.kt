@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.parcelize.Parcelize
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import kotlin.coroutines.resume
 
 private const val TAG = "DialogComponent"
@@ -304,7 +306,10 @@ fun rememberLoadingDialog(): LoadingDialogHandle {
     val visible = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    LoadingDialogMiuix(visible)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> LoadingDialogMiuix(visible)
+        UiMode.Material -> LoadingDialogMaterial(visible)
+    }
 
     return remember {
         LoadingDialogHandleImpl(visible, coroutineScope)
@@ -328,12 +333,20 @@ private fun rememberConfirmDialog(visuals: ConfirmDialogVisuals, callback: Confi
         }
     )
 
-    ConfirmDialogMiuix(
-        handle.visuals,
-        confirm = { coroutineScope.launch { resultChannel.send(ConfirmResult.Confirmed) } },
-        dismiss = { coroutineScope.launch { resultChannel.send(ConfirmResult.Canceled) } },
-        showDialog = visible
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> ConfirmDialogMiuix(
+            handle.visuals,
+            confirm = { coroutineScope.launch { resultChannel.send(ConfirmResult.Confirmed) } },
+            dismiss = { coroutineScope.launch { resultChannel.send(ConfirmResult.Canceled) } },
+            showDialog = visible
+        )
+        UiMode.Material -> ConfirmDialogMaterial(
+            handle.visuals,
+            confirm = { coroutineScope.launch { resultChannel.send(ConfirmResult.Confirmed) } },
+            dismiss = { coroutineScope.launch { resultChannel.send(ConfirmResult.Canceled) } },
+            showDialog = visible
+        )
+    }
 
     return handle
 }

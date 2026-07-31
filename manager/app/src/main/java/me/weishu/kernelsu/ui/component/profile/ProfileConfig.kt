@@ -3,6 +3,8 @@ package me.weishu.kernelsu.ui.component.profile
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 
 @Composable
 fun AppProfileConfig(
@@ -12,13 +14,10 @@ fun AppProfileConfig(
     profile: Natives.Profile,
     onProfileChange: (Natives.Profile) -> Unit,
 ) {
-    AppProfileConfigMiuix(
-        modifier = modifier,
-        fixedName = fixedName,
-        enabled = enabled,
-        profile = profile,
-        onProfileChange = onProfileChange
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> AppProfileConfigMiuix(modifier, fixedName, enabled, profile, onProfileChange)
+        UiMode.Material -> AppProfileConfigMaterial(modifier, fixedName, enabled, profile, onProfileChange)
+    }
 }
 
 @Composable
@@ -29,13 +28,15 @@ fun RootProfileConfig(
     profile: Natives.Profile,
     onProfileChange: (Natives.Profile) -> Unit,
 ) {
-    RootProfileConfigMiuix(
-        modifier = modifier,
-        fixedName = fixedName,
-        enabled = enabled,
-        profile = profile,
-        onProfileChange = onProfileChange
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> RootProfileConfigMiuix(modifier, fixedName, enabled, profile, onProfileChange)
+        UiMode.Material -> RootProfileConfigMaterial(
+            modifier = modifier,
+            enabled = enabled,
+            profile = profile,
+            onProfileChange = onProfileChange,
+        )
+    }
 }
 
 @Composable
@@ -46,11 +47,15 @@ fun TemplateConfig(
     onManageTemplate: () -> Unit = {},
     onProfileChange: (Natives.Profile) -> Unit
 ) {
-    TemplateConfigMiuix(
-        modifier = modifier,
-        profile = profile,
-        onViewTemplate = onViewTemplate,
-        onManageTemplate = onManageTemplate,
-        onProfileChange = onProfileChange
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> TemplateConfigMiuix(
+            modifier, profile, onViewTemplate, onManageTemplate, onProfileChange
+        )
+        UiMode.Material -> TemplateConfigMaterial(
+            profile = profile,
+            onViewTemplate = onViewTemplate,
+            onManageTemplate = onManageTemplate,
+            onProfileChange = onProfileChange,
+        )
+    }
 }

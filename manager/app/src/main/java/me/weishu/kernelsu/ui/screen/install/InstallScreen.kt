@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.getKernelVersion
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.choosekmidialog.ChooseKmiDialog
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
@@ -46,6 +48,7 @@ fun InstallScreen() {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     val resources = LocalResources.current
 
     var installMethod by rememberSaveable { mutableStateOf<InstallMethod?>(null) }
@@ -397,7 +400,10 @@ fun InstallScreen() {
         },
     )
 
-    InstallScreenMiuix(state, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> InstallScreenMiuix(state, actions)
+        UiMode.Material -> InstallScreenMaterial(state, actions, materialSnackbarHost)
+    }
 }
 
 private suspend fun <T> loadInstallState(defaultValue: T, block: suspend () -> T): T {

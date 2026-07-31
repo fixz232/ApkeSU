@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -76,6 +77,7 @@ import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.component.miuix.ScaleDialog
@@ -876,6 +878,7 @@ private fun ThemePreviewCardMiuix(
     val screenWidth = configuration.screenWidthDp.toFloat()
     val screenHeight = configuration.screenHeightDp.toFloat()
     val screenRatio = screenWidth / screenHeight
+    val useRail = useNavigationRail(enableFloatingBottomBar)
 
     val seedColor = if (keyColor == 0) colorScheme.primary else Color(keyColor)
     val effectiveStyle = if (keyColor == 0) PaletteStyle.TonalSpot else paletteStyle
@@ -920,12 +923,13 @@ private fun ThemePreviewCardMiuix(
                     .background(bgColor)
                     .border(1.dp, colorScheme.outline, RoundedCornerShape(20.dp))
             ) {
-                Column {
+                val content = @Composable {
+                    Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(if (useRail) 36.dp else 48.dp)
                         .fillMaxWidth()
-                        .padding(start = 12.dp, top = 24.dp),
+                        .padding(start = 12.dp, top = if (useRail) 12.dp else 24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -1002,8 +1006,45 @@ private fun ThemePreviewCardMiuix(
                 }
 
             }
+                }
 
-            if (enableFloatingBottomBar) {
+                if (useRail) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(30.dp)
+                                .background(navBarColor),
+                            verticalArrangement = Arrangement.spacedBy(
+                                10.dp,
+                                Alignment.CenterVertically,
+                            ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            repeat(4) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(13.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(
+                                            if (it == 0) navSelectedColor else navUnselectedColor
+                                        ),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(0.5.dp)
+                                .background(textColor.copy(alpha = 0.1f)),
+                        )
+                        Box(modifier = Modifier.weight(1f)) { content() }
+                    }
+                } else {
+                    content()
+                }
+
+            if (!useRail && enableFloatingBottomBar) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -1032,7 +1073,7 @@ private fun ThemePreviewCardMiuix(
                         }
                     }
                 }
-            } else {
+            } else if (!useRail) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

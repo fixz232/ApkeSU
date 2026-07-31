@@ -887,6 +887,7 @@
     <string name="settings_ui_mode">Estilo de interfaz de usuario</string>
     <string name="settings_ui_mode_summary">Elija el estilo de la interfaz.</string>
     <string name="interface_style_miuix">Miuix</string>
+    <string name="interface_style_material">Estilo predeterminado</string>
     <string name="interface_style_studio">Consola de obsidiana</string>
     <string name="interface_style_liquid_glass">Vidrio esmerilado</string>
     <string name="interface_style_snow">Cuatro estaciones</string>

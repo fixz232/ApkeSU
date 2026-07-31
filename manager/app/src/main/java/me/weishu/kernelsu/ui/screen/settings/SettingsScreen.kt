@@ -209,6 +209,7 @@ fun SettingPager(
     )
 
     when (LocalInterfaceStyle.current) {
+        InterfaceStyle.Material.value -> SettingPagerMaterial(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Studio.value -> SettingPagerStudio(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
         InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)

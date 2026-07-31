@@ -949,6 +949,7 @@
     <string name="settings_scroll_animation_effect_burst">Explosion de particules</string>
     <string name="settings_scroll_animation_effect_aurora">Lueur d\&apos;aurore</string>
     <string name="interface_style_miuix">Miuix</string>
+    <string name="interface_style_material">Style par défaut</string>
     <string name="interface_style_studio">Console en obsidienne</string>
     <string name="interface_style_liquid_glass">Verre dépoli</string>
     <string name="interface_style_snow">Quatre saisons</string>

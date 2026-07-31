@@ -13,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.dropUnlessResumed
 import kotlinx.coroutines.launch
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 
 @Composable
@@ -21,6 +23,7 @@ fun ExecuteModuleActionScreen(moduleId: String, fromShortcut: Boolean = false) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val scope = rememberCoroutineScope()
+    val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     var text by rememberSaveable { mutableStateOf("") }
     val logContent = remember { StringBuilder() }
     var isComplete by rememberSaveable { mutableStateOf(false) }
@@ -68,5 +71,8 @@ fun ExecuteModuleActionScreen(moduleId: String, fromShortcut: Boolean = false) {
         onClose = exitExecute,
     )
 
-    ExecuteModuleActionScreenMiuix(state, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> ExecuteModuleActionScreenMiuix(state, actions)
+        UiMode.Material -> ExecuteModuleActionScreenMaterial(state, actions, materialSnackbarHost)
+    }
 }

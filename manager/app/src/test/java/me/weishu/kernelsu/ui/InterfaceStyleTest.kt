@@ -25,20 +25,26 @@ class InterfaceStyleTest {
     }
 
     @Test
-    fun materialIsNotSelectableAndMigratesToMiuix() {
-        val legacyMaterialValue = "material"
-        assertFalse(InterfaceStyle.entries.any { it.value == legacyMaterialValue })
-        assertFalse(InterfaceStyle.selectableEntries.any { it.value == legacyMaterialValue })
-        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue(legacyMaterialValue))
+    fun materialIsSelectableAndUsesMaterialUiMode() {
+        val materialValue = InterfaceStyle.Material.value
+        assertTrue(InterfaceStyle.Material in InterfaceStyle.entries)
+        assertTrue(InterfaceStyle.Material in InterfaceStyle.selectableEntries)
+        assertEquals(materialValue, InterfaceStyle.normalizeValue(materialValue))
         assertEquals(
-            InterfaceStyle.selectedIndex(InterfaceStyle.Miuix.value),
-            InterfaceStyle.selectedIndex(legacyMaterialValue),
+            InterfaceStyle.selectableEntries.indexOf(InterfaceStyle.Material),
+            InterfaceStyle.selectedIndex(materialValue),
         )
-        assertEquals(UiMode.Miuix, UiMode.fromValue(legacyMaterialValue))
+        assertEquals(UiMode.Material, UiMode.fromValue(materialValue))
         assertEquals(
-            InterfaceStyle.Miuix.value,
-            ThemePreset.GEEK_DARK.targetUiMode(legacyMaterialValue),
+            materialValue,
+            ThemePreset.CUSTOM.targetUiMode(materialValue),
         )
+    }
+
+    @Test
+    fun unknownStyleFallsBackToMiuix() {
+        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue("unknown"))
+        assertEquals(UiMode.Miuix, UiMode.fromValue("unknown"))
     }
 
     @Test

@@ -3,7 +3,6 @@ package me.weishu.kernelsu.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -55,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -98,8 +96,10 @@ import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.bottombar.BottomBar
 import me.weishu.kernelsu.ui.component.bottombar.MainPagerState
+import me.weishu.kernelsu.ui.component.bottombar.NavigationBadgeState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
+import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.LocalUiDecorationScope
@@ -215,6 +215,7 @@ import me.weishu.kernelsu.ui.util.ManagerUpdateChecker
 import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getFileName
+import me.weishu.kernelsu.ui.util.getSuperuserCount
 import me.weishu.kernelsu.ui.util.install
 import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
@@ -224,6 +225,7 @@ import me.weishu.kernelsu.ui.util.StartupSoundPlayer
 import me.weishu.kernelsu.ui.viewmodel.MainActivityUiState
 import me.weishu.kernelsu.ui.viewmodel.MainActivityViewModel
 import me.weishu.kernelsu.ui.viewmodel.MainPagerConfig
+import me.weishu.kernelsu.ui.viewmodel.ModuleViewModel
 import me.weishu.kernelsu.ui.webui.WebUIActivity
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -888,6 +890,32 @@ fun MainScreen(
         value = fullFeatured
     }
     val userScrollEnabled = isFullFeatured
+    val moduleViewModel = viewModel<ModuleViewModel>()
+    val moduleUiState by moduleViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(isFullFeatured) {
+        if (isFullFeatured && moduleViewModel.uiState.value.moduleList.isEmpty()) {
+            moduleViewModel.initializePreferences()
+            moduleViewModel.fetchModuleList(checkUpdate = true, resort = false)
+        }
+    }
+    val superuserCount by produceState(initialValue = 0, isFullFeatured, refreshTick) {
+        value = if (isFullFeatured) {
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { getSuperuserCount() }.getOrDefault(0)
+            }
+        } else {
+            0
+        }
+    }
+    val navigationBadge = if (isFullFeatured) {
+        NavigationBadgeState(
+            superuserCount = superuserCount,
+            moduleEnabledCount = moduleUiState.moduleList.count { it.enabled },
+            moduleUpdatableCount = moduleUiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
+        )
+    } else {
+        NavigationBadgeState()
+    }
     val surfaceColor = liquidGlassBackdropColor()
     val blurBackdrop = rememberBlurBackdrop(enableBlur)
     val floatingBarBackdrop = if (enableFloatingBottomBar && enableFloatingBottomBarBlur) {
@@ -915,8 +943,7 @@ fun MainScreen(
 
     MainScreenBackHandler(mainPagerState, navController)
 
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val useNavigationRail = isLandscape && !enableFloatingBottomBar
+    val useNavigationRail = useNavigationRail(enableFloatingBottomBar)
     val navigationBarVisibilityState = rememberNavigationBarVisibilityState(
         enabled = !useNavigationRail && (autoHideNavigationBar || scrollHideNavigationBar),
         autoHideAfterInactivity = autoHideNavigationBar,
@@ -968,6 +995,7 @@ fun MainScreen(
                 Row {
                     SideRail(
                         blurBackdrop = blurBackdrop,
+                        navigationBadge = navigationBadge,
                     )
                     Box(
                         modifier = Modifier
@@ -988,6 +1016,7 @@ fun MainScreen(
                         BottomBar(
                             blurBackdrop = blurBackdrop,
                             backdrop = floatingBarBackdrop,
+                            navigationBadge = navigationBadge,
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     }

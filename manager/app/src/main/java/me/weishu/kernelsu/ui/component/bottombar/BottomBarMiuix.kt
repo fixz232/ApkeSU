@@ -62,6 +62,8 @@ import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
+import top.yukonga.miuix.kmp.basic.Badge
+import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -75,6 +77,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun BottomBarMiuix(
     blurBackdrop: LayerBackdrop?,
     backdrop: Backdrop?,
+    navigationBadge: NavigationBadgeState,
     modifier: Modifier,
 ) {
     val mainState = LocalMainPagerState.current
@@ -118,6 +121,7 @@ fun BottomBarMiuix(
                     destinations = destinations,
                     customIcons = customIcons,
                     selectedIndex = mainState.selectedPage,
+                    navigationBadge = navigationBadge,
                     onSelected = mainState::animateToPage,
                 )
             } else {
@@ -139,7 +143,8 @@ fun BottomBarMiuix(
                                 selected = mainState.selectedPage == index,
                                 onClick = {
                                     mainState.animateToPage(index)
-                                }
+                                },
+                                badge = navigationBadgeFor(index, navigationBadge),
                             )
                         }
                     }
@@ -163,22 +168,30 @@ fun BottomBarMiuix(
         ) {
             destinations.forEachIndexed { index, destination ->
                 val label = stringResource(destination.label)
+                val badge = navigationBadgeFor(index, navigationBadge, floating = true)
                 FloatingBottomBarItem(
                     onClick = {
                         mainState.animateToPage(index)
                     },
                     modifier = Modifier.defaultMinSize(minWidth = 76.dp)
                 ) {
-                    CustomNavigationIconImage(
-                        state = customIcons[destination.slot],
-                        contentDescription = label,
-                        modifier = Modifier.size(24.dp),
-                    ) {
-                        Icon(
-                            imageVector = destination.icon,
+                    val icon: @Composable () -> Unit = {
+                        CustomNavigationIconImage(
+                            state = customIcons[destination.slot],
                             contentDescription = label,
-                            tint = MiuixTheme.colorScheme.onSurface
-                        )
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                imageVector = destination.icon,
+                                contentDescription = label,
+                                tint = MiuixTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    if (badge != null) {
+                        BadgedBox(badge = { badge() }) { icon() }
+                    } else {
+                        icon()
                     }
                     Text(
                         text = label,
@@ -202,6 +215,7 @@ private fun MiuixCustomNavigationBar(
     destinations: List<BottomBarDestination>,
     customIcons: CustomNavigationIconSet,
     selectedIndex: Int,
+    navigationBadge: NavigationBadgeState,
     onSelected: (Int) -> Unit,
 ) {
     val navPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -222,6 +236,7 @@ private fun MiuixCustomNavigationBar(
                     destination = destination,
                     state = customIcons[destination.slot],
                     selected = selectedIndex == index,
+                    badge = navigationBadgeFor(index, navigationBadge),
                     onClick = { onSelected(index) },
                 )
             }
@@ -235,6 +250,7 @@ private fun RowScope.MiuixCustomNavigationBarItem(
     destination: BottomBarDestination,
     state: CustomNavigationIconState,
     selected: Boolean,
+    badge: (@Composable () -> Unit)?,
     onClick: () -> Unit,
 ) {
     val label = stringResource(destination.label)
@@ -280,18 +296,25 @@ private fun RowScope.MiuixCustomNavigationBarItem(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            CustomNavigationIconImage(
-                state = state,
-                contentDescription = label,
-                modifier = Modifier.size(24.dp),
-                alpha = if (selected) 1f else 0.72f,
-            ) {
-                Icon(
-                    imageVector = destination.icon,
+            val icon: @Composable () -> Unit = {
+                CustomNavigationIconImage(
+                    state = state,
                     contentDescription = label,
                     modifier = Modifier.size(24.dp),
-                    tint = iconTint,
-                )
+                    alpha = if (selected) 1f else 0.72f,
+                ) {
+                    Icon(
+                        imageVector = destination.icon,
+                        contentDescription = label,
+                        modifier = Modifier.size(24.dp),
+                        tint = iconTint,
+                    )
+                }
+            }
+            if (badge != null) {
+                BadgedBox(badge = { badge() }) { icon() }
+            } else {
+                icon()
             }
         }
         Text(
@@ -303,6 +326,42 @@ private fun RowScope.MiuixCustomNavigationBarItem(
             softWrap = false,
             overflow = TextOverflow.Visible,
         )
+    }
+}
+
+internal fun navigationBadgeFor(
+    index: Int,
+    state: NavigationBadgeState,
+    floating: Boolean = false,
+): (@Composable () -> Unit)? {
+    val badge = badgeFor(index, state) ?: return null
+    return when (badge.tone) {
+        BadgeTone.Alert -> {
+            {
+                Badge {
+                    Text(badge.count.toString())
+                }
+            }
+        }
+
+        BadgeTone.Accent -> {
+            {
+                Badge(
+                    containerColor = if (floating) {
+                        MiuixTheme.colorScheme.primaryContainer
+                    } else {
+                        MiuixTheme.colorScheme.primary
+                    },
+                    contentColor = if (floating) {
+                        MiuixTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MiuixTheme.colorScheme.onPrimary
+                    },
+                ) {
+                    Text(badge.count.toString())
+                }
+            }
+        }
     }
 }
 

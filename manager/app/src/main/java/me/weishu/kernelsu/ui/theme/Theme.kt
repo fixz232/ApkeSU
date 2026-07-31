@@ -60,6 +60,19 @@ data class AppSettings(
     val colorSpec: ColorSpec.SpecVersion,
 )
 
+val PaletteStyle.supportsSpec2025: Boolean
+    get() = this == PaletteStyle.TonalSpot ||
+        this == PaletteStyle.Neutral ||
+        this == PaletteStyle.Vibrant ||
+        this == PaletteStyle.Expressive
+
+fun ColorSpec.SpecVersion.effectiveFor(style: PaletteStyle): ColorSpec.SpecVersion =
+    if (this == ColorSpec.SpecVersion.SPEC_2025 && !style.supportsSpec2025) {
+        ColorSpec.SpecVersion.SPEC_2021
+    } else {
+        this
+    }
+
 object ThemeController {
     fun getAppSettings(context: Context): AppSettings {
         val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -128,11 +141,18 @@ fun KernelSUTheme(
     val currentAppSettings = appSettings ?: ThemeController.getAppSettings(context)
     val currentAppFontState = appFontState ?: readAppFontState(context)
 
-    MiuixKernelSUTheme(
-        appSettings = currentAppSettings,
-        appFontState = currentAppFontState,
-        content = content
-    )
+    when (uiMode) {
+        UiMode.Miuix -> MiuixKernelSUTheme(
+            appSettings = currentAppSettings,
+            appFontState = currentAppFontState,
+            content = content
+        )
+
+        UiMode.Material -> MaterialKernelSUTheme(
+            appSettings = currentAppSettings,
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -156,7 +176,6 @@ fun isInDarkTheme(): Boolean {
         else -> isSystemInDarkTheme()  // Follow system (0 or default)
     }
 }
-
 
 val LocalColorMode = staticCompositionLocalOf { 0 }
 

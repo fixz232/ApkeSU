@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.KernelStatusEvents
 import me.weishu.kernelsu.ui.util.reboot
@@ -29,9 +31,11 @@ fun FlashScreen(flashIt: FlashIt) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     val flashViewModel = viewModel<FlashViewModel>()
     val executionState by flashViewModel.state.collectAsStateWithLifecycle()
     val needJailbreakWarning = flashIt.needsJailbreakFlashWarning() && Natives.isLateLoadMode
+    val softReboot = flashIt is FlashIt.FlashModules && Natives.isLateLoadMode
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
     var operationRequested by rememberSaveable(flashIt) { mutableStateOf(false) }
     var refreshSent by rememberSaveable(flashIt) { mutableStateOf(false) }
@@ -75,6 +79,7 @@ fun FlashScreen(flashIt: FlashIt) {
         showRebootAction = executionState.showRebootAction,
         flashingStatus = executionState.status,
         showJailbreakWarning = needJailbreakWarning && !flashingEnabled,
+        rebootLabelRes = if (softReboot) R.string.reboot_soft else R.string.reboot,
     )
     val actions = FlashScreenActions(
         onBack = dropUnlessResumed {
@@ -87,7 +92,7 @@ fun FlashScreen(flashIt: FlashIt) {
             KernelStatusEvents.requestRefresh()
             scope.launch {
                 withContext(Dispatchers.IO) {
-                    reboot()
+                    reboot(if (softReboot) "soft_reboot" else "")
                 }
             }
         },
@@ -95,5 +100,8 @@ fun FlashScreen(flashIt: FlashIt) {
         onDismissJailbreakWarning = dropUnlessResumed { navigator.pop() },
     )
 
-    FlashScreenMiuix(state, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> FlashScreenMiuix(state, actions)
+        UiMode.Material -> FlashScreenMaterial(state, actions, materialSnackbarHost)
+    }
 }

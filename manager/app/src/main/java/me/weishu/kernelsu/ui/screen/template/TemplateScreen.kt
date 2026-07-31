@@ -17,6 +17,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.TemplateInfo
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.isNetworkAvailable
@@ -30,6 +32,7 @@ fun AppProfileTemplateScreen() {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     val requestKey = "template_edit"
 
     LaunchedEffect(Unit) {
@@ -111,8 +114,8 @@ fun AppProfileTemplateScreen() {
         },
     )
 
-    AppProfileTemplateScreenMiuix(
-        state = uiState,
-        actions = actions,
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> AppProfileTemplateScreenMiuix(uiState, actions)
+        UiMode.Material -> AppProfileTemplateScreenMaterial(uiState, actions, materialSnackbarHost)
+    }
 }

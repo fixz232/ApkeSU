@@ -395,7 +395,7 @@ private fun SulogStatusSection(
                             text = stringResource(R.string.sulog_enable_action),
                             onClick = actions.onEnableSulog,
                             colors = ButtonDefaults.textButtonColors(
-                                color = if (isDynamicColor) colorScheme.onErrorContainer else Color(0xFFF72727),
+                                color = if (isDynamicColor) colorScheme.onErrorContainer else colorScheme.error,
                                 textColor = colorScheme.onError,
                             ),
                         )

@@ -6,6 +6,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 
 @Composable
@@ -28,7 +30,10 @@ fun AboutScreen() {
         onOpenLink = uriHandler::openUri,
     )
 
-    AboutScreenMiuix(state, actions)
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> AboutScreenMiuix(state, actions)
+        UiMode.Material -> AboutScreenMaterial(state, actions)
+    }
 }
 
 private const val QQ_GROUP_URL = "https://qm.qq.com/q/8O7qvLM3zq"

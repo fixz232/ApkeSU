@@ -842,6 +842,10 @@
     <string name="settings_font_scale">字体缩放</string>
     <string name="settings_font_scale_summary">只调整应用内文字大小，不改变整个系统。</string>
     <string name="interface_style_miuix">小米风格</string>
+    <string name="interface_style_material">上游默认风格</string>
+    <string name="module_shortcut_copy_scheme">复制快捷方式链接</string>
+    <string name="module_shortcut_scheme_copied">快捷方式链接已复制</string>
+    <string name="jailbreak_reboot_warning">当前处于越狱模式，重启后将失去 Root 权限，开机后需要重新越狱。确定要重启吗？</string>
     <string name="interface_style_studio">曜石中枢</string>
     <string name="interface_style_liquid_glass">毛玻璃</string>
     <string name="interface_style_snow">四季主题</string>
@@ -2501,4 +2505,6 @@
     <string name="theme_store_fonts_summary">管理内置字体和已校验的自定义 TTF，字体选择会随主题包一起导入导出。</string>
     <string name="settings_avc_spoof">AVC 日志欺骗</string>
     <string name="settings_avc_spoof_summary">在 AVC 审核日志中隐藏 KernelSU SELinux 域。</string>
+    <string name="nav_rail_expand">展开导航栏</string>
+    <string name="nav_rail_collapse">收起导航栏</string>
 </resources>

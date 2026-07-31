@@ -14,6 +14,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.TemplateInfo
 import me.weishu.kernelsu.toOrdinalList
 import me.weishu.kernelsu.toRootProfileFlags
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.deleteAppProfileTemplate
 
@@ -123,8 +125,8 @@ fun TemplateEditorScreen(template: TemplateInfo, readOnly: Boolean) {
         },
     )
 
-    TemplateEditorScreenMiuix(
-        state = uiState,
-        actions = actions,
-    )
+    when (LocalUiMode.current) {
+        UiMode.Miuix -> TemplateEditorScreenMiuix(uiState, actions)
+        UiMode.Material -> TemplateEditorScreenMaterial(uiState, actions)
+    }
 }

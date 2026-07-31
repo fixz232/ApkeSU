@@ -921,6 +921,7 @@
     <string name="settings_ui_mode">UI スタイル</string>
     <string name="settings_ui_mode_summary">インターフェースのスタイルを選択します。</string>
     <string name="interface_style_miuix">ミウイ</string>
+    <string name="interface_style_material">標準スタイル</string>
     <string name="interface_style_studio">黒曜石コンソール</string>
     <string name="interface_style_liquid_glass">すりガラス</string>
     <string name="interface_style_snow">四季</string>
