@@ -30,16 +30,16 @@ internal const val MODULE_WALLPAPER_BACKUP_MIME_TYPE = "application/zip"
 internal const val MODULE_WALLPAPER_SAVED_SLOT_COUNT = 5
 
 private const val BACKUP_KIND = "apkesu.module-wallpaper"
-private const val BACKUP_VERSION = 1
-private const val SAVED_SLOT_VERSION = 1
+private const val BACKUP_VERSION = 2
+private const val SAVED_SLOT_VERSION = 2
 private const val SAVED_SLOT_KEY_PREFIX = "module_wallpaper_saved_slot"
 private const val MANIFEST_PATH = "manifest.json"
-private const val MAX_MANIFEST_BYTES = 128 * 1024L
-private const val MAX_IMAGE_COUNT = 32
+private const val MAX_MANIFEST_BYTES = 512 * 1024L
+private const val MAX_IMAGE_COUNT = MODULE_CARD_WALLPAPER_MAX_COUNT * 2 * (MODULE_WALLPAPER_SAVED_SLOT_COUNT + 1)
 private const val MAX_IMAGE_BYTES = 24 * 1024 * 1024L
-private const val MAX_TOTAL_IMAGE_BYTES = 128 * 1024 * 1024L
+private const val MAX_TOTAL_IMAGE_BYTES = 512 * 1024 * 1024L
 private const val BUFFER_SIZE = 32 * 1024
-private val IMAGE_PATH_PATTERN = Regex("images/wallpaper_[0-9]{2}\\.image")
+private val IMAGE_PATH_PATTERN = Regex("images/wallpaper_[0-9]{2,3}\\.image")
 private val SHA256_PATTERN = Regex("[0-9a-f]{64}")
 
 internal data class ModuleWallpaperBackupPreview(
@@ -51,10 +51,25 @@ internal data class ModuleWallpaperBackupPreview(
     val createdAtMillis: Long,
 )
 
+internal enum class ModuleWallpaperRestoreMode {
+    Merge,
+    Replace,
+}
+
 internal data class ModuleWallpaperBackupResult(
     val success: Boolean,
     val preview: ModuleWallpaperBackupPreview? = null,
     val error: Throwable? = null,
+)
+
+internal data class PreparedModuleWallpaperRestore(
+    val targetModuleId: String,
+    val preview: ModuleWallpaperBackupPreview,
+    val previousCurrent: ModuleCardWallpaperSnapshot,
+    val previousSlots: List<ModuleWallpaperSavedSlot?>,
+    val targetCurrent: ModuleCardWallpaperSnapshot,
+    val targetSlots: List<ModuleWallpaperSavedSlot?>,
+    val importedEntries: List<ModuleCardWallpaperEntry>,
 )
 
 internal data class ModuleWallpaperSavedSlot(
@@ -87,8 +102,8 @@ internal fun saveCurrentModuleWallpaperToSlot(
         requireValidModuleId(moduleId)
         requireValidSavedSlotIndex(slotIndex)
         val source = readModuleCardWallpaperSnapshot(context, moduleId)
-        require(source.entries.isNotEmpty()) { "The selected module has no custom wallpaper" }
-        require(source.entries.size <= MAX_IMAGE_COUNT) { "Too many module wallpapers" }
+        require(source.allEntries().isNotEmpty()) { "The selected module has no custom wallpaper" }
+        require(source.allEntries().size <= MAX_IMAGE_COUNT) { "Too many module wallpapers" }
 
         val copied = duplicateModuleWallpaperSnapshot(
             context = context,
@@ -106,12 +121,10 @@ internal fun saveCurrentModuleWallpaperToSlot(
             )
             .commit()
         if (!committed) {
-            copied.entries.forEach { releaseCustomImageReference(context, it.uriString) }
+            copied.allEntries().forEach { releaseCustomImageReference(context, it.uriString) }
             throw IOException("Unable to save the wallpaper slot")
         }
-        previous?.snapshot?.entries?.forEach {
-            releaseCustomImageReference(context, it.uriString)
-        }
+        previous?.snapshot?.let { releaseModuleWallpaperSnapshot(context, it) }
     }
 }
 
@@ -132,7 +145,7 @@ internal fun applyModuleWallpaperSavedSlot(
             storageScope = "slot_${slotIndex}_apply",
         )
         if (!replaceModuleCardWallpaperSnapshot(context, moduleId, copied)) {
-            copied.entries.forEach { releaseCustomImageReference(context, it.uriString) }
+            copied.allEntries().forEach { releaseCustomImageReference(context, it.uriString) }
             throw IOException("Unable to apply the wallpaper slot")
         }
     }
@@ -153,9 +166,7 @@ internal fun deleteModuleWallpaperSavedSlot(
             .remove(savedSlotPreferenceKey(moduleId, slotIndex))
             .commit()
         if (!committed) throw IOException("Unable to delete the wallpaper slot")
-        previous.snapshot.entries.forEach {
-            releaseCustomImageReference(context, it.uriString)
-        }
+        releaseModuleWallpaperSnapshot(context, previous.snapshot)
     }
 }
 
@@ -168,13 +179,28 @@ internal fun exportModuleWallpaperBackup(
     return runBackupOperation {
         requireValidModuleId(moduleId)
         val snapshot = readModuleCardWallpaperSnapshot(context, moduleId)
-        require(snapshot.entries.isNotEmpty()) { "The selected module has no custom wallpaper" }
-        require(snapshot.entries.size <= MAX_IMAGE_COUNT) { "Too many module wallpapers" }
+        val savedSlots = readModuleWallpaperSavedSlots(context, moduleId)
+        require(snapshot.allEntries().isNotEmpty() || savedSlots.any { it != null }) {
+            "The selected module has no custom wallpaper"
+        }
 
         val tempDir = createBackupTempDir(context)
         try {
             var totalBytes = 0L
-            val assets = snapshot.entries.mapIndexed { index, entry ->
+            val indexedEntries = buildList {
+                snapshot.entries.forEach { add(Triple("current", ModuleWallpaperVariant.Day, it)) }
+                snapshot.nightEntries.forEach { add(Triple("current", ModuleWallpaperVariant.Night, it)) }
+                savedSlots.forEachIndexed { slotIndex, slot ->
+                    slot?.snapshot?.entries?.forEach {
+                        add(Triple("slot_$slotIndex", ModuleWallpaperVariant.Day, it))
+                    }
+                    slot?.snapshot?.nightEntries?.forEach {
+                        add(Triple("slot_$slotIndex", ModuleWallpaperVariant.Night, it))
+                    }
+                }
+            }
+            require(indexedEntries.size <= MAX_IMAGE_COUNT) { "Too many module wallpapers" }
+            val assets = indexedEntries.mapIndexed { index, (scope, variant, entry) ->
                 val path = imagePath(index)
                 val file = File(tempDir, "export_$index.image")
                 val copied = openWallpaperInput(context, entry.uriString).use { input ->
@@ -189,13 +215,18 @@ internal fun exportModuleWallpaperBackup(
                     size = copied.size,
                     sha256 = copied.sha256,
                     crop = entry.crop,
+                    visualSettings = entry.visualSettings,
+                    autoContrast = entry.autoContrast,
+                    variant = variant,
+                    scope = scope,
                 )
             }
             val createdAt = System.currentTimeMillis()
             val manifest = createManifest(
                 moduleId = moduleId,
                 moduleName = moduleName,
-                carouselEnabled = snapshot.carouselEnabled,
+                snapshot = snapshot,
+                savedSlots = savedSlots,
                 createdAtMillis = createdAt,
                 assets = assets,
             )
@@ -215,7 +246,7 @@ internal fun exportModuleWallpaperBackup(
                 sourceModuleId = moduleId,
                 sourceModuleName = moduleName.ifBlank { moduleId },
                 imageCount = assets.size,
-                carouselEnabled = snapshot.carouselEnabled && assets.size > 1,
+                carouselEnabled = snapshot.carouselEnabled || snapshot.nightCarouselEnabled,
                 totalBytes = totalBytes,
                 createdAtMillis = createdAt,
             )
@@ -243,40 +274,185 @@ internal fun restoreModuleWallpaperBackup(
     context: Context,
     source: Uri,
     targetModuleId: String,
+    mode: ModuleWallpaperRestoreMode = ModuleWallpaperRestoreMode.Replace,
 ): ModuleWallpaperBackupResult {
     return runBackupOperation {
-        requireValidModuleId(targetModuleId)
-        val extracted = extractAndValidateBackup(context, source)
-        val importedEntries = mutableListOf<ModuleCardWallpaperEntry>()
-        try {
-            extracted.assets.forEachIndexed { index, asset ->
-                val persisted = persistCustomImageReference(
-                    context = context,
-                    sourceUri = Uri.fromFile(asset.file),
-                    storageKey = "module_card_wallpaper_${targetModuleId}_restore_$index",
-                ) ?: throw IOException("Unable to save wallpaper ${index + 1}")
-                importedEntries += ModuleCardWallpaperEntry(
-                    uriString = persisted,
-                    crop = asset.crop,
+        val prepared = prepareModuleWallpaperRestore(context, source, targetModuleId, mode)
+        commitPreparedModuleWallpaperRestores(context, listOf(prepared))
+        prepared.preview
+    }
+}
+
+internal fun prepareModuleWallpaperRestore(
+    context: Context,
+    source: Uri,
+    targetModuleId: String,
+    mode: ModuleWallpaperRestoreMode,
+): PreparedModuleWallpaperRestore {
+    requireValidModuleId(targetModuleId)
+    val extracted = extractAndValidateBackup(context, source)
+    val importedEntries = mutableListOf<ModuleCardWallpaperEntry>()
+    try {
+        extracted.assets.forEachIndexed { index, asset ->
+            val persisted = persistCustomImageReference(
+                context = context,
+                sourceUri = Uri.fromFile(asset.file),
+                storageKey = uniqueModuleWallpaperStorageKey(
+                    "module_card_wallpaper_${targetModuleId}_restore_$index"
+                ),
+                maxBytes = MODULE_CARD_WALLPAPER_MAX_FILE_BYTES,
+            ) ?: throw IOException("Unable to save wallpaper ${index + 1}")
+            importedEntries += ModuleCardWallpaperEntry(
+                uriString = persisted,
+                crop = asset.crop,
+                visualSettings = asset.visualSettings,
+                autoContrast = asset.autoContrast,
+            )
+        }
+
+        fun importedSnapshotForScope(
+            scope: String,
+            configuration: ModuleCardWallpaperSnapshot,
+        ): ModuleCardWallpaperSnapshot {
+            fun entries(variant: ModuleWallpaperVariant) = importedEntries.filterIndexed { index, _ ->
+                val asset = extracted.assets[index]
+                asset.scope == scope && asset.variant == variant
+            }
+            return configuration
+                .withCollection(
+                    ModuleWallpaperVariant.Day,
+                    configuration.collection(ModuleWallpaperVariant.Day).copy(
+                        entries = entries(ModuleWallpaperVariant.Day)
+                    ),
+                )
+                .withCollection(
+                    ModuleWallpaperVariant.Night,
+                    configuration.collection(ModuleWallpaperVariant.Night).copy(
+                        entries = entries(ModuleWallpaperVariant.Night)
+                    ),
+                )
+        }
+
+        val previousCurrent = readModuleCardWallpaperSnapshot(context, targetModuleId)
+        val importedCurrent = importedSnapshotForScope("current", extracted.configuration)
+        val targetCurrent = if (mode == ModuleWallpaperRestoreMode.Merge) {
+            mergeModuleWallpaperSnapshots(previousCurrent, importedCurrent)
+        } else {
+            importedCurrent
+        }
+        val previousSlots = readModuleWallpaperSavedSlots(context, targetModuleId)
+        val importedSlots = extracted.slotConfigurations.mapValues { (slotIndex, configuration) ->
+            importedSnapshotForScope("slot_$slotIndex", configuration)
+        }
+        val targetSlots = MutableList<ModuleWallpaperSavedSlot?>(MODULE_WALLPAPER_SAVED_SLOT_COUNT) { null }
+        for (slotIndex in 0 until MODULE_WALLPAPER_SAVED_SLOT_COUNT) {
+            val old = previousSlots[slotIndex]
+            val incoming = importedSlots[slotIndex]
+            targetSlots[slotIndex] = when {
+                incoming == null && mode == ModuleWallpaperRestoreMode.Merge -> old
+                incoming == null -> null
+                old != null && mode == ModuleWallpaperRestoreMode.Merge -> old.copy(
+                    snapshot = mergeModuleWallpaperSnapshots(old.snapshot, incoming)
+                )
+                else -> ModuleWallpaperSavedSlot(
+                    index = slotIndex,
+                    snapshot = incoming,
+                    savedAtMillis = System.currentTimeMillis(),
                 )
             }
-            val committed = replaceModuleCardWallpaperSnapshot(
-                context = context,
-                moduleId = targetModuleId,
-                snapshot = ModuleCardWallpaperSnapshot(
-                    entries = importedEntries,
-                    carouselEnabled = extracted.preview.carouselEnabled,
-                ),
-            )
-            if (!committed) throw IOException("Unable to save module wallpaper settings")
-            extracted.preview
-        } catch (error: Throwable) {
-            importedEntries.forEach { releaseCustomImageReference(context, it.uriString) }
-            throw error
-        } finally {
-            extracted.tempDir.deleteRecursively()
+        }
+        return PreparedModuleWallpaperRestore(
+            targetModuleId = targetModuleId,
+            preview = extracted.preview,
+            previousCurrent = previousCurrent,
+            previousSlots = previousSlots,
+            targetCurrent = targetCurrent,
+            targetSlots = targetSlots,
+            importedEntries = importedEntries,
+        )
+    } catch (error: Throwable) {
+        importedEntries.forEach { releaseCustomImageReference(context, it.uriString) }
+        throw error
+    } finally {
+        extracted.tempDir.deleteRecursively()
+    }
+}
+
+internal fun commitPreparedModuleWallpaperRestores(
+    context: Context,
+    preparedRestores: List<PreparedModuleWallpaperRestore>,
+) {
+    if (preparedRestores.isEmpty()) return
+    require(preparedRestores.map { it.targetModuleId }.distinct().size == preparedRestores.size) {
+        "Duplicate module in wallpaper restore"
+    }
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val editor = prefs.edit()
+    preparedRestores.forEach { prepared ->
+        editor.putModuleCardWallpaperSnapshot(prepared.targetModuleId, prepared.targetCurrent)
+        prepared.targetSlots.forEachIndexed { slotIndex, slot ->
+            val key = savedSlotPreferenceKey(prepared.targetModuleId, slotIndex)
+            if (slot == null) editor.remove(key)
+            else editor.putString(key, createSavedSlotJson(slot.snapshot, slot.savedAtMillis).toString())
         }
     }
+    val committed = try {
+        editor.commit()
+    } catch (error: Throwable) {
+        releasePreparedModuleWallpaperRestores(context, preparedRestores)
+        throw error
+    }
+    if (!committed) {
+        releasePreparedModuleWallpaperRestores(context, preparedRestores)
+        throw IOException("Unable to save module wallpaper settings")
+    }
+    preparedRestores.forEach { prepared ->
+        val previousEntries = prepared.previousCurrent.allEntries() +
+            prepared.previousSlots.filterNotNull().flatMap { it.snapshot.allEntries() }
+        val targetEntries = prepared.targetCurrent.allEntries() +
+            prepared.targetSlots.filterNotNull().flatMap { it.snapshot.allEntries() }
+        val retainedUris = targetEntries.mapTo(hashSetOf(), ModuleCardWallpaperEntry::uriString)
+        previousEntries.asSequence()
+            .map(ModuleCardWallpaperEntry::uriString)
+            .distinct()
+            .filterNot(retainedUris::contains)
+            .forEach { releaseCustomImageReference(context, it) }
+        prepared.importedEntries.asSequence()
+            .map(ModuleCardWallpaperEntry::uriString)
+            .distinct()
+            .filterNot(retainedUris::contains)
+            .forEach { releaseCustomImageReference(context, it) }
+    }
+}
+
+internal fun releasePreparedModuleWallpaperRestores(
+    context: Context,
+    preparedRestores: List<PreparedModuleWallpaperRestore>,
+) {
+    preparedRestores.asSequence()
+        .flatMap { it.importedEntries.asSequence() }
+        .map(ModuleCardWallpaperEntry::uriString)
+        .distinct()
+        .forEach { releaseCustomImageReference(context, it) }
+}
+
+internal fun mergeModuleWallpaperSnapshots(
+    existing: ModuleCardWallpaperSnapshot,
+    incoming: ModuleCardWallpaperSnapshot,
+): ModuleCardWallpaperSnapshot {
+    fun merged(variant: ModuleWallpaperVariant): ModuleWallpaperCollection {
+        val old = existing.collection(variant)
+        val next = incoming.collection(variant)
+        if (next.entries.isEmpty()) return old
+        val entries = (old.entries + next.entries).take(MODULE_CARD_WALLPAPER_MAX_COUNT)
+        return next.copy(
+            entries = entries,
+            carouselEnabled = (old.carouselEnabled || next.carouselEnabled) && entries.size > 1,
+        )
+    }
+    return incoming
+        .withCollection(ModuleWallpaperVariant.Day, merged(ModuleWallpaperVariant.Day))
+        .withCollection(ModuleWallpaperVariant.Night, merged(ModuleWallpaperVariant.Night))
 }
 
 private inline fun runBackupOperation(
@@ -310,18 +486,34 @@ private fun duplicateModuleWallpaperSnapshot(
 ): ModuleCardWallpaperSnapshot {
     val copiedEntries = mutableListOf<ModuleCardWallpaperEntry>()
     try {
-        source.entries.forEachIndexed { index, entry ->
-            val persisted = persistCustomImageReference(
-                context = context,
-                sourceUri = Uri.parse(entry.uriString),
-                storageKey = "module_card_wallpaper_${moduleId}_${storageScope}_$index",
-            ) ?: throw IOException("Unable to copy wallpaper ${index + 1}")
-            copiedEntries += entry.copy(uriString = persisted)
+        fun copyCollection(
+            variant: ModuleWallpaperVariant,
+            collection: ModuleWallpaperCollection,
+        ): ModuleWallpaperCollection {
+            val entries = collection.entries.mapIndexed { index, entry ->
+                val persisted = persistCustomImageReference(
+                    context = context,
+                    sourceUri = Uri.parse(entry.uriString),
+                    storageKey = uniqueModuleWallpaperStorageKey(
+                        "module_card_wallpaper_${moduleId}_${storageScope}_${variant.value}_$index"
+                    ),
+                    maxBytes = MODULE_CARD_WALLPAPER_MAX_FILE_BYTES,
+                ) ?: throw IOException("Unable to copy wallpaper ${index + 1}")
+                val copied = entry.copy(uriString = persisted)
+                copiedEntries += copied
+                copied
+            }
+            return collection.copy(entries = entries).normalized()
         }
-        return ModuleCardWallpaperSnapshot(
-            entries = copiedEntries,
-            carouselEnabled = source.carouselEnabled && copiedEntries.size > 1,
-        )
+        return ModuleCardWallpaperSnapshot(entries = emptyList(), carouselEnabled = false)
+            .withCollection(
+                ModuleWallpaperVariant.Day,
+                copyCollection(ModuleWallpaperVariant.Day, source.collection(ModuleWallpaperVariant.Day)),
+            )
+            .withCollection(
+                ModuleWallpaperVariant.Night,
+                copyCollection(ModuleWallpaperVariant.Night, source.collection(ModuleWallpaperVariant.Night)),
+            )
     } catch (error: Throwable) {
         copiedEntries.forEach { releaseCustomImageReference(context, it.uriString) }
         throw error
@@ -339,32 +531,25 @@ private fun readModuleWallpaperSavedSlot(
         ?: return null
     return runCatching {
         val json = JSONObject(raw)
-        require(json.optInt("version", -1) == SAVED_SLOT_VERSION) {
+        val version = json.optInt("version", -1)
+        require(version in 1..SAVED_SLOT_VERSION) {
             "Unsupported wallpaper slot version"
         }
-        val entriesJson = json.optJSONArray("wallpapers")
-            ?: throw IOException("Wallpaper slot contents are missing")
-        require(entriesJson.length() in 1..MAX_IMAGE_COUNT) { "Invalid wallpaper slot count" }
-        val entries = buildList {
-            for (index in 0 until entriesJson.length()) {
-                val item = entriesJson.optJSONObject(index)
-                    ?: throw IOException("Invalid wallpaper slot entry ${index + 1}")
-                val uriString = item.optString("uri").trim()
-                require(uriString.isNotEmpty()) { "Wallpaper slot URI is missing" }
-                add(
-                    ModuleCardWallpaperEntry(
-                        uriString = uriString,
-                        crop = item.requireCrop(),
-                    )
-                )
-            }
+        val snapshot = if (version == 1) {
+            val entries = json.optJSONArray("wallpapers").requireSlotEntries()
+            ModuleCardWallpaperSnapshot(
+                entries = entries,
+                carouselEnabled = json.optBoolean("carouselEnabled", false),
+            ).normalized()
+        } else {
+            ModuleCardWallpaperSnapshot(entries = emptyList(), carouselEnabled = false)
+                .withCollection(ModuleWallpaperVariant.Day, json.optJSONObject("day").requireSlotCollection())
+                .withCollection(ModuleWallpaperVariant.Night, json.optJSONObject("night").requireSlotCollection())
         }
+        require(snapshot.allEntries().isNotEmpty()) { "Wallpaper slot contents are missing" }
         ModuleWallpaperSavedSlot(
             index = slotIndex,
-            snapshot = ModuleCardWallpaperSnapshot(
-                entries = entries,
-                carouselEnabled = json.optBoolean("carouselEnabled", false) && entries.size > 1,
-            ),
+            snapshot = snapshot,
             savedAtMillis = json.optLong("savedAt", 0L).coerceAtLeast(0L),
         )
     }.getOrNull()
@@ -374,19 +559,64 @@ private fun createSavedSlotJson(
     snapshot: ModuleCardWallpaperSnapshot,
     savedAtMillis: Long,
 ): JSONObject {
+    return JSONObject()
+        .put("version", SAVED_SLOT_VERSION)
+        .put("savedAt", savedAtMillis)
+        .put("day", snapshot.collection(ModuleWallpaperVariant.Day).toSavedSlotJson())
+        .put("night", snapshot.collection(ModuleWallpaperVariant.Night).toSavedSlotJson())
+}
+
+private fun ModuleWallpaperCollection.toSavedSlotJson(): JSONObject {
     val wallpapers = JSONArray()
-    snapshot.entries.forEach { entry ->
+    entries.forEach { entry ->
         wallpapers.put(
             JSONObject()
                 .put("uri", entry.uriString)
                 .put("crop", entry.crop.toBackupJson())
+                .put("visualSettings", entry.visualSettings.toJson())
+                .put("autoContrast", entry.autoContrast)
         )
     }
-    return JSONObject()
-        .put("version", SAVED_SLOT_VERSION)
-        .put("savedAt", savedAtMillis)
-        .put("carouselEnabled", snapshot.carouselEnabled && snapshot.entries.size > 1)
-        .put("wallpapers", wallpapers)
+    return toBackupJson().put("wallpapers", wallpapers)
+}
+
+private fun JSONObject?.requireSlotCollection(): ModuleWallpaperCollection {
+    if (this == null) return ModuleWallpaperCollection()
+    val entries = optJSONArray("wallpapers").requireSlotEntries(allowEmpty = true)
+    return ModuleWallpaperCollection(
+        entries = entries,
+        carouselEnabled = optBoolean("carouselEnabled", false),
+        carouselOrder = ModuleWallpaperCarouselOrder.fromValue(optString("carouselOrder")),
+        intervalMillis = optLong("intervalMillis", MODULE_CARD_WALLPAPER_DEFAULT_INTERVAL_MILLIS),
+        selectedIndex = optInt("selectedIndex", 0),
+    ).normalized()
+}
+
+private fun JSONArray?.requireSlotEntries(allowEmpty: Boolean = false): List<ModuleCardWallpaperEntry> {
+    if (this == null) {
+        if (allowEmpty) return emptyList()
+        throw IOException("Wallpaper slot contents are missing")
+    }
+    require(length() <= MODULE_CARD_WALLPAPER_MAX_COUNT && (allowEmpty || length() > 0)) {
+        "Invalid wallpaper slot count"
+    }
+    return buildList {
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: throw IOException("Invalid wallpaper slot entry ${index + 1}")
+            val uriString = item.optString("uri").trim()
+            require(uriString.isNotEmpty()) { "Wallpaper slot URI is missing" }
+            add(
+                ModuleCardWallpaperEntry(
+                    uriString = uriString,
+                    crop = item.requireCrop(),
+                    visualSettings = me.weishu.kernelsu.ui.util.MediaVisualSettings.fromJson(
+                        item.optJSONObject("visualSettings")
+                    ),
+                    autoContrast = item.optBoolean("autoContrast", true),
+                )
+            )
+        }
+    }
 }
 
 private fun requireValidSavedSlotIndex(slotIndex: Int) {
@@ -405,12 +635,18 @@ private data class PreparedAsset(
     val size: Long,
     val sha256: String,
     val crop: CustomWallpaperCrop,
+    val visualSettings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
+    val autoContrast: Boolean,
+    val variant: ModuleWallpaperVariant,
+    val scope: String,
 )
 
 private data class ExtractedBackup(
     val tempDir: File,
     val preview: ModuleWallpaperBackupPreview,
     val assets: List<PreparedAsset>,
+    val configuration: ModuleCardWallpaperSnapshot,
+    val slotConfigurations: Map<Int, ModuleCardWallpaperSnapshot>,
 )
 
 private data class CopiedAsset(
@@ -421,7 +657,8 @@ private data class CopiedAsset(
 private fun createManifest(
     moduleId: String,
     moduleName: String,
-    carouselEnabled: Boolean,
+    snapshot: ModuleCardWallpaperSnapshot,
+    savedSlots: List<ModuleWallpaperSavedSlot?>,
     createdAtMillis: Long,
     assets: List<PreparedAsset>,
 ): JSONObject {
@@ -433,7 +670,23 @@ private fun createManifest(
                 .put("size", asset.size)
                 .put("sha256", asset.sha256)
                 .put("crop", asset.crop.toBackupJson())
+                .put("visualSettings", asset.visualSettings.toJson())
+                .put("autoContrast", asset.autoContrast)
+                .put("variant", asset.variant.value)
+                .put("scope", asset.scope)
         )
+    }
+    val slots = JSONArray()
+    savedSlots.forEachIndexed { index, slot ->
+        if (slot != null) {
+            slots.put(
+                JSONObject()
+                    .put("index", index)
+                    .put("savedAt", slot.savedAtMillis)
+                    .put("daySettings", slot.snapshot.collection(ModuleWallpaperVariant.Day).toBackupJson())
+                    .put("nightSettings", slot.snapshot.collection(ModuleWallpaperVariant.Night).toBackupJson())
+            )
+        }
     }
     return JSONObject()
         .put("kind", BACKUP_KIND)
@@ -441,8 +694,20 @@ private fun createManifest(
         .put("sourceModuleId", moduleId)
         .put("sourceModuleName", moduleName.ifBlank { moduleId })
         .put("createdAt", createdAtMillis)
-        .put("carouselEnabled", carouselEnabled && assets.size > 1)
+        .put("carouselEnabled", snapshot.carouselEnabled)
+        .put("daySettings", snapshot.collection(ModuleWallpaperVariant.Day).toBackupJson())
+        .put("nightSettings", snapshot.collection(ModuleWallpaperVariant.Night).toBackupJson())
+        .put("slots", slots)
         .put("wallpapers", wallpapers)
+}
+
+private fun ModuleWallpaperCollection.toBackupJson(): JSONObject {
+    val value = normalized()
+    return JSONObject()
+        .put("carouselEnabled", value.carouselEnabled)
+        .put("carouselOrder", value.carouselOrder.value)
+        .put("intervalMillis", value.intervalMillis)
+        .put("selectedIndex", value.selectedIndex)
 }
 
 private fun extractAndValidateBackup(context: Context, source: Uri): ExtractedBackup {
@@ -482,7 +747,8 @@ private fun extractAndValidateBackup(context: Context, source: Uri): ExtractedBa
         val manifest = manifestBytes?.toString(Charsets.UTF_8)?.let(::JSONObject)
             ?: throw IOException("Backup manifest is missing")
         require(manifest.optString("kind") == BACKUP_KIND) { "This is not an ApkeSU module wallpaper backup" }
-        require(manifest.optInt("version", -1) == BACKUP_VERSION) { "Unsupported module wallpaper backup version" }
+        val backupVersion = manifest.optInt("version", -1)
+        require(backupVersion in 1..BACKUP_VERSION) { "Unsupported module wallpaper backup version" }
         val sourceModuleId = manifest.optString("sourceModuleId").trim()
         requireValidModuleId(sourceModuleId)
         val sourceModuleName = manifest.optString("sourceModuleName")
@@ -519,12 +785,88 @@ private fun extractAndValidateBackup(context: Context, source: Uri): ExtractedBa
                         size = expectedSize,
                         sha256 = expectedSha256,
                         crop = item.requireCrop(),
+                        visualSettings = me.weishu.kernelsu.ui.util.MediaVisualSettings.fromJson(
+                            item.optJSONObject("visualSettings")
+                        ),
+                        autoContrast = item.optBoolean("autoContrast", true),
+                        variant = if (backupVersion >= 2 && item.optString("variant") == ModuleWallpaperVariant.Night.value) {
+                            ModuleWallpaperVariant.Night
+                        } else {
+                            ModuleWallpaperVariant.Day
+                        },
+                        scope = item.optString("scope", "current").takeIf {
+                            it == "current" || Regex("slot_[0-4]").matches(it)
+                        } ?: throw IOException("Invalid wallpaper scope"),
                     )
                 )
             }
         }
         require(extractedFiles.keys == referencedPaths) { "Backup contains unreferenced wallpaper files" }
-        val carouselEnabled = manifest.optBoolean("carouselEnabled", false) && assets.size > 1
+        fun readCollectionSettings(
+            json: JSONObject?,
+            debugKey: String,
+            entries: List<PreparedAsset>,
+            legacyCarousel: Boolean = false,
+        ): ModuleWallpaperCollection {
+            return ModuleWallpaperCollection(
+                carouselEnabled = json?.optBoolean("carouselEnabled", false)
+                    ?: legacyCarousel,
+                carouselOrder = ModuleWallpaperCarouselOrder.fromValue(json?.optString("carouselOrder")),
+                intervalMillis = json?.optLong(
+                    "intervalMillis",
+                    MODULE_CARD_WALLPAPER_DEFAULT_INTERVAL_MILLIS,
+                ) ?: MODULE_CARD_WALLPAPER_DEFAULT_INTERVAL_MILLIS,
+                selectedIndex = json?.optInt("selectedIndex", 0) ?: 0,
+                entries = List(entries.size) { index ->
+                    ModuleCardWallpaperEntry(
+                        uriString = "backup:$debugKey:$index",
+                        crop = entries[index].crop,
+                        visualSettings = entries[index].visualSettings,
+                        autoContrast = entries[index].autoContrast,
+                    )
+                },
+            ).normalized()
+        }
+        val dayAssets = assets.filter { it.scope == "current" && it.variant == ModuleWallpaperVariant.Day }
+        val nightAssets = assets.filter { it.scope == "current" && it.variant == ModuleWallpaperVariant.Night }
+        val daySettings = readCollectionSettings(
+            manifest.optJSONObject("daySettings"),
+            "current-day",
+            dayAssets,
+            manifest.optBoolean("carouselEnabled", false),
+        )
+        val nightSettings = readCollectionSettings(
+            manifest.optJSONObject("nightSettings"),
+            "current-night",
+            nightAssets,
+        )
+        val configuration = ModuleCardWallpaperSnapshot(entries = emptyList(), carouselEnabled = false)
+            .withCollection(ModuleWallpaperVariant.Day, daySettings)
+            .withCollection(ModuleWallpaperVariant.Night, nightSettings)
+        val slotConfigurations = linkedMapOf<Int, ModuleCardWallpaperSnapshot>()
+        val slotsJson = manifest.optJSONArray("slots") ?: JSONArray()
+        for (index in 0 until slotsJson.length()) {
+            val slotJson = slotsJson.optJSONObject(index) ?: throw IOException("Invalid saved slot")
+            val slotIndex = slotJson.optInt("index", -1)
+            require(slotIndex in 0 until MODULE_WALLPAPER_SAVED_SLOT_COUNT) { "Invalid saved slot index" }
+            require(slotIndex !in slotConfigurations) { "Duplicate saved slot index" }
+            val scope = "slot_$slotIndex"
+            val slotDayAssets = assets.filter { it.scope == scope && it.variant == ModuleWallpaperVariant.Day }
+            val slotNightAssets = assets.filter { it.scope == scope && it.variant == ModuleWallpaperVariant.Night }
+            require(slotDayAssets.isNotEmpty() || slotNightAssets.isNotEmpty()) { "Saved slot is empty" }
+            slotConfigurations[slotIndex] = ModuleCardWallpaperSnapshot(entries = emptyList(), carouselEnabled = false)
+                .withCollection(
+                    ModuleWallpaperVariant.Day,
+                    readCollectionSettings(slotJson.optJSONObject("daySettings"), "$scope-day", slotDayAssets),
+                )
+                .withCollection(
+                    ModuleWallpaperVariant.Night,
+                    readCollectionSettings(slotJson.optJSONObject("nightSettings"), "$scope-night", slotNightAssets),
+                )
+        }
+        val configuredScopes = slotConfigurations.keys.mapTo(hashSetOf()) { "slot_$it" } + "current"
+        require(assets.all { it.scope in configuredScopes }) { "Backup contains an unknown wallpaper slot" }
+        val carouselEnabled = daySettings.carouselEnabled || nightSettings.carouselEnabled
         return ExtractedBackup(
             tempDir = tempDir,
             preview = ModuleWallpaperBackupPreview(
@@ -536,6 +878,8 @@ private fun extractAndValidateBackup(context: Context, source: Uri): ExtractedBa
                 createdAtMillis = createdAt,
             ),
             assets = assets,
+            configuration = configuration,
+            slotConfigurations = slotConfigurations,
         )
     } catch (error: Throwable) {
         tempDir.deleteRecursively()

@@ -12,10 +12,13 @@
     <string name="rain_style_heavy_summary">暗い嵐の配色、強い風、濡れたガラス、頻繁に広がる水面の波紋を表現します。</string>
     <string name="rain_style_thunderstorm">雷雨</string>
     <string name="rain_style_thunderstorm_summary">夜間のみ3～8秒ごとに稲妻が光り、激しい雨と紫の雷雲を表示します。</string>
+    <string name="rain_style_after_rain">雨上がり</string>
+    <string name="rain_style_after_rain_summary">雨が次第に弱まり、雲が開き、濡れたガラスと地面に光が戻ります。</string>
     <string name="rain_motto_light">ガラスに落ち着く雨音を聴く</string>
     <string name="rain_motto_medium">雨が重なるほど、世界は静かになる</string>
     <string name="rain_motto_heavy">嵐の中でも、澄んだままで</string>
     <string name="rain_motto_thunderstorm">稲妻が夜を走り、核は揺るがない</string>
+    <string name="rain_motto_after_rain">雨のあと、水面に光が戻る</string>
     <string name="theme_preset_rain">雨景ガラス</string>
     <string name="theme_preset_rain_summary">冷たい灰青色のガラス、濡れたカードの縁、雨よけ装飾、連動するフローティングナビゲーションバー。</string>
     <string name="settings_pixel_card_motion">ピクセルカードのアニメーション</string>

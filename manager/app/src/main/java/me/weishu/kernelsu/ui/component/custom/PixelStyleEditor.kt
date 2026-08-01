@@ -39,6 +39,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -97,22 +98,40 @@ fun PixelGridEditor(
     onGridChange: (PixelGrid) -> Unit,
     modifier: Modifier = Modifier,
     isCellEditable: (x: Int, y: Int, width: Int, height: Int) -> Boolean = { _, _, _, _ -> true },
+    tool: PixelCanvasTool = PixelCanvasTool.Pencil,
+    showGrid: Boolean = true,
+    onColorPicked: (Long) -> Unit = {},
+    onStrokeEnd: () -> Unit = {},
+    constrainHeight: Boolean = true,
+    symmetry: PixelSymmetry = PixelSymmetry.None,
+    selection: PixelSelection? = null,
+    onSelectionChange: (PixelSelection?) -> Unit = {},
 ) {
     val latestGrid by rememberUpdatedState(grid)
     val latestColor by rememberUpdatedState(selectedColor)
     val latestOnStrokeStart by rememberUpdatedState(onStrokeStart)
     val latestOnGridChange by rememberUpdatedState(onGridChange)
     val latestIsCellEditable by rememberUpdatedState(isCellEditable)
+    val latestTool by rememberUpdatedState(tool)
+    val latestOnColorPicked by rememberUpdatedState(onColorPicked)
+    val latestOnStrokeEnd by rememberUpdatedState(onStrokeEnd)
+    val latestSymmetry by rememberUpdatedState(symmetry)
+    val latestOnSelectionChange by rememberUpdatedState(onSelectionChange)
+    var viewportZoom by remember(gestureKey) { mutableFloatStateOf(1f) }
+    var viewportPan by remember(gestureKey) { mutableStateOf(Offset.Zero) }
     val checkerLight = MaterialTheme.colorScheme.surfaceContainerHighest
     val checkerDark = MaterialTheme.colorScheme.surfaceVariant
     val gridLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
     val outerBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.72f)
+    val selectionColor = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(8.dp)
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 132.dp, max = 340.dp)
+            .then(
+                if (constrainHeight) Modifier.heightIn(min = 132.dp, max = 340.dp) else Modifier
+            )
             .border(1.dp, outerBorder, shape)
             .background(MaterialTheme.colorScheme.surface, shape)
             .semantics { this.contentDescription = contentDescription }
@@ -120,24 +139,30 @@ fun PixelGridEditor(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var working = latestGrid
-                    val strokeColor = latestColor
+                    val activeTool = latestTool
+                    val strokeColor = if (activeTool == PixelCanvasTool.Eraser) TRANSPARENT_PIXEL else latestColor
                     val strokeOnStart = latestOnStrokeStart
                     val strokeOnChange = latestOnGridChange
                     val strokeIsCellEditable = latestIsCellEditable
+                    val strokeInitialGrid = working
                     var strokeStarted = false
                     var previousCell: Pair<Int, Int>? = null
+                    var transforming = false
+                    var previousCentroid: Offset? = null
+                    var previousSpan = 0f
 
                     fun cellAt(position: Offset): Pair<Int, Int>? {
                         if (size.width <= 0 || size.height <= 0) return null
-                        val cellSize = min(
+                        val baseCellSize = min(
                             size.width.toFloat() / working.width,
                             size.height.toFloat() / working.height,
                         )
+                        val cellSize = baseCellSize * viewportZoom
                         if (cellSize <= 0f) return null
                         val contentWidth = cellSize * working.width
                         val contentHeight = cellSize * working.height
-                        val originX = (size.width - contentWidth) / 2f
-                        val originY = (size.height - contentHeight) / 2f
+                        val originX = (size.width - contentWidth) / 2f + viewportPan.x
+                        val originY = (size.height - contentHeight) / 2f + viewportPan.y
                         val x = floor((position.x - originX) / cellSize).toInt()
                         val y = floor((position.y - originY) / cellSize).toInt()
                         return (x to y).takeIf {
@@ -146,8 +171,24 @@ fun PixelGridEditor(
                     }
 
                     fun paintCell(x: Int, y: Int) {
-                        if (!strokeIsCellEditable(x, y, working.width, working.height)) return
-                        val next = working.withPixel(x, y, strokeColor)
+                        val targetCells = buildSet {
+                            add(x to y)
+                            if (latestSymmetry == PixelSymmetry.Horizontal || latestSymmetry == PixelSymmetry.Both) {
+                                add(working.width - 1 - x to y)
+                            }
+                            if (latestSymmetry == PixelSymmetry.Vertical || latestSymmetry == PixelSymmetry.Both) {
+                                add(x to working.height - 1 - y)
+                            }
+                            if (latestSymmetry == PixelSymmetry.Both) {
+                                add(working.width - 1 - x to working.height - 1 - y)
+                            }
+                        }
+                        var next = working
+                        targetCells.forEach { (targetX, targetY) ->
+                            if (strokeIsCellEditable(targetX, targetY, working.width, working.height)) {
+                                next = next.withPixel(targetX, targetY, strokeColor)
+                            }
+                        }
                         if (next == working) return
                         if (!strokeStarted) {
                             strokeOnStart(working)
@@ -170,23 +211,101 @@ fun PixelGridEditor(
                         previousCell = currentCell
                     }
 
+                    val firstCell = cellAt(down.position)
+                    if (activeTool == PixelCanvasTool.Eyedropper) {
+                        firstCell?.let { (x, y) -> latestOnColorPicked(working.colorAt(x, y)) }
+                        return@awaitEachGesture
+                    }
+                    if (activeTool == PixelCanvasTool.FloodFill) {
+                        firstCell?.let { (x, y) ->
+                            val next = working.floodFilled(x, y, strokeColor, strokeIsCellEditable)
+                            if (next != working) {
+                                strokeOnStart(working)
+                                strokeOnChange(next)
+                                latestOnStrokeEnd()
+                            }
+                        }
+                        return@awaitEachGesture
+                    }
+                    if (activeTool == PixelCanvasTool.Select) {
+                        val start = firstCell ?: return@awaitEachGesture
+                        latestOnSelectionChange(PixelSelection.between(start.first, start.second, start.first, start.second))
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            cellAt(change.position)?.let { current ->
+                                latestOnSelectionChange(
+                                    PixelSelection.between(start.first, start.second, current.first, current.second)
+                                )
+                            }
+                            change.consume()
+                        }
+                        return@awaitEachGesture
+                    }
+
                     paint(down.position)
                     while (true) {
                         val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
-                        paint(change.position)
-                        change.consume()
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+                        if (pressed.size >= 2) {
+                            if (!transforming && strokeStarted) {
+                                working = strokeInitialGrid
+                                strokeOnChange(strokeInitialGrid)
+                                strokeStarted = false
+                                latestOnStrokeEnd()
+                            }
+                            transforming = true
+                            previousCell = null
+                            val centroid = pressed.fold(Offset.Zero) { total, change -> total + change.position } /
+                                pressed.size.toFloat()
+                            val span = pressed.sumOf { change ->
+                                kotlin.math.hypot(
+                                    (change.position.x - centroid.x).toDouble(),
+                                    (change.position.y - centroid.y).toDouble(),
+                                )
+                            }.toFloat() / pressed.size
+                            val oldCentroid = previousCentroid
+                            if (oldCentroid != null && previousSpan > 0f && span > 0f) {
+                                viewportZoom = (viewportZoom * (span / previousSpan)).coerceIn(1f, MAX_PIXEL_CANVAS_ZOOM)
+                                viewportPan = if (viewportZoom <= 1.01f) {
+                                    Offset.Zero
+                                } else {
+                                    val nextPan = viewportPan + (centroid - oldCentroid)
+                                    val baseCellSize = min(
+                                        size.width.toFloat() / working.width,
+                                        size.height.toFloat() / working.height,
+                                    )
+                                    val contentWidth = baseCellSize * viewportZoom * working.width
+                                    val contentHeight = baseCellSize * viewportZoom * working.height
+                                    val maxPanX = ((contentWidth - size.width) / 2f).coerceAtLeast(0f)
+                                    val maxPanY = ((contentHeight - size.height) / 2f).coerceAtLeast(0f)
+                                    Offset(
+                                        x = nextPan.x.coerceIn(-maxPanX, maxPanX),
+                                        y = nextPan.y.coerceIn(-maxPanY, maxPanY),
+                                    )
+                                }
+                            }
+                            previousCentroid = centroid
+                            previousSpan = span
+                            pressed.forEach { it.consume() }
+                        } else if (!transforming) {
+                            val change = pressed.first()
+                            paint(change.position)
+                            change.consume()
+                        }
                     }
+                    if (strokeStarted) latestOnStrokeEnd()
                 }
             },
     ) {
-        val cellSize = min(size.width / grid.width, size.height / grid.height)
+        val cellSize = min(size.width / grid.width, size.height / grid.height) * viewportZoom
         val contentWidth = cellSize * grid.width
         val contentHeight = cellSize * grid.height
         val origin = Offset(
-            x = (size.width - contentWidth) / 2f,
-            y = (size.height - contentHeight) / 2f,
+            x = (size.width - contentWidth) / 2f + viewportPan.x,
+            y = (size.height - contentHeight) / 2f + viewportPan.y,
         )
         for (y in 0 until grid.height) {
             for (x in 0 until grid.width) {
@@ -213,7 +332,7 @@ fun PixelGridEditor(
                 }
             }
         }
-        if (cellSize >= 7f) {
+        if (showGrid && cellSize >= 7f) {
             for (x in 0..grid.width) {
                 val lineX = origin.x + x * cellSize
                 drawLine(gridLine, Offset(lineX, origin.y), Offset(lineX, origin.y + contentHeight), 0.7f)
@@ -222,6 +341,23 @@ fun PixelGridEditor(
                 val lineY = origin.y + y * cellSize
                 drawLine(gridLine, Offset(origin.x, lineY), Offset(origin.x + contentWidth, lineY), 0.7f)
             }
+        }
+        selection?.normalized(grid.width, grid.height)?.let { area ->
+            val topLeft = Offset(
+                origin.x + area.left * cellSize,
+                origin.y + area.top * cellSize,
+            )
+            drawRect(
+                color = selectionColor.copy(alpha = 0.10f),
+                topLeft = topLeft,
+                size = androidx.compose.ui.geometry.Size(area.width * cellSize, area.height * cellSize),
+            )
+            drawRect(
+                color = selectionColor,
+                topLeft = topLeft,
+                size = androidx.compose.ui.geometry.Size(area.width * cellSize, area.height * cellSize),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
+            )
         }
     }
 }
@@ -390,6 +526,8 @@ fun PixelMotionEditor(
     rule: PixelMotionRule,
     onRuleChange: (PixelMotionRule) -> Unit,
     modifier: Modifier = Modifier,
+    onInteractionStart: () -> Unit = {},
+    onInteractionEnd: () -> Unit = {},
 ) {
     val normalized = rule.normalized()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -413,6 +551,7 @@ fun PixelMotionEditor(
             Switch(
                 checked = normalized.enabled,
                 onCheckedChange = { enabled ->
+                    onInteractionStart()
                     onRuleChange(
                         normalized.copy(
                             enabled = enabled,
@@ -423,6 +562,7 @@ fun PixelMotionEditor(
                             },
                         ).normalized()
                     )
+                    onInteractionEnd()
                 },
             )
         }
@@ -435,7 +575,11 @@ fun PixelMotionEditor(
                 PixelMotionMode.entries.filter { it != PixelMotionMode.Static }.forEach { mode ->
                     FilterChip(
                         selected = normalized.mode == mode,
-                        onClick = { onRuleChange(normalized.copy(mode = mode).normalized()) },
+                        onClick = {
+                            onInteractionStart()
+                            onRuleChange(normalized.copy(mode = mode).normalized())
+                            onInteractionEnd()
+                        },
                         label = { Text(stringResource(mode.labelRes())) },
                     )
                 }
@@ -452,6 +596,8 @@ fun PixelMotionEditor(
                 onValueChange = { value ->
                     onRuleChange(normalized.copy(durationMillis = value.roundToInt()).normalized())
                 },
+                onInteractionStart = onInteractionStart,
+                onInteractionEnd = onInteractionEnd,
             )
             if (normalized.mode == PixelMotionMode.Drift) {
                 PixelSliderRow(
@@ -466,6 +612,8 @@ fun PixelMotionEditor(
                     onValueChange = { value ->
                         onRuleChange(normalized.copy(amplitudeCells = value.roundToInt()).normalized())
                     },
+                    onInteractionStart = onInteractionStart,
+                    onInteractionEnd = onInteractionEnd,
                 )
             }
             Row(
@@ -475,7 +623,11 @@ fun PixelMotionEditor(
                 PixelMotionRepeat.entries.forEach { repeat ->
                     FilterChip(
                         selected = normalized.repeat == repeat,
-                        onClick = { onRuleChange(normalized.copy(repeat = repeat).normalized()) },
+                        onClick = {
+                            onInteractionStart()
+                            onRuleChange(normalized.copy(repeat = repeat).normalized())
+                            onInteractionEnd()
+                        },
                         label = {
                             Text(
                                 text = stringResource(repeat.labelRes()),
@@ -499,7 +651,10 @@ private fun PixelSliderRow(
     steps: Int,
     valueText: String,
     onValueChange: (Float) -> Unit,
+    onInteractionStart: () -> Unit,
+    onInteractionEnd: () -> Unit,
 ) {
+    var interactionActive by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(text = title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -507,7 +662,19 @@ private fun PixelSliderRow(
         }
         Slider(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = { next ->
+                if (!interactionActive) {
+                    interactionActive = true
+                    onInteractionStart()
+                }
+                onValueChange(next)
+            },
+            onValueChangeFinished = {
+                if (interactionActive) {
+                    interactionActive = false
+                    onInteractionEnd()
+                }
+            },
             valueRange = valueRange,
             steps = steps,
         )
@@ -550,3 +717,4 @@ private fun PixelMotionRepeat.labelRes(): Int = when (this) {
 }
 
 private const val MAX_EDITOR_PALETTE_COLORS = 24
+private const val MAX_PIXEL_CANVAS_ZOOM = 6f

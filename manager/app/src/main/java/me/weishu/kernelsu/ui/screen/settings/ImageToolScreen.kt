@@ -72,6 +72,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.material.TonalCard
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.createRootShell
+import me.weishu.kernelsu.ui.util.execKsud
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -890,9 +891,33 @@ private suspend fun flashImage(
         echo "partition_size=${'$'}partition_size"
         echo "sha256=$sha256"
     """.trimIndent()
-    runImageToolRootCommand(command, "flash").also {
+    val result = try {
+        runImageToolRootCommand(command, "flash")
+    } finally {
         staged.delete()
     }
+    if (!result.success || !isRescueTrackedPartition(partition)) {
+        return@withContext result
+    }
+    val partitionName = partition.substringAfterLast('/')
+    val pendingMarked = execKsud(
+        args = "rescue mark-pending image-tool-$partitionName",
+        newShell = true,
+        globalMnt = true,
+    )
+    result.copy(
+        log = buildString {
+            append(result.log)
+            if (!result.log.endsWith('\n')) appendLine()
+            appendLine(
+                if (pendingMarked) {
+                    "Rescue protection: next boot marked for verification"
+                } else {
+                    "Rescue protection: pending marker was not written"
+                }
+            )
+        }
+    )
 }
 
 private suspend fun createEditableCopy(
@@ -951,6 +976,11 @@ private fun sanitizeImageToolPartition(value: String): String {
         "Partition path is invalid"
     }
     return path
+}
+
+private fun isRescueTrackedPartition(path: String): Boolean {
+    val name = path.substringAfterLast('/').removeSuffix("_a").removeSuffix("_b")
+    return name in setOf("boot", "init_boot", "vendor_boot", "dtbo", "vbmeta")
 }
 
 private fun sanitizeImageToolOutputName(value: String): String {

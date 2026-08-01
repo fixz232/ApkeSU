@@ -184,6 +184,13 @@ pub fn run_stage(stage: &str, block: bool) {
         warn!("ensure magisk module compat failed before {stage}: {e}");
     }
 
+    // post-fs-data is the earliest load window, but targets on late-mounted
+    // storage may not exist yet. Retry Pathmask during the later Android
+    // service milestones; apply_if_configured is idempotent once it is loaded.
+    if matches!(stage, "service" | "boot-completed") {
+        crate::pathmask::apply_if_configured();
+    }
+
     if let Err(e) = crate::module::exec_common_scripts(&format!("{stage}.d"), block) {
         warn!("Failed to exec common {stage} scripts: {e}");
     }

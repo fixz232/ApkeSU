@@ -67,6 +67,7 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.util.GraphicsRendererCommandResult
 import me.weishu.kernelsu.ui.util.GraphicsRendererMode
 import me.weishu.kernelsu.ui.util.GraphicsRendererStatus
@@ -413,7 +414,7 @@ private fun GraphicsRendererPersistenceRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {

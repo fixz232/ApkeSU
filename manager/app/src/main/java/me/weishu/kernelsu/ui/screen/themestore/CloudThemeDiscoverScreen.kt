@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.CloudOff
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Leaderboard
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -67,7 +69,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
@@ -79,6 +80,8 @@ import me.weishu.kernelsu.ui.util.CloudThemeLocalRecord
 import me.weishu.kernelsu.ui.util.CloudThemeLocalState
 import me.weishu.kernelsu.ui.util.CloudThemePublicationStatus
 import me.weishu.kernelsu.ui.util.CloudThemeRepository
+import me.weishu.kernelsu.ui.util.CloudThemeUsageStatistics
+import me.weishu.kernelsu.ui.util.calculateUsageStatistics
 import me.weishu.kernelsu.ui.util.loadCloudThemeImage
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -95,6 +98,7 @@ private enum class CloudThemeDiscoverFilter {
 @Composable
 internal fun CloudThemeDiscoverContent(
     onOpenTheme: (String) -> Unit,
+    onOpenRanking: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -117,6 +121,10 @@ internal fun CloudThemeDiscoverContent(
             try {
                 snapshot = repository.loadCatalog(forceRefresh = force)
                 localState = repository.readLocalState()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                // Keep the last usable catalog visible; a null snapshot exposes the retry state.
             } finally {
                 loading = false
                 refreshing = false
@@ -125,9 +133,16 @@ internal fun CloudThemeDiscoverContent(
     }
 
     LaunchedEffect(repository) {
-        snapshot = repository.loadCatalog(forceRefresh = false)
-        localState = repository.readLocalState()
-        loading = false
+        try {
+            snapshot = repository.loadCatalog(forceRefresh = false)
+            localState = repository.readLocalState()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            snapshot = null
+        } finally {
+            loading = false
+        }
     }
     LifecycleResumeEffect(repository) {
         localState = repository.readLocalState()
@@ -171,6 +186,9 @@ internal fun CloudThemeDiscoverContent(
             .toList()
         if (filter == CloudThemeDiscoverFilter.Latest) all.take(24) else all
     }
+    val usageStatistics = remember(snapshot) {
+        snapshot?.catalog?.calculateUsageStatistics()
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -183,6 +201,14 @@ internal fun CloudThemeDiscoverContent(
                 refreshing = refreshing,
                 onRefresh = { refresh(true) },
             )
+        }
+        usageStatistics?.let { statistics ->
+            item {
+                CloudThemeUsagePreview(
+                    statistics = statistics,
+                    onClick = onOpenRanking,
+                )
+            }
         }
         item {
             OutlinedTextField(
@@ -272,6 +298,79 @@ internal fun CloudThemeDiscoverContent(
             }
         }
         item { Spacer(modifier = Modifier.height(18.dp)) }
+    }
+}
+
+@Composable
+private fun CloudThemeUsagePreview(
+    statistics: CloudThemeUsageStatistics,
+    onClick: () -> Unit,
+) {
+    val leader = statistics.rankedThemes.firstOrNull()
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = cloudThemeSurfaceColor(),
+        tonalElevation = if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) 0.dp else 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(8.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Leaderboard,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.cloud_theme_ranking_entry_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cloudThemeTextColor(),
+                )
+                Text(
+                    text = stringResource(
+                        R.string.cloud_theme_ranking_entry_summary,
+                        NumberFormat.getIntegerInstance().format(statistics.totalUsageCount),
+                        statistics.creatorCount,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cloudThemeMutedColor(),
+                )
+                leader?.let {
+                    Text(
+                        text = stringResource(R.string.cloud_theme_ranking_entry_leader, it.name),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = stringResource(R.string.cloud_theme_open_ranking),
+                tint = cloudThemeMutedColor(),
+            )
+        }
     }
 }
 
@@ -512,13 +611,7 @@ private fun CloudThemeRecordBadge(
     record: CloudThemeLocalRecord?,
     isActive: Boolean,
 ) {
-    val compatible = theme.isCompatible(BuildConfig.VERSION_CODE.toLong())
     val (icon, label, tint) = when {
-        !compatible -> Triple(
-            Icons.Rounded.ErrorOutline,
-            stringResource(R.string.cloud_theme_incompatible_short),
-            MaterialTheme.colorScheme.error,
-        )
         record?.let {
             it.versionCode < theme.versionCode ||
                 (it.versionCode == theme.versionCode && it.sha256 != theme.sha256)

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,22 +119,29 @@ fun AppFontScreen() {
         busy = true
         message = null
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { check(setAppFontPreset(context, preset)) }
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { check(setAppFontPreset(context, preset)) }
+                }
+                if (result.isSuccess) {
+                    refresh()
+                    message = AppFontMessage(
+                        text = applySuccessText,
+                        isError = false,
+                    )
+                } else {
+                    message = AppFontMessage(
+                        text = result.exceptionOrNull().appFontError(applyFailedText),
+                        isError = true,
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                message = AppFontMessage(error.appFontError(applyFailedText), isError = true)
+            } finally {
+                busy = false
             }
-            if (result.isSuccess) {
-                refresh()
-                message = AppFontMessage(
-                    text = applySuccessText,
-                    isError = false,
-                )
-            } else {
-                message = AppFontMessage(
-                    text = result.exceptionOrNull().appFontError(applyFailedText),
-                    isError = true,
-                )
-            }
-            busy = false
         }
     }
 
@@ -142,19 +150,26 @@ fun AppFontScreen() {
         busy = true
         message = null
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                selectSavedAppFont(context, font.id)
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    selectSavedAppFont(context, font.id)
+                }
+                result.onSuccess { selected ->
+                    state = selected
+                    message = AppFontMessage(applySuccessText, isError = false)
+                }.onFailure { error ->
+                    message = AppFontMessage(
+                        text = error.appFontError(applyFailedText),
+                        isError = true,
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                message = AppFontMessage(error.appFontError(applyFailedText), isError = true)
+            } finally {
+                busy = false
             }
-            result.onSuccess { selected ->
-                state = selected
-                message = AppFontMessage(applySuccessText, isError = false)
-            }.onFailure { error ->
-                message = AppFontMessage(
-                    text = error.appFontError(applyFailedText),
-                    isError = true,
-                )
-            }
-            busy = false
         }
     }
 
@@ -166,24 +181,32 @@ fun AppFontScreen() {
         busy = true
         message = null
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                importCustomAppFont(context, uri)
-            }
-            result.onSuccess { imported ->
-                state = imported
-                message = AppFontMessage(
-                    text = importSuccessText,
-                    isError = false,
-                )
-                Toast.makeText(context, R.string.app_font_import_success, Toast.LENGTH_SHORT).show()
-            }.onFailure { error ->
-                message = AppFontMessage(
-                    text = error.appFontError(importFailedText),
-                    isError = true,
-                )
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    importCustomAppFont(context, uri)
+                }
+                result.onSuccess { imported ->
+                    state = imported
+                    message = AppFontMessage(
+                        text = importSuccessText,
+                        isError = false,
+                    )
+                    Toast.makeText(context, R.string.app_font_import_success, Toast.LENGTH_SHORT).show()
+                }.onFailure { error ->
+                    message = AppFontMessage(
+                        text = error.appFontError(importFailedText),
+                        isError = true,
+                    )
+                    Toast.makeText(context, R.string.app_font_import_failed, Toast.LENGTH_SHORT).show()
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                message = AppFontMessage(error.appFontError(importFailedText), isError = true)
                 Toast.makeText(context, R.string.app_font_import_failed, Toast.LENGTH_SHORT).show()
+            } finally {
+                busy = false
             }
-            busy = false
         }
     }
 
@@ -255,15 +278,22 @@ fun AppFontScreen() {
                         busy = true
                         message = null
                         scope.launch {
-                            val removed = withContext(Dispatchers.IO) {
-                                removeCustomAppFont(context)
+                            try {
+                                val removed = withContext(Dispatchers.IO) {
+                                    removeCustomAppFont(context)
+                                }
+                                refresh()
+                                message = AppFontMessage(
+                                    text = if (removed) removeSuccessText else removeFailedText,
+                                    isError = !removed,
+                                )
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (error: Throwable) {
+                                message = AppFontMessage(error.appFontError(removeFailedText), isError = true)
+                            } finally {
+                                busy = false
                             }
-                            refresh()
-                            message = AppFontMessage(
-                                text = if (removed) removeSuccessText else removeFailedText,
-                                isError = !removed,
-                            )
-                            busy = false
                         }
                     },
                 ) {
@@ -296,20 +326,28 @@ fun AppFontScreen() {
                         busy = true
                         message = null
                         scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                deleteSavedAppFont(context, font.id)
-                            }
-                            result.onSuccess { next ->
-                                state = next
-                                message = AppFontMessage(deleteSuccessText, isError = false)
-                            }.onFailure { error ->
+                            try {
+                                val result = withContext(Dispatchers.IO) {
+                                    deleteSavedAppFont(context, font.id)
+                                }
+                                result.onSuccess { next ->
+                                    state = next
+                                    message = AppFontMessage(deleteSuccessText, isError = false)
+                                }.onFailure { error ->
+                                    refresh()
+                                    message = AppFontMessage(
+                                        text = error.appFontError(deleteFailedText),
+                                        isError = true,
+                                    )
+                                }
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (error: Throwable) {
                                 refresh()
-                                message = AppFontMessage(
-                                    text = error.appFontError(deleteFailedText),
-                                    isError = true,
-                                )
+                                message = AppFontMessage(error.appFontError(deleteFailedText), isError = true)
+                            } finally {
+                                busy = false
                             }
-                            busy = false
                         }
                     },
                 ) {

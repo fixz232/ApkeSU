@@ -72,6 +72,7 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.util.CpuSpoofCommandResult
 import me.weishu.kernelsu.ui.util.CpuSpoofStatus
 import me.weishu.kernelsu.ui.util.CPU_SPOOF_PROPERTY_VALUE_LIMIT
@@ -592,7 +593,7 @@ private fun CpuSpoofSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),

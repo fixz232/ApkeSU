@@ -75,7 +75,13 @@ struct RestorePlan {
 }
 
 pub fn print_status() {
-    let config = read_config().unwrap_or_default();
+    let config_result = read_config();
+    let status_error = config_result
+        .as_ref()
+        .err()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    let config = config_result.unwrap_or_default();
     let specs = partition_specs(&config);
     let manifest = read_manifest().unwrap_or_else(|_| json!({}));
     let validation = validate_backups(&config);
@@ -85,6 +91,8 @@ pub fn print_status() {
         .map(|err| err.to_string())
         .unwrap_or_default();
     let status = json!({
+        "statusOk": status_error.is_empty(),
+        "statusError": status_error,
         "enabled": is_enabled(),
         "config": config_json(&config),
         "images": specs.iter().map(image_status).collect::<Vec<_>>(),
@@ -106,20 +114,34 @@ pub fn print_status() {
 }
 
 pub fn print_test_report() {
-    let config = read_config().unwrap_or_default();
+    let config_result = read_config();
+    let config_error = config_result
+        .as_ref()
+        .err()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    let config = config_result.unwrap_or_default();
     let specs = partition_specs(&config);
     let environment = validate_environment(&specs);
     let backup_validation = validate_backups(&config);
-    let ok = environment.is_ok();
-    let reason = environment
-        .err()
-        .map(|err| err.to_string())
-        .unwrap_or_default();
-    let backup_ready = backup_validation.is_ok();
-    let backup_reason = backup_validation
-        .err()
-        .map(|err| err.to_string())
-        .unwrap_or_default();
+    let ok = config_error.is_empty() && environment.is_ok();
+    let reason = if config_error.is_empty() {
+        environment
+            .err()
+            .map(|err| err.to_string())
+            .unwrap_or_default()
+    } else {
+        config_error.clone()
+    };
+    let backup_ready = config_error.is_empty() && backup_validation.is_ok();
+    let backup_reason = if config_error.is_empty() {
+        backup_validation
+            .err()
+            .map(|err| err.to_string())
+            .unwrap_or_default()
+    } else {
+        config_error
+    };
     let report = json!({
         "ok": ok,
         "reason": reason,
@@ -140,14 +162,31 @@ pub fn print_test_report() {
 
 pub fn import_config_text(content: &str) -> Result<()> {
     let config = parse_config(content)?;
+    let changed = read_config().map_or(true, |current| {
+        config_json(&current) != config_json(&config)
+    });
     write_config(&config)?;
+    if changed && is_enabled() {
+        remove_file_if_exists(Path::new(ENABLED_PATH))
+            .context("configuration changed but rescue protection could not be disabled")?;
+        clear_runtime_markers();
+        append_log("rescue protection disabled because its configuration changed");
+    }
     append_log("rescue config updated by manager");
     Ok(())
 }
 
 pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
+    let result = import_image_inner(partition, source, force);
+    if let Err(err) = &result {
+        append_log(format!("image import failed: {err:#}"));
+    }
+    result
+}
+
+fn import_image_inner(partition: &str, source: &Path, force: bool) -> Result<()> {
     let name = normalize_partition_name(partition)?;
-    let config = read_config().unwrap_or_default();
+    let config = read_config()?;
     let specs = partition_specs(&config);
     let spec = specs
         .iter()
@@ -155,10 +194,11 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
         .cloned()
         .unwrap_or_else(|| current_slot_spec(&name, name == "boot", &config));
 
-    ensure_safe_import_source(source)?;
+    let source = ensure_safe_import_source(source)?;
     let Some(device) = find_partition(&spec)? else {
         bail!("{} partition is missing", spec.name);
     };
+    validate_import_source_against_partition(&source, &spec, &device)?;
 
     if Path::new(&spec.image_path).exists() && !force {
         bail!(
@@ -171,7 +211,7 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
     let protected_files = vec![spec.image_path.clone(), MANIFEST_PATH.to_string()];
     preserve_files(&protected_files)?;
     let import_result = (|| -> Result<()> {
-        fs::copy(source, &spec.image_path).with_context(|| {
+        atomic_copy(&source, Path::new(&spec.image_path)).with_context(|| {
             format!(
                 "failed to import {} backup from {}",
                 spec.name,
@@ -182,8 +222,10 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
         write_manifest(&specs)
     })();
     if let Err(err) = import_result {
-        restore_preserved_files(&protected_files);
-        return Err(err);
+        if let Err(restore_err) = restore_preserved_files(&protected_files) {
+            bail!("import failed: {err:#}; previous backup restore failed: {restore_err:#}");
+        }
+        return Err(err).context("previous rescue backup was restored");
     }
     cleanup_preserved_files(&protected_files);
     append_log(format!(
@@ -197,9 +239,13 @@ pub fn import_image(partition: &str, source: &Path, force: bool) -> Result<()> {
 
 pub fn backup(force: bool) -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
-    let config = read_config().unwrap_or_default();
+    let config = read_config()?;
     let specs = partition_specs(&config);
-    if Path::new(MANIFEST_PATH).exists() && !force {
+    let backup_exists = Path::new(MANIFEST_PATH).exists()
+        || specs
+            .iter()
+            .any(|spec| Path::new(&spec.image_path).exists());
+    if backup_exists && !force {
         bail!("backup already exists; pass --force to overwrite it");
     }
     append_log("backup requested by manager");
@@ -220,7 +266,9 @@ pub fn backup(force: bool) -> Result<()> {
     })();
 
     if let Err(err) = backup_result {
-        restore_preserved_files(&protected_files);
+        if let Err(restore_err) = restore_preserved_files(&protected_files) {
+            bail!("backup failed: {err:#}; previous backup restore failed: {restore_err:#}");
+        }
         append_log(format!(
             "backup failed; restored previous rescue backups: {err:#}"
         ));
@@ -232,24 +280,34 @@ pub fn backup(force: bool) -> Result<()> {
 }
 
 pub fn enable() -> Result<()> {
-    let config = read_config().unwrap_or_default();
+    let config = read_config()?;
     validate_backups(&config)?;
     utils::ensure_dir_exists(RESCUE_DIR)?;
     clear_runtime_markers();
-    fs::write(ENABLED_PATH, b"1").context("failed to enable rescue protection")?;
-    fs::write(BOOT_OK_PATH, b"1").context("failed to mark current boot as healthy")?;
-    write_boot_count(0);
-    write_auto_restore_attempts(0);
+    atomic_write(Path::new(ENABLED_PATH), b"1").context("failed to enable rescue protection")?;
+    let initialize_result = (|| -> Result<()> {
+        atomic_write(Path::new(BOOT_OK_PATH), b"1")
+            .context("failed to mark current boot as healthy")?;
+        atomic_write(Path::new(BOOT_COUNT_PATH), b"0")
+            .context("failed to reset rescue boot counter")?;
+        atomic_write(Path::new(AUTO_RESTORE_ATTEMPTS_PATH), b"0")
+            .context("failed to reset rescue restore attempts")
+    })();
+    if let Err(err) = initialize_result {
+        let _ = remove_file_if_exists(Path::new(ENABLED_PATH));
+        return Err(err).context("rescue protection was not enabled");
+    }
     append_log("rescue protection enabled");
     Ok(())
 }
 
 pub fn disable() -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
-    let _ = fs::remove_file(ENABLED_PATH);
-    let _ = fs::remove_file(BOOT_COUNT_PATH);
-    let _ = fs::remove_file(AUTO_RESTORE_ATTEMPTS_PATH);
-    let _ = fs::remove_file(BOOT_OK_PATH);
+    remove_file_if_exists(Path::new(ENABLED_PATH))
+        .context("failed to disable rescue protection")?;
+    remove_file_if_exists(Path::new(BOOT_COUNT_PATH))?;
+    remove_file_if_exists(Path::new(AUTO_RESTORE_ATTEMPTS_PATH))?;
+    remove_file_if_exists(Path::new(BOOT_OK_PATH))?;
     clear_runtime_markers();
     append_log("rescue protection disabled");
     Ok(())
@@ -264,23 +322,19 @@ pub fn restore_keep_data_now() -> Result<()> {
     restore_backups("manual data-preserving rollback", false)
 }
 
-pub fn mark_next_boot_pending(reason: &str) {
+pub fn mark_next_boot_pending(reason: &str) -> Result<()> {
     if !is_enabled() {
-        return;
+        return Ok(());
     }
 
-    if let Err(err) = utils::ensure_dir_exists(RESCUE_DIR) {
-        append_log(format!("failed to mark next boot pending: {err:#}"));
-        return;
-    }
-
+    utils::ensure_dir_exists(RESCUE_DIR).context("failed to prepare pending boot marker")?;
+    atomic_write(Path::new(PENDING_BOOT_PATH), reason.as_bytes())
+        .context("failed to write pending boot marker")?;
     let _ = fs::remove_file(BOOT_OK_PATH);
     write_boot_count(0);
     write_auto_restore_attempts(0);
-    if let Err(err) = fs::write(PENDING_BOOT_PATH, reason) {
-        append_log(format!("failed to write pending boot marker: {err:#}"));
-    }
     append_log(format!("next boot marked pending: {reason}"));
+    Ok(())
 }
 
 pub fn print_logs() {
@@ -294,7 +348,7 @@ pub fn print_logs() {
 
 pub fn clear_logs() -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
-    fs::write(LOG_PATH, "").context("failed to clear rescue log")?;
+    atomic_write(Path::new(LOG_PATH), b"").context("failed to clear rescue log")?;
     append_log("rescue log cleared");
     Ok(())
 }
@@ -715,7 +769,7 @@ fn auto_restore_backups() -> Result<()> {
 }
 
 fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
-    let config = read_config().unwrap_or_default();
+    let config = read_config()?;
     let plans = restore_plans(&config)?;
     let mut selected_plan = None;
     let mut last_error = None;
@@ -788,10 +842,7 @@ fn backup_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
             .with_context(|| format!("failed to backup {}", spec.name))?;
         validate_image_size_against_partition(spec, device)
     })();
-    if let Err(err) = backup_result {
-        restore_preserved_file(&spec.image_path);
-        return Err(err);
-    }
+    backup_result?;
     append_log(format!(
         "backup {} ok: size={}, sha256={}",
         spec.name,
@@ -802,14 +853,23 @@ fn backup_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
 }
 
 fn restore_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
+    let expected_sha256 = sha256_of(&spec.image_path);
+    if expected_sha256.is_empty() {
+        bail!("failed to calculate {} backup sha256", spec.name);
+    }
     append_log(format!(
         "restore {}: {} -> {}, sha256={}",
-        spec.name,
-        spec.image_path,
-        device,
-        sha256_of(&spec.image_path)
+        spec.name, spec.image_path, device, expected_sha256
     ));
     run_dd(&spec.image_path, device).with_context(|| format!("failed to restore {}", spec.name))?;
+    let actual_sha256 = sha256_of(device);
+    if actual_sha256.is_empty() {
+        bail!("failed to verify restored {} partition", spec.name);
+    }
+    if actual_sha256 != expected_sha256 {
+        bail!("{} restore verification failed: sha256 mismatch", spec.name);
+    }
+    append_log(format!("restore {} verified", spec.name));
     Ok(())
 }
 
@@ -1109,10 +1169,11 @@ fn write_manifest(specs: &[PartitionSpec]) -> Result<()> {
         "createdAt": Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         "slot": current_slot(),
         "device": device_summary(),
-        "config": config_json(&read_config().unwrap_or_default()),
+        "config": config_json(&read_config()?),
         "images": images,
     });
-    fs::write(MANIFEST_PATH, manifest.to_string()).context("failed to write rescue manifest")
+    atomic_write(Path::new(MANIFEST_PATH), manifest.to_string().as_bytes())
+        .context("failed to write rescue manifest")
 }
 
 fn read_manifest() -> Result<Value> {
@@ -1195,7 +1256,11 @@ fn read_config() -> Result<RescueConfig> {
 
 fn write_config(config: &RescueConfig) -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
-    fs::write(CONFIG_PATH, config_json(config).to_string()).context("failed to write rescue config")
+    atomic_write(
+        Path::new(CONFIG_PATH),
+        config_json(config).to_string().as_bytes(),
+    )
+    .context("failed to write rescue config")
 }
 
 fn parse_config(content: &str) -> Result<RescueConfig> {
@@ -1203,11 +1268,14 @@ fn parse_config(content: &str) -> Result<RescueConfig> {
     let mut custom_partitions = BTreeMap::new();
     if let Some(object) = value.get("customPartitions").and_then(Value::as_object) {
         for (name, path) in object {
-            if is_known_partition(name)
-                && let Some(path) = path.as_str().and_then(sanitize_partition_path)
-            {
-                custom_partitions.insert(name.clone(), path);
+            if !is_known_partition(name) {
+                bail!("unsupported custom rescue partition: {name}");
             }
+            let path = path
+                .as_str()
+                .and_then(sanitize_partition_path)
+                .with_context(|| format!("invalid custom partition path for {name}"))?;
+            custom_partitions.insert(name.clone(), path);
         }
     }
     Ok(RescueConfig {
@@ -1285,7 +1353,7 @@ fn normalize_partition_name(name: &str) -> Result<String> {
     }
 }
 
-fn ensure_safe_import_source(source: &Path) -> Result<()> {
+fn ensure_safe_import_source(source: &Path) -> Result<PathBuf> {
     let path = source
         .canonicalize()
         .with_context(|| format!("failed to resolve {}", source.display()))?;
@@ -1296,28 +1364,31 @@ fn ensure_safe_import_source(source: &Path) -> Result<()> {
     if size == 0 {
         bail!("source image is empty");
     }
-    Ok(())
+    Ok(path)
 }
 
 fn preserve_file(path: &str) -> Result<()> {
     let source = Path::new(path);
+    let backup = backup_path(source);
     if !source.exists() {
+        remove_file_if_exists(&backup)?;
         return Ok(());
     }
-    let backup = backup_path(source);
-    fs::copy(source, &backup)
+    atomic_copy(source, &backup)
         .with_context(|| format!("failed to preserve previous backup {}", source.display()))?;
     Ok(())
 }
 
-fn restore_preserved_file(path: &str) {
+fn restore_preserved_file(path: &str) -> Result<()> {
     let source = Path::new(path);
     let backup = backup_path(source);
     if backup.exists() {
-        let _ = fs::copy(&backup, source);
+        atomic_copy(&backup, source)
+            .with_context(|| format!("failed to restore previous backup {}", source.display()))?;
     } else {
-        let _ = fs::remove_file(source);
+        remove_file_if_exists(source)?;
     }
+    Ok(())
 }
 
 fn rescue_file_paths(specs: &[PartitionSpec]) -> Vec<String> {
@@ -1330,17 +1401,30 @@ fn rescue_file_paths(specs: &[PartitionSpec]) -> Vec<String> {
 }
 
 fn preserve_files(paths: &[String]) -> Result<()> {
+    let mut preserved = Vec::with_capacity(paths.len());
     for path in paths {
-        preserve_file(path)?;
+        if let Err(err) = preserve_file(path) {
+            cleanup_preserved_files(&preserved);
+            return Err(err);
+        }
+        preserved.push(path.clone());
     }
     Ok(())
 }
 
-fn restore_preserved_files(paths: &[String]) {
+fn restore_preserved_files(paths: &[String]) -> Result<()> {
+    let mut errors = Vec::new();
     for path in paths {
-        restore_preserved_file(path);
+        if let Err(err) = restore_preserved_file(path) {
+            errors.push(format!("{path}: {err:#}"));
+        }
     }
-    cleanup_preserved_files(paths);
+    if errors.is_empty() {
+        cleanup_preserved_files(paths);
+        Ok(())
+    } else {
+        bail!("{}", errors.join("; "))
+    }
 }
 
 fn cleanup_preserved_files(paths: &[String]) {
@@ -1355,6 +1439,90 @@ fn backup_path(path: &Path) -> PathBuf {
         .and_then(|name| name.to_str())
         .unwrap_or("backup");
     path.with_file_name(format!("{file_name}.bak"))
+}
+
+fn validate_import_source_against_partition(
+    source: &Path,
+    spec: &PartitionSpec,
+    device: &str,
+) -> Result<()> {
+    let image_size = fs::metadata(source)
+        .with_context(|| format!("failed to read import metadata for {}", spec.name))?
+        .len();
+    let device_size = partition_size(device);
+    if device_size == 0 {
+        bail!("failed to determine {} partition size", spec.name);
+    }
+    if image_size != device_size {
+        bail!(
+            "{} import size mismatch: image={}, partition={}",
+            spec.name,
+            image_size,
+            device_size
+        );
+    }
+    Ok(())
+}
+
+fn atomic_copy(source: &Path, destination: &Path) -> Result<u64> {
+    let parent = destination
+        .parent()
+        .with_context(|| format!("{} has no parent", destination.display()))?;
+    utils::ensure_dir_exists(parent)?;
+    let mut input =
+        fs::File::open(source).with_context(|| format!("failed to open {}", source.display()))?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)
+        .with_context(|| format!("failed to create temporary file in {}", parent.display()))?;
+    let copied = io::copy(&mut input, &mut temporary)
+        .with_context(|| format!("failed to copy {}", source.display()))?;
+    temporary.as_file().sync_all().with_context(|| {
+        format!(
+            "failed to sync temporary copy for {}",
+            destination.display()
+        )
+    })?;
+    temporary
+        .persist(destination)
+        .map_err(|err| err.error)
+        .with_context(|| format!("failed to atomically replace {}", destination.display()))?;
+    sync_parent_directory(parent);
+    Ok(copied)
+}
+
+fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
+    let parent = path
+        .parent()
+        .with_context(|| format!("{} has no parent", path.display()))?;
+    utils::ensure_dir_exists(parent)?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)
+        .with_context(|| format!("failed to create temporary file in {}", parent.display()))?;
+    temporary
+        .write_all(content)
+        .with_context(|| format!("failed to write temporary file for {}", path.display()))?;
+    temporary
+        .as_file()
+        .sync_all()
+        .with_context(|| format!("failed to sync temporary file for {}", path.display()))?;
+    temporary
+        .persist(path)
+        .map_err(|err| err.error)
+        .with_context(|| format!("failed to atomically replace {}", path.display()))?;
+    sync_parent_directory(parent);
+    Ok(())
+}
+
+fn remove_file_if_exists(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err).with_context(|| format!("failed to remove {}", path.display())),
+    }
+}
+
+fn sync_parent_directory(parent: &Path) {
+    if let Ok(directory) = fs::File::open(parent) {
+        let _ = directory.sync_all();
+    }
 }
 
 fn current_slot() -> String {
@@ -1605,4 +1773,74 @@ fn tail_file(path: &str, max_lines: usize) -> Result<String> {
     let lines = content.lines().collect::<Vec<_>>();
     let start = lines.len().saturating_sub(max_lines);
     Ok(lines[start..].join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        PartitionSpec, backup_path, normalize_partition_name, parse_config, preserve_file,
+        restore_preserved_file, validate_import_source_against_partition,
+    };
+    use std::fs;
+
+    #[test]
+    fn normalizes_supported_partition_aliases() {
+        assert_eq!(normalize_partition_name("initboot").unwrap(), "init_boot");
+        assert_eq!(normalize_partition_name("verboot").unwrap(), "vendor_boot");
+        assert!(normalize_partition_name("system").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_custom_partition_paths() {
+        let invalid_path = r#"{"customPartitions":{"boot":"/data/local/tmp/boot.img"}}"#;
+        let unknown_partition = r#"{"customPartitions":{"system":"/dev/block/system"}}"#;
+        assert!(parse_config(invalid_path).is_err());
+        assert!(parse_config(unknown_partition).is_err());
+    }
+
+    #[test]
+    fn validates_import_size_before_replacing_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.img");
+        let partition = directory.path().join("boot");
+        fs::write(&source, b"short").unwrap();
+        fs::write(&partition, b"partition").unwrap();
+        let spec = PartitionSpec {
+            name: "boot".to_string(),
+            label: "boot".to_string(),
+            image_path: directory.path().join("boot.img").display().to_string(),
+            required: true,
+            custom_path: None,
+            ota: false,
+            restore: true,
+        };
+        assert!(
+            validate_import_source_against_partition(
+                &source,
+                &spec,
+                &partition.display().to_string(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn restores_preserved_file_and_does_not_reuse_stale_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("boot.img");
+        let target_text = target.display().to_string();
+        fs::write(&target, b"known-good").unwrap();
+        preserve_file(&target_text).unwrap();
+        fs::write(&target, b"new-image").unwrap();
+        restore_preserved_file(&target_text).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"known-good");
+
+        fs::remove_file(&target).unwrap();
+        assert!(backup_path(&target).exists());
+        preserve_file(&target_text).unwrap();
+        assert!(!backup_path(&target).exists());
+        fs::write(&target, b"partial-import").unwrap();
+        restore_preserved_file(&target_text).unwrap();
+        assert!(!target.exists());
+    }
 }

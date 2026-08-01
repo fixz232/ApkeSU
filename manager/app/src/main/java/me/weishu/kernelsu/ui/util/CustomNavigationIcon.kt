@@ -77,15 +77,72 @@ enum class CustomNavigationIconSlot(
         cropRightKey = "custom_navigation_icon_settings_crop_right",
         cropBottomKey = "custom_navigation_icon_settings_crop_bottom",
     ),
+
+    ;
+
+    val sizeScaleKey: String get() = "custom_navigation_icon_${id}_size_scale"
+    val innerPaddingKey: String get() = "custom_navigation_icon_${id}_inner_padding"
+    val verticalOffsetKey: String get() = "custom_navigation_icon_${id}_vertical_offset"
+    val opacityKey: String get() = "custom_navigation_icon_${id}_opacity"
+    val tintArgbKey: String get() = "custom_navigation_icon_${id}_tint_argb"
+    val maskKey: String get() = "custom_navigation_icon_${id}_mask"
+    val labelKey: String get() = "custom_navigation_icon_${id}_label"
+
+    val preferenceKeys: Set<String>
+        get() = setOf(
+            uriKey,
+            cropLeftKey,
+            cropTopKey,
+            cropRightKey,
+            cropBottomKey,
+            sizeScaleKey,
+            innerPaddingKey,
+            verticalOffsetKey,
+            opacityKey,
+            tintArgbKey,
+            maskKey,
+            labelKey,
+        )
+}
+
+enum class CustomNavigationIconMask(val value: String) {
+    Original("original"),
+    Circle("circle"),
+    Square("square"),
+    RoundedSquare("rounded_square");
+
+    companion object {
+        fun fromValue(value: String?): CustomNavigationIconMask {
+            return entries.firstOrNull { it.value == value } ?: Original
+        }
+    }
 }
 
 @Immutable
 data class CustomNavigationIconState(
     val uriString: String? = null,
     val crop: CustomWallpaperCrop = DEFAULT_CUSTOM_NAVIGATION_ICON_CROP,
+    val sizeScale: Float = 1f,
+    val innerPaddingDp: Float = 0f,
+    val verticalOffsetDp: Float = 0f,
+    val opacity: Float = 1f,
+    val tintArgb: Long? = null,
+    val mask: CustomNavigationIconMask = CustomNavigationIconMask.Original,
+    val labelOverride: String? = null,
 ) {
     val hasSelected: Boolean
         get() = !uriString.isNullOrBlank()
+
+    fun normalized(): CustomNavigationIconState = copy(
+        crop = sanitizeCustomWallpaperCrop(crop),
+        sizeScale = sizeScale.takeIf(Float::isFinite)?.coerceIn(0.6f, 1.4f) ?: 1f,
+        innerPaddingDp = innerPaddingDp.takeIf(Float::isFinite)?.coerceIn(0f, 8f) ?: 0f,
+        verticalOffsetDp = verticalOffsetDp.takeIf(Float::isFinite)?.coerceIn(-8f, 8f) ?: 0f,
+        opacity = opacity.takeIf(Float::isFinite)?.coerceIn(0.2f, 1f) ?: 1f,
+        labelOverride = labelOverride?.trim()?.take(20)?.takeIf(String::isNotBlank),
+    )
+
+    fun displayLabel(fallback: String): String = normalized().labelOverride ?: fallback
 }
 
 @Immutable
@@ -100,6 +157,16 @@ data class CustomNavigationIconSet(
 
     val hasSelected: Boolean
         get() = selectedCount > 0
+
+    val hasCustomization: Boolean
+        get() = CustomNavigationIconSlot.entries.any { slot ->
+            get(slot).normalized().let { state ->
+                state.hasSelected || state.labelOverride != null || state.sizeScale != 1f ||
+                    state.innerPaddingDp != 0f || state.verticalOffsetDp != 0f ||
+                    state.opacity != 1f || state.tintArgb != null ||
+                    state.mask != CustomNavigationIconMask.Original
+            }
+        }
 
     operator fun get(slot: CustomNavigationIconSlot): CustomNavigationIconState {
         return when (slot) {
@@ -140,6 +207,23 @@ fun setCustomNavigationIconCrop(context: Context, slot: CustomNavigationIconSlot
     }
 }
 
+fun setCustomNavigationIconPresentation(
+    context: Context,
+    slot: CustomNavigationIconSlot,
+    state: CustomNavigationIconState,
+) {
+    val value = state.normalized()
+    customNavigationIconPrefs(context).edit(commit = true) {
+        putFloat(slot.sizeScaleKey, value.sizeScale)
+        putFloat(slot.innerPaddingKey, value.innerPaddingDp)
+        putFloat(slot.verticalOffsetKey, value.verticalOffsetDp)
+        putFloat(slot.opacityKey, value.opacity)
+        if (value.tintArgb == null) remove(slot.tintArgbKey) else putLong(slot.tintArgbKey, value.tintArgb)
+        putString(slot.maskKey, value.mask.value)
+        if (value.labelOverride == null) remove(slot.labelKey) else putString(slot.labelKey, value.labelOverride)
+    }
+}
+
 internal fun SharedPreferences.readCustomNavigationIconSet(): CustomNavigationIconSet {
     return CustomNavigationIconSet(
         home = readCustomNavigationIconState(CustomNavigationIconSlot.Home),
@@ -162,7 +246,14 @@ internal fun SharedPreferences.readCustomNavigationIconState(
                 bottom = getFloat(slot.cropBottomKey, DEFAULT_CUSTOM_NAVIGATION_ICON_CROP.bottom),
             )
         ),
-    )
+        sizeScale = getFloat(slot.sizeScaleKey, 1f),
+        innerPaddingDp = getFloat(slot.innerPaddingKey, 0f),
+        verticalOffsetDp = getFloat(slot.verticalOffsetKey, 0f),
+        opacity = getFloat(slot.opacityKey, 1f),
+        tintArgb = if (contains(slot.tintArgbKey)) getLong(slot.tintArgbKey, 0L) else null,
+        mask = CustomNavigationIconMask.fromValue(getString(slot.maskKey, null)),
+        labelOverride = getString(slot.labelKey, null),
+    ).normalized()
 }
 
 internal fun SharedPreferences.Editor.putCustomNavigationIconCrop(

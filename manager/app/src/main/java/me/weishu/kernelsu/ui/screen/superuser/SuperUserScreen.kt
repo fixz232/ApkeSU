@@ -20,7 +20,8 @@ import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 fun SuperUserPager(
     navigator: Navigator,
     bottomInnerPadding: Dp,
-    isCurrentPage: Boolean = true
+    isCurrentPage: Boolean = true,
+    onOpenSecondary: () -> Unit = {},
 ) {
     val viewModel = viewModel<SuperUserViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -48,16 +49,19 @@ fun SuperUserPager(
     val onToggleShowOnlyPrimaryUserApps: () -> Unit = {
         viewModel.toggleShowOnlyPrimaryUserApps()
     }
+    val openSecondary: (Route) -> Unit = { route ->
+        onOpenSecondary()
+        navigator.push(route)
+    }
     val onOpenProfile: (GroupedApps) -> Unit = fun(group: GroupedApps) {
         if (navigator.current() is Route.AppProfile) return
-        navigator.push(Route.AppProfile(group.uid))
+        openSecondary(Route.AppProfile(group.uid))
         viewModel.markNeedRefresh()
     }
     val actions = SuperUserActions(
         onRefresh = { viewModel.loadAppList(force = true) },
-        onOpenSulog = { navigator.push(Route.Sulog) },
-        onOpenAppIdManager = { navigator.push(Route.AppIdManager) },
-        onOpenAppFreeze = { navigator.push(Route.AppFreeze) },
+        onOpenSulog = { openSecondary(Route.Sulog) },
+        onOpenAppTools = { openSecondary(Route.SuperUserTools) },
         onSearchTextChange = onSearchTextChange,
         onSearchStatusChange = viewModel::updateSearchStatus,
         onClearSearch = { onSearchTextChange("") },
@@ -70,15 +74,6 @@ fun SuperUserPager(
     when (LocalInterfaceStyle.current) {
         InterfaceStyle.Material.value -> {
             SuperUserPagerMaterial(
-                uiState = uiState,
-                actions = actions,
-                bottomInnerPadding = bottomInnerPadding,
-            )
-            return
-        }
-
-        InterfaceStyle.Studio.value -> {
-            SuperUserPagerStudio(
                 uiState = uiState,
                 actions = actions,
                 bottomInnerPadding = bottomInnerPadding,
@@ -115,6 +110,7 @@ fun SuperUserPager(
 
         InterfaceStyle.Snow.value,
         InterfaceStyle.Rain.value,
+        InterfaceStyle.Ink.value,
         InterfaceStyle.Pixel.value -> {
             SuperUserPagerMiuix(
                 uiState = uiState,

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,12 +36,12 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContactPage
 import androidx.compose.material.icons.rounded.Dashboard
@@ -56,7 +57,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
@@ -103,9 +103,13 @@ import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.pixel.pixelPalette
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.rain.rainPalette
+import me.weishu.kernelsu.ui.component.ink.InkStyle
+import me.weishu.kernelsu.ui.component.ink.inkPalette
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -144,19 +148,18 @@ fun SettingPagerMiuix(
     val enableBlur = LocalEnableBlur.current
     val backdrop = rememberBlurBackdrop(enableBlur)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else colorScheme.surface
+    val barColor = immersiveTopBarColor(
+        if (blurActive) Color.Transparent else colorScheme.surface,
+    )
     val topBarColors = skrootproTopBarColors(barColor, colorScheme.onSurface)
     val loadingDialog = rememberLoadingDialog()
     val showUninstallDialog = rememberSaveable { mutableStateOf(false) }
     val showSendLogDialog = rememberSaveable { mutableStateOf(false) }
-    val showWallpaperOpacitySlider = rememberSaveable { mutableStateOf(false) }
-    val showWallpaperPassthroughOpacitySlider = rememberSaveable { mutableStateOf(false) }
-    val showVideoBackgroundDurationSlider = rememberSaveable { mutableStateOf(false) }
-    var updatesExpanded by rememberSaveable { mutableStateOf(false) }
     var appearanceExpanded by rememberSaveable { mutableStateOf(false) }
-    var profilesExpanded by rememberSaveable { mutableStateOf(false) }
-    var rootFeaturesExpanded by rememberSaveable { mutableStateOf(false) }
-    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var homeManagerExpanded by rememberSaveable { mutableStateOf(false) }
+    var rootPermissionsExpanded by rememberSaveable { mutableStateOf(false) }
+    var mountHideExpanded by rememberSaveable { mutableStateOf(false) }
+    var toolboxExpanded by rememberSaveable { mutableStateOf(false) }
     var maintenanceExpanded by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -186,68 +189,14 @@ fun SettingPagerMiuix(
                 overscrollEffect = null,
             ) {
                 item {
-                    KsuIsValid {
-                        CollapsibleMiuixSection(
-                            title = stringResource(R.string.settings_section_updates),
-                            summary = stringResource(R.string.settings_section_updates_summary),
-                            icon = Icons.Rounded.UploadFile,
-                            itemCount = UPDATES_ITEM_COUNT,
-                            expanded = updatesExpanded,
-                            onExpandedChange = { updatesExpanded = it },
-                            topPadding = 12.dp,
-                        ) {
-                            SwitchPreference(
-                                title = stringResource(id = R.string.settings_module_check_update),
-                                summary = stringResource(id = R.string.settings_module_check_update_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.UploadFile,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_module_check_update),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.checkModuleUpdate,
-                                onCheckedChange = actions.onSetCheckModuleUpdate
-                            )
-                            SwitchPreference(
-                                title = stringResource(id = R.string.settings_version_mismatch_warning),
-                                summary = stringResource(id = R.string.settings_version_mismatch_warning_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.BugReport,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_version_mismatch_warning),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.showVersionMismatchWarning,
-                                onCheckedChange = actions.onSetShowVersionMismatchWarning
-                            )
-                            SwitchPreference(
-                                title = stringResource(id = R.string.settings_gki_warning),
-                                summary = stringResource(id = R.string.settings_gki_warning_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.BugReport,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_gki_warning),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.showGkiWarning,
-                                onCheckedChange = actions.onSetShowGkiWarning
-                            )
-                        }
-                    }
-
                     CollapsibleMiuixSection(
-                        title = stringResource(R.string.settings_section_appearance),
-                        summary = stringResource(R.string.settings_section_appearance_summary),
+                        title = stringResource(R.string.settings_hub_appearance),
+                        summary = stringResource(R.string.settings_hub_appearance_summary),
                         icon = Icons.Rounded.Palette,
-                        itemCount = uiState.appearanceSectionItemCount(),
+                        itemCount = uiState.appearanceCategoryItemCount(),
                         expanded = appearanceExpanded,
                         onExpandedChange = { appearanceExpanded = it },
+                        topPadding = 12.dp,
                     ) {
                         val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
                         OverlayDropdownPreference(
@@ -265,6 +214,22 @@ fun SettingPagerMiuix(
                             selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                             onSelectedIndexChange = actions.onSetUiModeIndex
                         )
+                        if (uiState.uiMode == InterfaceStyle.Miuix.value) {
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_miuix_classic_home_layout),
+                                summary = stringResource(R.string.settings_miuix_classic_home_layout_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Dashboard,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = null,
+                                        tint = colorScheme.onBackground,
+                                    )
+                                },
+                                checked = uiState.miuixClassicHomeLayoutEnabled,
+                                onCheckedChange = actions.onSetMiuixClassicHomeLayoutEnabled,
+                            )
+                        }
                         if (uiState.uiMode == InterfaceStyle.Snow.value) {
                             SeasonMiuixPreference(
                                 selectedValue = uiState.seasonStyle,
@@ -281,6 +246,16 @@ fun SettingPagerMiuix(
                                 onCardMotionEnabledChange = actions.onSetRainCardMotionEnabled,
                             )
                         }
+                        if (uiState.uiMode == InterfaceStyle.Ink.value) {
+                            InkMiuixPreference(
+                                selectedValue = uiState.inkStyle,
+                                fontEnabled = uiState.inkFontEnabled,
+                                cardMotionEnabled = uiState.inkCardMotionEnabled,
+                                onSelectedIndexChange = actions.onSetInkStyleIndex,
+                                onFontEnabledChange = actions.onSetInkFontEnabled,
+                                onCardMotionEnabledChange = actions.onSetInkCardMotionEnabled,
+                            )
+                        }
                         if (uiState.uiMode == InterfaceStyle.Pixel.value) {
                             PixelMiuixPreference(
                                 selectedValue = uiState.pixelStyle,
@@ -295,85 +270,29 @@ fun SettingPagerMiuix(
                             checked = dayNightChecked,
                             onCheckedChange = actions.onSetDayNightMode,
                         )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_section_visual_effects),
-                            summary = stringResource(id = R.string.settings_visual_effects_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_section_visual_effects),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenVisualEffects
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_ui_decoration_library),
-                            summary = stringResource(id = R.string.settings_ui_decoration_library_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.AutoFixHigh,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_ui_decoration_library),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenUiDecorationLibrary
-                        )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_theme),
-                            summary = stringResource(id = R.string.settings_theme_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Palette,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_theme),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenTheme
-                        )
-                        ArrowPreference(
+                        CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.theme_store),
                             summary = stringResource(id = R.string.theme_store_settings_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Storefront,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.theme_store),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenThemeStore
+                            icon = Icons.Rounded.Storefront,
+                            onClick = actions.onOpenThemeStore,
                         )
-                        ArrowPreference(
-                            title = stringResource(id = R.string.settings_language),
-                            summary = stringResource(id = R.string.settings_language_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Language,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_language),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenLanguage
-                        )
-                        ArrowPreference(
+                    }
+
+                    CollapsibleMiuixSection(
+                        title = stringResource(R.string.settings_hub_home_manager),
+                        summary = stringResource(R.string.settings_hub_home_manager_summary),
+                        icon = Icons.Rounded.Dashboard,
+                        itemCount = HOME_MANAGER_ITEM_COUNT,
+                        expanded = homeManagerExpanded,
+                        onExpandedChange = { homeManagerExpanded = it },
+                    ) {
+                        CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.settings_manager_identity),
                             summary = stringResource(id = R.string.settings_manager_identity_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Apps,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_manager_identity),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenLauncherIcon
+                            icon = Icons.Rounded.Apps,
+                            onClick = actions.onOpenLauncherIcon,
                         )
-                        ArrowPreference(
+                        CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.settings_home_title),
                             summary = if (uiState.customHomeTitle.isBlank()) {
                                 stringResource(id = R.string.settings_home_title_default_summary)
@@ -383,94 +302,47 @@ fun SettingPagerMiuix(
                                     uiState.customHomeTitle,
                                 )
                             },
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.EditNote,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_home_title),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onEditHomeTitle
+                            icon = Icons.Rounded.EditNote,
+                            onClick = actions.onEditHomeTitle,
                         )
-                        ArrowPreference(
+                        CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.home_layout_title),
                             summary = stringResource(id = R.string.home_layout_settings_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Dashboard,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.home_layout_title),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
-                            onClick = actions.onOpenHomeLayout
+                            icon = Icons.Rounded.Dashboard,
+                            onClick = actions.onOpenHomeLayout,
                         )
-                        SwitchPreference(
+                        CategorizedMiuixSwitchRow(
                             title = stringResource(id = R.string.settings_show_home_support_card),
                             summary = stringResource(id = R.string.settings_show_home_support_card_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_show_home_support_card),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
+                            icon = Icons.Rounded.Visibility,
                             checked = uiState.showHomeSupportCard,
-                            onCheckedChange = actions.onSetShowHomeSupportCard
+                            onCheckedChange = actions.onSetShowHomeSupportCard,
                         )
-                        SwitchPreference(
+                        CategorizedMiuixSwitchRow(
                             title = stringResource(id = R.string.settings_show_home_learn_card),
                             summary = stringResource(id = R.string.settings_show_home_learn_card_summary),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.Visibility,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.settings_show_home_learn_card),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
+                            icon = Icons.Rounded.Visibility,
                             checked = uiState.showHomeLearnCard,
-                            onCheckedChange = actions.onSetShowHomeLearnCard
+                            onCheckedChange = actions.onSetShowHomeLearnCard,
                         )
                     }
 
                     KsuIsValid {
                         CollapsibleMiuixSection(
-                            title = stringResource(R.string.settings_section_profiles),
-                            summary = stringResource(R.string.settings_section_profiles_summary),
-                            icon = Icons.Rounded.Fence,
-                            itemCount = 1,
-                            expanded = profilesExpanded,
-                            onExpandedChange = { profilesExpanded = it },
+                            title = stringResource(R.string.settings_hub_root_permissions),
+                            summary = stringResource(R.string.settings_hub_root_permissions_summary),
+                            icon = Icons.Rounded.Security,
+                            itemCount = ROOT_PERMISSIONS_ITEM_COUNT,
+                            expanded = rootPermissionsExpanded,
+                            onExpandedChange = { rootPermissionsExpanded = it },
                         ) {
                             val profileTemplate = stringResource(id = R.string.settings_profile_template)
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = profileTemplate,
                                 summary = stringResource(id = R.string.settings_profile_template_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Fence,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = profileTemplate,
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onOpenProfileTemplate
+                                icon = Icons.Rounded.Fence,
+                                onClick = actions.onOpenProfileTemplate,
                             )
-                        }
-                    }
-
-                    KsuIsValid {
-                        CollapsibleMiuixSection(
-                            title = stringResource(R.string.settings_section_root_features),
-                            summary = stringResource(R.string.settings_section_root_features_summary),
-                            icon = Icons.Rounded.RemoveModerator,
-                            itemCount = ROOT_FEATURES_ITEM_COUNT,
-                            expanded = rootFeaturesExpanded,
-                            onExpandedChange = { rootFeaturesExpanded = it },
-                        ) {
                             val suCompatModeItems = listOf(
                                 stringResource(id = R.string.settings_mode_enable_by_default),
                                 stringResource(id = R.string.settings_mode_disable_until_reboot),
@@ -504,20 +376,13 @@ fun SettingPagerMiuix(
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                 else -> stringResource(id = R.string.settings_kernel_umount_summary)
                             }
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_kernel_umount),
                                 summary = umountSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.RemoveCircle,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_kernel_umount),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
+                                icon = Icons.Rounded.RemoveCircle,
                                 enabled = uiState.kernelUmountStatus == "supported",
                                 checked = uiState.isKernelUmountEnabled,
-                                onCheckedChange = actions.onSetKernelUmountEnabled
+                                onCheckedChange = actions.onSetKernelUmountEnabled,
                             )
 
                             val selinuxHideSummary = when (uiState.selinuxHideStatus) {
@@ -525,20 +390,13 @@ fun SettingPagerMiuix(
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                 else -> stringResource(id = R.string.settings_selinux_hide_summary)
                             }
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_selinux_hide),
                                 summary = selinuxHideSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Policy,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_selinux_hide),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
+                                icon = Icons.Rounded.Policy,
                                 enabled = uiState.selinuxHideStatus == "supported",
                                 checked = uiState.isSelinuxHideEnabled,
-                                onCheckedChange = actions.onSetSelinuxHideEnabled
+                                onCheckedChange = actions.onSetSelinuxHideEnabled,
                             )
 
                             val sulogSummary = when (uiState.sulogStatus) {
@@ -546,20 +404,13 @@ fun SettingPagerMiuix(
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                 else -> stringResource(id = R.string.settings_sulog_summary)
                             }
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_sulog),
                                 summary = sulogSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.AutoMirrored.Rounded.Article,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_sulog),
-                                        tint = if (uiState.sulogStatus == "supported") colorScheme.onBackground else colorScheme.disabledOnSecondaryVariant
-                                    )
-                                },
+                                icon = Icons.AutoMirrored.Rounded.Article,
                                 enabled = uiState.sulogStatus == "supported",
                                 checked = uiState.isSulogEnabled,
-                                onCheckedChange = actions.onSetSulogEnabled
+                                onCheckedChange = actions.onSetSulogEnabled,
                             )
 
                             val adbRootSummary = when (uiState.adbRootStatus) {
@@ -567,20 +418,13 @@ fun SettingPagerMiuix(
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                 else -> stringResource(id = R.string.settings_adb_root_summary)
                             }
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_adb_root),
                                 summary = adbRootSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Adb,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_adb_root),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
+                                icon = Icons.Rounded.Adb,
                                 enabled = uiState.adbRootStatus == "supported",
                                 checked = uiState.isAdbRootEnabled,
-                                onCheckedChange = actions.onSetAdbRootEnabled
+                                onCheckedChange = actions.onSetAdbRootEnabled,
                             )
 
                             val avcSpoofSummary = when (uiState.avcSpoofStatus) {
@@ -588,100 +432,52 @@ fun SettingPagerMiuix(
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                 else -> stringResource(id = R.string.settings_avc_spoof_summary)
                             }
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_avc_spoof),
                                 summary = avcSpoofSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.EditNote,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_avc_spoof),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
+                                icon = Icons.Rounded.EditNote,
                                 enabled = uiState.avcSpoofStatus == "supported",
                                 checked = uiState.isAvcSpoofEnabled,
-                                onCheckedChange = actions.onSetAvcSpoofEnabled
-                            )
-
-                            SwitchPreference(
-                                title = stringResource(id = R.string.settings_epkesu_hide),
-                                summary = stringResource(id = R.string.settings_epkesu_hide_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Visibility,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_epkesu_hide),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.isEpkesuHideEnabled,
-                                onCheckedChange = actions.onSetEpkesuHideEnabled
+                                onCheckedChange = actions.onSetAvcSpoofEnabled,
                             )
                         }
 
                         CollapsibleMiuixSection(
-                            title = stringResource(R.string.settings_section_advanced),
-                            summary = stringResource(R.string.settings_section_advanced_summary),
-                            icon = Icons.Rounded.DeveloperMode,
-                            itemCount = ADVANCED_ITEM_COUNT + 1 +
-                                if (uiState.graphicsRendererFeatureEnabled) 1 else 0,
-                            expanded = advancedExpanded,
-                            onExpandedChange = { advancedExpanded = it },
+                            title = stringResource(R.string.settings_hub_mount_hide),
+                            summary = stringResource(R.string.settings_hub_mount_hide_summary),
+                            icon = Icons.Rounded.Layers,
+                            itemCount = MOUNT_HIDE_ITEM_COUNT,
+                            expanded = mountHideExpanded,
+                            onExpandedChange = { mountHideExpanded = it },
                         ) {
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_umount_modules_default),
                                 summary = stringResource(id = R.string.settings_umount_modules_default_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.FolderDelete,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_umount_modules_default),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
+                                icon = Icons.Rounded.FolderDelete,
                                 checked = uiState.isDefaultUmountModules,
-                                onCheckedChange = actions.onSetDefaultUmountModules
+                                onCheckedChange = actions.onSetDefaultUmountModules,
                             )
 
                             val builtinMountSummary = uiState.builtinMountConflict?.let {
                                 stringResource(id = R.string.settings_builtin_mount_conflict_summary, it)
                             } ?: stringResource(id = R.string.settings_builtin_mount_summary)
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = stringResource(id = R.string.settings_builtin_mount),
                                 summary = builtinMountSummary,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Layers,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_builtin_mount),
-                                        tint = colorScheme.onBackground,
-                                    )
-                                },
+                                icon = Icons.Rounded.Layers,
                                 onClick = actions.onOpenBuiltinMount,
                             )
 
-                            SwitchPreference(
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_kpatch_next),
                                 summary = kPatchNextSummary(uiState),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.DeveloperMode,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_kpatch_next),
-                                        tint = if (uiState.canToggleKPatchNext) {
-                                            colorScheme.onBackground
-                                        } else {
-                                            colorScheme.disabledOnSecondaryVariant
-                                        }
-                                    )
-                                },
+                                icon = Icons.Rounded.DeveloperMode,
                                 enabled = uiState.canToggleKPatchNext,
-                                checked = uiState.isKPatchNextEnabled,
-                                onCheckedChange = actions.onSetKPatchNextEnabled
+                                checked = uiState.isKPatchNextSwitchChecked,
+                                onCheckedChange = actions.onSetKPatchNextEnabled,
                             )
 
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = stringResource(id = R.string.settings_kpatch_next_webui),
                                 summary = stringResource(
                                     id = if (uiState.canOpenKPatchNextWebUi) {
@@ -690,196 +486,144 @@ fun SettingPagerMiuix(
                                         R.string.settings_kpatch_next_webui_disabled_summary
                                     }
                                 ),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Apps,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_kpatch_next_webui),
-                                        tint = if (uiState.canOpenKPatchNextWebUi) {
-                                            colorScheme.onBackground
-                                        } else {
-                                            colorScheme.disabledOnSecondaryVariant
-                                        }
-                                    )
-                                },
+                                icon = Icons.Rounded.Apps,
                                 enabled = uiState.canOpenKPatchNextWebUi,
-                                onClick = actions.onOpenKPatchNextWebUi
+                                onClick = actions.onOpenKPatchNextWebUi,
                             )
 
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = pathConfigTitle(uiState),
                                 summary = pathConfigSummary(uiState),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Visibility,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = pathConfigTitle(uiState),
-                                        tint = if (uiState.canOpenPathConfig) {
-                                            colorScheme.onBackground
-                                        } else {
-                                            colorScheme.disabledOnSecondaryVariant
-                                        }
-                                    )
-                                },
+                                icon = Icons.Rounded.Visibility,
                                 enabled = uiState.canOpenPathConfig,
-                                onClick = actions.onOpenHiddenPathConfig
+                                onClick = actions.onOpenHiddenPathConfig,
                             )
+                            CategorizedMiuixSwitchRow(
+                                title = stringResource(id = R.string.settings_epkesu_hide),
+                                summary = stringResource(id = R.string.settings_epkesu_hide_summary),
+                                icon = Icons.Rounded.Visibility,
+                                checked = uiState.isEpkesuHideEnabled,
+                                onCheckedChange = actions.onSetEpkesuHideEnabled,
+                            )
+                        }
 
-                            ArrowPreference(
+                        CollapsibleMiuixSection(
+                            title = stringResource(R.string.settings_hub_toolbox),
+                            summary = stringResource(R.string.settings_hub_toolbox_summary),
+                            icon = Icons.Rounded.DeveloperMode,
+                            itemCount = TOOLBOX_ITEM_COUNT +
+                                if (uiState.graphicsRendererFeatureEnabled) 1 else 0,
+                            expanded = toolboxExpanded,
+                            onExpandedChange = { toolboxExpanded = it },
+                        ) {
+                            CategorizedMiuixActionRow(
+                                title = stringResource(id = R.string.rescue_protection),
+                                summary = stringResource(id = R.string.rescue_protection_summary),
+                                icon = Icons.Rounded.Security,
+                                onClick = actions.onOpenRescueProtection,
+                            )
+                            CategorizedMiuixActionRow(
+                                title = stringResource(id = R.string.image_tool_title),
+                                summary = stringResource(id = R.string.image_tool_settings_summary),
+                                icon = Icons.Rounded.ImageSearch,
+                                onClick = actions.onOpenImageTool,
+                            )
+                            CategorizedMiuixActionRow(
                                 title = stringResource(id = R.string.settings_cpu_spoof),
                                 summary = stringResource(id = R.string.settings_cpu_spoof_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.DeveloperMode,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_cpu_spoof),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onOpenCpuSpoof
+                                icon = Icons.Rounded.DeveloperMode,
+                                onClick = actions.onOpenCpuSpoof,
                             )
-
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = stringResource(id = R.string.settings_device_identity),
                                 summary = stringResource(id = R.string.settings_device_identity_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Badge,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_device_identity),
-                                        tint = colorScheme.onBackground,
-                                    )
-                                },
+                                icon = Icons.Rounded.Badge,
                                 onClick = actions.onOpenDeviceIdentity,
                             )
-
-                            SwitchPreference(
+                            CategorizedMiuixActionRow(
+                                title = stringResource(id = R.string.settings_ai_chat),
+                                summary = stringResource(id = R.string.settings_ai_chat_summary),
+                                icon = Icons.Rounded.AutoFixHigh,
+                                onClick = actions.onOpenAiChat,
+                            )
+                            CategorizedMiuixSwitchRow(
                                 title = stringResource(R.string.settings_graphics_renderer_tool),
                                 summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.DeveloperMode,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(R.string.settings_graphics_renderer_tool),
-                                        tint = colorScheme.onBackground,
-                                    )
-                                },
+                                icon = Icons.Rounded.DeveloperMode,
                                 checked = uiState.graphicsRendererFeatureEnabled,
                                 onCheckedChange = actions.onSetGraphicsRendererFeatureEnabled,
                             )
 
                             if (uiState.graphicsRendererFeatureEnabled) {
-                                ArrowPreference(
+                                CategorizedMiuixActionRow(
                                     title = stringResource(R.string.settings_graphics_renderer),
                                     summary = stringResource(R.string.settings_graphics_renderer_summary),
-                                    startAction = {
-                                        Icon(
-                                            Icons.Rounded.DeveloperMode,
-                                            modifier = Modifier.padding(end = 6.dp),
-                                            contentDescription = stringResource(R.string.settings_graphics_renderer),
-                                            tint = colorScheme.onBackground,
-                                        )
-                                    },
+                                    icon = Icons.Rounded.DeveloperMode,
                                     onClick = actions.onOpenGraphicsRenderer,
                                 )
                             }
-
-                            ArrowPreference(
-                                title = stringResource(id = R.string.rescue_protection),
-                                summary = stringResource(id = R.string.rescue_protection_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Security,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.rescue_protection),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onOpenRescueProtection
-                            )
-
-                            ArrowPreference(
-                                title = stringResource(id = R.string.image_tool_title),
-                                summary = stringResource(id = R.string.image_tool_settings_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.ImageSearch,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.image_tool_title),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onOpenImageTool
-                            )
-
-                            ArrowPreference(
-                                title = stringResource(id = R.string.settings_ai_chat),
-                                summary = stringResource(id = R.string.settings_ai_chat_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.AutoFixHigh,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_ai_chat),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                onClick = actions.onOpenAiChat
-                            )
-
-                            SwitchPreference(
-                                title = stringResource(id = R.string.enable_web_debugging),
-                                summary = stringResource(id = R.string.enable_web_debugging_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.DeveloperMode,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.enable_web_debugging),
-                                        tint = colorScheme.onBackground
-                                    )
-                                },
-                                checked = uiState.enableWebDebugging,
-                                onCheckedChange = actions.onSetEnableWebDebugging
-                            )
-                            SwitchPreference(
-                                title = stringResource(id = R.string.settings_auto_jailbreak),
-                                summary = stringResource(id = R.string.settings_auto_jailbreak_summary),
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.ElectricalServices,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = stringResource(id = R.string.settings_auto_jailbreak),
-                                        tint = if (uiState.isLateLoadMode) colorScheme.onBackground else colorScheme.disabledOnSecondaryVariant
-                                    )
-                                },
-                                enabled = uiState.isLateLoadMode,
-                                checked = uiState.autoJailbreak,
-                                onCheckedChange = actions.onSetAutoJailbreak
-                            )
                         }
                     }
 
                     CollapsibleMiuixSection(
-                        title = stringResource(R.string.settings_section_maintenance),
-                        summary = stringResource(R.string.settings_section_maintenance_summary),
+                        title = stringResource(R.string.settings_hub_app_maintenance),
+                        summary = stringResource(R.string.settings_hub_app_maintenance_summary),
                         icon = Icons.Rounded.BugReport,
-                        itemCount = uiState.maintenanceSectionItemCount(),
+                        itemCount = uiState.maintenanceCategoryItemCount(),
                         expanded = maintenanceExpanded,
                         onExpandedChange = { maintenanceExpanded = it },
                         bottomPadding = 12.dp,
                     ) {
+                        CategorizedMiuixActionRow(
+                            title = stringResource(id = R.string.settings_language),
+                            summary = stringResource(id = R.string.settings_language_summary),
+                            icon = Icons.Rounded.Language,
+                            onClick = actions.onOpenLanguage,
+                        )
+                        KsuIsValid {
+                            CategorizedMiuixSwitchRow(
+                                title = stringResource(id = R.string.settings_module_check_update),
+                                summary = stringResource(id = R.string.settings_module_check_update_summary),
+                                icon = Icons.Rounded.UploadFile,
+                                checked = uiState.checkModuleUpdate,
+                                onCheckedChange = actions.onSetCheckModuleUpdate,
+                            )
+                            CategorizedMiuixSwitchRow(
+                                title = stringResource(id = R.string.settings_version_mismatch_warning),
+                                summary = stringResource(id = R.string.settings_version_mismatch_warning_summary),
+                                icon = Icons.Rounded.BugReport,
+                                checked = uiState.showVersionMismatchWarning,
+                                onCheckedChange = actions.onSetShowVersionMismatchWarning,
+                            )
+                            CategorizedMiuixSwitchRow(
+                                title = stringResource(id = R.string.settings_gki_warning),
+                                summary = stringResource(id = R.string.settings_gki_warning_summary),
+                                icon = Icons.Rounded.BugReport,
+                                checked = uiState.showGkiWarning,
+                                onCheckedChange = actions.onSetShowGkiWarning,
+                            )
+                        }
+                        CategorizedMiuixSwitchRow(
+                            title = stringResource(id = R.string.enable_web_debugging),
+                            summary = stringResource(id = R.string.enable_web_debugging_summary),
+                            icon = Icons.Rounded.DeveloperMode,
+                            checked = uiState.enableWebDebugging,
+                            onCheckedChange = actions.onSetEnableWebDebugging,
+                        )
+                        CategorizedMiuixSwitchRow(
+                            title = stringResource(id = R.string.settings_auto_jailbreak),
+                            summary = stringResource(id = R.string.settings_auto_jailbreak_summary),
+                            icon = Icons.Rounded.ElectricalServices,
+                            enabled = uiState.isLateLoadMode,
+                            checked = uiState.autoJailbreak,
+                            onCheckedChange = actions.onSetAutoJailbreak,
+                        )
                         if (uiState.isLkmMode) {
                             val uninstall = stringResource(id = R.string.settings_uninstall)
-                            ArrowPreference(
+                            CategorizedMiuixActionRow(
                                 title = uninstall,
                                 enabled = !uiState.isLateLoadMode,
-                                startAction = {
-                                    Icon(
-                                        Icons.Rounded.Delete,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = uninstall,
-                                        tint = colorScheme.onBackground,
-                                    )
-                                },
+                                icon = Icons.Rounded.Delete,
                                 onClick = { showUninstallDialog.value = true },
                             )
                             UninstallDialog(
@@ -887,16 +631,9 @@ fun SettingPagerMiuix(
                                 onDismissRequest = { showUninstallDialog.value = false }
                             )
                         }
-                        ArrowPreference(
+                        CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.send_log),
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.BugReport,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = stringResource(id = R.string.send_log),
-                                    tint = colorScheme.onBackground
-                                )
-                            },
+                            icon = Icons.Rounded.BugReport,
                             onClick = { showSendLogDialog.value = true },
                         )
                         SendLogDialog(
@@ -905,16 +642,9 @@ fun SettingPagerMiuix(
                             loadingDialog = loadingDialog
                         )
                         val about = stringResource(id = R.string.about)
-                        ArrowPreference(
+                        CategorizedMiuixActionRow(
                             title = about,
-                            startAction = {
-                                Icon(
-                                    Icons.Rounded.ContactPage,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                    contentDescription = about,
-                                    tint = colorScheme.onBackground
-                                )
-                            },
+                            icon = Icons.Rounded.ContactPage,
                             onClick = actions.onOpenAbout,
                         )
                     }
@@ -923,6 +653,56 @@ fun SettingPagerMiuix(
             }
         }
     }
+}
+
+@Composable
+private fun CategorizedMiuixActionRow(
+    title: String,
+    summary: String = "",
+    icon: ImageVector,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    ArrowPreference(
+        title = title,
+        summary = summary,
+        startAction = {
+            Icon(
+                imageVector = icon,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = null,
+                tint = if (enabled) colorScheme.onBackground else colorScheme.disabledOnSecondaryVariant,
+            )
+        },
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun CategorizedMiuixSwitchRow(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    SwitchPreference(
+        title = title,
+        summary = summary,
+        startAction = {
+            Icon(
+                imageVector = icon,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = null,
+                tint = if (enabled) colorScheme.onBackground else colorScheme.disabledOnSecondaryVariant,
+            )
+        },
+        enabled = enabled,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+    )
 }
 
 @Composable
@@ -1068,7 +848,9 @@ private fun CollapsibleMiuixSection(
                 .padding(top = 6.dp, bottom = bottomPadding)
                 .fillMaxWidth()
                 .settingsLiquidGlassSurface(),
-            colors = snowMiuixCardColors(),
+            colors = snowMiuixCardColors(
+                color = immersiveSurfaceColor(colorScheme.surfaceContainer),
+            ),
             insideMargin = PaddingValues(top = if (isSnowInterfaceStyle()) 8.dp else 0.dp),
         ) {
             content()
@@ -1076,14 +858,17 @@ private fun CollapsibleMiuixSection(
     }
 }
 
-private const val UPDATES_ITEM_COUNT = 3
-private const val ROOT_FEATURES_ITEM_COUNT = 7
-private const val ADVANCED_ITEM_COUNT = 12
+private const val HOME_MANAGER_ITEM_COUNT = 5
+private const val ROOT_PERMISSIONS_ITEM_COUNT = 7
+private const val MOUNT_HIDE_ITEM_COUNT = 6
+private const val TOOLBOX_ITEM_COUNT = 6
 
-private fun SettingsUiState.appearanceSectionItemCount(): Int {
-    return 17 + when (uiMode) {
+private fun SettingsUiState.appearanceCategoryItemCount(): Int {
+    return 6 + when (uiMode) {
+        InterfaceStyle.Miuix.value -> 1
         InterfaceStyle.Rain.value,
         InterfaceStyle.Snow.value,
+        InterfaceStyle.Ink.value,
         -> 2
         InterfaceStyle.Pixel.value,
         -> 2
@@ -1273,6 +1058,7 @@ private fun RainMiuixPreference(
                                     RainStyle.MediumRain -> 4
                                     RainStyle.HeavyRain -> 5
                                     RainStyle.Thunderstorm -> 6
+                                    RainStyle.AfterRain -> 2
                                 }
                                 repeat(lineCount) { line ->
                                     Box(
@@ -1292,6 +1078,16 @@ private fun RainMiuixPreference(
                                     .height(1.dp)
                                     .background(preview.ripple.copy(alpha = 0.72f)),
                             )
+                            if (rainStyle == RainStyle.AfterRain) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 3.dp, end = 4.dp)
+                                        .size(5.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(preview.highlight.copy(alpha = 0.78f)),
+                                )
+                            }
                         }
                         Spacer(Modifier.width(7.dp))
                         Text(
@@ -1308,9 +1104,6 @@ private fun RainMiuixPreference(
                         )
                     }
                 }
-                repeat(2 - styleRow.size) {
-                    Spacer(Modifier.weight(1f))
-                }
             }
         }
     }
@@ -1322,6 +1115,165 @@ private fun RainMiuixPreference(
                 Icons.Rounded.AutoFixHigh,
                 modifier = Modifier.padding(end = 6.dp),
                 contentDescription = stringResource(R.string.settings_rain_card_motion),
+                tint = colorScheme.onBackground,
+            )
+        },
+        checked = cardMotionEnabled,
+        onCheckedChange = onCardMotionEnabledChange,
+    )
+}
+
+@Composable
+private fun InkMiuixPreference(
+    selectedValue: String,
+    fontEnabled: Boolean,
+    cardMotionEnabled: Boolean,
+    onSelectedIndexChange: (Int) -> Unit,
+    onFontEnabledChange: (Boolean) -> Unit,
+    onCardMotionEnabledChange: (Boolean) -> Unit,
+) {
+    val selectedStyle = InkStyle.fromValue(selectedValue)
+    val dark = isInDarkTheme()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.Brush,
+            modifier = Modifier.padding(end = 12.dp).size(24.dp),
+            contentDescription = null,
+            tint = colorScheme.onBackground,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_ink_style),
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(selectedStyle.summaryRes),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
+            .selectableGroup()
+            .padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        InkStyle.entries.toList().chunked(2).forEach { styleRow ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                styleRow.forEach { inkStyle ->
+                    val index = InkStyle.entries.indexOf(inkStyle)
+                    val selected = inkStyle == selectedStyle
+                    val preview = inkPalette(inkStyle, dark)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (selected) {
+                                    colorScheme.primaryContainer.copy(alpha = 0.92f)
+                                } else {
+                                    Color.Transparent
+                                },
+                            )
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelectedIndexChange(index) },
+                            )
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Canvas(
+                            modifier = Modifier
+                                .size(width = 34.dp, height = 22.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(preview.backgroundTop, preview.backgroundBottom),
+                                    ),
+                                )
+                                .border(1.dp, preview.outline.copy(alpha = 0.72f), RoundedCornerShape(5.dp)),
+                        ) {
+                            drawLine(
+                                color = preview.farMountain.copy(alpha = 0.72f),
+                                start = androidx.compose.ui.geometry.Offset(0f, size.height * 0.72f),
+                                end = androidx.compose.ui.geometry.Offset(size.width * 0.46f, size.height * 0.40f),
+                                strokeWidth = 1.dp.toPx(),
+                            )
+                            drawLine(
+                                color = preview.nearMountain.copy(alpha = 0.78f),
+                                start = androidx.compose.ui.geometry.Offset(size.width * 0.34f, size.height * 0.76f),
+                                end = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.46f),
+                                strokeWidth = 1.dp.toPx(),
+                            )
+                            drawLine(
+                                color = preview.water.copy(alpha = 0.74f),
+                                start = androidx.compose.ui.geometry.Offset(size.width * 0.20f, size.height * 0.84f),
+                                end = androidx.compose.ui.geometry.Offset(size.width * 0.82f, size.height * 0.84f),
+                                strokeWidth = 0.7.dp.toPx(),
+                            )
+                            drawCircle(
+                                color = preview.seal.copy(alpha = 0.82f),
+                                radius = 1.5.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.82f, size.height * 0.23f),
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            text = stringResource(inkStyle.labelRes),
+                            color = if (selected) {
+                                colorScheme.onPrimaryContainer
+                            } else {
+                                colorScheme.onSurfaceVariantSummary
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+    SwitchPreference(
+        title = stringResource(R.string.settings_ink_font),
+        summary = stringResource(R.string.settings_ink_font_summary),
+        startAction = {
+            Icon(
+                Icons.Rounded.EditNote,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = stringResource(R.string.settings_ink_font),
+                tint = colorScheme.onBackground,
+            )
+        },
+        checked = fontEnabled,
+        onCheckedChange = onFontEnabledChange,
+    )
+    SwitchPreference(
+        title = stringResource(R.string.settings_ink_card_motion),
+        summary = stringResource(R.string.settings_ink_card_motion_summary),
+        startAction = {
+            Icon(
+                Icons.Rounded.AutoFixHigh,
+                modifier = Modifier.padding(end = 6.dp),
+                contentDescription = stringResource(R.string.settings_ink_card_motion),
                 tint = colorScheme.onBackground,
             )
         },
@@ -1512,8 +1464,8 @@ private fun DayNightMiuixPreference(
     }
 }
 
-private fun SettingsUiState.maintenanceSectionItemCount(): Int {
-    return if (isLkmMode) 3 else 2
+private fun SettingsUiState.maintenanceCategoryItemCount(): Int {
+    return if (isLkmMode) 9 else 8
 }
 
 @Composable

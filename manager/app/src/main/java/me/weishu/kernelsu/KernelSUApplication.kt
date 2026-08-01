@@ -23,13 +23,19 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     companion object {
         private const val TAG = "KernelSUApplication"
 
-        fun setEnableOnBackInvokedCallback(appInfo: ApplicationInfo, enable: Boolean) {
-            runCatching {
+        fun setEnableOnBackInvokedCallback(appInfo: ApplicationInfo, enable: Boolean): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+            return runCatching {
+                HiddenApiBypass.addHiddenApiExemptions(
+                    "Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback"
+                )
                 val applicationInfoClass = ApplicationInfo::class.java
                 val method = applicationInfoClass.getDeclaredMethod("setEnableOnBackInvokedCallback", Boolean::class.javaPrimitiveType)
                 method.isAccessible = true
                 method.invoke(appInfo, enable)
-            }
+            }.onFailure { error ->
+                Log.w(TAG, "update predictive back callback failed", error)
+            }.isSuccess
         }
     }
 
@@ -59,10 +65,7 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val prefs = this.getSharedPreferences("settings", MODE_PRIVATE)
             val enable = prefs.getBoolean("enable_predictive_back", false)
-            runCatching {
-                HiddenApiBypass.addHiddenApiExemptions("Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback")
-                setEnableOnBackInvokedCallback(applicationInfo, enable)
-            }
+            setEnableOnBackInvokedCallback(applicationInfo, enable)
         }
 
         val webroot = File(dataDir, "webroot")

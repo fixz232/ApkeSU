@@ -85,6 +85,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.util.ForegroundToolFailure
 import me.weishu.kernelsu.ui.util.ForegroundToolRuntimeState
 import me.weishu.kernelsu.ui.util.ForegroundToolStatus
@@ -181,7 +183,9 @@ fun ForegroundToolProtectionScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surface,
+                    ),
                 ),
             )
         },
@@ -380,7 +384,7 @@ private fun ForegroundToolToggleCard(
     val canEnable = state.targets.isNotEmpty() && state.tools.isNotEmpty()
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -447,7 +451,7 @@ private fun ForegroundToolToggleCard(
 private fun ForegroundToolDetailsCard(status: ForegroundToolStatus) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -547,7 +551,7 @@ private fun ForegroundToolLogCard(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

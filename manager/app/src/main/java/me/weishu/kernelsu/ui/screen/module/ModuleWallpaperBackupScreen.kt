@@ -44,6 +44,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -97,6 +98,11 @@ private data class PendingModuleWallpaperImport(
     val preview: ModuleWallpaperBackupPreview,
 )
 
+private data class PendingModuleWallpaperBundleImport(
+    val uri: Uri,
+    val preview: ModuleWallpaperBundlePreview,
+)
+
 @Composable
 fun ModuleWallpaperBackupScreen() {
     val context = LocalContext.current
@@ -108,9 +114,13 @@ fun ModuleWallpaperBackupScreen() {
     var selectedModuleId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingExportModule by remember { mutableStateOf<Module?>(null) }
     var pendingImport by remember { mutableStateOf<PendingModuleWallpaperImport?>(null) }
+    var pendingBundleImport by remember { mutableStateOf<PendingModuleWallpaperBundleImport?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showModulePicker by rememberSaveable { mutableStateOf(false) }
     var showRestoreConfirmation by rememberSaveable { mutableStateOf(false) }
+    var restoreMode by rememberSaveable { mutableStateOf(ModuleWallpaperRestoreMode.Replace) }
+    var showBundleRestoreConfirmation by rememberSaveable { mutableStateOf(false) }
+    var bundleRestoreMode by rememberSaveable { mutableStateOf(ModuleWallpaperRestoreMode.Replace) }
     var showSlotOverwritePicker by rememberSaveable { mutableStateOf(false) }
     var pendingOverwriteSlotIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var pendingDeleteSlotIndex by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -126,6 +136,15 @@ fun ModuleWallpaperBackupScreen() {
     val savedSlots = remember(selectedModuleId, configurationRevision) {
         selectedModuleId?.let { readModuleWallpaperSavedSlots(context, it) }
             ?: List(MODULE_WALLPAPER_SAVED_SLOT_COUNT) { null }
+    }
+    val selectedBackupImageCount = (selectedSnapshot?.allEntries()?.size ?: 0) +
+        savedSlots.filterNotNull().sumOf { it.snapshot.allEntries().size }
+    val selectedHasBackupData = selectedBackupImageCount > 0
+    val configuredModuleCount = remember(modules, configurationRevision) {
+        modules.count { module ->
+            readModuleCardWallpaperSnapshot(context, module.id).allEntries().isNotEmpty() ||
+                readModuleWallpaperSavedSlots(context, module.id).any { it != null }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -187,6 +206,7 @@ fun ModuleWallpaperBackupScreen() {
                 }
                 val preview = result.preview
                 if (result.success && preview != null) {
+                    pendingBundleImport = null
                     pendingImport = PendingModuleWallpaperImport(uri, preview)
                 } else {
                     errorMessage = result.error.toDisplayMessage(
@@ -198,14 +218,105 @@ fun ModuleWallpaperBackupScreen() {
             }
         }
     }
+    val bundleExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(MODULE_WALLPAPER_BUNDLE_MIME_TYPE),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        busy = true
+        scope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    exportAllModuleWallpaperBackup(context, uri, modules)
+                }
+                if (result.success) {
+                    Toast.makeText(
+                        context,
+                        resources.getString(
+                            R.string.module_wallpaper_bundle_export_success,
+                            result.preview?.moduleCount ?: 0,
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                } else {
+                    errorMessage = result.error.toDisplayMessage(
+                        resources.getString(R.string.module_wallpaper_bundle_export_failed)
+                    )
+                }
+            } finally {
+                busy = false
+            }
+        }
+    }
+    val bundleImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        busy = true
+        scope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    previewAllModuleWallpaperBackup(context, uri)
+                }
+                val preview = result.preview
+                if (result.success && preview != null) {
+                    pendingImport = null
+                    pendingBundleImport = PendingModuleWallpaperBundleImport(uri, preview)
+                } else {
+                    errorMessage = result.error.toDisplayMessage(
+                        resources.getString(R.string.module_wallpaper_bundle_import_failed)
+                    )
+                }
+            } finally {
+                busy = false
+            }
+        }
+    }
 
     fun exportSelectedModule() {
         val module = selectedModule ?: return
-        if (selectedSnapshot?.entries.isNullOrEmpty()) return
+        if (!selectedHasBackupData) return
         pendingExportModule = module
         exportLauncher.launch(
             "${module.id.safeBackupFilePart()}-wallpaper.$MODULE_WALLPAPER_BACKUP_EXTENSION"
         )
+    }
+
+    fun restorePendingBundleImport() {
+        val pending = pendingBundleImport ?: return
+        showBundleRestoreConfirmation = false
+        busy = true
+        scope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    restoreAllModuleWallpaperBackup(
+                        context = context,
+                        source = pending.uri,
+                        installedModules = modules,
+                        mode = bundleRestoreMode,
+                    )
+                }
+                if (result.success) {
+                    pendingBundleImport = null
+                    configurationRevision++
+                    appliedSlotIndex = -1
+                    Toast.makeText(
+                        context,
+                        resources.getString(
+                            R.string.module_wallpaper_bundle_restore_success,
+                            result.restoredModules,
+                            result.skippedModules,
+                        ),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                } else {
+                    errorMessage = result.error.toDisplayMessage(
+                        resources.getString(R.string.module_wallpaper_bundle_restore_failed)
+                    )
+                }
+            } finally {
+                busy = false
+            }
+        }
     }
 
     fun restorePendingImport() {
@@ -220,6 +331,7 @@ fun ModuleWallpaperBackupScreen() {
                         context = context,
                         source = pending.uri,
                         targetModuleId = targetModuleId,
+                        mode = restoreMode,
                     )
                 }
                 if (result.success) {
@@ -365,9 +477,26 @@ fun ModuleWallpaperBackupScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
+                ModuleWallpaperBundleCard(
+                    configuredModuleCount = configuredModuleCount,
+                    busy = busy,
+                    modulesLoaded = modules.isNotEmpty(),
+                    onExport = {
+                        bundleExportLauncher.launch(
+                            "all-module-wallpapers.$MODULE_WALLPAPER_BUNDLE_EXTENSION"
+                        )
+                    },
+                    onImport = {
+                        bundleImportLauncher.launch(
+                            arrayOf(MODULE_WALLPAPER_BUNDLE_MIME_TYPE, "application/octet-stream", "*/*")
+                        )
+                    },
+                )
+            }
+            item {
                 ModuleWallpaperBackupHeader(
-                    configured = selectedSnapshot?.entries?.isNotEmpty() == true,
-                    imageCount = selectedSnapshot?.entries?.size ?: 0,
+                    configured = selectedHasBackupData,
+                    imageCount = selectedBackupImageCount,
                 )
             }
             item {
@@ -385,7 +514,7 @@ fun ModuleWallpaperBackupScreen() {
                 ModuleWallpaperSavedSlotsSection(
                     slots = savedSlots,
                     appliedSlotIndex = appliedSlotIndex,
-                    canSave = selectedModule != null && !selectedSnapshot?.entries.isNullOrEmpty(),
+                    canSave = selectedModule != null && !selectedSnapshot?.allEntries().isNullOrEmpty(),
                     busy = busy,
                     onSaveNext = ::saveCurrentToNextSlot,
                     onSaveToSlot = { slotIndex ->
@@ -406,7 +535,7 @@ fun ModuleWallpaperBackupScreen() {
                 ) {
                     Button(
                         modifier = Modifier.weight(1f),
-                        enabled = !busy && selectedModule != null && !selectedSnapshot?.entries.isNullOrEmpty(),
+                        enabled = !busy && selectedModule != null && selectedHasBackupData,
                         onClick = ::exportSelectedModule,
                     ) {
                         Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -459,6 +588,16 @@ fun ModuleWallpaperBackupScreen() {
                     )
                 }
             }
+            pendingBundleImport?.let { pending ->
+                item {
+                    ModuleWallpaperBundleImportPreviewCard(
+                        preview = pending.preview,
+                        busy = busy,
+                        onRestore = { showBundleRestoreConfirmation = true },
+                        onDiscard = { pendingBundleImport = null },
+                    )
+                }
+            }
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
@@ -501,7 +640,7 @@ fun ModuleWallpaperBackupScreen() {
                             Text(
                                 text = stringResource(
                                     R.string.module_wallpaper_slot_image_count,
-                                    slot?.snapshot?.entries?.size ?: 0,
+                                    slot?.snapshot?.allEntries()?.size ?: 0,
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -566,13 +705,38 @@ fun ModuleWallpaperBackupScreen() {
                 icon = { Icon(Icons.Rounded.Restore, contentDescription = null) },
                 title = { Text(stringResource(R.string.module_wallpaper_backup_restore_confirm_title)) },
                 text = {
-                    Text(
-                        stringResource(
-                            R.string.module_wallpaper_backup_restore_confirm_message,
-                            target.name,
-                            preview.imageCount,
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            stringResource(
+                                R.string.module_wallpaper_backup_restore_confirm_message,
+                                target.name,
+                                preview.imageCount,
+                            )
                         )
-                    )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = restoreMode == ModuleWallpaperRestoreMode.Merge,
+                                onClick = { restoreMode = ModuleWallpaperRestoreMode.Merge },
+                                label = { Text(stringResource(R.string.module_wallpaper_restore_merge)) },
+                            )
+                            FilterChip(
+                                selected = restoreMode == ModuleWallpaperRestoreMode.Replace,
+                                onClick = { restoreMode = ModuleWallpaperRestoreMode.Replace },
+                                label = { Text(stringResource(R.string.module_wallpaper_restore_replace)) },
+                            )
+                        }
+                        Text(
+                            text = stringResource(
+                                if (restoreMode == ModuleWallpaperRestoreMode.Merge) {
+                                    R.string.module_wallpaper_restore_merge_summary
+                                } else {
+                                    R.string.module_wallpaper_restore_replace_summary
+                                }
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
                 confirmButton = {
                     TextButton(onClick = ::restorePendingImport) {
@@ -581,6 +745,41 @@ fun ModuleWallpaperBackupScreen() {
                 },
                 dismissButton = {
                     TextButton(onClick = { showRestoreConfirmation = false }) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                },
+            )
+        }
+    }
+    if (showBundleRestoreConfirmation) {
+        val preview = pendingBundleImport?.preview
+        if (preview != null) {
+            AlertDialog(
+                onDismissRequest = { showBundleRestoreConfirmation = false },
+                icon = { Icon(Icons.Rounded.Restore, contentDescription = null) },
+                title = { Text(stringResource(R.string.module_wallpaper_bundle_restore_confirm_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            stringResource(
+                                R.string.module_wallpaper_bundle_restore_confirm_message,
+                                preview.moduleCount,
+                                preview.imageCount,
+                            )
+                        )
+                        RestoreModeSelector(
+                            mode = bundleRestoreMode,
+                            onModeChange = { bundleRestoreMode = it },
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = ::restorePendingBundleImport) {
+                        Text(stringResource(R.string.module_wallpaper_bundle_restore))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBundleRestoreConfirmation = false }) {
                         Text(stringResource(android.R.string.cancel))
                     }
                 },
@@ -598,6 +797,162 @@ fun ModuleWallpaperBackupScreen() {
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun RestoreModeSelector(
+    mode: ModuleWallpaperRestoreMode,
+    onModeChange: (ModuleWallpaperRestoreMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = mode == ModuleWallpaperRestoreMode.Merge,
+                onClick = { onModeChange(ModuleWallpaperRestoreMode.Merge) },
+                label = { Text(stringResource(R.string.module_wallpaper_restore_merge)) },
+            )
+            FilterChip(
+                selected = mode == ModuleWallpaperRestoreMode.Replace,
+                onClick = { onModeChange(ModuleWallpaperRestoreMode.Replace) },
+                label = { Text(stringResource(R.string.module_wallpaper_restore_replace)) },
+            )
+        }
+        Text(
+            text = stringResource(
+                if (mode == ModuleWallpaperRestoreMode.Merge) {
+                    R.string.module_wallpaper_restore_merge_summary
+                } else {
+                    R.string.module_wallpaper_restore_replace_summary
+                }
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ModuleWallpaperBundleCard(
+    configuredModuleCount: Int,
+    busy: Boolean,
+    modulesLoaded: Boolean,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.module_wallpaper_bundle_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(
+                    R.string.module_wallpaper_bundle_summary,
+                    configuredModuleCount,
+                    MODULE_WALLPAPER_SAVED_SLOT_COUNT,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy && configuredModuleCount > 0,
+                    onClick = onExport,
+                ) {
+                    Icon(Icons.Rounded.Backup, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(7.dp))
+                    Text(stringResource(R.string.module_wallpaper_bundle_export))
+                }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy && modulesLoaded,
+                    onClick = onImport,
+                ) {
+                    Icon(Icons.Rounded.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(7.dp))
+                    Text(stringResource(R.string.module_wallpaper_bundle_import))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModuleWallpaperBundleImportPreviewCard(
+    preview: ModuleWallpaperBundlePreview,
+    busy: Boolean,
+    onRestore: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.module_wallpaper_bundle_preview_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            BackupPreviewLine(
+                label = stringResource(R.string.module_wallpaper_bundle_modules),
+                value = preview.moduleCount.toString(),
+            )
+            BackupPreviewLine(
+                label = stringResource(R.string.module_wallpaper_backup_contents),
+                value = stringResource(
+                    R.string.module_wallpaper_backup_contents_value,
+                    preview.imageCount,
+                    formatBackupSize(preview.totalBytes),
+                ),
+            )
+            BackupPreviewLine(
+                label = stringResource(R.string.module_wallpaper_backup_created_at),
+                value = if (preview.createdAtMillis > 0L) {
+                    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                        .format(Date(preview.createdAtMillis))
+                } else {
+                    stringResource(R.string.module_wallpaper_backup_unknown)
+                },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                TextButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onDiscard,
+                ) {
+                    Text(stringResource(R.string.module_wallpaper_backup_discard))
+                }
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onRestore,
+                ) {
+                    Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(stringResource(R.string.module_wallpaper_bundle_restore))
+                }
+            }
+        }
     }
 }
 
@@ -669,7 +1024,7 @@ private fun ModuleWallpaperSavedSlotCard(
     onApply: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val previewEntry = slot?.snapshot?.entries?.firstOrNull()
+    val previewEntry = slot?.snapshot?.allEntries()?.firstOrNull()
     val previewBitmap = rememberModuleCardWallpaperBitmap(previewEntry)
     val cardShape = RoundedCornerShape(8.dp)
     Card(
@@ -740,7 +1095,7 @@ private fun ModuleWallpaperSavedSlotCard(
                 } else {
                     stringResource(
                         R.string.module_wallpaper_slot_details,
-                        slot.snapshot.entries.size,
+                        slot.snapshot.allEntries().size,
                         if (slot.snapshot.carouselEnabled) {
                             stringResource(R.string.module_wallpaper_backup_carousel_on)
                         } else {
@@ -895,7 +1250,7 @@ private fun ModuleWallpaperTargetCard(
                         Text(
                             text = stringResource(
                                 R.string.module_wallpaper_backup_current_config,
-                                snapshot?.entries?.size ?: 0,
+                                snapshot?.allEntries()?.size ?: 0,
                                 if (snapshot?.carouselEnabled == true) {
                                     stringResource(R.string.module_wallpaper_backup_carousel_on)
                                 } else {

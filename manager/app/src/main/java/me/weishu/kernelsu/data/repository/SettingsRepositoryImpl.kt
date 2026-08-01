@@ -13,10 +13,12 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.PAGE_TRANSITION_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_KEY
@@ -35,6 +37,12 @@ import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
 import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_FONT_ENABLED
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.ink.INK_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.ink.INK_FONT_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.ink.INK_STYLE_KEY
+import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
@@ -59,6 +67,7 @@ import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
 import me.weishu.kernelsu.ui.theme.THEME_SYNC_STRATEGY_KEY
 import me.weishu.kernelsu.ui.theme.defaultThemePresetForUiMode
 import me.weishu.kernelsu.ui.theme.themePreferenceKey
+import me.weishu.kernelsu.ui.theme.sanitizeMonetSurfaceOpacity
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_BOTTOM_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_LEFT_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_RIGHT_KEY
@@ -70,6 +79,7 @@ import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_URI_KEY
+import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MUSIC_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_CLICK_SOUND_URI_KEY
@@ -79,6 +89,9 @@ import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_SOUND_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_SOUND_VOLUME_KEY
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
+import me.weishu.kernelsu.ui.util.CustomNavigationIconState
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
+import me.weishu.kernelsu.ui.util.StartupAnimationSettings
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
@@ -100,6 +113,8 @@ import me.weishu.kernelsu.ui.util.releaseCustomImageReference
 import me.weishu.kernelsu.ui.util.releasePersistableVideoBackgroundReadPermission
 import me.weishu.kernelsu.ui.util.clearCustomPageBackground as clearPageBackground
 import me.weishu.kernelsu.ui.util.readCustomNavigationIconSet
+import me.weishu.kernelsu.ui.util.readGlobalBackgroundVisualSettings
+import me.weishu.kernelsu.ui.util.readStartupAnimationSettings
 import me.weishu.kernelsu.ui.util.readCustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.sanitizeCustomAudioVolume
 import me.weishu.kernelsu.ui.util.sanitizeCustomBackgroundMusicVolume
@@ -112,6 +127,9 @@ import me.weishu.kernelsu.ui.util.setCustomPageBackgroundCrop as writeCustomPage
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundOpacity as writeCustomPageBackgroundOpacity
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundVideo as writeCustomPageBackgroundVideo
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundVideoDurationSeconds as writeCustomPageBackgroundVideoDurationSeconds
+import me.weishu.kernelsu.ui.util.setCustomPageBackgroundVisualSettings as writeCustomPageBackgroundVisualSettings
+import me.weishu.kernelsu.ui.util.setGlobalBackgroundVisualSettings as writeGlobalBackgroundVisualSettings
+import me.weishu.kernelsu.ui.util.setStartupAnimationSettings as writeStartupAnimationSettings
 import me.weishu.kernelsu.ui.util.setCustomPageBackgroundWallpaper as writeCustomPageBackgroundWallpaper
 import me.weishu.kernelsu.ui.util.setBuiltinMountDefaultMode as writeBuiltinMountDefaultMode
 import me.weishu.kernelsu.ui.util.setBuiltinMountEnabled as writeBuiltinMountEnabled
@@ -121,6 +139,7 @@ import me.weishu.kernelsu.ui.util.getEpkesuHideStatus as readEpkesuHideStatus
 import me.weishu.kernelsu.ui.util.setEpkesuHideEnabled as writeEpkesuHideEnabled
 import me.weishu.kernelsu.ui.util.setCustomNavigationIcon as writeCustomNavigationIcon
 import me.weishu.kernelsu.ui.util.setCustomNavigationIconCrop as writeCustomNavigationIconCrop
+import me.weishu.kernelsu.ui.util.setCustomNavigationIconPresentation as writeCustomNavigationIconPresentation
 import org.json.JSONArray
 import java.util.UUID
 
@@ -161,6 +180,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean(SHOW_HOME_LEARN_CARD_KEY, true)
         set(value) = prefs.edit { putBoolean(SHOW_HOME_LEARN_CARD_KEY, value) }
 
+    override var miuixClassicHomeLayoutEnabled: Boolean
+        get() = prefs.getBoolean(MIUIX_CLASSIC_HOME_LAYOUT_KEY, false)
+        set(value) = prefs.edit { putBoolean(MIUIX_CLASSIC_HOME_LAYOUT_KEY, value) }
+
     override var graphicsRendererFeatureEnabled: Boolean
         get() = prefs.getBoolean(GRAPHICS_RENDERER_FEATURE_ENABLED_KEY, false)
         set(value) = prefs.edit { putBoolean(GRAPHICS_RENDERER_FEATURE_ENABLED_KEY, value) }
@@ -199,6 +222,18 @@ class SettingsRepositoryImpl : SettingsRepository {
             ?: defaultThemePreset.colorSpec.name
         set(value) = prefs.edit {
             putString(themeKey("color_spec"), value)
+            putString(themeKey("theme_preset"), ThemePreset.CUSTOM.value)
+        }
+
+    override var monetSurfaceOpacity: Float
+        get() = sanitizeMonetSurfaceOpacity(
+            prefs.getFloat(
+                themeKey("monet_surface_opacity"),
+                defaultThemePreset.monetSurfaceOpacity,
+            )
+        )
+        set(value) = prefs.edit {
+            putFloat(themeKey("monet_surface_opacity"), sanitizeMonetSurfaceOpacity(value))
             putString(themeKey("theme_preset"), ThemePreset.CUSTOM.value)
         }
 
@@ -311,6 +346,25 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var rainCardMotionEnabled: Boolean
         get() = prefs.getBoolean(RAIN_CARD_MOTION_ENABLED_KEY, DEFAULT_RAIN_CARD_MOTION_ENABLED)
         set(value) = prefs.edit { putBoolean(RAIN_CARD_MOTION_ENABLED_KEY, value) }
+
+    override var inkStyle: String
+        get() = InkStyle.fromValue(prefs.getString(INK_STYLE_KEY, InkStyle.DEFAULT_VALUE)).value
+        set(value) {
+            val inkStyle = InkStyle.fromValue(value)
+            prefs.edit {
+                putString(INK_STYLE_KEY, inkStyle.value)
+                putInt(themeKey("key_color"), inkStyle.keyColor)
+                putString(themeKey("theme_preset"), ThemePreset.INK.value)
+            }
+        }
+
+    override var inkFontEnabled: Boolean
+        get() = prefs.getBoolean(INK_FONT_ENABLED_KEY, DEFAULT_INK_FONT_ENABLED)
+        set(value) = prefs.edit { putBoolean(INK_FONT_ENABLED_KEY, value) }
+
+    override var inkCardMotionEnabled: Boolean
+        get() = prefs.getBoolean(INK_CARD_MOTION_ENABLED_KEY, DEFAULT_INK_CARD_MOTION_ENABLED)
+        set(value) = prefs.edit { putBoolean(INK_CARD_MOTION_ENABLED_KEY, value) }
 
     override var pixelStyle: String
         get() = PixelStyle.fromValue(prefs.getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE)).value
@@ -466,6 +520,14 @@ class SettingsRepositoryImpl : SettingsRepository {
             putString(GLOBAL_SCROLL_EFFECT_KEY, GlobalScrollEffect.fromValue(value).value)
         }
 
+    override var pageTransitionEffect: String
+        get() = PageTransitionEffect.fromValue(
+            prefs.getString(PAGE_TRANSITION_EFFECT_KEY, PageTransitionEffect.DEFAULT_VALUE)
+        ).value
+        set(value) = prefs.edit {
+            putString(PAGE_TRANSITION_EFFECT_KEY, PageTransitionEffect.fromValue(value).value)
+        }
+
     override var themeSyncStrategy: ThemeSyncStrategy
         get() = ThemeSyncStrategy.fromValue(prefs.getString(THEME_SYNC_STRATEGY_KEY, ThemeSyncStrategy.SHARED.value))
         set(value) {
@@ -595,6 +657,10 @@ class SettingsRepositoryImpl : SettingsRepository {
             putFloat(CUSTOM_WALLPAPER_OPACITY_KEY, sanitizeCustomWallpaperOpacity(value))
         }
 
+    override var customWallpaperVisualSettings: MediaVisualSettings
+        get() = readGlobalBackgroundVisualSettings(ksuApp)
+        set(value) = writeGlobalBackgroundVisualSettings(ksuApp, value)
+
     override var customWallpaperCrop: CustomWallpaperCrop
         get() = sanitizeCustomWallpaperCrop(
             CustomWallpaperCrop(
@@ -692,6 +758,13 @@ class SettingsRepositoryImpl : SettingsRepository {
         writeCustomPageBackgroundVideoDurationSeconds(ksuApp, target, seconds)
     }
 
+    override fun setCustomPageBackgroundVisualSettings(
+        target: CustomPageBackgroundTarget,
+        settings: MediaVisualSettings,
+    ) {
+        writeCustomPageBackgroundVisualSettings(ksuApp, target, settings)
+    }
+
     override fun clearCustomPageBackground(target: CustomPageBackgroundTarget) {
         clearPageBackground(ksuApp, target)
     }
@@ -774,6 +847,10 @@ class SettingsRepositoryImpl : SettingsRepository {
             }
         }
 
+    override var startupAnimationSettings: StartupAnimationSettings
+        get() = readStartupAnimationSettings(ksuApp)
+        set(value) = writeStartupAnimationSettings(ksuApp, value)
+
     override val customNavigationIcons: CustomNavigationIconSet
         get() = prefs.readCustomNavigationIconSet()
 
@@ -783,6 +860,13 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override fun setCustomNavigationIconCrop(slot: CustomNavigationIconSlot, crop: CustomWallpaperCrop) {
         writeCustomNavigationIconCrop(ksuApp, slot, crop)
+    }
+
+    override fun setCustomNavigationIconPresentation(
+        slot: CustomNavigationIconSlot,
+        state: CustomNavigationIconState,
+    ) {
+        writeCustomNavigationIconPresentation(ksuApp, slot, state)
     }
 
     override suspend fun getSuCompatStatus(): String = getFeatureStatus("su_compat")
@@ -872,6 +956,7 @@ class SettingsRepositoryImpl : SettingsRepository {
                     keyColor = preset.keyColor,
                     colorStyle = preset.paletteStyle.name,
                     colorSpec = preset.colorSpec.name,
+                    monetSurfaceOpacity = preset.monetSurfaceOpacity,
                     enableBlur = preset.enableBlur,
                     enableFloatingBottomBar = preset.enableFloatingBottomBar,
                     enableFloatingBottomBarBlur = preset.enableFloatingBottomBarBlur,
@@ -958,6 +1043,7 @@ class SettingsRepositoryImpl : SettingsRepository {
                     keyColor = preset.keyColor,
                     colorStyle = preset.paletteStyle.name,
                     colorSpec = preset.colorSpec.name,
+                    monetSurfaceOpacity = preset.monetSurfaceOpacity,
                     enableBlur = preset.enableBlur,
                     enableFloatingBottomBar = preset.enableFloatingBottomBar,
                     enableFloatingBottomBarBlur = preset.enableFloatingBottomBarBlur,
@@ -997,6 +1083,7 @@ class SettingsRepositoryImpl : SettingsRepository {
             keyColor = keyColor,
             colorStyle = colorStyle,
             colorSpec = colorSpec,
+            monetSurfaceOpacity = monetSurfaceOpacity,
             enableBlur = enableBlur,
             enableFloatingBottomBar = enableFloatingBottomBar,
             enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
@@ -1016,6 +1103,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         putInt(themeKey("key_color", strategy, style), snapshot.keyColor)
         putString(themeKey("color_style", strategy, style), snapshot.colorStyle)
         putString(themeKey("color_spec", strategy, style), snapshot.colorSpec)
+        putFloat(
+            themeKey("monet_surface_opacity", strategy, style),
+            sanitizeMonetSurfaceOpacity(snapshot.monetSurfaceOpacity),
+        )
         putBoolean(themeKey("enable_blur", strategy, style), snapshot.enableBlur)
         putBoolean(themeKey("enable_floating_bottom_bar", strategy, style), snapshot.enableFloatingBottomBar)
         putBoolean(themeKey("enable_floating_bottom_bar_blur", strategy, style), snapshot.enableFloatingBottomBarBlur)
@@ -1043,6 +1134,12 @@ class SettingsRepositoryImpl : SettingsRepository {
                 ?: defaultPreset.paletteStyle.name,
             colorSpec = prefs.getString(customThemePresetKey(id, "color_spec"), defaultPreset.colorSpec.name)
                 ?: defaultPreset.colorSpec.name,
+            monetSurfaceOpacity = sanitizeMonetSurfaceOpacity(
+                prefs.getFloat(
+                    customThemePresetKey(id, "monet_surface_opacity"),
+                    defaultPreset.monetSurfaceOpacity,
+                )
+            ),
             enableBlur = prefs.getBoolean(customThemePresetKey(id, "enable_blur"), defaultPreset.enableBlur),
             enableFloatingBottomBar = prefs.getBoolean(
                 customThemePresetKey(id, "enable_floating_bottom_bar"),
@@ -1083,6 +1180,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         putInt(customThemePresetKey(preset.id, "key_color"), preset.snapshot.keyColor)
         putString(customThemePresetKey(preset.id, "color_style"), preset.snapshot.colorStyle)
         putString(customThemePresetKey(preset.id, "color_spec"), preset.snapshot.colorSpec)
+        putFloat(
+            customThemePresetKey(preset.id, "monet_surface_opacity"),
+            sanitizeMonetSurfaceOpacity(preset.snapshot.monetSurfaceOpacity),
+        )
         putBoolean(customThemePresetKey(preset.id, "enable_blur"), preset.snapshot.enableBlur)
         putBoolean(customThemePresetKey(preset.id, "enable_floating_bottom_bar"), preset.snapshot.enableFloatingBottomBar)
         putBoolean(
@@ -1125,6 +1226,7 @@ class SettingsRepositoryImpl : SettingsRepository {
             "key_color",
             "color_style",
             "color_spec",
+            "monet_surface_opacity",
             "enable_blur",
             "enable_floating_bottom_bar",
             "enable_floating_bottom_bar_blur",

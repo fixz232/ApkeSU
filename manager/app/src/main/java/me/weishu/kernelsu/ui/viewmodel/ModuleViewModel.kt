@@ -37,6 +37,7 @@ import me.weishu.kernelsu.ui.screen.module.ModuleEffect
 import me.weishu.kernelsu.ui.screen.module.ModuleUiState
 import me.weishu.kernelsu.ui.util.PinyinUtil
 import me.weishu.kernelsu.ui.util.hasMagisk
+import me.weishu.kernelsu.ui.util.isManagerHiddenModuleId
 import me.weishu.kernelsu.ui.util.module.fetchModuleDetail
 import me.weishu.kernelsu.ui.util.module.fetchReleaseDescriptionHtml
 import okhttp3.Request
@@ -264,7 +265,9 @@ class ModuleViewModel(
     private suspend fun loadModuleList(resort: Boolean = true): Boolean {
         return try {
             val parsedModules = withContext(Dispatchers.IO) {
-                repo.getModules().getOrThrow()
+                repo.getModules().getOrThrow().filterNot { module ->
+                    isManagerHiddenModuleId(module.id)
+                }
             }
             val renderState = withContext(Dispatchers.Default) {
                 buildModuleListRenderState(_uiState.value.copy(modules = parsedModules), resort)

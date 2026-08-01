@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,12 +44,16 @@ import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -73,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -83,6 +91,7 @@ import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.THEME_STORE_FILE_EXTENSION
@@ -96,29 +105,36 @@ import me.weishu.kernelsu.ui.util.exportThemeStorePackage
 import me.weishu.kernelsu.ui.util.importThemeStorePackage
 import me.weishu.kernelsu.ui.util.previewThemeStorePackage
 import me.weishu.kernelsu.ui.util.readThemeStoreSummary
-import top.yukonga.miuix.kmp.basic.Card
+import me.weishu.kernelsu.ui.util.readThemeLibrary
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 enum class ThemeStorePage(@StringRes val titleRes: Int) {
     Overview(R.string.cloud_theme_store_title),
-    Assets(R.string.theme_store_assets_title),
-    Backgrounds(R.string.theme_store_backgrounds_title),
-    Transfer(R.string.theme_store_transfer_title),
+    Customize(R.string.theme_store_customize_title),
+    Library(R.string.theme_store_library_title),
     My(R.string.theme_store_my_title),
 }
 
+enum class ThemeStoreCustomizeSection(@StringRes val titleRes: Int) {
+    Style(R.string.theme_store_customize_style),
+    Assets(R.string.theme_store_customize_assets),
+    Atmosphere(R.string.theme_store_customize_atmosphere),
+}
+
 @Composable
-fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
+fun ThemeStoreScreen(
+    page: ThemeStorePage = ThemeStorePage.Overview,
+    customizeSection: ThemeStoreCustomizeSection = ThemeStoreCustomizeSection.Style,
+) {
     val context = LocalContext.current
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     var summary by remember { mutableStateOf(readThemeStoreSummary(context)) }
+    var savedThemeCount by remember { mutableIntStateOf(readThemeLibrary(context).size) }
     var busy by remember { mutableStateOf(false) }
     var pendingImport by remember { mutableStateOf<PendingThemeStoreImport?>(null) }
     var transferReport by remember { mutableStateOf<ThemeStoreTransferReport?>(null) }
@@ -130,6 +146,12 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
 
     fun refresh() {
         summary = readThemeStoreSummary(context)
+        savedThemeCount = readThemeLibrary(context).size
+    }
+
+    fun showTransferFailure(error: Throwable, messageRes: Int) {
+        transferReport = ThemeStoreTransferReport.failure(error)
+        Toast.makeText(context, messageRes, Toast.LENGTH_LONG).show()
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -152,6 +174,10 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
                     },
                     Toast.LENGTH_LONG,
                 ).show()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                showTransferFailure(error, R.string.theme_store_export_failed)
             } finally {
                 busy = false
             }
@@ -189,6 +215,10 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
                         Toast.LENGTH_LONG,
                     ).show()
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                showTransferFailure(error, R.string.theme_store_import_failed)
             } finally {
                 busy = false
             }
@@ -205,10 +235,17 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
         onOpenCloudTheme = { themeId ->
             navigator.push(Route.CloudThemeDetail(themeId))
         },
+        onOpenCloudThemeRanking = dropUnlessResumed {
+            navigator.push(Route.CloudThemeRanking)
+        },
         onOpenHomeCardWallpapers = dropUnlessResumed { navigator.push(Route.HomeCardWallpapers) },
         onOpenInstallCardWallpapers = dropUnlessResumed { navigator.push(Route.InstallCardWallpapers) },
         onOpenNavigationIcons = dropUnlessResumed { navigator.push(Route.NavigationIcons) },
         onOpenFonts = dropUnlessResumed { navigator.push(Route.ThemeStoreFonts) },
+        onOpenColorPalette = dropUnlessResumed { navigator.push(Route.ColorPalette) },
+        onOpenUiDecorationLibrary = dropUnlessResumed { navigator.push(Route.UiDecorationLibrary) },
+        onOpenVisualEffects = dropUnlessResumed { navigator.push(Route.VisualEffects) },
+        onOpenThemeLibrary = dropUnlessResumed { navigator.push(Route.ThemeStoreLibrary) },
         onOpenBackgroundSettings = dropUnlessResumed { navigator.push(Route.Backgrounds) },
         onOpenSoundEffects = dropUnlessResumed { navigator.push(Route.SoundEffects) },
         onOpenStartupAnimation = dropUnlessResumed { navigator.push(Route.StartupAnimation) },
@@ -232,20 +269,16 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
                     modifier = Modifier.padding(paddingValues),
                 )
 
-                ThemeStorePage.Assets -> ThemeStoreAssetsContent(
+                ThemeStorePage.Customize -> ThemeStoreCustomizeContent(
                     summary = summary,
                     actions = actions,
+                    initialSection = customizeSection,
                     modifier = Modifier.padding(paddingValues),
                 )
 
-                ThemeStorePage.Backgrounds -> ThemeStoreBackgroundsContent(
+                ThemeStorePage.Library -> ThemeStoreLibraryContent(
                     summary = summary,
-                    actions = actions,
-                    modifier = Modifier.padding(paddingValues),
-                )
-
-                ThemeStorePage.Transfer -> ThemeStoreTransferContent(
-                    summary = summary,
+                    savedThemeCount = savedThemeCount,
                     busy = busy,
                     report = transferReport,
                     actions = actions,
@@ -292,13 +325,13 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
                 MiuixTopAppBar(
                     title = stringResource(selectedPage.titleRes),
                     color = Color.Transparent,
-                    titleColor = colorScheme.onSurface,
+                    titleColor = themeStoreTextColor(),
                     navigationIcon = {
                         MiuixIconButton(onClick = actions.onBack) {
                             MiuixIcon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                 contentDescription = stringResource(R.string.close),
-                                tint = colorScheme.onBackground,
+                                tint = themeStoreTextColor(),
                             )
                         }
                     },
@@ -339,6 +372,10 @@ fun ThemeStoreScreen(page: ThemeStorePage = ThemeStorePage.Overview) {
                             },
                             Toast.LENGTH_LONG,
                         ).show()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Throwable) {
+                        showTransferFailure(error, R.string.theme_store_import_failed)
                     } finally {
                         busy = false
                     }
@@ -354,38 +391,63 @@ private fun ThemeStoreNavigationBar(
     onSelected: (ThemeStorePage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavigationBar(
-        modifier = modifier.fillMaxWidth(),
-        color = if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
-            SkrootproColors.BarSurface
-        } else {
-            colorScheme.surface
-        },
+    val palette = themeStorePalette()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(palette.navigationSurface),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         ThemeStorePage.entries.forEach { destination ->
+            val selected = selectedPage == destination
             val icon = when (destination) {
                 ThemeStorePage.Overview -> Icons.Rounded.Explore
-                ThemeStorePage.Assets -> Icons.Rounded.ImageSearch
-                ThemeStorePage.Backgrounds -> Icons.Rounded.Wallpaper
-                ThemeStorePage.Transfer -> Icons.Rounded.SaveAlt
+                ThemeStorePage.Customize -> Icons.Rounded.AutoFixHigh
+                ThemeStorePage.Library -> Icons.Rounded.SaveAlt
                 ThemeStorePage.My -> Icons.Rounded.Person
             }
             val label = stringResource(
                 when (destination) {
                     ThemeStorePage.Overview -> R.string.cloud_theme_tab_discover
-                    ThemeStorePage.Assets -> R.string.theme_store_tab_assets
-                    ThemeStorePage.Backgrounds -> R.string.theme_store_tab_backgrounds
-                    ThemeStorePage.Transfer -> R.string.theme_store_tab_transfer
+                    ThemeStorePage.Customize -> R.string.theme_store_tab_customize
+                    ThemeStorePage.Library -> R.string.theme_store_tab_library
                     ThemeStorePage.My -> R.string.theme_store_tab_my
                 }
             )
-            NavigationBarItem(
-                modifier = Modifier.weight(1f),
-                icon = icon,
-                label = label,
-                selected = selectedPage == destination,
-                onClick = { onSelected(destination) },
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelected(destination) }
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 40.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (selected) palette.accentContainer else Color.Transparent,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(21.dp),
+                        tint = if (selected) palette.accent else palette.mutedText,
+                    )
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selected) palette.text else palette.mutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -397,118 +459,206 @@ private fun ThemeStoreOverviewContent(
 ) {
     CloudThemeDiscoverContent(
         onOpenTheme = actions.onOpenCloudTheme,
+        onOpenRanking = actions.onOpenCloudThemeRanking,
         modifier = modifier,
     )
 }
 
 @Composable
-private fun ThemeStoreAssetsContent(
+private fun ThemeStoreCustomizeContent(
     summary: ThemeStoreSummary,
     actions: ThemeStoreActions,
+    initialSection: ThemeStoreCustomizeSection,
     modifier: Modifier = Modifier,
 ) {
+    var selectedSection by rememberSaveable(initialSection) {
+        mutableStateOf(initialSection)
+    }
     ThemeStorePageColumn(modifier) {
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.home_card_wallpapers),
-            summary = stringResource(R.string.home_card_wallpapers_summary),
-            status = stringResource(
-                R.string.theme_store_configured_count,
-                summary.cardConfiguredCount,
-                ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Home },
-            ),
-            icon = Icons.Rounded.ImageSearch,
-            onClick = actions.onOpenHomeCardWallpapers,
+        ThemeStoreCustomizeSelector(
+            selected = selectedSection,
+            onSelected = { selectedSection = it },
         )
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.install_card_wallpapers),
-            summary = stringResource(R.string.install_card_wallpapers_summary),
-            status = stringResource(
-                R.string.theme_store_configured_count,
-                summary.installCardConfiguredCount,
-                ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Install },
-            ),
-            icon = Icons.Rounded.AutoFixHigh,
-            onClick = actions.onOpenInstallCardWallpapers,
-        )
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.theme_store_navigation_icons),
-            summary = stringResource(R.string.settings_navigation_icons_summary),
-            status = stringResource(
-                R.string.theme_store_configured_count,
-                summary.navigationIcons.selectedCount,
-                CustomNavigationIconSlot.entries.size,
-            ),
-            icon = Icons.Rounded.Settings,
-            onClick = actions.onOpenNavigationIcons,
-        )
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.app_font_title),
-            summary = stringResource(R.string.theme_store_fonts_summary),
-            status = appFontStateName(summary.appFont),
-            icon = Icons.Rounded.FontDownload,
-            onClick = actions.onOpenFonts,
-        )
-        ThemeStoreNotice(stringResource(R.string.theme_store_assets_full_editor_notice))
+        when (selectedSection) {
+            ThemeStoreCustomizeSection.Style -> ThemeStoreStyleItems(summary, actions)
+            ThemeStoreCustomizeSection.Assets -> ThemeStoreAssetItems(summary, actions)
+            ThemeStoreCustomizeSection.Atmosphere -> ThemeStoreAtmosphereItems(summary, actions)
+        }
     }
 }
 
 @Composable
-private fun ThemeStoreBackgroundsContent(
-    summary: ThemeStoreSummary,
-    actions: ThemeStoreActions,
-    modifier: Modifier = Modifier,
+private fun ThemeStoreCustomizeSelector(
+    selected: ThemeStoreCustomizeSection,
+    onSelected: (ThemeStoreCustomizeSection) -> Unit,
 ) {
-    ThemeStorePageColumn(modifier) {
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.theme_store_global_background),
-            summary = stringResource(R.string.theme_store_global_background_summary),
-            status = stringResource(
-                when {
-                    summary.wallpaper.hasVideoSelected -> R.string.settings_video_background_selected_summary
-                    summary.wallpaper.hasImageSelected -> R.string.settings_wallpaper_selected_summary
-                    else -> R.string.settings_background_summary
-                }
-            ),
-            icon = Icons.Rounded.Wallpaper,
-            onClick = actions.onOpenBackgroundSettings,
-        )
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.settings_sound_effects),
-            summary = stringResource(R.string.settings_sound_effects_summary),
-            status = stringResource(
-                R.string.theme_store_configured_count,
-                summary.audio.configuredCount,
-                3,
-            ),
-            icon = Icons.AutoMirrored.Rounded.VolumeUp,
-            onClick = actions.onOpenSoundEffects,
-        )
-        ThemeStoreDestinationItem(
-            title = stringResource(R.string.settings_startup_animation),
-            summary = stringResource(R.string.settings_startup_animation_summary),
-            status = stringResource(
-                if (summary.startupAnimationUri.isNullOrBlank()) {
-                    R.string.theme_store_item_empty
-                } else {
-                    R.string.theme_store_item_selected
-                }
-            ),
-            icon = Icons.Rounded.PlayCircle,
-            onClick = actions.onOpenStartupAnimation,
-        )
-        ThemeStoreNotice(stringResource(R.string.theme_store_page_backgrounds_notice))
+    val palette = themeStorePalette()
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(end = 8.dp),
+    ) {
+        items(ThemeStoreCustomizeSection.entries, key = { it.name }) { section ->
+            FilterChip(
+                selected = selected == section,
+                onClick = { onSelected(section) },
+                label = { Text(stringResource(section.titleRes)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = palette.surface.copy(alpha = 0.58f),
+                    labelColor = palette.mutedText,
+                    selectedContainerColor = palette.accentContainer,
+                    selectedLabelColor = palette.text,
+                ),
+            )
+        }
     }
 }
 
 @Composable
-private fun ThemeStoreTransferContent(
+private fun ColumnScope.ThemeStoreStyleItems(
     summary: ThemeStoreSummary,
+    actions: ThemeStoreActions,
+) {
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.theme_store_monet_title),
+        summary = stringResource(R.string.theme_store_monet_summary),
+        status = if (summary.appearance.miuixMonet) {
+            stringResource(
+                R.string.theme_store_monet_status,
+                (summary.appearance.monetSurfaceOpacity * 100).toInt(),
+            )
+        } else {
+            stringResource(R.string.theme_store_monet_disabled)
+        },
+        icon = Icons.Rounded.Palette,
+        onClick = actions.onOpenColorPalette,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.settings_ui_decoration_library),
+        summary = stringResource(R.string.settings_ui_decoration_library_summary),
+        status = stringResource(R.string.theme_store_open_editor),
+        icon = Icons.Rounded.AutoFixHigh,
+        onClick = actions.onOpenUiDecorationLibrary,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.settings_section_visual_effects),
+        summary = stringResource(R.string.settings_visual_effects_summary),
+        status = stringResource(R.string.theme_store_open_editor),
+        icon = Icons.Rounded.Visibility,
+        onClick = actions.onOpenVisualEffects,
+    )
+}
+
+@Composable
+private fun ColumnScope.ThemeStoreAssetItems(
+    summary: ThemeStoreSummary,
+    actions: ThemeStoreActions,
+) {
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.home_card_wallpapers),
+        summary = stringResource(R.string.home_card_wallpapers_summary),
+        status = stringResource(
+            R.string.theme_store_configured_count,
+            summary.cardConfiguredCount,
+            ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Home },
+        ),
+        icon = Icons.Rounded.ImageSearch,
+        onClick = actions.onOpenHomeCardWallpapers,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.install_card_wallpapers),
+        summary = stringResource(R.string.install_card_wallpapers_summary),
+        status = stringResource(
+            R.string.theme_store_configured_count,
+            summary.installCardConfiguredCount,
+            ThemeStoreImageSlot.entries.count { it.group == ThemeStoreImageGroup.Install },
+        ),
+        icon = Icons.Rounded.AutoFixHigh,
+        onClick = actions.onOpenInstallCardWallpapers,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.theme_store_navigation_icons),
+        summary = stringResource(R.string.settings_navigation_icons_summary),
+        status = stringResource(
+            R.string.theme_store_configured_count,
+            summary.navigationIcons.selectedCount,
+            CustomNavigationIconSlot.entries.size,
+        ),
+        icon = Icons.Rounded.Settings,
+        onClick = actions.onOpenNavigationIcons,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.app_font_title),
+        summary = stringResource(R.string.theme_store_fonts_summary),
+        status = appFontStateName(summary.appFont),
+        icon = Icons.Rounded.FontDownload,
+        onClick = actions.onOpenFonts,
+    )
+    ThemeStoreNotice(stringResource(R.string.theme_store_assets_full_editor_notice))
+}
+
+@Composable
+private fun ColumnScope.ThemeStoreAtmosphereItems(
+    summary: ThemeStoreSummary,
+    actions: ThemeStoreActions,
+) {
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.theme_store_global_background),
+        summary = stringResource(R.string.theme_store_global_background_summary),
+        status = stringResource(
+            when {
+                summary.wallpaper.hasVideoSelected -> R.string.settings_video_background_selected_summary
+                summary.wallpaper.hasImageSelected -> R.string.settings_wallpaper_selected_summary
+                else -> R.string.settings_background_summary
+            }
+        ),
+        icon = Icons.Rounded.Wallpaper,
+        onClick = actions.onOpenBackgroundSettings,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.settings_sound_effects),
+        summary = stringResource(R.string.settings_sound_effects_summary),
+        status = stringResource(
+            R.string.theme_store_configured_count,
+            summary.audio.configuredCount,
+            3,
+        ),
+        icon = Icons.AutoMirrored.Rounded.VolumeUp,
+        onClick = actions.onOpenSoundEffects,
+    )
+    ThemeStoreDestinationItem(
+        title = stringResource(R.string.settings_startup_animation),
+        summary = stringResource(R.string.settings_startup_animation_summary),
+        status = stringResource(
+            if (summary.startupAnimationUri.isNullOrBlank()) {
+                R.string.theme_store_item_empty
+            } else {
+                R.string.theme_store_item_selected
+            }
+        ),
+        icon = Icons.Rounded.PlayCircle,
+        onClick = actions.onOpenStartupAnimation,
+    )
+    ThemeStoreNotice(stringResource(R.string.theme_store_page_backgrounds_notice))
+}
+
+@Composable
+private fun ThemeStoreLibraryContent(
+    summary: ThemeStoreSummary,
+    savedThemeCount: Int,
     busy: Boolean,
     report: ThemeStoreTransferReport?,
     actions: ThemeStoreActions,
     modifier: Modifier = Modifier,
 ) {
     ThemeStorePageColumn(modifier) {
+        ThemeStoreDestinationItem(
+            title = stringResource(R.string.theme_store_my_library_title),
+            summary = stringResource(R.string.theme_store_my_summary),
+            status = stringResource(R.string.theme_store_my_count, savedThemeCount),
+            icon = Icons.Rounded.SaveAlt,
+            onClick = actions.onOpenThemeLibrary,
+        )
         ThemeStoreTransferPanel(summary, busy, actions)
         ThemeStoreNotice(stringResource(R.string.theme_store_import_replaces_notice))
         report?.let { ThemeStoreTransferReportCard(it) }
@@ -540,6 +690,7 @@ private fun ThemeStoreDestinationItem(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
+    val palette = themeStorePalette()
     ThemeStoreSurface {
         Row(
             modifier = Modifier
@@ -552,13 +703,13 @@ private fun ThemeStoreDestinationItem(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.11f), CircleShape),
+                    .background(palette.accentContainer, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = palette.accent,
                     modifier = Modifier.size(21.dp),
                 )
             }
@@ -582,7 +733,7 @@ private fun ThemeStoreDestinationItem(
                 Text(
                     text = status,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = palette.accent,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -602,6 +753,7 @@ private fun ThemeStoreTransferPanel(
     busy: Boolean,
     actions: ThemeStoreActions,
 ) {
+    val palette = themeStorePalette()
     ThemeStoreSurface {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -615,16 +767,20 @@ private fun ThemeStoreTransferPanel(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f), CircleShape),
+                        .background(palette.accentContainer, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (busy) {
-                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = palette.accent,
+                            strokeWidth = 2.dp,
+                        )
                     } else {
                         Icon(
                             imageVector = Icons.Rounded.SaveAlt,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = palette.accent,
                         )
                     }
                 }
@@ -680,15 +836,17 @@ private fun ThemeStoreTransferPanel(
 
 @Composable
 private fun ThemeStoreTransferReportCard(report: ThemeStoreTransferReport) {
+    val dark = isInDarkTheme()
+    val palette = themeStorePalette()
     val icon = when {
         !report.success -> Icons.Rounded.Error
         report.warnings.isNotEmpty() -> Icons.Rounded.Warning
         else -> Icons.Rounded.CheckCircle
     }
     val tint = when {
-        !report.success -> MaterialTheme.colorScheme.error
-        report.warnings.isNotEmpty() -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.primary
+        !report.success -> if (dark) Color(0xFFFFB4AB) else MaterialTheme.colorScheme.error
+        report.warnings.isNotEmpty() -> if (dark) Color(0xFFFFD18A) else MaterialTheme.colorScheme.tertiary
+        else -> palette.accent
     }
     ThemeStoreSurface {
         Column(
@@ -788,45 +946,90 @@ private fun ThemeStoreBackButton(onClick: () -> Unit) {
 
 @Composable
 private fun ThemeStoreSurface(content: @Composable () -> Unit) {
-    if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(SkrootproColors.BarSurface),
-        ) {
-            content()
-        }
-    } else {
-        Card(modifier = Modifier.fillMaxWidth(), content = { content() })
+    val palette = themeStorePalette()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.surface),
+    ) {
+        content()
     }
 }
 
 @Composable
 private fun themeStoreTextColor(): Color {
-    return if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
-        SkrootproColors.Text
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    return themeStorePalette().text
 }
 
 @Composable
 private fun themeStoreMutedColor(): Color {
-    return if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
-        SkrootproColors.Muted
+    return themeStorePalette().mutedText
+}
+
+private data class ThemeStorePalette(
+    val surface: Color,
+    val navigationSurface: Color,
+    val text: Color,
+    val mutedText: Color,
+    val accent: Color,
+    val accentContainer: Color,
+)
+
+@Composable
+private fun themeStorePalette(): ThemeStorePalette {
+    if (LocalInterfaceStyle.current == InterfaceStyle.Skrootpro.value) {
+        return ThemeStorePalette(
+            surface = SkrootproColors.BarSurface,
+            navigationSurface = SkrootproColors.BarSurface,
+            text = SkrootproColors.Text,
+            mutedText = SkrootproColors.Muted,
+            accent = SkrootproColors.Purple,
+            accentContainer = SkrootproColors.Purple.copy(alpha = 0.18f),
+        )
+    }
+
+    val dark = isInDarkTheme()
+    val materialColors = MaterialTheme.colorScheme
+    val requestedAccent = materialColors.primary
+    val accent = if (dark && requestedAccent.luminance() < 0.34f) {
+        Color(0xFFC7CCFF)
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        requestedAccent
+    }
+    return if (dark) {
+        ThemeStorePalette(
+            surface = Color(0xDE191C23),
+            navigationSurface = Color(0xF0181A20),
+            text = Color(0xFFF4F5FA),
+            mutedText = Color(0xFFC3C7D2),
+            accent = accent,
+            accentContainer = accent.copy(alpha = 0.20f),
+        )
+    } else {
+        ThemeStorePalette(
+            surface = colorScheme.surfaceContainer,
+            navigationSurface = colorScheme.surface,
+            text = materialColors.onSurface,
+            mutedText = materialColors.onSurfaceVariant,
+            accent = accent,
+            accentContainer = accent.copy(alpha = 0.11f),
+        )
     }
 }
 
 private data class ThemeStoreActions(
     val onBack: () -> Unit,
     val onOpenCloudTheme: (String) -> Unit,
+    val onOpenCloudThemeRanking: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
     val onOpenInstallCardWallpapers: () -> Unit,
     val onOpenNavigationIcons: () -> Unit,
     val onOpenFonts: () -> Unit,
+    val onOpenColorPalette: () -> Unit,
+    val onOpenUiDecorationLibrary: () -> Unit,
+    val onOpenVisualEffects: () -> Unit,
+    val onOpenThemeLibrary: () -> Unit,
     val onOpenBackgroundSettings: () -> Unit,
     val onOpenSoundEffects: () -> Unit,
     val onOpenStartupAnimation: () -> Unit,
@@ -840,17 +1043,18 @@ private data class ThemeStoreTransferReport(
     val errorMessage: String?,
 ) {
     companion object {
+        fun failure(error: Throwable): ThemeStoreTransferReport {
+            return ThemeStoreTransferReport(
+                success = false,
+                warnings = emptyList(),
+                errorMessage = error.themeStoreDisplayMessage(),
+            )
+        }
+
         fun from(
             result: ThemeStorePackageResult,
         ): ThemeStoreTransferReport {
-            val errorMessage = result.error
-                ?.localizedMessage
-                ?.trim()
-                ?.lineSequence()
-                ?.firstOrNull()
-                ?.take(240)
-                ?.takeIf { it.isNotBlank() }
-                ?: result.error?.javaClass?.simpleName
+            val errorMessage = result.error?.themeStoreDisplayMessage()
             return ThemeStoreTransferReport(
                 success = result.success,
                 warnings = result.warnings.distinctBy { it.assetId to it.reason },
@@ -860,9 +1064,21 @@ private data class ThemeStoreTransferReport(
     }
 }
 
+private fun Throwable.themeStoreDisplayMessage(): String {
+    return localizedMessage
+        ?.trim()
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.take(240)
+        ?.takeIf { it.isNotBlank() }
+        ?: javaClass.simpleName
+}
+
 private val ThemeStoreSummary.cardConfiguredCount: Int
     get() = listOf(
         lkmCard,
+        classicMiuixLkmCard,
+        materialLkmCard,
         superuserCard,
         moduleCard,
         statusMonitorCard,

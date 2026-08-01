@@ -1,11 +1,18 @@
 package me.weishu.kernelsu.ui.component.alpha
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -45,7 +52,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -69,7 +75,6 @@ import me.weishu.kernelsu.ui.component.snow.SnowCapBand
 import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
-import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 private data class AlphaPalette(
     val background: Color,
@@ -241,21 +246,6 @@ object AlphaColors {
         get() = when {
             isSnowStyle() && isInDarkTheme() -> SnowDark
             isSnowStyle() -> SnowLight
-            isStudioStyle() -> AlphaPalette(
-                background = colorScheme.surface,
-                topBar = colorScheme.surface,
-                surface = colorScheme.surfaceContainer,
-                surfaceStrong = colorScheme.primary.copy(alpha = 0.10f)
-                    .compositeOver(colorScheme.surfaceContainer),
-                accent = colorScheme.primary,
-                onAccent = colorScheme.onPrimary,
-                accentSoft = colorScheme.primary.copy(alpha = 0.14f)
-                    .compositeOver(colorScheme.surfaceContainer),
-                text = colorScheme.onSurface,
-                muted = colorScheme.onSurfaceVariantSummary,
-                disabled = colorScheme.onSurface.copy(alpha = 0.38f),
-                divider = colorScheme.outline.copy(alpha = 0.18f),
-            )
             isDeltaStyle() && isInDarkTheme() -> DeltaDark
             isDeltaStyle() -> Delta
             isInDarkTheme() -> AlphaDark
@@ -317,12 +307,6 @@ fun isDeltaStyle(): Boolean {
 
 @Composable
 @ReadOnlyComposable
-fun isStudioStyle(): Boolean {
-    return LocalInterfaceStyle.current == InterfaceStyle.Studio.value
-}
-
-@Composable
-@ReadOnlyComposable
 fun isSnowStyle(): Boolean {
     return LocalInterfaceStyle.current == InterfaceStyle.Snow.value
 }
@@ -330,7 +314,7 @@ fun isSnowStyle(): Boolean {
 @Composable
 @ReadOnlyComposable
 fun alphaStrongWeight(): FontWeight {
-    return if (isStudioStyle() || isSnowStyle()) FontWeight.SemiBold else FontWeight.Black
+    return if (isSnowStyle()) FontWeight.SemiBold else FontWeight.Black
 }
 
 @Composable
@@ -353,6 +337,7 @@ fun AlphaScreen(
     tertiaryTopActionIcon: ImageVector? = null,
     onTertiaryTopActionClick: () -> Unit = {},
     tertiaryTopActionContentDescription: String? = null,
+    topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val snowStyle = isSnowStyle()
@@ -372,18 +357,30 @@ fun AlphaScreen(
             )
         }
         Column(modifier = Modifier.fillMaxSize()) {
-            AlphaTopBar(
-                title = title,
-                actionIcon = topActionIcon,
-                onActionClick = onTopActionClick,
-                actionContentDescription = topActionContentDescription,
-                secondaryActionIcon = secondaryTopActionIcon,
-                onSecondaryActionClick = onSecondaryTopActionClick,
-                secondaryActionContentDescription = secondaryTopActionContentDescription,
-                tertiaryActionIcon = tertiaryTopActionIcon,
-                onTertiaryActionClick = onTertiaryTopActionClick,
-                tertiaryActionContentDescription = tertiaryTopActionContentDescription,
-            )
+            AnimatedVisibility(
+                visible = topBarVisible,
+                enter = expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = tween(180),
+                ) + fadeIn(animationSpec = tween(150)),
+                exit = shrinkVertically(
+                    shrinkTowards = Alignment.Top,
+                    animationSpec = tween(160),
+                ) + fadeOut(animationSpec = tween(120)),
+            ) {
+                AlphaTopBar(
+                    title = title,
+                    actionIcon = topActionIcon,
+                    onActionClick = onTopActionClick,
+                    actionContentDescription = topActionContentDescription,
+                    secondaryActionIcon = secondaryTopActionIcon,
+                    onSecondaryActionClick = onSecondaryTopActionClick,
+                    secondaryActionContentDescription = secondaryTopActionContentDescription,
+                    tertiaryActionIcon = tertiaryTopActionIcon,
+                    onTertiaryActionClick = onTertiaryTopActionClick,
+                    tertiaryActionContentDescription = tertiaryTopActionContentDescription,
+                )
+            }
             Box(modifier = Modifier.weight(1f)) {
                 content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
             }
@@ -457,54 +454,6 @@ fun AlphaTopBar(
                 snowColor = AlphaColors.Snow,
                 shadowColor = AlphaColors.SnowShadow,
                 modifier = Modifier.fillMaxWidth().height(10.dp),
-            )
-        }
-        return
-    }
-
-    if (isStudioStyle()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(topBarColor)
-                .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .padding(start = 16.dp, end = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    color = AlphaColors.Text,
-                    fontSize = alphaSp(20f, maxScale = 1.04f),
-                    lineHeight = alphaSp(24f, maxScale = 1.04f),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                AlphaTopBarActions(
-                    actionIcon = actionIcon,
-                    onActionClick = onActionClick,
-                    actionContentDescription = actionContentDescription,
-                    secondaryActionIcon = secondaryActionIcon,
-                    onSecondaryActionClick = onSecondaryActionClick,
-                    secondaryActionContentDescription = secondaryActionContentDescription,
-                    tertiaryActionIcon = tertiaryActionIcon,
-                    onTertiaryActionClick = onTertiaryActionClick,
-                    tertiaryActionContentDescription = tertiaryActionContentDescription,
-                    tint = AlphaColors.Muted,
-                    iconSize = 24.dp,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(dividerColor),
             )
         }
         return
@@ -658,6 +607,7 @@ private fun AlphaTopBarActions(
 fun AlphaCard(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(14.dp),
+    backgroundContent: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val shape = AlphaShapes.Card
@@ -696,6 +646,7 @@ fun AlphaCard(
             )
             .uiDecoratedCard(shape = shape),
     ) {
+        backgroundContent?.invoke(this)
         Box(modifier = Modifier.padding(resolvedPadding)) {
             content()
         }
@@ -761,7 +712,6 @@ fun AlphaOutlinedButton(
             .background(
                 when {
                     isDeltaStyle() -> AlphaColors.AccentSoft
-                    isStudioStyle() -> AlphaColors.SurfaceStrong
                     isSnowStyle() -> AlphaColors.SurfaceStrong
                     else -> AlphaColors.Background
                 }

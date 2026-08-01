@@ -66,4 +66,35 @@ class SettingsFeatureAvailabilityTest {
         assertFalse(state.canOpenPathConfig)
         assertFalse(state.canToggleKPatchNext)
     }
+
+    @Test
+    fun kpatchNextOperationLocksTheSwitch() {
+        val state = SettingsUiState(
+            runtimeModeResolved = true,
+            isKPatchNextOperationRunning = true,
+        )
+
+        assertFalse(state.canToggleKPatchNext)
+    }
+
+    @Test
+    fun kpatchNextSwitchRepresentsInstallLifecycle() {
+        assertTrue(
+            SettingsUiState(
+                isKPatchNextInstalled = true,
+                isKPatchNextEnabled = false,
+            ).isKPatchNextSwitchChecked
+        )
+        assertTrue(
+            SettingsUiState(
+                isKPatchNextPendingUpdate = true,
+            ).isKPatchNextSwitchChecked
+        )
+        assertFalse(
+            SettingsUiState(
+                isKPatchNextInstalled = true,
+                isKPatchNextPendingRemove = true,
+            ).isKPatchNextSwitchChecked
+        )
+    }
 }

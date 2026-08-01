@@ -31,10 +31,14 @@ pub fn print_status() {
         .map_or(MODULE_VERSION_CODE_FALLBACK, String::as_str);
     let installed = module_dir.join("module.prop").exists();
     let pending_update = update_dir.join("module.prop").exists();
-    let pending_remove = module_dir.join(defs::REMOVE_FILE_NAME).exists();
+    let pending_remove = module_dir.join(defs::REMOVE_FILE_NAME).exists()
+        || update_dir.join(defs::REMOVE_FILE_NAME).exists();
     let enabled =
         installed && !module_dir.join(defs::DISABLE_FILE_NAME).exists() && !pending_remove;
-    let webui = module_dir.join(defs::MODULE_WEB_DIR).exists();
+    let webui = module_dir
+        .join(defs::MODULE_WEB_DIR)
+        .join("index.html")
+        .is_file();
     let unresolved = module_dir.join("unresolved").exists();
     let data_dir = Path::new(KPATCH_NEXT_DATA_DIR).exists();
 
@@ -86,8 +90,14 @@ pub fn enable() -> Result<()> {
 pub fn disable() -> Result<()> {
     let module_dir = module_dir();
     let update_dir = update_dir();
-    let touched = ensure_disable_marker_if_dir_exists(&module_dir)?
-        || ensure_disable_marker_if_dir_exists(&update_dir)?;
+    for dir in [&module_dir, &update_dir] {
+        if dir.is_symlink() {
+            bail!("{} is a symlink, refusing to remove it", dir.display());
+        }
+    }
+    let active_touched = ensure_remove_marker_if_dir_exists(&module_dir)?;
+    let update_touched = ensure_remove_marker_if_dir_exists(&update_dir)?;
+    let touched = active_touched || update_touched;
 
     if touched && let Err(e) = module::regenerate_preinit_rc() {
         log::warn!("regenerate preinit rc failed: {e}");
@@ -133,11 +143,11 @@ fn write_builtin_zip() -> Result<PathBuf> {
     Ok(zip_path)
 }
 
-fn ensure_disable_marker_if_dir_exists(dir: &Path) -> Result<bool> {
+fn ensure_remove_marker_if_dir_exists(dir: &Path) -> Result<bool> {
     if !dir.exists() {
         return Ok(false);
     }
-    utils::ensure_file_exists(dir.join(defs::DISABLE_FILE_NAME))?;
+    utils::ensure_file_exists(dir.join(defs::REMOVE_FILE_NAME))?;
     Ok(true)
 }
 

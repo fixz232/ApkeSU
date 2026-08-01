@@ -12,10 +12,13 @@
     <string name="rain_style_heavy_summary">Paleta de tormenta oscura, viento más fuerte, cristal más húmedo y ondas frecuentes en el suelo.</string>
     <string name="rain_style_thunderstorm">Tormenta eléctrica</string>
     <string name="rain_style_thunderstorm_summary">Relámpagos nocturnos cada 3 a 8 segundos, con lluvia densa y nubes de tormenta violetas.</string>
+    <string name="rain_style_after_rain">Tras la lluvia</string>
+    <string name="rain_style_after_rain_summary">La lluvia disminuye, las nubes se abren y el cristal húmedo recupera sus reflejos.</string>
     <string name="rain_motto_light">Escucha cómo la lluvia se posa sobre el cristal</string>
     <string name="rain_motto_medium">Cuando la lluvia aumenta, el mundo se calma</string>
     <string name="rain_motto_heavy">Mantén la claridad en medio de la tormenta</string>
     <string name="rain_motto_thunderstorm">El relámpago cruza la noche; el núcleo resiste</string>
+    <string name="rain_motto_after_rain">Tras la lluvia, la luz vuelve al agua</string>
     <string name="theme_preset_rain">Cristal lluvioso</string>
     <string name="theme_preset_rain_summary">Cristal gris azulado frío, bordes de tarjetas mojados, aleros de lluvia y una barra de navegación flotante a juego.</string>
     <string name="settings_pixel_card_motion">Animación de tarjetas pixeladas</string>

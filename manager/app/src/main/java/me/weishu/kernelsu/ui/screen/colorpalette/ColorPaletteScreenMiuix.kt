@@ -81,11 +81,15 @@ import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
 import me.weishu.kernelsu.ui.component.liquid.globalLiquidGlassSurface
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.component.miuix.ScaleDialog
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.theme.ColorMode
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
+import me.weishu.kernelsu.ui.theme.isInterfaceForcedDark
 import me.weishu.kernelsu.ui.theme.keyColorOptions
 import me.weishu.kernelsu.ui.theme.ThemePreset
+import me.weishu.kernelsu.ui.theme.ThemeAppearanceDefaults
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -128,6 +132,11 @@ fun ColorPaletteScreenMiuix(
     var showSavePresetDialog by remember { mutableStateOf(false) }
     var renamePreset by remember { mutableStateOf<CustomThemePreset?>(null) }
     val isDark = currentColorMode.isDark || currentColorMode.isSystem && isSystemInDarkTheme()
+    val interfaceForcesDark = isInterfaceForcedDark(
+        interfaceStyle = uiState.uiMode,
+        rainStyle = RainStyle.fromValue(uiState.rainStyle),
+        pixelStyle = PixelStyle.fromValue(uiState.pixelStyle),
+    )
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -215,6 +224,24 @@ fun ColorPaletteScreenMiuix(
                             height = 48.dp,
                         )
 
+                        AnimatedVisibility(visible = interfaceForcesDark) {
+                            Text(
+                                text = stringResource(R.string.settings_theme_forced_dark_notice),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                color = colorScheme.primary,
+                                fontSize = 13.sp,
+                            )
+                        }
+
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_theme_mode_amoled),
+                            summary = stringResource(R.string.settings_theme_mode_amoled_summary),
+                            checked = currentColorMode.isAmoled,
+                            onCheckedChange = { enabled ->
+                                actions.onSetColorMode(if (enabled) ColorMode.DARK_AMOLED else ColorMode.DARK)
+                            },
+                        )
+
                         Card(
                             modifier = Modifier
                                 .padding(top = 12.dp)
@@ -276,6 +303,17 @@ fun ColorPaletteScreenMiuix(
                                         onSelectedIndexChange = { index ->
                                             actions.onSetKeyColor(colorValues[index])
                                         }
+                                    )
+
+                                    AdvancedSliderMiuix(
+                                        title = stringResource(R.string.settings_monet_surface_opacity),
+                                        summary = stringResource(R.string.settings_monet_surface_opacity_summary),
+                                        icon = Icons.Rounded.WaterDrop,
+                                        value = uiState.monetSurfaceOpacity,
+                                        valueRange = ThemeAppearanceDefaults.MIN_MONET_SURFACE_OPACITY..
+                                            ThemeAppearanceDefaults.MAX_MONET_SURFACE_OPACITY,
+                                        keyPoints = listOf(0.45f, 0.6f, 0.75f, 0.9f, 1f),
+                                        onValueChangeFinished = actions.onSetMonetSurfaceOpacity,
                                     )
 
                                     AnimatedVisibility(
@@ -441,6 +479,7 @@ fun ColorPaletteScreenMiuix(
                                     )
                                 },
                                 checked = uiState.enablePredictiveBack,
+                                enabled = !state.predictiveBackUpdatePending,
                                 onCheckedChange = {
                                     actions.onSetEnablePredictiveBack(it)
                                 }

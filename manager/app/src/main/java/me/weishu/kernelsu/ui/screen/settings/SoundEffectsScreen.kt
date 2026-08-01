@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.PauseCircle
+import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.FilledTonalButton
@@ -34,15 +36,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,17 +67,35 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.component.AudioWaveform
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
+import me.weishu.kernelsu.ui.util.AppAudioSettings
+import me.weishu.kernelsu.ui.util.AudioPreviewPlayer
+import me.weishu.kernelsu.ui.util.AudioPreviewState
+import me.weishu.kernelsu.ui.util.AudioTrackSettings
+import me.weishu.kernelsu.ui.util.AudioScheme
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_AUDIO_VOLUME
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MIN_CUSTOM_AUDIO_VOLUME
 import me.weishu.kernelsu.ui.util.MIN_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.StartupSoundPlayer
-import me.weishu.kernelsu.ui.util.releasePersistableAudioReadPermission
-import me.weishu.kernelsu.ui.util.takePersistableAudioReadPermission
+import me.weishu.kernelsu.ui.util.readAppAudioSettings
+import me.weishu.kernelsu.ui.util.readAudioSchemes
+import me.weishu.kernelsu.ui.util.saveCurrentAudioScheme
+import me.weishu.kernelsu.ui.util.applyAudioScheme
+import me.weishu.kernelsu.ui.util.deleteAudioScheme
+import me.weishu.kernelsu.ui.util.inspectMediaFile
+import me.weishu.kernelsu.ui.util.isAudioUriReferencedBySavedScheme
+import me.weishu.kernelsu.ui.util.persistCustomAudioReference
+import me.weishu.kernelsu.ui.util.releaseCustomAudioReference
+import me.weishu.kernelsu.ui.util.setAppAudioSettings
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
@@ -80,22 +108,75 @@ fun SoundEffectsScreen() {
     val onBack = dropUnlessResumed { navigator.pop() }
     val viewModel = viewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var audioSettings by remember(context) { mutableStateOf(readAppAudioSettings(context)) }
+    var audioSchemes by remember(context) { mutableStateOf(readAudioSchemes(context)) }
+    val previewState by AudioPreviewPlayer.state.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    fun updateAudioSettings(next: AppAudioSettings) {
+        val previous = audioSettings
+        val value = next.normalized()
+        setAppAudioSettings(context, value)
+        audioSettings = value
+        if (!value.masterEnabled ||
+            previous.startup.enabled && !value.startup.enabled ||
+            previous.click.enabled && !value.click.enabled ||
+            previous.background.enabled && !value.background.enabled
+        ) {
+            AudioPreviewPlayer.stop()
+        }
+        if (!value.masterEnabled) {
+            StartupSoundPlayer.stop()
+            ClickSoundPlayer.release()
+            BackgroundMusicPlayer.stop()
+        } else if (value.background.enabled && !uiState.customBackgroundMusicUri.isNullOrBlank()) {
+            BackgroundMusicPlayer.playConfigured(context)
+        } else {
+            BackgroundMusicPlayer.stop()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { AudioPreviewPlayer.stop() }
+    }
 
     val startupSoundLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         StartupSoundPlayer.clearAutoPlaySuppression()
         uri ?: return@rememberLauncherForActivityResult
-        takePersistableAudioReadPermission(context, uri)
-        val uriString = uri.toString()
-        viewModel.setCustomStartupSoundUri(uriString)
-        StartupSoundPlayer.play(
-            context = context,
-            uriString = uriString,
-            durationSeconds = uiState.customStartupSoundDurationSeconds,
-            volume = uiState.customStartupSoundVolume,
-        ) {
-            Toast.makeText(context, R.string.settings_startup_sound_play_failed, Toast.LENGTH_SHORT).show()
+        scope.launch {
+            if (!inspectMediaFile(context, uri).decodable) {
+                Toast.makeText(context, R.string.settings_audio_invalid_file, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val uriString = withContext(Dispatchers.IO) {
+                persistCustomAudioReference(context, uri, "startup_sound")
+            }
+            if (uriString == null) {
+                Toast.makeText(context, R.string.settings_audio_import_failed, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (uriString != uiState.customStartupSoundUri) {
+                val previous = uiState.customStartupSoundUri
+                if (!isAudioUriReferencedBySavedScheme(context, previous)) {
+                    releaseCustomAudioReference(context, previous)
+                }
+            }
+            val enabledSettings = audioSettings.copy(
+                masterEnabled = true,
+                startup = audioSettings.startup.copy(enabled = true),
+            )
+            updateAudioSettings(enabledSettings)
+            viewModel.setCustomStartupSoundUri(uriString)
+            AudioPreviewPlayer.play(
+                context = context,
+                uriString = uriString,
+                volume = uiState.customStartupSoundVolume,
+                settings = enabledSettings.startup,
+            ) {
+                Toast.makeText(context, R.string.settings_startup_sound_play_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -103,11 +184,33 @@ fun SoundEffectsScreen() {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        takePersistableAudioReadPermission(context, uri)
-        val uriString = uri.toString()
-        viewModel.setCustomClickSoundUri(uriString)
-        ClickSoundPlayer.play(context, uriString, uiState.customClickSoundVolume) {
-            Toast.makeText(context, R.string.settings_click_sound_play_failed, Toast.LENGTH_SHORT).show()
+        scope.launch {
+            if (!inspectMediaFile(context, uri).decodable) {
+                Toast.makeText(context, R.string.settings_audio_invalid_file, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val uriString = withContext(Dispatchers.IO) {
+                persistCustomAudioReference(context, uri, "click_sound")
+            }
+            if (uriString == null) {
+                Toast.makeText(context, R.string.settings_audio_import_failed, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (uriString != uiState.customClickSoundUri) {
+                val previous = uiState.customClickSoundUri
+                if (!isAudioUriReferencedBySavedScheme(context, previous)) {
+                    releaseCustomAudioReference(context, previous)
+                }
+            }
+            val enabledSettings = audioSettings.copy(
+                masterEnabled = true,
+                click = audioSettings.click.copy(enabled = true),
+            )
+            updateAudioSettings(enabledSettings)
+            viewModel.setCustomClickSoundUri(uriString)
+            AudioPreviewPlayer.play(context, uriString, uiState.customClickSoundVolume, enabledSettings.click) {
+                Toast.makeText(context, R.string.settings_click_sound_play_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -115,11 +218,33 @@ fun SoundEffectsScreen() {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        takePersistableAudioReadPermission(context, uri)
-        val uriString = uri.toString()
-        viewModel.setCustomBackgroundMusicUri(uriString)
-        BackgroundMusicPlayer.play(context, uriString, uiState.customBackgroundMusicVolume) {
-            Toast.makeText(context, R.string.settings_background_music_play_failed, Toast.LENGTH_SHORT).show()
+        scope.launch {
+            if (!inspectMediaFile(context, uri).decodable) {
+                Toast.makeText(context, R.string.settings_audio_invalid_file, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val uriString = withContext(Dispatchers.IO) {
+                persistCustomAudioReference(context, uri, "background_music")
+            }
+            if (uriString == null) {
+                Toast.makeText(context, R.string.settings_audio_import_failed, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (uriString != uiState.customBackgroundMusicUri) {
+                val previous = uiState.customBackgroundMusicUri
+                if (!isAudioUriReferencedBySavedScheme(context, previous)) {
+                    releaseCustomAudioReference(context, previous)
+                }
+            }
+            val enabledSettings = audioSettings.copy(
+                masterEnabled = true,
+                background = audioSettings.background.copy(enabled = true),
+            )
+            updateAudioSettings(enabledSettings)
+            viewModel.setCustomBackgroundMusicUri(uriString)
+            AudioPreviewPlayer.play(context, uriString, uiState.customBackgroundMusicVolume, enabledSettings.background) {
+                Toast.makeText(context, R.string.settings_background_music_play_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -134,57 +259,101 @@ fun SoundEffectsScreen() {
             startupSoundLauncher.launch(arrayOf("audio/*"))
         },
         onPreviewStartupSound = {
-            StartupSoundPlayer.play(
+            AudioPreviewPlayer.play(
                 context = context,
                 uriString = uiState.customStartupSoundUri,
-                durationSeconds = uiState.customStartupSoundDurationSeconds,
                 volume = uiState.customStartupSoundVolume,
+                settings = audioSettings.startup,
             ) {
                 Toast.makeText(context, R.string.settings_startup_sound_play_failed, Toast.LENGTH_SHORT).show()
             }
         },
         onClearStartupSound = {
             StartupSoundPlayer.stop()
-            releasePersistableAudioReadPermission(context, uiState.customStartupSoundUri)
+            if (!isAudioUriReferencedBySavedScheme(context, uiState.customStartupSoundUri)) {
+                releaseCustomAudioReference(context, uiState.customStartupSoundUri)
+            }
             viewModel.clearCustomStartupSound()
         },
         onSetStartupSoundDurationSeconds = viewModel::setCustomStartupSoundDurationSeconds,
         onSetStartupSoundVolume = viewModel::setCustomStartupSoundVolume,
         onPickClickSound = { clickSoundLauncher.launch(arrayOf("audio/*")) },
         onPreviewClickSound = {
-            ClickSoundPlayer.play(context, uiState.customClickSoundUri, uiState.customClickSoundVolume) {
+            AudioPreviewPlayer.play(
+                context,
+                uiState.customClickSoundUri,
+                uiState.customClickSoundVolume,
+                audioSettings.click,
+            ) {
                 Toast.makeText(context, R.string.settings_click_sound_play_failed, Toast.LENGTH_SHORT).show()
             }
         },
         onClearClickSound = {
             ClickSoundPlayer.release()
-            releasePersistableAudioReadPermission(context, uiState.customClickSoundUri)
+            if (!isAudioUriReferencedBySavedScheme(context, uiState.customClickSoundUri)) {
+                releaseCustomAudioReference(context, uiState.customClickSoundUri)
+            }
             viewModel.clearCustomClickSound()
         },
         onSetClickSoundVolume = viewModel::setCustomClickSoundVolume,
         onPickBackgroundMusic = { backgroundMusicLauncher.launch(arrayOf("audio/*")) },
         onPreviewBackgroundMusic = {
-            BackgroundMusicPlayer.play(
+            AudioPreviewPlayer.play(
                 context = context,
                 uriString = uiState.customBackgroundMusicUri,
                 volume = uiState.customBackgroundMusicVolume,
+                settings = audioSettings.background,
             ) {
                 Toast.makeText(context, R.string.settings_background_music_play_failed, Toast.LENGTH_SHORT).show()
             }
         },
         onClearBackgroundMusic = {
             BackgroundMusicPlayer.stop()
-            releasePersistableAudioReadPermission(context, uiState.customBackgroundMusicUri)
+            if (!isAudioUriReferencedBySavedScheme(context, uiState.customBackgroundMusicUri)) {
+                releaseCustomAudioReference(context, uiState.customBackgroundMusicUri)
+            }
             viewModel.clearCustomBackgroundMusic()
         },
         onSetBackgroundMusicVolume = {
             viewModel.setCustomBackgroundMusicVolume(it)
             BackgroundMusicPlayer.updateVolume(it)
         },
+        onSetAudioSettings = ::updateAudioSettings,
+        onPausePreview = AudioPreviewPlayer::pause,
+        onResumePreview = AudioPreviewPlayer::resume,
+        onStopPreview = AudioPreviewPlayer::stop,
+        onSeekPreview = AudioPreviewPlayer::seekTo,
+        onSaveScheme = { name ->
+            val saved = saveCurrentAudioScheme(context, name)
+            if (saved != null) audioSchemes = readAudioSchemes(context)
+            saved != null
+        },
+        onApplyScheme = { scheme ->
+            if (applyAudioScheme(context, scheme)) {
+                AudioPreviewPlayer.stop()
+                BackgroundMusicPlayer.stop()
+                audioSettings = scheme.settings
+                viewModel.refresh()
+                if (scheme.settings.masterEnabled && scheme.settings.background.enabled &&
+                    !scheme.backgroundMusicUri.isNullOrBlank()
+                ) {
+                    BackgroundMusicPlayer.playConfigured(context)
+                }
+                true
+            } else false
+        },
+        onDeleteScheme = { scheme ->
+            val deleted = deleteAudioScheme(context, scheme.id)
+            if (deleted) audioSchemes = readAudioSchemes(context)
+            deleted
+        },
     )
 
     SoundEffectsScreenMiuix(
         uiState = uiState,
+        audioSettings = audioSettings,
+        previewState = previewState,
+        audioSchemes = audioSchemes,
         actions = actions,
         onBack = onBack,
     )
@@ -193,6 +362,9 @@ fun SoundEffectsScreen() {
 @Composable
 private fun SoundEffectsScreenMiuix(
     uiState: SettingsUiState,
+    audioSettings: AppAudioSettings,
+    previewState: AudioPreviewState,
+    audioSchemes: List<AudioScheme>,
     actions: SoundEffectsActions,
     onBack: () -> Unit,
 ) {
@@ -219,6 +391,9 @@ private fun SoundEffectsScreenMiuix(
     ) { innerPadding ->
         SoundEffectsContent(
             uiState = uiState,
+            audioSettings = audioSettings,
+            previewState = previewState,
+            audioSchemes = audioSchemes,
             actions = actions,
             modifier = Modifier
                 .fillMaxSize()
@@ -232,6 +407,9 @@ private fun SoundEffectsScreenMiuix(
 @Composable
 private fun SoundEffectsContent(
     uiState: SettingsUiState,
+    audioSettings: AppAudioSettings,
+    previewState: AudioPreviewState,
+    audioSchemes: List<AudioScheme>,
     actions: SoundEffectsActions,
     modifier: Modifier,
 ) {
@@ -245,6 +423,18 @@ private fun SoundEffectsContent(
             style = MaterialTheme.typography.bodyMedium,
         )
 
+        AudioMasterCard(
+            settings = audioSettings,
+            onValueChange = actions.onSetAudioSettings,
+        )
+
+        AudioSchemesCard(
+            schemes = audioSchemes,
+            onSave = actions.onSaveScheme,
+            onApply = actions.onApplyScheme,
+            onDelete = actions.onDeleteScheme,
+        )
+
         SoundEditorCard(
             title = stringResource(R.string.settings_startup_sound),
             summary = stringResource(
@@ -256,10 +446,20 @@ private fun SoundEffectsContent(
             ),
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             selected = !uiState.customStartupSoundUri.isNullOrBlank(),
+            enabled = audioSettings.startup.enabled,
+            onEnabledChange = {
+                actions.onSetAudioSettings(audioSettings.copy(startup = audioSettings.startup.copy(enabled = it)))
+            },
             onPick = actions.onPickStartupSound,
             onPreview = actions.onPreviewStartupSound,
             onClear = actions.onClearStartupSound,
         ) {
+            MediaFileInfoSummary(rememberMediaFileInfo(uiState.customStartupSoundUri))
+            AudioPreviewControls(
+                uriString = uiState.customStartupSoundUri,
+                state = previewState,
+                actions = actions,
+            )
             SoundSlider(
                 title = stringResource(R.string.settings_startup_sound_duration),
                 icon = Icons.Rounded.Timer,
@@ -277,6 +477,13 @@ private fun SoundEffectsContent(
                 valueLabel = { stringResource(R.string.settings_audio_volume_value, (it * 100).roundToInt()) },
                 onValueChange = actions.onSetStartupSoundVolume,
             )
+            AudioTrackControls(
+                value = audioSettings.startup,
+                mediaDurationMs = rememberMediaFileInfo(uiState.customStartupSoundUri)?.durationMillis,
+                onValueChange = {
+                    actions.onSetAudioSettings(audioSettings.copy(startup = it))
+                },
+            )
         }
 
         SoundEditorCard(
@@ -290,10 +497,16 @@ private fun SoundEffectsContent(
             ),
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             selected = !uiState.customClickSoundUri.isNullOrBlank(),
+            enabled = audioSettings.click.enabled,
+            onEnabledChange = {
+                actions.onSetAudioSettings(audioSettings.copy(click = audioSettings.click.copy(enabled = it)))
+            },
             onPick = actions.onPickClickSound,
             onPreview = actions.onPreviewClickSound,
             onClear = actions.onClearClickSound,
         ) {
+            MediaFileInfoSummary(rememberMediaFileInfo(uiState.customClickSoundUri))
+            AudioPreviewControls(uiState.customClickSoundUri, previewState, actions)
             SoundSlider(
                 title = stringResource(R.string.settings_click_sound_volume),
                 icon = Icons.AutoMirrored.Rounded.VolumeUp,
@@ -301,6 +514,12 @@ private fun SoundEffectsContent(
                 valueRange = MIN_CUSTOM_AUDIO_VOLUME..MAX_CUSTOM_AUDIO_VOLUME,
                 valueLabel = { stringResource(R.string.settings_audio_volume_value, (it * 100).roundToInt()) },
                 onValueChange = actions.onSetClickSoundVolume,
+            )
+            AudioTrackControls(
+                value = audioSettings.click,
+                mediaDurationMs = rememberMediaFileInfo(uiState.customClickSoundUri)?.durationMillis,
+                onValueChange = { actions.onSetAudioSettings(audioSettings.copy(click = it)) },
+                allowLoop = false,
             )
         }
 
@@ -315,10 +534,18 @@ private fun SoundEffectsContent(
             ),
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             selected = !uiState.customBackgroundMusicUri.isNullOrBlank(),
+            enabled = audioSettings.background.enabled,
+            onEnabledChange = {
+                val next = audioSettings.copy(background = audioSettings.background.copy(enabled = it))
+                actions.onSetAudioSettings(next)
+                if (!it) BackgroundMusicPlayer.stop()
+            },
             onPick = actions.onPickBackgroundMusic,
             onPreview = actions.onPreviewBackgroundMusic,
             onClear = actions.onClearBackgroundMusic,
         ) {
+            MediaFileInfoSummary(rememberMediaFileInfo(uiState.customBackgroundMusicUri))
+            AudioPreviewControls(uiState.customBackgroundMusicUri, previewState, actions)
             SoundSlider(
                 title = stringResource(R.string.settings_background_music_volume),
                 icon = Icons.AutoMirrored.Rounded.VolumeUp,
@@ -327,7 +554,273 @@ private fun SoundEffectsContent(
                 valueLabel = { stringResource(R.string.settings_audio_volume_value, (it * 100).roundToInt()) },
                 onValueChange = actions.onSetBackgroundMusicVolume,
             )
+            AudioTrackControls(
+                value = audioSettings.background,
+                mediaDurationMs = rememberMediaFileInfo(uiState.customBackgroundMusicUri)?.durationMillis,
+                onValueChange = { actions.onSetAudioSettings(audioSettings.copy(background = it)) },
+            )
         }
+    }
+}
+
+@Composable
+private fun AudioMasterCard(
+    settings: AppAudioSettings,
+    onValueChange: (AppAudioSettings) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AudioToggleRow(
+                title = stringResource(R.string.settings_audio_master),
+                summary = stringResource(R.string.settings_audio_master_summary),
+                checked = settings.masterEnabled,
+                onCheckedChange = { onValueChange(settings.copy(masterEnabled = it)) },
+            )
+            Text(
+                text = stringResource(R.string.settings_audio_policy_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            AudioToggleRow(
+                title = stringResource(R.string.settings_audio_respect_silent),
+                checked = settings.respectSilentMode,
+                onCheckedChange = { onValueChange(settings.copy(respectSilentMode = it)) },
+            )
+            AudioToggleRow(
+                title = stringResource(R.string.settings_audio_respect_dnd),
+                checked = settings.respectDoNotDisturb,
+                onCheckedChange = { onValueChange(settings.copy(respectDoNotDisturb = it)) },
+            )
+            AudioToggleRow(
+                title = stringResource(R.string.settings_audio_headset),
+                checked = settings.pauseOnHeadsetDisconnect,
+                onCheckedChange = { onValueChange(settings.copy(pauseOnHeadsetDisconnect = it)) },
+            )
+            AudioToggleRow(
+                title = stringResource(R.string.settings_audio_haptic),
+                checked = settings.hapticWithClick,
+                onCheckedChange = { onValueChange(settings.copy(hapticWithClick = it)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioSchemesCard(
+    schemes: List<AudioScheme>,
+    onSave: (String) -> Boolean,
+    onApply: (AudioScheme) -> Boolean,
+    onDelete: (AudioScheme) -> Boolean,
+) {
+    var name by remember { mutableStateOf("") }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = stringResource(R.string.settings_audio_schemes),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(32) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.settings_audio_scheme_name)) },
+                )
+                FilledTonalButton(
+                    enabled = name.isNotBlank(),
+                    onClick = { if (onSave(name)) name = "" },
+                ) {
+                    Text(stringResource(R.string.settings_audio_scheme_save))
+                }
+            }
+            schemes.forEach { scheme ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(scheme.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = stringResource(
+                                R.string.settings_audio_scheme_files,
+                                listOf(
+                                    scheme.startupSoundUri,
+                                    scheme.clickSoundUri,
+                                    scheme.backgroundMusicUri,
+                                ).count { !it.isNullOrBlank() },
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = { onApply(scheme) }) {
+                        Text(stringResource(R.string.settings_audio_scheme_apply))
+                    }
+                    TextButton(onClick = { onDelete(scheme) }) {
+                        Text(stringResource(R.string.settings_audio_scheme_delete))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioPreviewControls(
+    uriString: String?,
+    state: AudioPreviewState,
+    actions: SoundEffectsActions,
+) {
+    if (uriString.isNullOrBlank()) return
+    val active = state.uriString == uriString
+    AudioWaveform(
+        uriString = uriString,
+        progress = if (active && state.durationMs > 0L) state.positionMs.toFloat() / state.durationMs else 0f,
+    )
+    if (!active) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.settings_audio_progress),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+        Slider(
+            value = state.positionMs.toFloat().coerceAtMost(state.durationMs.toFloat().coerceAtLeast(1f)),
+            onValueChange = { actions.onSeekPreview(it.toLong()) },
+            valueRange = 0f..state.durationMs.toFloat().coerceAtLeast(1f),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = if (state.playing) actions.onPausePreview else actions.onResumePreview,
+            ) {
+                Icon(
+                    imageVector = if (state.playing) Icons.Rounded.PauseCircle else Icons.Rounded.PlayCircle,
+                    contentDescription = null,
+                )
+                Text(
+                    text = stringResource(
+                        if (state.playing) R.string.settings_audio_pause else R.string.settings_audio_resume
+                    ),
+                    modifier = Modifier.padding(start = 5.dp),
+                )
+            }
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = actions.onStopPreview,
+            ) {
+                Icon(Icons.Rounded.StopCircle, contentDescription = null)
+                Text(
+                    text = stringResource(R.string.settings_audio_stop),
+                    modifier = Modifier.padding(start = 5.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioTrackControls(
+    value: AudioTrackSettings,
+    mediaDurationMs: Long?,
+    onValueChange: (AudioTrackSettings) -> Unit,
+    allowLoop: Boolean = true,
+) {
+    val settings = value.normalized()
+    val duration = mediaDurationMs?.coerceAtLeast(1L) ?: 1L
+    val end = settings.trimEndMs.takeIf { it > 0L }?.coerceAtMost(duration) ?: duration
+    SoundSlider(
+        title = stringResource(R.string.settings_audio_trim_start),
+        icon = Icons.Rounded.Timer,
+        value = settings.trimStartMs.coerceAtMost(end).toFloat(),
+        valueRange = 0f..duration.toFloat(),
+        valueLabel = { stringResource(R.string.settings_audio_seconds_decimal, it / 1000f) },
+        onValueChange = {
+            onValueChange(settings.copy(trimStartMs = it.toLong().coerceAtMost(end)).normalized())
+        },
+    )
+    SoundSlider(
+        title = stringResource(R.string.settings_audio_trim_end),
+        icon = Icons.Rounded.Timer,
+        value = end.toFloat(),
+        valueRange = 0f..duration.toFloat(),
+        valueLabel = { stringResource(R.string.settings_audio_seconds_decimal, it / 1000f) },
+        onValueChange = {
+            onValueChange(
+                settings.copy(trimEndMs = it.toLong().coerceAtLeast(settings.trimStartMs)).normalized()
+            )
+        },
+    )
+    SoundSlider(
+        title = stringResource(R.string.settings_audio_fade_in),
+        icon = Icons.AutoMirrored.Rounded.VolumeUp,
+        value = settings.fadeInMs.toFloat(),
+        valueRange = 0f..5_000f,
+        valueLabel = { stringResource(R.string.settings_audio_milliseconds, it.roundToInt()) },
+        onValueChange = { onValueChange(settings.copy(fadeInMs = it.roundToInt()).normalized()) },
+    )
+    SoundSlider(
+        title = stringResource(R.string.settings_audio_fade_out),
+        icon = Icons.AutoMirrored.Rounded.VolumeUp,
+        value = settings.fadeOutMs.toFloat(),
+        valueRange = 0f..5_000f,
+        valueLabel = { stringResource(R.string.settings_audio_milliseconds, it.roundToInt()) },
+        onValueChange = { onValueChange(settings.copy(fadeOutMs = it.roundToInt()).normalized()) },
+    )
+    AudioToggleRow(
+        title = stringResource(R.string.settings_audio_normalize),
+        checked = settings.normalizeVolume,
+        onCheckedChange = { onValueChange(settings.copy(normalizeVolume = it)) },
+    )
+    if (allowLoop) {
+        AudioToggleRow(
+            title = stringResource(R.string.settings_audio_loop),
+            checked = settings.loop,
+            onCheckedChange = { onValueChange(settings.copy(loop = it)) },
+        )
+    }
+}
+
+@Composable
+private fun AudioToggleRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    summary: String? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            summary?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -337,6 +830,8 @@ private fun SoundEditorCard(
     summary: String,
     icon: ImageVector,
     selected: Boolean,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
     onPick: () -> Unit,
     onPreview: () -> Unit,
     onClear: () -> Unit,
@@ -345,7 +840,7 @@ private fun SoundEditorCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f),
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -375,6 +870,10 @@ private fun SoundEditorCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                )
             }
 
             Row(
@@ -400,7 +899,7 @@ private fun SoundEditorCard(
                 OutlinedButton(
                     modifier = Modifier.weight(1f),
                     onClick = onPreview,
-                    enabled = selected,
+                    enabled = selected && enabled,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.PlayCircle,
@@ -503,4 +1002,12 @@ private data class SoundEffectsActions(
     val onPreviewBackgroundMusic: () -> Unit,
     val onClearBackgroundMusic: () -> Unit,
     val onSetBackgroundMusicVolume: (Float) -> Unit,
+    val onSetAudioSettings: (AppAudioSettings) -> Unit,
+    val onPausePreview: () -> Unit,
+    val onResumePreview: () -> Unit,
+    val onStopPreview: () -> Unit,
+    val onSeekPreview: (Long) -> Unit,
+    val onSaveScheme: (String) -> Boolean,
+    val onApplyScheme: (AudioScheme) -> Boolean,
+    val onDeleteScheme: (AudioScheme) -> Boolean,
 )

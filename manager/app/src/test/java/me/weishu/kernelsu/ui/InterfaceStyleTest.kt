@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import me.weishu.kernelsu.ui.theme.ThemePreset
+import me.weishu.kernelsu.ui.theme.defaultThemePresetForUiMode
 
 class InterfaceStyleTest {
     @Test
@@ -22,6 +23,15 @@ class InterfaceStyleTest {
         InterfaceStyle.selectableEntries.forEachIndexed { index, style ->
             assertEquals(style, InterfaceStyle.fromIndex(index))
         }
+    }
+
+    @Test
+    fun inkIsSelectableAndUsesItsDedicatedPreset() {
+        assertTrue(InterfaceStyle.Ink in InterfaceStyle.selectableEntries)
+        val index = InterfaceStyle.selectedIndex(InterfaceStyle.Ink.value)
+        assertEquals(InterfaceStyle.Ink, InterfaceStyle.fromIndex(index))
+        assertEquals(InterfaceStyle.Ink.value, InterfaceStyle.normalizeValue(InterfaceStyle.Ink.value))
+        assertEquals(ThemePreset.INK, defaultThemePresetForUiMode(InterfaceStyle.Ink.value))
     }
 
     @Test
@@ -45,6 +55,19 @@ class InterfaceStyleTest {
     fun unknownStyleFallsBackToMiuix() {
         assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue("unknown"))
         assertEquals(UiMode.Miuix, UiMode.fromValue("unknown"))
+    }
+
+    @Test
+    fun studioIsRemovedAndLegacyValuesMigrateToMiuix() {
+        val legacyStudioValue = "studio"
+        assertFalse(InterfaceStyle.entries.any { it.value == legacyStudioValue })
+        assertFalse(InterfaceStyle.selectableEntries.any { it.value == legacyStudioValue })
+        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue(legacyStudioValue))
+        assertEquals(
+            InterfaceStyle.selectedIndex(InterfaceStyle.Miuix.value),
+            InterfaceStyle.selectedIndex(legacyStudioValue),
+        )
+        assertEquals(ThemePreset.CLEAN_TOOL, ThemePreset.fromValue(legacyStudioValue))
     }
 
     @Test

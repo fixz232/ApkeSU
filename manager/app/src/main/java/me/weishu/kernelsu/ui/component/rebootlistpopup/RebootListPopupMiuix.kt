@@ -87,6 +87,7 @@ fun RebootListPopupMiuix(
                         bitmap = wallpaperBitmap,
                         videoUriString = wallpaperState.videoUriString,
                         videoCrop = wallpaperState.crop,
+                        visualSettings = wallpaperState.visualSettings,
                     )
                     ListPopupColumn {
                         rebootOptions.forEachIndexed { idx, option ->

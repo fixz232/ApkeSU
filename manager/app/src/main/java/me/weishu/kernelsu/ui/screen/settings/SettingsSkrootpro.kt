@@ -19,20 +19,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Timer
@@ -72,9 +69,7 @@ import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproColors
-import me.weishu.kernelsu.ui.component.skrootpro.SkrootproDivider
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
-import me.weishu.kernelsu.ui.component.skrootpro.SkrootproSectionTitle
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -93,9 +88,10 @@ fun SettingPagerSkrootpro(
     bottomInnerPadding: Dp,
 ) {
     var appearanceExpanded by rememberSaveable { mutableStateOf(false) }
-    var updatesExpanded by rememberSaveable { mutableStateOf(false) }
-    var rootFeaturesExpanded by rememberSaveable { mutableStateOf(false) }
-    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var homeManagerExpanded by rememberSaveable { mutableStateOf(false) }
+    var rootPermissionsExpanded by rememberSaveable { mutableStateOf(false) }
+    var mountHideExpanded by rememberSaveable { mutableStateOf(false) }
+    var toolboxExpanded by rememberSaveable { mutableStateOf(false) }
     var maintenanceExpanded by rememberSaveable { mutableStateOf(false) }
 
     SkrootproScreen(
@@ -109,15 +105,12 @@ fun SettingPagerSkrootpro(
                 .padding(contentPadding)
                 .padding(horizontal = 18.dp, vertical = 10.dp),
         ) {
-            SkrootproSectionTitle(stringResource(R.string.settings_ui_mode))
-            SkrootproStylePicker(uiState = uiState, actions = actions)
-            SkrootproDivider(modifier = Modifier.padding(vertical = 18.dp))
-
             CollapsibleSkrootproSection(
-                title = stringResource(R.string.settings_section_appearance),
+                title = stringResource(R.string.settings_hub_appearance),
                 expanded = appearanceExpanded,
                 onExpandedChange = { appearanceExpanded = it },
             ) {
+                SkrootproStylePicker(uiState = uiState, actions = actions)
                 val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_day_night_switch),
@@ -133,33 +126,17 @@ fun SettingPagerSkrootpro(
                     },
                 )
                 SkrootproActionRow(
-                    title = stringResource(R.string.settings_section_visual_effects),
-                    summary = stringResource(R.string.settings_visual_effects_summary),
-                    leadingIcon = Icons.Rounded.Visibility,
-                    onClick = actions.onOpenVisualEffects,
-                )
-                SkrootproActionRow(
-                    title = stringResource(R.string.settings_ui_decoration_library),
-                    summary = stringResource(R.string.settings_ui_decoration_library_summary),
-                    leadingIcon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenUiDecorationLibrary,
-                )
-                SkrootproActionRow(
-                    title = stringResource(R.string.settings_theme),
-                    summary = stringResource(R.string.settings_theme_summary),
-                    onClick = actions.onOpenTheme,
-                )
-                SkrootproActionRow(
                     title = stringResource(R.string.theme_store),
                     summary = stringResource(R.string.theme_store_settings_summary),
                     onClick = actions.onOpenThemeStore,
                 )
-                SkrootproActionRow(
-                    title = stringResource(R.string.settings_language),
-                    summary = stringResource(R.string.settings_language_summary),
-                    leadingIcon = Icons.Rounded.Language,
-                    onClick = actions.onOpenLanguage,
-                )
+            }
+
+            CollapsibleSkrootproSection(
+                title = stringResource(R.string.settings_hub_home_manager),
+                expanded = homeManagerExpanded,
+                onExpandedChange = { homeManagerExpanded = it },
+            ) {
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_manager_identity),
                     summary = stringResource(R.string.settings_manager_identity_summary),
@@ -197,34 +174,15 @@ fun SettingPagerSkrootpro(
             }
 
             CollapsibleSkrootproSection(
-                title = stringResource(R.string.settings_section_updates),
-                expanded = updatesExpanded,
-                onExpandedChange = { updatesExpanded = it },
+                title = stringResource(R.string.settings_hub_root_permissions),
+                expanded = rootPermissionsExpanded,
+                onExpandedChange = { rootPermissionsExpanded = it },
             ) {
-                SkrootproSwitchRow(
-                    title = stringResource(R.string.settings_module_check_update),
-                    checked = uiState.checkModuleUpdate,
-                    onCheckedChange = actions.onSetCheckModuleUpdate,
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_profile_template),
+                    summary = stringResource(R.string.settings_profile_template_summary),
+                    onClick = actions.onOpenProfileTemplate,
                 )
-                SkrootproSwitchRow(
-                    title = stringResource(R.string.settings_version_mismatch_warning),
-                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
-                    checked = uiState.showVersionMismatchWarning,
-                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
-                )
-                SkrootproSwitchRow(
-                    title = stringResource(R.string.settings_gki_warning),
-                    summary = stringResource(R.string.settings_gki_warning_summary),
-                    checked = uiState.showGkiWarning,
-                    onCheckedChange = actions.onSetShowGkiWarning,
-                )
-            }
-
-            CollapsibleSkrootproSection(
-                title = stringResource(R.string.settings_section_root_features),
-                expanded = rootFeaturesExpanded,
-                onExpandedChange = { rootFeaturesExpanded = it },
-            ) {
                 val suCompatOptions = listOf(
                     stringResource(R.string.settings_mode_enable_by_default),
                     stringResource(R.string.settings_mode_disable_until_reboot),
@@ -298,23 +256,13 @@ fun SettingPagerSkrootpro(
                     onCheckedChange = actions.onSetAvcSpoofEnabled,
                     enabled = uiState.avcSpoofStatus == "supported",
                 )
-                SkrootproSwitchRow(
-                    title = stringResource(R.string.settings_epkesu_hide),
-                    checked = uiState.isEpkesuHideEnabled,
-                    onCheckedChange = actions.onSetEpkesuHideEnabled,
-                )
             }
 
             CollapsibleSkrootproSection(
-                title = stringResource(R.string.settings_section_advanced),
-                expanded = advancedExpanded,
-                onExpandedChange = { advancedExpanded = it },
+                title = stringResource(R.string.settings_hub_mount_hide),
+                expanded = mountHideExpanded,
+                onExpandedChange = { mountHideExpanded = it },
             ) {
-                SkrootproActionRow(
-                    title = stringResource(R.string.settings_profile_template),
-                    summary = stringResource(R.string.settings_profile_template_summary),
-                    onClick = actions.onOpenProfileTemplate,
-                )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_umount_modules_default),
                     checked = uiState.isDefaultUmountModules,
@@ -331,7 +279,7 @@ fun SettingPagerSkrootpro(
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_kpatch_next),
                     summary = kPatchNextSummary(uiState),
-                    checked = uiState.isKPatchNextEnabled,
+                    checked = uiState.isKPatchNextSwitchChecked,
                     onCheckedChange = actions.onSetKPatchNextEnabled,
                     enabled = uiState.canToggleKPatchNext,
                 )
@@ -359,6 +307,31 @@ fun SettingPagerSkrootpro(
                     enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_epkesu_hide),
+                    summary = stringResource(R.string.settings_epkesu_hide_summary),
+                    checked = uiState.isEpkesuHideEnabled,
+                    onCheckedChange = actions.onSetEpkesuHideEnabled,
+                )
+            }
+
+            CollapsibleSkrootproSection(
+                title = stringResource(R.string.settings_hub_toolbox),
+                expanded = toolboxExpanded,
+                onExpandedChange = { toolboxExpanded = it },
+            ) {
+                SkrootproActionRow(
+                    title = stringResource(R.string.rescue_protection),
+                    summary = stringResource(R.string.rescue_protection_summary),
+                    leadingIcon = Icons.Rounded.Security,
+                    onClick = actions.onOpenRescueProtection,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.image_tool_title),
+                    summary = stringResource(R.string.image_tool_settings_summary),
+                    leadingIcon = Icons.Rounded.ImageSearch,
+                    onClick = actions.onOpenImageTool,
+                )
                 SkrootproActionRow(
                     title = stringResource(R.string.settings_cpu_spoof),
                     summary = stringResource(R.string.settings_cpu_spoof_summary),
@@ -370,6 +343,12 @@ fun SettingPagerSkrootpro(
                     summary = stringResource(R.string.settings_device_identity_summary),
                     leadingIcon = Icons.Rounded.Badge,
                     onClick = actions.onOpenDeviceIdentity,
+                )
+                SkrootproActionRow(
+                    title = stringResource(R.string.settings_ai_chat),
+                    summary = stringResource(R.string.settings_ai_chat_summary),
+                    leadingIcon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenAiChat,
                 )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.settings_graphics_renderer_tool),
@@ -385,23 +364,36 @@ fun SettingPagerSkrootpro(
                         onClick = actions.onOpenGraphicsRenderer,
                     )
                 }
+            }
+
+            CollapsibleSkrootproSection(
+                title = stringResource(R.string.settings_hub_app_maintenance),
+                expanded = maintenanceExpanded,
+                onExpandedChange = { maintenanceExpanded = it },
+            ) {
                 SkrootproActionRow(
-                    title = stringResource(R.string.rescue_protection),
-                    summary = stringResource(R.string.rescue_protection_summary),
-                    leadingIcon = Icons.Rounded.Security,
-                    onClick = actions.onOpenRescueProtection,
+                    title = stringResource(R.string.settings_language),
+                    summary = stringResource(R.string.settings_language_summary),
+                    leadingIcon = Icons.Rounded.Language,
+                    onClick = actions.onOpenLanguage,
                 )
-                SkrootproActionRow(
-                    title = stringResource(R.string.image_tool_title),
-                    summary = stringResource(R.string.image_tool_settings_summary),
-                    leadingIcon = Icons.Rounded.ImageSearch,
-                    onClick = actions.onOpenImageTool,
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_module_check_update),
+                    summary = stringResource(R.string.settings_module_check_update_summary),
+                    checked = uiState.checkModuleUpdate,
+                    onCheckedChange = actions.onSetCheckModuleUpdate,
                 )
-                SkrootproActionRow(
-                    title = stringResource(R.string.settings_ai_chat),
-                    summary = stringResource(R.string.settings_ai_chat_summary),
-                    leadingIcon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenAiChat,
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_version_mismatch_warning),
+                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
+                    checked = uiState.showVersionMismatchWarning,
+                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
+                )
+                SkrootproSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
                 )
                 SkrootproSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
@@ -414,13 +406,6 @@ fun SettingPagerSkrootpro(
                     onCheckedChange = actions.onSetAutoJailbreak,
                     enabled = uiState.isLateLoadMode,
                 )
-            }
-
-            CollapsibleSkrootproSection(
-                title = stringResource(R.string.settings_section_maintenance),
-                expanded = maintenanceExpanded,
-                onExpandedChange = { maintenanceExpanded = it },
-            ) {
                 SkrootproActionRow(
                     title = stringResource(R.string.about),
                     summary = "",

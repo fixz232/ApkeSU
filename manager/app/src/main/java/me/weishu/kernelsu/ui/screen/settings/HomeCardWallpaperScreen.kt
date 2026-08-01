@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.screen.settings
 
 import android.graphics.Bitmap
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -47,6 +49,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
+import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperBackground
 import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperState
@@ -103,7 +107,11 @@ private val homeCardWallpaperSections = listOf(
     HomeCardWallpaperSectionSpec(
         titleRes = R.string.home_card_wallpapers_main_section,
         summaryRes = R.string.home_card_wallpapers_main_section_summary,
-        targets = listOf(HomeMetricCardWallpaperTarget.Lkm),
+        targets = listOf(
+            HomeMetricCardWallpaperTarget.Lkm,
+            HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+            HomeMetricCardWallpaperTarget.MaterialLkm,
+        ),
     ),
     HomeCardWallpaperSectionSpec(
         titleRes = R.string.home_card_wallpapers_metric_section,
@@ -170,6 +178,7 @@ private fun HomeCardWallpaperContent(
 ) {
     var cropTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var previewTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    var showFullPreview by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier,
@@ -180,6 +189,14 @@ private fun HomeCardWallpaperContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { showFullPreview = true },
+        ) {
+            Icon(Icons.Rounded.Visibility, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.home_card_wallpaper_full_preview))
+        }
         homeCardWallpaperSections.forEach { section ->
             HomeCardWallpaperSection(
                 section = section,
@@ -191,6 +208,10 @@ private fun HomeCardWallpaperContent(
         }
         Spacer(modifier = Modifier.size(12.dp))
     }
+    HomeCardWallpaperPagePreviewDialog(
+        show = showFullPreview,
+        onDismissRequest = { showFullPreview = false },
+    )
 }
 
 @Composable
@@ -287,9 +308,12 @@ private fun HomeCardWallpaperItem(
 ) {
     val aspectRatio = homeCardWallpaperAspectRatio(target)
     val title = stringResource(target.titleRes)
+    var editNight by rememberSaveable(target.name) { mutableStateOf(false) }
+    var showAdjustments by rememberSaveable(target.name) { mutableStateOf(false) }
     val state = rememberHomeMetricCardWallpaperState(
         target = target,
         onWallpaperSelected = { onShowCropChange(true) },
+        forceNight = editNight,
     )
     val bitmap = rememberHomeMetricCardWallpaperBitmap(
         uriString = state.uriString,
@@ -298,6 +322,7 @@ private fun HomeCardWallpaperItem(
     val imageBitmap = remember(bitmap) { bitmap?.asImageBitmap() }
     val videoFrameBitmap = rememberCustomVideoFrameBitmap(state.videoUriString)
     val summary = stringResource(homeCardWallpaperSummaryRes(state))
+    val mediaInfo = rememberMediaFileInfo(state.uriString ?: state.videoUriString)
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -330,6 +355,18 @@ private fun HomeCardWallpaperItem(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                IconButton(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    onClick = state.onPickWallpaper,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Wallpaper,
+                        contentDescription = stringResource(target.pickLabelRes),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
                 if (state.hasSelectedAnyWallpaper) {
                     HomeCardWallpaperOverflowMenu(
                         onEditCrop = { onShowCropChange(true) },
@@ -337,6 +374,21 @@ private fun HomeCardWallpaperItem(
                         onClear = state.onClearWallpaper,
                     )
                 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = !editNight,
+                    onClick = { editNight = false },
+                    label = { Text(stringResource(R.string.media_variant_day)) },
+                )
+                FilterChip(
+                    selected = editNight,
+                    onClick = { editNight = true },
+                    label = { Text(stringResource(R.string.media_variant_night)) },
+                )
             }
             if (state.hasSelectedAnyWallpaper) {
                 HomeCardWallpaperFrame(
@@ -346,13 +398,47 @@ private fun HomeCardWallpaperItem(
                     videoFrameBitmap = videoFrameBitmap,
                     hasMedia = true,
                     aspectRatio = aspectRatio,
+                    visualSettings = state.visualSettings,
                 )
+                MediaFileInfoSummary(mediaInfo)
             } else {
                 HomeCardWallpaperEmptyRow(target = target)
             }
             HomeCardWallpaperPrimaryActions(
                 onPickWallpaper = state.onPickWallpaper,
                 onPickVideoWallpaper = state.onPickVideoWallpaper,
+            )
+            if (state.hasSelectedAnyWallpaper) {
+                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { showAdjustments = !showAdjustments },
+                ) {
+                    Text(
+                        stringResource(
+                            if (showAdjustments) R.string.media_editor_hide_adjustments
+                            else R.string.media_editor_show_adjustments
+                        )
+                    )
+                }
+                AnimatedVisibility(visible = showAdjustments) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MediaVisualControls(
+                            value = state.visualSettings,
+                            onValueChange = state.onVisualSettingsChange,
+                            showContrast = true,
+                            showMotion = true,
+                        )
+                        Text(
+                            text = stringResource(R.string.media_editor_responsive_crops),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+            MediaVariantControls(
+                value = state.variantSettings,
+                onValueChange = state.onVariantSettingsChange,
             )
         }
     }
@@ -370,6 +456,11 @@ private fun HomeCardWallpaperItem(
         editorAspectRatio = aspectRatio,
         cropAspectRatio = aspectRatio,
         previewBitmap = if (state.hasSelectedVideoWallpaper) videoFrameBitmap else null,
+        transform = state.visualSettings.transform,
+        onTransformChange = { transform ->
+            state.onVisualSettingsChange(state.visualSettings.copy(transform = transform))
+        },
+        onGenerateResponsiveCrops = state.onResponsiveCropsChange,
     )
     HomeCardWallpaperPreviewDialog(
         show = showPreview && state.hasSelectedAnyWallpaper,
@@ -379,6 +470,7 @@ private fun HomeCardWallpaperItem(
         videoUriString = state.videoUriString,
         crop = state.crop,
         aspectRatio = aspectRatio,
+        visualSettings = state.visualSettings,
         onDismissRequest = { onShowPreviewChange(false) },
     )
 }
@@ -528,6 +620,7 @@ private fun HomeCardWallpaperFrame(
     videoFrameBitmap: ImageBitmap?,
     hasMedia: Boolean,
     aspectRatio: Float,
+    visualSettings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
 ) {
     val frameBitmap = imageBitmap ?: videoFrameBitmap
     Box(
@@ -539,12 +632,18 @@ private fun HomeCardWallpaperFrame(
         contentAlignment = Alignment.Center,
     ) {
         when {
-            frameBitmap != null -> Image(
+            frameBitmap != null -> MediaVisualLayer(
+                settings = visualSettings,
                 modifier = Modifier.fillMaxSize(),
-                bitmap = frameBitmap,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-            )
+            ) { colorFilter ->
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    bitmap = frameBitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = colorFilter,
+                )
+            }
 
             hasMedia -> CircularProgressIndicator()
 
@@ -556,11 +655,6 @@ private fun HomeCardWallpaperFrame(
             )
         }
         if (frameBitmap != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.42f))
-            )
             HomeCardWallpaperSampleContent(
                 target = target,
                 fallbackTitle = title,
@@ -583,7 +677,9 @@ private fun HomeCardWallpaperSampleContent(
         modifier = modifier.padding(14.dp),
     ) {
         when (target) {
-            HomeMetricCardWallpaperTarget.Lkm -> HomeCardWallpaperStatusSample(
+            HomeMetricCardWallpaperTarget.Lkm,
+            HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+            HomeMetricCardWallpaperTarget.MaterialLkm -> HomeCardWallpaperStatusSample(
                 primaryColor = primaryColor,
                 secondaryColor = secondaryColor,
                 accentColor = accentColor,
@@ -943,7 +1039,9 @@ private fun HomeCardWallpaperPreviewTag(
 private fun homeCardWallpaperTargetIcon(
     target: HomeMetricCardWallpaperTarget,
 ): ImageVector = when (target) {
-    HomeMetricCardWallpaperTarget.Lkm -> Icons.Rounded.CheckCircleOutline
+    HomeMetricCardWallpaperTarget.Lkm,
+    HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+    HomeMetricCardWallpaperTarget.MaterialLkm -> Icons.Rounded.CheckCircleOutline
     HomeMetricCardWallpaperTarget.Superuser -> Icons.Rounded.Shield
     HomeMetricCardWallpaperTarget.Module -> Icons.Rounded.Extension
     HomeMetricCardWallpaperTarget.StatusMonitor -> Icons.Rounded.Security
@@ -985,6 +1083,7 @@ private fun HomeCardWallpaperPreviewDialog(
     videoUriString: String?,
     crop: CustomWallpaperCrop,
     aspectRatio: Float,
+    visualSettings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
     onDismissRequest: () -> Unit,
 ) {
     if (!show) return
@@ -1002,6 +1101,7 @@ private fun HomeCardWallpaperPreviewDialog(
                     videoUriString = videoUriString,
                     crop = crop,
                     aspectRatio = aspectRatio,
+                    visualSettings = visualSettings,
                 )
                 MiuixTextButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -1022,6 +1122,7 @@ private fun HomeCardWallpaperLivePreviewFrame(
     videoUriString: String?,
     crop: CustomWallpaperCrop,
     aspectRatio: Float,
+    visualSettings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
 ) {
     Box(
         modifier = Modifier
@@ -1035,6 +1136,7 @@ private fun HomeCardWallpaperLivePreviewFrame(
             bitmap = bitmap,
             videoUriString = videoUriString,
             videoCrop = crop,
+            visualSettings = visualSettings,
         )
         if (bitmap == null && videoUriString.isNullOrBlank()) {
             Text(
@@ -1048,6 +1150,123 @@ private fun HomeCardWallpaperLivePreviewFrame(
                 modifier = Modifier.matchParentSize(),
             )
         }
+    }
+}
+
+@Composable
+private fun HomeCardWallpaperPagePreviewDialog(
+    show: Boolean,
+    onDismissRequest: () -> Unit,
+) {
+    if (!show) return
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.home_card_wallpaper_full_preview),
+        onDismissRequest = onDismissRequest,
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 620.dp)
+                        .verticalScroll(rememberScrollState())
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
+                            RoundedCornerShape(18.dp),
+                        )
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "ApkeSU",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    HomeCardWallpaperMappedPreview(HomeMetricCardWallpaperTarget.Lkm)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        HomeCardWallpaperMappedPreview(
+                            target = HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+                            modifier = Modifier.width(164.dp),
+                        )
+                    }
+                    HomeCardWallpaperMappedPreview(HomeMetricCardWallpaperTarget.MaterialLkm)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        HomeCardWallpaperMappedPreview(
+                            target = HomeMetricCardWallpaperTarget.Superuser,
+                            modifier = Modifier.weight(1f),
+                        )
+                        HomeCardWallpaperMappedPreview(
+                            target = HomeMetricCardWallpaperTarget.Module,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    HomeCardWallpaperMappedPreview(HomeMetricCardWallpaperTarget.StatusMonitor)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        HomeCardWallpaperMappedPreview(
+                            target = HomeMetricCardWallpaperTarget.SystemInfo,
+                            modifier = Modifier.weight(1f),
+                        )
+                        HomeCardWallpaperMappedPreview(
+                            target = HomeMetricCardWallpaperTarget.RebootMenu,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                MiuixTextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(android.R.string.ok),
+                    onClick = onDismissRequest,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun HomeCardWallpaperMappedPreview(
+    target: HomeMetricCardWallpaperTarget,
+    modifier: Modifier = Modifier,
+) {
+    val state = rememberHomeMetricCardWallpaperState(target = target, onWallpaperSelected = {})
+    val bitmap = rememberHomeMetricCardWallpaperBitmap(state.uriString, state.crop)
+    val ratio = homeCardWallpaperAspectRatio(target).coerceIn(0.72f, 3.6f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        HomeMetricCardWallpaperBackground(
+            bitmap = bitmap,
+            videoUriString = state.videoUriString,
+            videoCrop = state.crop,
+            visualSettings = state.visualSettings,
+        )
+        if (!state.hasSelectedAnyWallpaper) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.34f))
+            )
+        }
+        HomeCardWallpaperSampleContent(
+            target = target,
+            fallbackTitle = stringResource(target.titleRes),
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

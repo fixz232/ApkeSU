@@ -12,10 +12,13 @@
     <string name="rain_style_heavy_summary">自動進入深灰暗藍雨夜，風雨更強，濕潤玻璃與落地水波更明顯。</string>
     <string name="rain_style_thunderstorm">雷陣雨</string>
     <string name="rain_style_thunderstorm_summary">僅在夜間每 3 至 8 秒隨機閃電，搭配密集雨幕與暗紫雷雲。</string>
+    <string name="rain_style_after_rain">雨後</string>
+    <string name="rain_style_after_rain_summary">雨勢逐漸減弱，雲層緩慢打開，濕潤玻璃與地面重新映出微光。</string>
     <string name="rain_motto_light">聽雨落在玻璃上</string>
     <string name="rain_motto_medium">雨聲漸密，世界漸靜</string>
     <string name="rain_motto_heavy">穿過風雨，仍然清醒</string>
     <string name="rain_motto_thunderstorm">雷光劃夜，守住內核</string>
+    <string name="rain_motto_after_rain">雨過之後，水面重新有了光</string>
     <string name="theme_preset_rain">雨境</string>
     <string name="theme_preset_rain_summary">冷灰藍雨幕、濕潤卡片邊緣、水簷頂部裝飾與聯動懸浮底欄。</string>
 </resources>

@@ -20,10 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -116,8 +117,11 @@ fun ModulePagerSkrootpro(
     }
 
     val modules = if (uiState.searchStatus.isExpand()) uiState.searchResults else uiState.moduleList
+    val moduleListState = rememberLazyListState()
+    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
     SkrootproScreen(
         title = stringResource(R.string.skrootpro_title),
+        topBarVisible = topBarVisible,
         showAdd = uiState.installButtonVisible,
         onAddClick = {
             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -126,9 +130,9 @@ fun ModulePagerSkrootpro(
             }
             selectZipLauncher.launch(intent)
         },
-        secondaryActionIcon = Icons.Rounded.Backup,
-        onSecondaryActionClick = actions.onOpenWallpaperBackup,
-        secondaryActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
+        secondaryActionIcon = Icons.Rounded.Build,
+        onSecondaryActionClick = actions.onOpenTools,
+        secondaryActionContentDescription = stringResource(R.string.module_tools_title),
         bottomInnerPadding = bottomInnerPadding,
     ) { contentPadding ->
         Column(
@@ -159,6 +163,7 @@ fun ModulePagerSkrootpro(
                 )
             } else {
                 LazyColumn(
+                    state = moduleListState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -177,6 +182,8 @@ fun ModulePagerSkrootpro(
                             onUndoUninstallClick = { actions.onUndoUninstallModule(module) },
                             onToggleClick = { actions.onToggleModule(module) },
                             onWebManageClick = { actions.onOpenWebUi(module) },
+                            onEditWallpaper = { actions.onOpenWallpaperEditor(module) },
+                            wallpaperPaused = moduleListState.isScrollInProgress,
                         )
                     }
                 }
@@ -279,6 +286,8 @@ private fun SkrootproModuleCard(
     onUndoUninstallClick: () -> Unit,
     onToggleClick: () -> Unit,
     onWebManageClick: () -> Unit,
+    onEditWallpaper: () -> Unit,
+    wallpaperPaused: Boolean,
 ) {
     val pending = module.update || module.remove
     var menuExpanded by remember(module.id) { mutableStateOf(false) }
@@ -291,9 +300,10 @@ private fun SkrootproModuleCard(
     )
     val wallpaperEntry = rememberModuleCardWallpaperFrame(
         state = wallpaperState,
-        paused = showWallpaperCrop || showWallpaperPreview,
+        paused = wallpaperPaused || showWallpaperCrop || showWallpaperPreview,
     )
-    val wallpaperBitmap = rememberModuleCardWallpaperBitmap(wallpaperEntry)
+    val wallpaperLoadState = rememberModuleCardWallpaperLoadState(wallpaperEntry)
+    val wallpaperBitmap = wallpaperLoadState.bitmap
 
     Box(
         modifier = Modifier
@@ -304,7 +314,8 @@ private fun SkrootproModuleCard(
     ) {
         ModuleCardWallpaperBackground(
             bitmap = wallpaperBitmap,
-            overlayColor = SkrootproColors.Surface.copy(alpha = 0.70f),
+            entry = wallpaperEntry,
+            contentIsLight = true,
         )
         Box(
             modifier = Modifier.padding(start = 20.dp, top = 9.dp, end = 14.dp, bottom = 9.dp)
@@ -409,7 +420,7 @@ private fun SkrootproModuleCard(
                         text = { SkrootproMenuText(stringResource(R.string.module_wallpaper_pick)) },
                         onClick = {
                             menuExpanded = false
-                            wallpaperState.onPickWallpaper()
+                            onEditWallpaper()
                         },
                     )
                     if (wallpaperState.hasSelectedWallpaper) {
@@ -500,6 +511,7 @@ private fun SkrootproModuleCard(
         moduleName = module.name,
         uriString = wallpaperEntry?.uriString,
         bitmap = wallpaperBitmap,
+        loadFailed = wallpaperLoadState.failed,
         onDismissRequest = { showWallpaperPreview = false },
     )
 }

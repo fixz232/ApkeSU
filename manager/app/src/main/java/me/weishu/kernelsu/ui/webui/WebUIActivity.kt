@@ -45,6 +45,7 @@ import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
+import me.weishu.kernelsu.ui.component.ThemeModeTransitionOverlay
 import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
@@ -60,11 +61,18 @@ import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SEASON_STYLE_KEY
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
+import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
+import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
 import me.weishu.kernelsu.ui.theme.LocalColorMode
 import me.weishu.kernelsu.ui.theme.THEME_SYNC_STRATEGY_KEY
 import me.weishu.kernelsu.ui.theme.ThemeController
 import me.weishu.kernelsu.ui.theme.ThemePreferenceKeys
+import me.weishu.kernelsu.ui.theme.resolveEffectiveDarkMode
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_BOTTOM_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_LEFT_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_CROP_RIGHT_KEY
@@ -80,10 +88,13 @@ import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECON
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
+import me.weishu.kernelsu.ui.util.GLOBAL_BACKGROUND_VISUAL_KEYS
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundDurationSeconds
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
+import me.weishu.kernelsu.ui.util.readMediaVisualSettings
 import me.weishu.kernelsu.ui.util.LocalScrollAnimation
 import me.weishu.kernelsu.ui.util.LocalScrollAnimationEffect
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
@@ -112,8 +123,16 @@ class WebUIActivity : ComponentActivity() {
                 UiMode.fromValue(uiModeValue)
             }
             val localColorMode = appSettings.colorMode.value
-            val darkMode = appSettings.colorMode.isDark ||
-                (appSettings.colorMode.isSystem && isSystemInDarkTheme())
+            val rainStyle = RainStyle.fromValue(visualEffectsState.rainStyle)
+            val pixelStyle = PixelStyle.fromValue(visualEffectsState.pixelStyle)
+            val darkMode = resolveEffectiveDarkMode(
+                colorMode = appSettings.colorMode,
+                systemDark = isSystemInDarkTheme(),
+                interfaceStyle = uiModeValue,
+                rainStyle = rainStyle,
+                pixelStyle = pixelStyle,
+            )
+            val selectedNightEffect = NightBackgroundEffect.fromValue(visualEffectsState.nightBackgroundEffect)
 
             DisposableEffect(prefs) {
                 val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -140,12 +159,14 @@ class WebUIActivity : ComponentActivity() {
                 LocalColorMode provides localColorMode,
                 LocalSwitchStyle provides SwitchStyle.fromValue(visualEffectsState.switchStyle),
                 LocalSeasonStyle provides SeasonStyle.fromValue(visualEffectsState.seasonStyle),
+                LocalRainStyle provides rainStyle,
+                LocalPixelStyle provides pixelStyle,
                 LocalScrollAnimation provides visualEffectsState.globalScrollEnabled,
                 LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(visualEffectsState.globalScrollEffect),
                 LocalNightBackgroundEffectActive provides (
                     darkMode &&
                         !visualEffectsState.nightBackgroundPassthrough &&
-                        NightBackgroundEffect.fromValue(visualEffectsState.nightBackgroundEffect) != NightBackgroundEffect.Off
+                        selectedNightEffect != NightBackgroundEffect.Off
                     ),
             ) {
                 KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
@@ -167,13 +188,14 @@ class WebUIActivity : ComponentActivity() {
                             videoDurationSeconds = wallpaperState.videoDurationSeconds,
                             opacity = wallpaperState.opacity,
                             crop = wallpaperState.crop,
+                            visualSettings = wallpaperState.visualSettings,
                             passthroughEnabled = wallpaperState.passthroughEnabled,
                             passthroughOpacity = wallpaperState.passthroughOpacity,
                         ) {
                             if (!visualEffectsState.nightBackgroundPassthrough) {
                                 NightBackgroundEffectOverlay(
                                     enabled = darkMode,
-                                    effectValue = visualEffectsState.nightBackgroundEffect,
+                                    effectValue = selectedNightEffect.value,
                                     passthrough = false,
                                 )
                             }
@@ -186,7 +208,7 @@ class WebUIActivity : ComponentActivity() {
                         if (visualEffectsState.nightBackgroundPassthrough) {
                             NightBackgroundEffectOverlay(
                                 enabled = darkMode,
-                                effectValue = visualEffectsState.nightBackgroundEffect,
+                                effectValue = selectedNightEffect.value,
                                 passthrough = true,
                                 passthroughOpacity = visualEffectsState.nightBackgroundPassthroughOpacity,
                             )
@@ -196,6 +218,7 @@ class WebUIActivity : ComponentActivity() {
                             effectValue = visualEffectsState.globalSnowEffect,
                         )
                         GlobalScrollEffectOverlay(state = globalScrollEffectState)
+                        ThemeModeTransitionOverlay(darkMode = darkMode)
                     }
                 }
             }
@@ -215,6 +238,7 @@ private data class WebUiWallpaperState(
     val videoDurationSeconds: Int,
     val opacity: Float,
     val crop: CustomWallpaperCrop,
+    val visualSettings: MediaVisualSettings,
     val passthroughEnabled: Boolean,
     val passthroughOpacity: Float,
 )
@@ -222,6 +246,8 @@ private data class WebUiWallpaperState(
 private data class WebUiVisualEffectsState(
     val switchStyle: String,
     val seasonStyle: String,
+    val rainStyle: String,
+    val pixelStyle: String,
     val globalSnowEnabled: Boolean,
     val globalSnowEffect: String,
     val nightBackgroundEffect: String,
@@ -252,6 +278,7 @@ private fun readWebUiWallpaperState(prefs: SharedPreferences): WebUiWallpaperSta
                 bottom = prefs.getFloat(CUSTOM_WALLPAPER_CROP_BOTTOM_KEY, DEFAULT_CUSTOM_WALLPAPER_CROP.bottom),
             )
         ),
+        visualSettings = prefs.readMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS),
         passthroughEnabled = prefs.getBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, false),
         passthroughOpacity = sanitizeCustomWallpaperPassthroughOpacity(
             prefs.getFloat(
@@ -266,6 +293,8 @@ private fun readWebUiVisualEffectsState(prefs: SharedPreferences): WebUiVisualEf
     return WebUiVisualEffectsState(
         switchStyle = prefs.getString(SWITCH_STYLE_KEY, SwitchStyle.DEFAULT_VALUE) ?: SwitchStyle.DEFAULT_VALUE,
         seasonStyle = prefs.getString(SEASON_STYLE_KEY, SeasonStyle.DEFAULT_VALUE) ?: SeasonStyle.DEFAULT_VALUE,
+        rainStyle = prefs.getString(RAIN_STYLE_KEY, RainStyle.DEFAULT_VALUE) ?: RainStyle.DEFAULT_VALUE,
+        pixelStyle = prefs.getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE) ?: PixelStyle.DEFAULT_VALUE,
         globalSnowEnabled = prefs.getBoolean(GLOBAL_SNOW_ENABLED_KEY, false),
         globalSnowEffect = prefs.getString(GLOBAL_SNOW_EFFECT_KEY, GlobalSnowEffect.DEFAULT_VALUE)
             ?: GlobalSnowEffect.DEFAULT_VALUE,
@@ -297,22 +326,25 @@ private val themePreferenceKeys = buildSet {
     }
 }
 
-private val wallpaperPreferenceKeys = setOf(
-    CUSTOM_WALLPAPER_URI_KEY,
-    CUSTOM_WALLPAPER_OPACITY_KEY,
-    CUSTOM_WALLPAPER_CROP_LEFT_KEY,
-    CUSTOM_WALLPAPER_CROP_TOP_KEY,
-    CUSTOM_WALLPAPER_CROP_RIGHT_KEY,
-    CUSTOM_WALLPAPER_CROP_BOTTOM_KEY,
-    CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY,
-    CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY,
-    CUSTOM_VIDEO_BACKGROUND_URI_KEY,
-    CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
-)
+private val wallpaperPreferenceKeys = buildSet {
+    add(CUSTOM_WALLPAPER_URI_KEY)
+    add(CUSTOM_WALLPAPER_OPACITY_KEY)
+    add(CUSTOM_WALLPAPER_CROP_LEFT_KEY)
+    add(CUSTOM_WALLPAPER_CROP_TOP_KEY)
+    add(CUSTOM_WALLPAPER_CROP_RIGHT_KEY)
+    add(CUSTOM_WALLPAPER_CROP_BOTTOM_KEY)
+    add(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY)
+    add(CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY)
+    add(CUSTOM_VIDEO_BACKGROUND_URI_KEY)
+    add(CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY)
+    addAll(GLOBAL_BACKGROUND_VISUAL_KEYS.all)
+}
 
 private val visualEffectsPreferenceKeys = setOf(
     SWITCH_STYLE_KEY,
     SEASON_STYLE_KEY,
+    RAIN_STYLE_KEY,
+    PIXEL_STYLE_KEY,
     GLOBAL_SNOW_ENABLED_KEY,
     GLOBAL_SNOW_EFFECT_KEY,
     NIGHT_BACKGROUND_EFFECT_KEY,

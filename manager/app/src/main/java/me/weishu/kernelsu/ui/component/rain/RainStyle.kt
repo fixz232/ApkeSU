@@ -46,6 +46,13 @@ enum class RainStyle(
         summaryRes = R.string.rain_style_thunderstorm_summary,
         mottoRes = R.string.rain_motto_thunderstorm,
         keyColor = 0xFF666FA8.toInt(),
+    ),
+    AfterRain(
+        value = "after_rain",
+        labelRes = R.string.rain_style_after_rain,
+        summaryRes = R.string.rain_style_after_rain_summary,
+        mottoRes = R.string.rain_motto_after_rain,
+        keyColor = 0xFF719C9B.toInt(),
     );
 
     companion object {
@@ -82,19 +89,56 @@ fun rainPalette(style: RainStyle, dark: Boolean): RainPalette {
     val darkScene = dark || style == RainStyle.HeavyRain || style == RainStyle.Thunderstorm
     if (darkScene) {
         val thunder = style == RainStyle.Thunderstorm
+        val clearing = style == RainStyle.AfterRain
         return RainPalette(
-            backgroundTop = if (thunder) Color(0xFF30384E) else Color(0xFF2C3B4E),
-            backgroundBottom = if (thunder) Color(0xFF151A28) else Color(0xFF19222D),
-            fog = if (thunder) Color(0xFF858AA8) else Color(0xFF789094),
-            cloud = if (thunder) Color(0xFF737A98) else Color(0xFF62747B),
+            backgroundTop = when {
+                thunder -> Color(0xFF30384E)
+                clearing -> Color(0xFF314854)
+                else -> Color(0xFF2C3B4E)
+            },
+            backgroundBottom = when {
+                thunder -> Color(0xFF151A28)
+                clearing -> Color(0xFF1C2C34)
+                else -> Color(0xFF19222D)
+            },
+            fog = when {
+                thunder -> Color(0xFF858AA8)
+                clearing -> Color(0xFF8EA6A7)
+                else -> Color(0xFF789094)
+            },
+            cloud = when {
+                thunder -> Color(0xFF737A98)
+                clearing -> Color(0xFF70898C)
+                else -> Color(0xFF62747B)
+            },
             rain = Color(0xFFD5E9F7),
-            rainAccent = if (thunder) Color(0xFFE2DFFF) else Color(0xFFA4E5DF),
-            ripple = if (thunder) Color(0xFFBDB8F2) else Color(0xFF78BFC1),
-            surfaceTop = if (thunder) Color(0xC52C3045) else Color(0xC326383E),
-            surfaceBottom = if (thunder) Color(0xB31A1D2D) else Color(0xB319282D),
-            outline = if (thunder) Color(0xFF9AA2D0) else Color(0xFF82ABB2),
-            highlight = Color(0xFFF3FAFF),
-            content = Color(0xFFF1F6FA),
+            rainAccent = when {
+                thunder -> Color(0xFFE2DFFF)
+                clearing -> Color(0xFFBDEDE4)
+                else -> Color(0xFFA4E5DF)
+            },
+            ripple = when {
+                thunder -> Color(0xFFBDB8F2)
+                clearing -> Color(0xFF7FC3B7)
+                else -> Color(0xFF78BFC1)
+            },
+            surfaceTop = when {
+                thunder -> Color(0xB82C3045)
+                clearing -> Color(0xAC2A4145)
+                else -> Color(0xB326383E)
+            },
+            surfaceBottom = when {
+                thunder -> Color(0x981A1D2D)
+                clearing -> Color(0x8C1D3033)
+                else -> Color(0x9419282D)
+            },
+            outline = when {
+                thunder -> Color(0xFF9AA2D0)
+                clearing -> Color(0xFF8BB9B3)
+                else -> Color(0xFF82ABB2)
+            },
+            highlight = if (clearing) Color(0xFFF0FAF8) else Color(0xFFF3FAFF),
+            content = Color(0xFFE4EDF2),
             shadow = Color(0xFF080D13),
         )
     }
@@ -108,11 +152,11 @@ fun rainPalette(style: RainStyle, dark: Boolean): RainPalette {
             rain = Color(0xFFF4FBFF),
             rainAccent = Color(0xFFC8F1EE),
             ripple = Color(0xFF6196A2),
-            surfaceTop = Color(0xCFF1F7F7),
-            surfaceBottom = Color(0xB8D8E6E7),
+            surfaceTop = Color(0xA8F1F7F7),
+            surfaceBottom = Color(0x8ED8E6E7),
             outline = Color(0xFF7097A5),
             highlight = Color.White,
-            content = Color(0xFF172F3A),
+            content = Color(0xFF1B3540),
             shadow = Color(0xFF3E5A64),
         )
 
@@ -124,12 +168,28 @@ fun rainPalette(style: RainStyle, dark: Boolean): RainPalette {
             rain = Color(0xFFF0F9FF),
             rainAccent = Color(0xFFB9ECE8),
             ripple = Color(0xFF588F9B),
-            surfaceTop = Color(0xCCE7F0F0),
-            surfaceBottom = Color(0xB8CDDCDD),
+            surfaceTop = Color(0xACE7F0F0),
+            surfaceBottom = Color(0x90CDDCDD),
             outline = Color(0xFF628B99),
             highlight = Color.White,
-            content = Color(0xFF17313B),
+            content = Color(0xFF1A3540),
             shadow = Color(0xFF34535D),
+        )
+
+        RainStyle.AfterRain -> RainPalette(
+            backgroundTop = Color(0xFF7F9FB4),
+            backgroundBottom = Color(0xFFBED0D8),
+            fog = Color(0xFFC8D4D7),
+            cloud = Color(0xFFD9E2E0),
+            rain = Color(0xFFF1FBFF),
+            rainAccent = Color(0xFFC9F1E8),
+            ripple = Color(0xFF699A98),
+            surfaceTop = Color(0xA6F0F7F5),
+            surfaceBottom = Color(0x89D2E4E1),
+            outline = Color(0xFF75989C),
+            highlight = Color(0xFFFBFFFF),
+            content = Color(0xFF1D373E),
+            shadow = Color(0xFF40595B),
         )
 
         RainStyle.HeavyRain,
@@ -156,6 +216,7 @@ internal data class RainSceneSpec(
             RainStyle.MediumRain -> RainSceneSpec(104, 10, 11_000, 12f, 24f, 0.46f, 0.9f, 0.13f, 0.18f, 0.48f)
             RainStyle.HeavyRain -> RainSceneSpec(142, 15, 8_500, 18f, 34f, 0.54f, 1.08f, 0.20f, 0.20f, 0.54f)
             RainStyle.Thunderstorm -> RainSceneSpec(168, 18, 7_200, 20f, 38f, 0.58f, 1.18f, 0.24f, 0.22f, 0.58f)
+            RainStyle.AfterRain -> RainSceneSpec(58, 8, 14_000, 8f, 18f, 0.38f, 0.76f, 0.07f, 0.16f, 0.38f)
         }
     }
 }
@@ -173,3 +234,10 @@ internal fun isRainLightningEnabled(
 internal fun nextLightningDelayMillis(random: Random): Long = random.nextLong(3_000L, 8_001L)
 
 internal fun nextLightningFlashDurationMillis(random: Random): Long = random.nextLong(50L, 101L)
+
+internal fun afterRainRainAlpha(style: RainStyle, progress: Float): Float {
+    if (style != RainStyle.AfterRain) return 1f
+    return (1f - progress.coerceIn(0f, 1f) * 0.82f).coerceAtLeast(0.18f)
+}
+
+internal const val AFTER_RAIN_CLEARING_DURATION_MILLIS = 14_000

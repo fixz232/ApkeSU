@@ -20,21 +20,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storefront
@@ -78,7 +75,6 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
 import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
 import me.weishu.kernelsu.ui.component.alpha.isSnowStyle
-import me.weishu.kernelsu.ui.component.alpha.isStudioStyle
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_WALLPAPER_OPACITY
@@ -106,38 +102,22 @@ fun SettingPagerAlpha(
                 .verticalScroll(rememberScrollState())
                 .padding(
                     start = if (snowStyle) 14.dp else 16.dp,
-                    top = when {
-                        snowStyle -> 12.dp
-                        isStudioStyle() -> 14.dp
-                        else -> 18.dp
-                    },
+                    top = if (snowStyle) 12.dp else 18.dp,
                     end = if (snowStyle) 14.dp else 16.dp,
                     bottom = contentPadding.calculateBottomPadding(),
                 ),
-            verticalArrangement = Arrangement.spacedBy(
-                when {
-                    snowStyle -> 10.dp
-                    isStudioStyle() -> 12.dp
-                    else -> 14.dp
-                }
-            ),
+            verticalArrangement = Arrangement.spacedBy(if (snowStyle) 10.dp else 14.dp),
         ) {
             AlphaSection(
-                title = stringResource(R.string.settings_ui_mode),
-                icon = Icons.Rounded.Apps,
+                title = stringResource(R.string.settings_hub_appearance),
+                icon = Icons.Rounded.Palette,
+                collapsible = true,
             ) {
                 AlphaDeltaModePicker(
                     deltaSelected = uiState.uiMode == InterfaceStyle.Delta.value,
                     onModeSelected = actions.onSetAlphaDeltaMode,
                 )
                 AlphaStylePicker(uiState = uiState, actions = actions)
-            }
-
-            AlphaSection(
-                title = stringResource(R.string.settings_section_appearance),
-                icon = Icons.Rounded.Palette,
-                collapsible = true,
-            ) {
                 val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_day_night_switch),
@@ -153,35 +133,18 @@ fun SettingPagerAlpha(
                     },
                 )
                 AlphaActionRow(
-                    title = stringResource(R.string.settings_section_visual_effects),
-                    summary = stringResource(R.string.settings_visual_effects_summary),
-                    icon = Icons.Rounded.Visibility,
-                    onClick = actions.onOpenVisualEffects,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_ui_decoration_library),
-                    summary = stringResource(R.string.settings_ui_decoration_library_summary),
-                    icon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenUiDecorationLibrary,
-                )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_theme),
-                    summary = stringResource(R.string.settings_theme_summary),
-                    icon = Icons.Rounded.Palette,
-                    onClick = actions.onOpenTheme,
-                )
-                AlphaActionRow(
                     title = stringResource(R.string.theme_store),
                     summary = stringResource(R.string.theme_store_settings_summary),
                     icon = Icons.Rounded.Storefront,
                     onClick = actions.onOpenThemeStore,
                 )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_language),
-                    summary = stringResource(R.string.settings_language_summary),
-                    icon = Icons.Rounded.Language,
-                    onClick = actions.onOpenLanguage,
-                )
+            }
+
+            AlphaSection(
+                title = stringResource(R.string.settings_hub_home_manager),
+                icon = Icons.Rounded.Apps,
+                collapsible = true,
+            ) {
                 AlphaActionRow(
                     title = stringResource(R.string.settings_manager_identity),
                     summary = stringResource(R.string.settings_manager_identity_summary),
@@ -219,41 +182,8 @@ fun SettingPagerAlpha(
             }
 
             AlphaSection(
-                title = stringResource(R.string.settings_section_updates),
-                icon = Icons.Rounded.ElectricalServices,
-                collapsible = true,
-            ) {
-                AlphaSwitchRow(
-                    title = stringResource(R.string.settings_module_check_update),
-                    summary = stringResource(R.string.settings_module_check_update_summary),
-                    checked = uiState.checkModuleUpdate,
-                    onCheckedChange = actions.onSetCheckModuleUpdate,
-                )
-                AlphaSwitchRow(
-                    title = stringResource(R.string.settings_version_mismatch_warning),
-                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
-                    checked = uiState.showVersionMismatchWarning,
-                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
-                )
-                AlphaSwitchRow(
-                    title = stringResource(R.string.settings_gki_warning),
-                    summary = stringResource(R.string.settings_gki_warning_summary),
-                    checked = uiState.showGkiWarning,
-                    onCheckedChange = actions.onSetShowGkiWarning,
-                )
-            }
-
-            AlphaSection(
-                title = stringResource(R.string.settings_section_root_features),
+                title = stringResource(R.string.settings_hub_root_permissions),
                 icon = Icons.Rounded.Security,
-                collapsible = true,
-            ) {
-                AlphaFeatureRows(uiState = uiState, actions = actions)
-            }
-
-            AlphaSection(
-                title = stringResource(R.string.settings_section_advanced),
-                icon = Icons.Rounded.DeveloperMode,
                 collapsible = true,
             ) {
                 AlphaActionRow(
@@ -261,6 +191,14 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.settings_profile_template_summary),
                     onClick = actions.onOpenProfileTemplate,
                 )
+                AlphaFeatureRows(uiState = uiState, actions = actions)
+            }
+
+            AlphaSection(
+                title = stringResource(R.string.settings_hub_mount_hide),
+                icon = Icons.Rounded.RemoveModerator,
+                collapsible = true,
+            ) {
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_umount_modules_default),
                     summary = stringResource(R.string.settings_umount_modules_default_summary),
@@ -278,7 +216,7 @@ fun SettingPagerAlpha(
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_kpatch_next),
                     summary = kPatchNextSummary(uiState),
-                    checked = uiState.isKPatchNextEnabled,
+                    checked = uiState.isKPatchNextSwitchChecked,
                     enabled = uiState.canToggleKPatchNext,
                     onCheckedChange = actions.onSetKPatchNextEnabled,
                 )
@@ -306,6 +244,31 @@ fun SettingPagerAlpha(
                     enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_epkesu_hide),
+                    summary = stringResource(R.string.settings_epkesu_hide_summary),
+                    checked = uiState.isEpkesuHideEnabled,
+                    onCheckedChange = actions.onSetEpkesuHideEnabled,
+                )
+            }
+
+            AlphaSection(
+                title = stringResource(R.string.settings_hub_toolbox),
+                icon = Icons.Rounded.DeveloperMode,
+                collapsible = true,
+            ) {
+                AlphaActionRow(
+                    title = stringResource(R.string.rescue_protection),
+                    summary = stringResource(R.string.rescue_protection_summary),
+                    icon = Icons.Rounded.Security,
+                    onClick = actions.onOpenRescueProtection,
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.image_tool_title),
+                    summary = stringResource(R.string.image_tool_settings_summary),
+                    icon = Icons.Rounded.ImageSearch,
+                    onClick = actions.onOpenImageTool,
+                )
                 AlphaActionRow(
                     title = stringResource(R.string.settings_cpu_spoof),
                     summary = stringResource(R.string.settings_cpu_spoof_summary),
@@ -317,6 +280,12 @@ fun SettingPagerAlpha(
                     summary = stringResource(R.string.settings_device_identity_summary),
                     icon = Icons.Rounded.Badge,
                     onClick = actions.onOpenDeviceIdentity,
+                )
+                AlphaActionRow(
+                    title = stringResource(R.string.settings_ai_chat),
+                    summary = stringResource(R.string.settings_ai_chat_summary),
+                    icon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenAiChat,
                 )
                 AlphaSwitchRow(
                     title = stringResource(R.string.settings_graphics_renderer_tool),
@@ -332,23 +301,36 @@ fun SettingPagerAlpha(
                         onClick = actions.onOpenGraphicsRenderer,
                     )
                 }
+            }
+
+            AlphaSection(
+                title = stringResource(R.string.settings_hub_app_maintenance),
+                icon = Icons.Rounded.Info,
+                collapsible = true,
+            ) {
                 AlphaActionRow(
-                    title = stringResource(R.string.rescue_protection),
-                    summary = stringResource(R.string.rescue_protection_summary),
-                    icon = Icons.Rounded.Security,
-                    onClick = actions.onOpenRescueProtection,
+                    title = stringResource(R.string.settings_language),
+                    summary = stringResource(R.string.settings_language_summary),
+                    icon = Icons.Rounded.Language,
+                    onClick = actions.onOpenLanguage,
                 )
-                AlphaActionRow(
-                    title = stringResource(R.string.image_tool_title),
-                    summary = stringResource(R.string.image_tool_settings_summary),
-                    icon = Icons.Rounded.ImageSearch,
-                    onClick = actions.onOpenImageTool,
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_module_check_update),
+                    summary = stringResource(R.string.settings_module_check_update_summary),
+                    checked = uiState.checkModuleUpdate,
+                    onCheckedChange = actions.onSetCheckModuleUpdate,
                 )
-                AlphaActionRow(
-                    title = stringResource(R.string.settings_ai_chat),
-                    summary = stringResource(R.string.settings_ai_chat_summary),
-                    icon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenAiChat,
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_version_mismatch_warning),
+                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
+                    checked = uiState.showVersionMismatchWarning,
+                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
+                )
+                AlphaSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
                 )
                 AlphaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
@@ -363,13 +345,6 @@ fun SettingPagerAlpha(
                     enabled = uiState.isLateLoadMode,
                     onCheckedChange = actions.onSetAutoJailbreak,
                 )
-            }
-
-            AlphaSection(
-                title = stringResource(R.string.settings_section_maintenance),
-                icon = Icons.Rounded.Info,
-                collapsible = true,
-            ) {
                 AlphaActionRow(
                     title = stringResource(R.string.about),
                     summary = "",
@@ -378,19 +353,6 @@ fun SettingPagerAlpha(
             }
         }
     }
-}
-
-@Composable
-fun SettingPagerStudio(
-    uiState: SettingsUiState,
-    actions: SettingsScreenActions,
-    bottomInnerPadding: Dp,
-) {
-    SettingPagerAlpha(
-        uiState = uiState,
-        actions = actions,
-        bottomInnerPadding = bottomInnerPadding,
-    )
 }
 
 @Composable
@@ -472,12 +434,6 @@ private fun AlphaFeatureRows(
         checked = uiState.isAvcSpoofEnabled,
         enabled = uiState.avcSpoofStatus == "supported",
         onCheckedChange = actions.onSetAvcSpoofEnabled,
-    )
-    AlphaSwitchRow(
-        title = stringResource(R.string.settings_epkesu_hide),
-        summary = stringResource(R.string.settings_epkesu_hide_summary),
-        checked = uiState.isEpkesuHideEnabled,
-        onCheckedChange = actions.onSetEpkesuHideEnabled,
     )
 }
 
@@ -580,8 +536,7 @@ private fun AlphaSection(
         return
     }
 
-    val studio = isStudioStyle()
-    Column(verticalArrangement = Arrangement.spacedBy(if (studio) 7.dp else 6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -592,9 +547,9 @@ private fun AlphaSection(
         ) {
             Text(
                 text = title,
-                color = if (studio) AlphaColors.Accent else AlphaColors.Text,
-                fontSize = alphaSp(if (studio) 13.5f else 20f, maxScale = 1.04f),
-                lineHeight = alphaSp(if (studio) 17f else 24f, maxScale = 1.04f),
+                color = AlphaColors.Text,
+                fontSize = alphaSp(20f, maxScale = 1.04f),
+                lineHeight = alphaSp(24f, maxScale = 1.04f),
                 fontWeight = alphaStrongWeight(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -990,7 +945,7 @@ private fun AlphaActionRow(
                 )
             }
         }
-        if (isStudioStyle() || snow) {
+        if (snow) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                 contentDescription = null,

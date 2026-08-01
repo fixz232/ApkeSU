@@ -78,6 +78,10 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.AppIdFailure
 import me.weishu.kernelsu.ui.util.AppIdSnapshot
 import me.weishu.kernelsu.ui.util.SsaidXmlEditor
@@ -121,7 +125,7 @@ fun AppIdManagerScreen() {
 
     Scaffold(
         modifier = Modifier.imePadding(),
-        containerColor = Color.Transparent,
+        containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             TopAppBar(
@@ -146,8 +150,10 @@ fun AppIdManagerScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
+                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surfaceContainer,
+                    ),
                 ),
             )
         },
@@ -461,7 +467,7 @@ private fun AppIdEditor(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -704,7 +710,7 @@ private fun AppIdAppRow(
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+            immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow)
         },
     ) {
         Column(
@@ -945,7 +951,7 @@ private fun AppIdFailureText(failure: AppIdFailure, color: Color) {
 private fun AppIdEmptyCard() {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Row(
             modifier = Modifier

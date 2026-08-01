@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.component.decoration
 import androidx.compose.runtime.Immutable
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 const val UI_DECORATION_CONFIG_KEY = "ui_decoration_config"
 const val UI_DECORATION_CUSTOM_PRESETS_KEY = "ui_decoration_custom_presets"
@@ -229,6 +230,39 @@ data class UiDecorationConfig(
             }.getOrElse { UiDecorationConfig() }
         }
     }
+}
+
+@Immutable
+internal data class UiDecorationRenderTuning(
+    val opacity: Float,
+    val intensity: Float,
+) {
+    val alpha: Float
+        get() = opacity * intensity
+
+    val visible: Boolean
+        get() = alpha > 0f
+
+    fun detailCount(total: Int, minimumVisible: Int = 1): Int {
+        if (total <= 0 || intensity <= 0f) return 0
+        val minimum = minimumVisible.coerceIn(0, total)
+        return (minimum + (total - minimum) * intensity)
+            .roundToInt()
+            .coerceIn(minimum, total)
+    }
+
+    fun detailScale(minimum: Float = 0.65f, maximum: Float = 1f): Float {
+        if (!minimum.isFinite() || !maximum.isFinite() || maximum < minimum) return 1f
+        return minimum + (maximum - minimum) * intensity
+    }
+}
+
+internal fun UiDecorationConfig.renderTuning(): UiDecorationRenderTuning {
+    val normalized = normalized()
+    return UiDecorationRenderTuning(
+        opacity = normalized.opacity,
+        intensity = normalized.intensity,
+    )
 }
 
 @Immutable

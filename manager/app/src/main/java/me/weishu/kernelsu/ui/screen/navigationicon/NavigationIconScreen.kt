@@ -102,6 +102,7 @@ fun NavigationIconScreen() {
     val pickTarget = rememberSaveable { mutableStateOf<String?>(null) }
     val cropTarget = rememberSaveable { mutableStateOf<String?>(null) }
     val previewTarget = rememberSaveable { mutableStateOf<String?>(null) }
+    val adjustTarget = rememberSaveable { mutableStateOf<String?>(null) }
     val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -131,6 +132,9 @@ fun NavigationIconScreen() {
         },
         onPreview = { slot ->
             previewTarget.value = slot.id
+        },
+        onAdjust = { slot ->
+            adjustTarget.value = slot.id
         },
         onClear = { slot ->
             viewModel.clearCustomNavigationIcon(slot)
@@ -178,10 +182,21 @@ fun NavigationIconScreen() {
         SettingsNavigationIconPreviewDialog(
             show = uiState.customNavigationIcons[previewSlot].hasSelected,
             slot = previewSlot,
-            state = uiState.customNavigationIcons[previewSlot],
+            icons = uiState.customNavigationIcons,
             onDismissRequest = {
                 previewTarget.value = null
             },
+        )
+    }
+
+    val adjustSlot = adjustTarget.value?.let(::navigationIconSlotFromId)
+    if (adjustSlot != null) {
+        NavigationIconAdjustmentDialog(
+            show = true,
+            slot = adjustSlot,
+            state = uiState.customNavigationIcons[adjustSlot],
+            onValueChange = { viewModel.setCustomNavigationIconPresentation(adjustSlot, it) },
+            onDismissRequest = { adjustTarget.value = null },
         )
     }
 }
@@ -331,13 +346,22 @@ private fun NavigationIconMiuixPreference(
             }
         },
         onClick = { actions.onPick(slot) },
-        holdDownState = state.hasSelected,
+        holdDownState = state.hasSelected || state.labelOverride != null,
         bottomAction = {
-            if (state.hasSelected) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                MiuixTextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(R.string.settings_navigation_icon_adjust_action),
+                    onClick = { actions.onAdjust(slot) },
+                )
+                if (state.hasSelected) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     MiuixTextButton(
@@ -355,6 +379,7 @@ private fun NavigationIconMiuixPreference(
                         text = stringResource(R.string.settings_navigation_icon_clear_action),
                         onClick = { actions.onClear(slot) },
                     )
+                }
                 }
             }
         },
@@ -410,5 +435,6 @@ private data class NavigationIconActions(
     val onPick: (CustomNavigationIconSlot) -> Unit,
     val onCrop: (CustomNavigationIconSlot) -> Unit,
     val onPreview: (CustomNavigationIconSlot) -> Unit,
+    val onAdjust: (CustomNavigationIconSlot) -> Unit,
     val onClear: (CustomNavigationIconSlot) -> Unit,
 )

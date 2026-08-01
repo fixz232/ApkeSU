@@ -18,21 +18,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
@@ -111,18 +108,15 @@ fun SettingPagerDelta(
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            DeltaSettingsSection(title = stringResource(R.string.settings_ui_mode)) {
+            DeltaSettingsSection(
+                title = stringResource(R.string.settings_hub_appearance),
+                collapsible = true,
+            ) {
                 DeltaAlphaModePicker(
                     deltaSelected = uiState.uiMode == InterfaceStyle.Delta.value,
                     onModeSelected = actions.onSetAlphaDeltaMode,
                 )
                 DeltaStylePicker(uiState = uiState, actions = actions)
-            }
-
-            DeltaSettingsSection(
-                title = stringResource(R.string.settings_section_appearance),
-                collapsible = true,
-            ) {
                 val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
                 DeltaSwitchRow(
                     title = stringResource(R.string.settings_day_night_switch),
@@ -137,27 +131,9 @@ fun SettingPagerDelta(
                         )
                     },
                 )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_section_visual_effects),
-                    summary = stringResource(R.string.settings_visual_effects_summary),
-                    icon = Icons.Rounded.Visibility,
-                    onClick = actions.onOpenVisualEffects,
-                )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_ui_decoration_library),
-                    summary = stringResource(R.string.settings_ui_decoration_library_summary),
-                    icon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenUiDecorationLibrary,
-                )
                 DeltaColorVariantPicker(
                     selectedVariant = uiState.deltaColorVariant,
                     onVariantSelected = actions.onSetDeltaColorVariant,
-                )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_theme),
-                    summary = stringResource(R.string.settings_theme_summary),
-                    icon = Icons.Rounded.Palette,
-                    onClick = actions.onOpenTheme,
                 )
                 DeltaActionRow(
                     title = stringResource(R.string.theme_store),
@@ -165,12 +141,12 @@ fun SettingPagerDelta(
                     icon = Icons.Rounded.Storefront,
                     onClick = actions.onOpenThemeStore,
                 )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_language),
-                    summary = stringResource(R.string.settings_language_summary),
-                    icon = Icons.Rounded.Language,
-                    onClick = actions.onOpenLanguage,
-                )
+            }
+
+            DeltaSettingsSection(
+                title = stringResource(R.string.settings_hub_home_manager),
+                collapsible = true,
+            ) {
                 DeltaActionRow(
                     title = stringResource(R.string.settings_manager_identity),
                     summary = stringResource(R.string.settings_manager_identity_summary),
@@ -208,38 +184,7 @@ fun SettingPagerDelta(
             }
 
             DeltaSettingsSection(
-                title = stringResource(R.string.settings_section_updates),
-                collapsible = true,
-            ) {
-                DeltaSwitchRow(
-                    title = stringResource(R.string.settings_module_check_update),
-                    summary = stringResource(R.string.settings_module_check_update_summary),
-                    checked = uiState.checkModuleUpdate,
-                    onCheckedChange = actions.onSetCheckModuleUpdate,
-                )
-                DeltaSwitchRow(
-                    title = stringResource(R.string.settings_version_mismatch_warning),
-                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
-                    checked = uiState.showVersionMismatchWarning,
-                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
-                )
-                DeltaSwitchRow(
-                    title = stringResource(R.string.settings_gki_warning),
-                    summary = stringResource(R.string.settings_gki_warning_summary),
-                    checked = uiState.showGkiWarning,
-                    onCheckedChange = actions.onSetShowGkiWarning,
-                )
-            }
-
-            DeltaSettingsSection(
-                title = stringResource(R.string.settings_section_root_features),
-                collapsible = true,
-            ) {
-                DeltaFeatureRows(uiState = uiState, actions = actions)
-            }
-
-            DeltaSettingsSection(
-                title = stringResource(R.string.settings_section_advanced),
+                title = stringResource(R.string.settings_hub_root_permissions),
                 collapsible = true,
             ) {
                 DeltaActionRow(
@@ -247,6 +192,13 @@ fun SettingPagerDelta(
                     summary = stringResource(R.string.settings_profile_template_summary),
                     onClick = actions.onOpenProfileTemplate,
                 )
+                DeltaFeatureRows(uiState = uiState, actions = actions)
+            }
+
+            DeltaSettingsSection(
+                title = stringResource(R.string.settings_hub_mount_hide),
+                collapsible = true,
+            ) {
                 DeltaSwitchRow(
                     title = stringResource(R.string.settings_umount_modules_default),
                     summary = stringResource(R.string.settings_umount_modules_default_summary),
@@ -264,7 +216,7 @@ fun SettingPagerDelta(
                 DeltaSwitchRow(
                     title = stringResource(R.string.settings_kpatch_next),
                     summary = kPatchNextSummary(uiState),
-                    checked = uiState.isKPatchNextEnabled,
+                    checked = uiState.isKPatchNextSwitchChecked,
                     enabled = uiState.canToggleKPatchNext,
                     onCheckedChange = actions.onSetKPatchNextEnabled,
                 )
@@ -292,6 +244,30 @@ fun SettingPagerDelta(
                     enabled = uiState.canOpenPathConfig,
                     onClick = actions.onOpenHiddenPathConfig,
                 )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_epkesu_hide),
+                    summary = stringResource(R.string.settings_epkesu_hide_summary),
+                    checked = uiState.isEpkesuHideEnabled,
+                    onCheckedChange = actions.onSetEpkesuHideEnabled,
+                )
+            }
+
+            DeltaSettingsSection(
+                title = stringResource(R.string.settings_hub_toolbox),
+                collapsible = true,
+            ) {
+                DeltaActionRow(
+                    title = stringResource(R.string.rescue_protection),
+                    summary = stringResource(R.string.rescue_protection_summary),
+                    icon = Icons.Rounded.Security,
+                    onClick = actions.onOpenRescueProtection,
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.image_tool_title),
+                    summary = stringResource(R.string.image_tool_settings_summary),
+                    icon = Icons.Rounded.ImageSearch,
+                    onClick = actions.onOpenImageTool,
+                )
                 DeltaActionRow(
                     title = stringResource(R.string.settings_cpu_spoof),
                     summary = stringResource(R.string.settings_cpu_spoof_summary),
@@ -303,6 +279,12 @@ fun SettingPagerDelta(
                     summary = stringResource(R.string.settings_device_identity_summary),
                     icon = Icons.Rounded.Badge,
                     onClick = actions.onOpenDeviceIdentity,
+                )
+                DeltaActionRow(
+                    title = stringResource(R.string.settings_ai_chat),
+                    summary = stringResource(R.string.settings_ai_chat_summary),
+                    icon = Icons.Rounded.AutoFixHigh,
+                    onClick = actions.onOpenAiChat,
                 )
                 DeltaSwitchRow(
                     title = stringResource(R.string.settings_graphics_renderer_tool),
@@ -318,23 +300,35 @@ fun SettingPagerDelta(
                         onClick = actions.onOpenGraphicsRenderer,
                     )
                 }
+            }
+
+            DeltaSettingsSection(
+                title = stringResource(R.string.settings_hub_app_maintenance),
+                collapsible = true,
+            ) {
                 DeltaActionRow(
-                    title = stringResource(R.string.rescue_protection),
-                    summary = stringResource(R.string.rescue_protection_summary),
-                    icon = Icons.Rounded.Security,
-                    onClick = actions.onOpenRescueProtection,
+                    title = stringResource(R.string.settings_language),
+                    summary = stringResource(R.string.settings_language_summary),
+                    icon = Icons.Rounded.Language,
+                    onClick = actions.onOpenLanguage,
                 )
-                DeltaActionRow(
-                    title = stringResource(R.string.image_tool_title),
-                    summary = stringResource(R.string.image_tool_settings_summary),
-                    icon = Icons.Rounded.ImageSearch,
-                    onClick = actions.onOpenImageTool,
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_module_check_update),
+                    summary = stringResource(R.string.settings_module_check_update_summary),
+                    checked = uiState.checkModuleUpdate,
+                    onCheckedChange = actions.onSetCheckModuleUpdate,
                 )
-                DeltaActionRow(
-                    title = stringResource(R.string.settings_ai_chat),
-                    summary = stringResource(R.string.settings_ai_chat_summary),
-                    icon = Icons.Rounded.AutoFixHigh,
-                    onClick = actions.onOpenAiChat,
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_version_mismatch_warning),
+                    summary = stringResource(R.string.settings_version_mismatch_warning_summary),
+                    checked = uiState.showVersionMismatchWarning,
+                    onCheckedChange = actions.onSetShowVersionMismatchWarning,
+                )
+                DeltaSwitchRow(
+                    title = stringResource(R.string.settings_gki_warning),
+                    summary = stringResource(R.string.settings_gki_warning_summary),
+                    checked = uiState.showGkiWarning,
+                    onCheckedChange = actions.onSetShowGkiWarning,
                 )
                 DeltaSwitchRow(
                     title = stringResource(R.string.enable_web_debugging),
@@ -349,12 +343,6 @@ fun SettingPagerDelta(
                     enabled = uiState.isLateLoadMode,
                     onCheckedChange = actions.onSetAutoJailbreak,
                 )
-            }
-
-            DeltaSettingsSection(
-                title = stringResource(R.string.settings_section_maintenance),
-                collapsible = true,
-            ) {
                 DeltaActionRow(
                     title = stringResource(R.string.about),
                     summary = "",
@@ -727,12 +715,6 @@ private fun DeltaFeatureRows(
         checked = uiState.isAvcSpoofEnabled,
         enabled = uiState.avcSpoofStatus == "supported",
         onCheckedChange = actions.onSetAvcSpoofEnabled,
-    )
-    DeltaSwitchRow(
-        title = stringResource(R.string.settings_epkesu_hide),
-        summary = stringResource(R.string.settings_epkesu_hide_summary),
-        checked = uiState.isEpkesuHideEnabled,
-        onCheckedChange = actions.onSetEpkesuHideEnabled,
     )
 }
 

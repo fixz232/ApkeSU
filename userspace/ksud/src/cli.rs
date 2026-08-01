@@ -526,7 +526,7 @@ enum KpatchNext {
     /// Install or enable built-in KPatch Next
     Enable,
 
-    /// Disable built-in KPatch Next
+    /// Uninstall built-in KPatch Next on the next boot
     Disable,
 }
 
@@ -965,10 +965,7 @@ pub fn run() -> Result<()> {
                 Rescue::Disable => rescue::disable(),
                 Rescue::Restore => rescue::restore_now(),
                 Rescue::RestoreKeepData => rescue::restore_keep_data_now(),
-                Rescue::MarkPending { reason } => {
-                    rescue::mark_next_boot_pending(&reason);
-                    Ok(())
-                }
+                Rescue::MarkPending { reason } => rescue::mark_next_boot_pending(&reason),
                 Rescue::RecoveryCheck => {
                     rescue::check_on_recovery_boot();
                     Ok(())

@@ -6,6 +6,20 @@ object ThemeAppearanceDefaults {
     const val PAGE_SCALE = 1.0f
     const val FONT_SCALE = 1.0f
     const val BLUR_INTENSITY = 1.0f
+    const val MONET_SURFACE_OPACITY = 1.0f
+    const val MIN_MONET_SURFACE_OPACITY = 0.45f
+    const val MAX_MONET_SURFACE_OPACITY = 1.0f
+}
+
+fun sanitizeMonetSurfaceOpacity(value: Float): Float {
+    return if (value.isFinite()) {
+        value.coerceIn(
+            ThemeAppearanceDefaults.MIN_MONET_SURFACE_OPACITY,
+            ThemeAppearanceDefaults.MAX_MONET_SURFACE_OPACITY,
+        )
+    } else {
+        ThemeAppearanceDefaults.MONET_SURFACE_OPACITY
+    }
 }
 
 data class ThemeAppearanceSnapshot(
@@ -14,6 +28,7 @@ data class ThemeAppearanceSnapshot(
     val keyColor: Int,
     val colorStyle: String,
     val colorSpec: String,
+    val monetSurfaceOpacity: Float,
     val enableBlur: Boolean,
     val enableFloatingBottomBar: Boolean,
     val enableFloatingBottomBarBlur: Boolean,
@@ -49,6 +64,7 @@ val ThemePreferenceKeys = listOf(
     "key_color",
     "color_style",
     "color_spec",
+    "monet_surface_opacity",
     "theme_preset",
     "enable_blur",
     "enable_floating_bottom_bar",
@@ -72,13 +88,13 @@ fun themePreferenceKey(
 
 fun defaultThemePresetForUiMode(uiMode: String): ThemePreset {
     return when (uiMode) {
-        InterfaceStyle.Studio.value -> ThemePreset.STUDIO
         InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
         InterfaceStyle.Alpha.value -> ThemePreset.ALPHA
         InterfaceStyle.Delta.value -> ThemePreset.DELTA
         InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
         InterfaceStyle.Snow.value -> ThemePreset.SNOW
         InterfaceStyle.Rain.value -> ThemePreset.RAIN
+        InterfaceStyle.Ink.value -> ThemePreset.INK
         InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
         else -> ThemePreset.CLEAN_TOOL
     }

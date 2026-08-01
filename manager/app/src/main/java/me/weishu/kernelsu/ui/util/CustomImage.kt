@@ -6,8 +6,10 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import androidx.compose.runtime.Immutable
+import androidx.core.net.toUri
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -56,19 +58,23 @@ data class CustomWallpaperCrop(
 }
 
 fun sanitizeCustomWallpaperOpacity(value: Float): Float {
-    return value.coerceIn(MIN_CUSTOM_WALLPAPER_OPACITY, MAX_CUSTOM_WALLPAPER_OPACITY)
+    return value.takeIf(Float::isFinite)
+        ?.coerceIn(MIN_CUSTOM_WALLPAPER_OPACITY, MAX_CUSTOM_WALLPAPER_OPACITY)
+        ?: DEFAULT_CUSTOM_WALLPAPER_OPACITY
 }
 
 fun sanitizeCustomWallpaperPassthroughOpacity(value: Float): Float {
-    return value.coerceIn(MIN_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY, MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY)
+    return value.takeIf(Float::isFinite)
+        ?.coerceIn(MIN_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY, MAX_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY)
+        ?: DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 }
 
 fun sanitizeCustomWallpaperCrop(crop: CustomWallpaperCrop): CustomWallpaperCrop {
     val minSize = 0.12f
-    val left = crop.left.coerceIn(0f, 1f - minSize)
-    val top = crop.top.coerceIn(0f, 1f - minSize)
-    val right = crop.right.coerceIn(left + minSize, 1f)
-    val bottom = crop.bottom.coerceIn(top + minSize, 1f)
+    val left = crop.left.takeIf(Float::isFinite)?.coerceIn(0f, 1f - minSize) ?: 0f
+    val top = crop.top.takeIf(Float::isFinite)?.coerceIn(0f, 1f - minSize) ?: 0f
+    val right = crop.right.takeIf(Float::isFinite)?.coerceIn(left + minSize, 1f) ?: 1f
+    val bottom = crop.bottom.takeIf(Float::isFinite)?.coerceIn(top + minSize, 1f) ?: 1f
     return CustomWallpaperCrop(left, top, right, bottom)
 }
 
@@ -85,7 +91,7 @@ fun releasePersistableImageReadPermission(context: Context, uriString: String?) 
     if (uriString.isNullOrBlank()) return
     runCatching {
         context.contentResolver.releasePersistableUriPermission(
-            Uri.parse(uriString),
+            uriString.toUri(),
             Intent.FLAG_GRANT_READ_URI_PERMISSION
         )
     }
@@ -95,24 +101,43 @@ fun persistCustomImageReference(
     context: Context,
     sourceUri: Uri,
     storageKey: String,
+    maxBytes: Long = Long.MAX_VALUE,
 ): String? {
     return runCatching {
+        require(maxBytes > 0L) { "maxBytes must be positive" }
         val appContext = context.applicationContext
         val targetFile = customImageFile(appContext, storageKey)
         val parentDir = targetFile.parentFile ?: return@runCatching null
         val tempFile = File(parentDir, "${targetFile.name}.tmp")
         parentDir.mkdirs()
-        appContext.contentResolver.openInputStream(sourceUri)?.use { input ->
-            FileOutputStream(tempFile).use { output ->
-                input.copyTo(output)
-            }
-        } ?: return@runCatching null
+        try {
+            appContext.contentResolver.openInputStream(sourceUri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var totalBytes = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        totalBytes += count
+                        if (totalBytes > maxBytes) {
+                            throw IOException("The selected image is too large")
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    if (totalBytes == 0L) throw IOException("The selected image is empty")
+                    output.fd.sync()
+                }
+            } ?: return@runCatching null
 
-        if (!tempFile.renameTo(targetFile)) {
-            tempFile.copyTo(targetFile, overwrite = true)
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+            Uri.fromFile(targetFile).toString()
+        } finally {
             tempFile.delete()
         }
-        Uri.fromFile(targetFile).toString()
     }.getOrNull()
 }
 
@@ -128,7 +153,7 @@ fun loadCustomImageBitmap(
     crop: CustomWallpaperCrop? = null,
 ): Bitmap? {
     return runCatching {
-        val uri = Uri.parse(uriString)
+        val uri = uriString.toUri()
         val source = if (uri.scheme == "file") {
             ImageDecoder.createSource(File(uri.path ?: return@runCatching null))
         } else {
@@ -147,7 +172,7 @@ fun loadCustomImageBitmap(
 private fun deletePersistedCustomImageReference(context: Context, uriString: String?) {
     if (uriString.isNullOrBlank()) return
     runCatching {
-        val uri = Uri.parse(uriString)
+        val uri = uriString.toUri()
         if (uri.scheme != "file") return@runCatching
         val path = uri.path ?: return@runCatching
         val file = File(path).canonicalFile

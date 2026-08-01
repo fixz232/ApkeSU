@@ -13,9 +13,11 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -57,7 +59,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.runtime.Composable
@@ -162,7 +164,6 @@ import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
-import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.icon.extended.MoreCircle
 import top.yukonga.miuix.kmp.icon.extended.Undo
 import top.yukonga.miuix.kmp.icon.extended.UploadCloud
@@ -302,24 +303,29 @@ fun ModulePagerMiuix(
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else colorScheme.surface
     val topBarColors = skrootproTopBarColors(barColor, colorScheme.onSurface)
+    val topBarVisible = rememberModuleTopBarVisible(listState.isScrollInProgress)
 
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            BlurredBar(backdrop) {
-                searchStatus.TopAppBarAnim(backgroundColor = topBarColors.container) {
-                    TopAppBar(
+            AnimatedVisibility(
+                visible = topBarVisible,
+                enter = expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = tween(180),
+                ) + fadeIn(animationSpec = tween(150)),
+                exit = shrinkVertically(
+                    shrinkTowards = Alignment.Top,
+                    animationSpec = tween(160),
+                ) + fadeOut(animationSpec = tween(120)),
+            ) {
+                BlurredBar(backdrop) {
+                    searchStatus.TopAppBarAnim(backgroundColor = topBarColors.container) {
+                        TopAppBar(
                         color = topBarColors.container,
                         titleColor = topBarColors.content,
                         title = stringResource(R.string.module),
                         actions = {
-                            IconButton(onClick = actions.onOpenWallpaperBackup) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Backup,
-                                    tint = topBarColors.content,
-                                    contentDescription = stringResource(R.string.module_wallpaper_backup_open),
-                                )
-                            }
                             Box {
                                 val showTopPopup = remember { mutableStateOf(false) }
                                 IconButton(
@@ -372,12 +378,12 @@ fun ModulePagerMiuix(
                         },
                         navigationIcon = {
                             IconButton(
-                                onClick = actions.onOpenRepo,
+                                onClick = actions.onOpenTools,
                             ) {
                                 Icon(
-                                    imageVector = MiuixIcons.Download,
+                                    imageVector = Icons.Rounded.Build,
                                     tint = topBarColors.content,
-                                    contentDescription = null
+                                    contentDescription = stringResource(R.string.module_tools_title)
                                 )
                             }
                         },
@@ -407,7 +413,8 @@ fun ModulePagerMiuix(
                                 SearchBarFake(searchStatus.label, dynamicTopPadding)
                             }
                         }
-                    )
+                        )
+                    }
                 }
             }
         },
@@ -791,6 +798,7 @@ private fun ModuleList(
 ) {
     val loadingDialog = rememberLoadingDialog()
     val scope = rememberCoroutineScope()
+    val wallpaperPaused = listState.isScrollInProgress
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxHeight(),
@@ -840,7 +848,9 @@ private fun ModuleList(
                         if (module.hasWebUi) {
                             actions.onOpenWebUi(module)
                         }
-                    }
+                    },
+                    onEditWallpaper = { actions.onOpenWallpaperEditor(currentModuleState.value) },
+                    wallpaperPaused = wallpaperPaused,
                 )
             }
 
@@ -860,7 +870,9 @@ fun ModuleItem(
     onUpdate: () -> Unit,
     onExecuteAction: () -> Unit,
     onAddActionShortcut: (ShortcutType) -> Unit,
-    onOpenWebUi: () -> Unit
+    onOpenWebUi: () -> Unit,
+    onEditWallpaper: () -> Unit,
+    wallpaperPaused: Boolean,
 ) {
     val secondaryContainer = colorScheme.secondaryContainer.copy(alpha = 0.8f)
     val actionIconTint = colorScheme.onSurface.copy(alpha = if (isInDarkTheme()) 0.7f else 0.9f)
@@ -880,10 +892,11 @@ fun ModuleItem(
     )
     val wallpaperEntry = rememberModuleCardWallpaperFrame(
         state = wallpaperState,
-        paused = showWallpaperCrop || showWallpaperPreview,
+        paused = wallpaperPaused || showWallpaperCrop || showWallpaperPreview,
     )
-    val wallpaperBitmap = rememberModuleCardWallpaperBitmap(wallpaperEntry)
-    val hasWallpaper = wallpaperBitmap != null
+    val wallpaperLoadState = rememberModuleCardWallpaperLoadState(wallpaperEntry)
+    val wallpaperBitmap = wallpaperLoadState.bitmap
+    val hasWallpaper = wallpaperEntry != null
 
     Card(
         cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
@@ -920,7 +933,7 @@ fun ModuleItem(
         }
     ) {
         Box {
-            ModuleCardWallpaperBackground(wallpaperBitmap)
+            ModuleCardWallpaperBackground(bitmap = wallpaperBitmap, entry = wallpaperEntry)
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1209,7 +1222,7 @@ fun ModuleItem(
                         canPlayCarousel = wallpaperState.canPlayCarousel,
                         carouselEnabled = wallpaperState.carouselEnabled,
                         onExpandedChange = { showWallpaperMenu = it },
-                        onPickWallpaper = wallpaperState.onPickWallpaper,
+                        onPickWallpaper = onEditWallpaper,
                         onCropWallpaper = { showWallpaperCrop = true },
                         onPreviewWallpaper = { showWallpaperPreview = true },
                         onToggleCarousel = wallpaperState.onToggleCarousel,
@@ -1243,6 +1256,7 @@ fun ModuleItem(
         moduleName = module.name,
         uriString = wallpaperEntry?.uriString,
         bitmap = wallpaperBitmap,
+        loadFailed = wallpaperLoadState.failed,
         onDismissRequest = { showWallpaperPreview = false },
     )
 }

@@ -17,8 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.AcUnit
-import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -55,12 +54,9 @@ fun SuperUserPagerDelta(
         title = stringResource(R.string.superuser),
         icon = Icons.Rounded.Security,
         bottomInnerPadding = bottomInnerPadding,
-        topActionIcon = Icons.Rounded.Fingerprint,
-        onTopActionClick = actions.onOpenAppIdManager,
-        topActionContentDescription = stringResource(R.string.app_id_manager_open),
-        secondaryTopActionIcon = Icons.Rounded.AcUnit,
-        onSecondaryTopActionClick = actions.onOpenAppFreeze,
-        secondaryTopActionContentDescription = stringResource(R.string.app_freeze_open),
+        topActionIcon = Icons.Rounded.Apps,
+        onTopActionClick = actions.onOpenAppTools,
+        topActionContentDescription = stringResource(R.string.superuser_app_tools_title),
     ) { contentPadding ->
         LazyColumn(
             contentPadding = PaddingValues(

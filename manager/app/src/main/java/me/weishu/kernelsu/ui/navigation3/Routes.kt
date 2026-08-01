@@ -38,6 +38,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data class SettingsCategory(val category: String) : Route
+
+    @Parcelize
+    @Serializable
     data object LanguageSettings : Route
 
     @Parcelize
@@ -51,6 +55,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object Sulog : Route
+
+    @Parcelize
+    @Serializable
+    data object SuperUserTools : Route
 
     @Parcelize
     @Serializable
@@ -190,6 +198,10 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object CloudThemeRanking : Route
+
+    @Parcelize
+    @Serializable
     data object CloudThemeCreator : Route
 
     @Parcelize
@@ -202,7 +214,15 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object ModuleTools : Route
+
+    @Parcelize
+    @Serializable
     data object ModuleWallpaperBackup : Route
+
+    @Parcelize
+    @Serializable
+    data class ModuleWallpaperEditor(val moduleId: String) : Route
 
     @Parcelize
     @Serializable

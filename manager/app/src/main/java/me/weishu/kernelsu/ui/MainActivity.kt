@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
+import android.window.SplashScreenView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -15,11 +18,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -32,7 +40,9 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.pager.HorizontalPager
@@ -51,11 +61,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -75,6 +88,8 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
@@ -82,14 +97,20 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ui.component.AutoHidingNavigationBar
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
+import me.weishu.kernelsu.ui.component.preloadCustomPageBackgroundImages
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalScrollEffectOverlay
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffectOverlay
+import me.weishu.kernelsu.ui.component.ThemeModeTransitionOverlay
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.LocalNightBackgroundEffectActive
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffectOverlay
+import me.weishu.kernelsu.ui.component.LocalPageTransitionEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
+import me.weishu.kernelsu.ui.component.mainPageTransition
+import me.weishu.kernelsu.ui.component.rememberSystemAnimationsEnabled
 import me.weishu.kernelsu.ui.component.navigationBarVisibilityController
 import me.weishu.kernelsu.ui.component.rememberNavigationBarVisibilityState
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
@@ -117,6 +138,14 @@ import me.weishu.kernelsu.ui.component.pixel.PixelBackdrop
 import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.rememberPixelCardMotionProgress
+import me.weishu.kernelsu.ui.component.ink.InkBackdrop
+import me.weishu.kernelsu.ui.component.ink.InkChromeOverlay
+import me.weishu.kernelsu.ui.component.ink.InkStyle
+import me.weishu.kernelsu.ui.component.ink.LocalInkCardMotionEnabled
+import me.weishu.kernelsu.ui.component.ink.LocalInkCardMotionProgress
+import me.weishu.kernelsu.ui.component.ink.LocalInkFontEnabled
+import me.weishu.kernelsu.ui.component.ink.LocalInkStyle
+import me.weishu.kernelsu.ui.component.ink.rememberInkCardMotionProgress
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionEnabled
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionProgress
@@ -125,7 +154,6 @@ import me.weishu.kernelsu.ui.component.rain.RainBackdrop
 import me.weishu.kernelsu.ui.component.rain.RainChromeOverlay
 import me.weishu.kernelsu.ui.component.rain.RainForegroundOverlay
 import me.weishu.kernelsu.ui.component.rain.RainStyle
-import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
 import me.weishu.kernelsu.ui.component.rain.rememberRainCardMotionProgress
 import me.weishu.kernelsu.ui.component.rain.rememberRainSceneProgress
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
@@ -150,10 +178,15 @@ import me.weishu.kernelsu.ui.screen.executemoduleaction.ExecuteModuleActionScree
 import me.weishu.kernelsu.ui.screen.flash.FlashIt
 import me.weishu.kernelsu.ui.screen.flash.FlashScreen
 import me.weishu.kernelsu.ui.screen.home.HomePager
+import me.weishu.kernelsu.ui.screen.home.HomeMetricCardWallpaperTarget
+import me.weishu.kernelsu.ui.screen.home.hasHomeMetricCardWallpaperImage
+import me.weishu.kernelsu.ui.screen.home.preloadHomeMetricCardWallpaperImages
 import me.weishu.kernelsu.ui.screen.install.InstallScreen
 import me.weishu.kernelsu.ui.screen.launchericon.LauncherIconScreen
 import me.weishu.kernelsu.ui.screen.module.ModulePager
+import me.weishu.kernelsu.ui.screen.module.ModuleToolsScreen
 import me.weishu.kernelsu.ui.screen.module.ModuleWallpaperBackupScreen
+import me.weishu.kernelsu.ui.screen.module.ModuleWallpaperEditorScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoDetailScreen
 import me.weishu.kernelsu.ui.screen.modulerepo.ModuleRepoScreen
 import me.weishu.kernelsu.ui.screen.navigationicon.NavigationIconScreen
@@ -176,6 +209,7 @@ import me.weishu.kernelsu.ui.screen.settings.InstallCardWallpaperScreen
 import me.weishu.kernelsu.ui.screen.settings.LanguageSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.PreInstallStyleSettingsScreen
 import me.weishu.kernelsu.ui.screen.settings.SettingPager
+import me.weishu.kernelsu.ui.screen.settings.SettingsCategoryScreen
 import me.weishu.kernelsu.ui.screen.settings.SoundEffectsScreen
 import me.weishu.kernelsu.ui.screen.settings.StartupAnimationScreen
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationLibraryScreen
@@ -184,18 +218,22 @@ import me.weishu.kernelsu.ui.screen.settings.SwitchStyleCreatorScreen
 import me.weishu.kernelsu.ui.screen.sulog.SulogScreen
 import me.weishu.kernelsu.ui.screen.superuser.AppIdManagerScreen
 import me.weishu.kernelsu.ui.screen.superuser.AppFreezeScreen
+import me.weishu.kernelsu.ui.screen.superuser.SuperUserToolsScreen
 import me.weishu.kernelsu.ui.screen.superuser.SuperUserPager
 import me.weishu.kernelsu.ui.screen.template.AppProfileTemplateScreen
 import me.weishu.kernelsu.ui.screen.templateeditor.TemplateEditorScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStorePage
+import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreCustomizeSection
 import me.weishu.kernelsu.ui.screen.themestore.CloudThemeCreatorScreen
 import me.weishu.kernelsu.ui.screen.themestore.CloudThemeCreatorGuideScreen
 import me.weishu.kernelsu.ui.screen.themestore.CloudThemeDetailScreen
+import me.weishu.kernelsu.ui.screen.themestore.CloudThemeRankingScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreLibraryScreen
 import me.weishu.kernelsu.ui.screen.themestore.AppFontScreen
 import me.weishu.kernelsu.ui.screen.themestore.ThemeStoreScreen
 import me.weishu.kernelsu.ui.screen.home.hasBlockingRootVersionMismatch
 import me.weishu.kernelsu.ui.theme.KernelSUTheme
+import me.weishu.kernelsu.ui.theme.resolveEffectiveDarkMode
 import me.weishu.kernelsu.ui.theme.LocalAutoHideNavigationBar
 import me.weishu.kernelsu.ui.theme.LocalBlurIntensity
 import me.weishu.kernelsu.ui.theme.LocalColorMode
@@ -207,6 +245,8 @@ import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.theme.LocalScrollHideNavigationBar
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
+import me.weishu.kernelsu.ui.util.readAppAudioSettings
+import me.weishu.kernelsu.ui.util.isAudioPlaybackAllowed
 import me.weishu.kernelsu.ui.util.KernelStatusEvents
 import me.weishu.kernelsu.ui.util.LocalCustomNavigationIcons
 import me.weishu.kernelsu.ui.util.LocalScrollAnimation
@@ -248,6 +288,58 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Keep immersive pages, including transparent Material settings, drawn behind side cutouts.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+        }
+
+        val lkmWallpaperTargets = listOf(
+            HomeMetricCardWallpaperTarget.Lkm,
+            HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+            HomeMetricCardWallpaperTarget.MaterialLkm,
+        ).filter { target ->
+            hasHomeMetricCardWallpaperImage(
+                context = applicationContext,
+                target = target,
+            )
+        }
+        if (lkmWallpaperTargets.isNotEmpty()) {
+            var waitingForLkmWallpaper = true
+            var splashProvider: SplashScreenView? = null
+
+            fun releaseSplash() {
+                splashProvider?.remove()
+                splashProvider = null
+            }
+
+            splashScreen.setOnExitAnimationListener { provider ->
+                if (waitingForLkmWallpaper) {
+                    splashProvider = provider
+                } else {
+                    provider.remove()
+                }
+            }
+            lifecycleScope.launch {
+                lkmWallpaperTargets.map { target ->
+                    async {
+                        preloadHomeMetricCardWallpaperImages(
+                            context = applicationContext,
+                            target = target,
+                        )
+                    }
+                }.awaitAll()
+                waitingForLkmWallpaper = false
+                releaseSplash()
+            }
+            lifecycleScope.launch {
+                delay(LKM_WALLPAPER_SPLASH_TIMEOUT_MS)
+                waitingForLkmWallpaper = false
+                releaseSplash()
+            }
+        }
+
         lifecycleScope.launch(Dispatchers.IO) {
             val managerReady = runCatching {
                 Natives.refreshInfo()
@@ -279,6 +371,7 @@ class MainActivity : ComponentActivity() {
             val clickSoundVolume = uiState.customClickSoundVolume
             val backgroundMusicUri = uiState.customBackgroundMusicUri
             val backgroundMusicVolume = uiState.customBackgroundMusicVolume
+            val appAudioSettings = uiState.appAudioSettings
             var showStartupAnimation by rememberSaveable { mutableStateOf(!startupAnimationUri.isNullOrBlank()) }
             val effectiveEnableBlur = resolveRealtimeBlurEnabled(
                 interfaceStyle = uiState.interfaceStyle,
@@ -289,14 +382,14 @@ class MainActivity : ComponentActivity() {
                 requested = uiState.enableFloatingBottomBarBlur,
             )
             val selectedRainStyle = RainStyle.fromValue(uiState.rainStyle)
+            val selectedInkStyle = InkStyle.fromValue(uiState.inkStyle)
             val rainInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Rain.value
             val seasonInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
+            val inkInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Ink.value
             val pixelInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
             val seasonCardMotionProgress = rememberSeasonCardMotionProgress(
                 enabled = seasonInterfaceActive && uiState.seasonCardMotionEnabled,
             )
-            val rainForcesDark = rainInterfaceActive &&
-                forceRainDarkTheme(selectedRainStyle)
             val rainCardMotionProgress = rememberRainCardMotionProgress(
                 enabled = rainInterfaceActive && uiState.rainCardMotionEnabled,
             )
@@ -304,11 +397,21 @@ class MainActivity : ComponentActivity() {
                 enabled = rainInterfaceActive,
                 style = selectedRainStyle,
             )
+            val inkCardMotionProgress = rememberInkCardMotionProgress(
+                enabled = inkInterfaceActive && uiState.inkCardMotionEnabled,
+            )
             val pixelCardMotionProgress = rememberPixelCardMotionProgress(
                 enabled = pixelInterfaceActive && uiState.pixelCardMotionEnabled,
             )
-            val darkMode = rainForcesDark || appSettings.colorMode.isDark ||
-                (appSettings.colorMode.isSystem && isSystemInDarkTheme())
+            val darkMode = resolveEffectiveDarkMode(
+                colorMode = appSettings.colorMode,
+                systemDark = isSystemInDarkTheme(),
+                interfaceStyle = uiState.interfaceStyle,
+                rainStyle = selectedRainStyle,
+                pixelStyle = PixelStyle.fromValue(uiState.pixelStyle),
+            )
+            val selectedNightBackgroundEffect =
+                NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect)
 
             DisposableEffect(darkMode) {
                 enableEdgeToEdge(
@@ -331,8 +434,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            LaunchedEffect(backgroundMusicUri, backgroundMusicVolume) {
-                if (backgroundMusicUri.isNullOrBlank()) {
+            LaunchedEffect(backgroundMusicUri, backgroundMusicVolume, appAudioSettings) {
+                if (backgroundMusicUri.isNullOrBlank() ||
+                    !appAudioSettings.masterEnabled ||
+                    !appAudioSettings.background.enabled
+                ) {
                     BackgroundMusicPlayer.stop()
                 } else {
                     BackgroundMusicPlayer.play(this@MainActivity, backgroundMusicUri, backgroundMusicVolume)
@@ -382,6 +488,12 @@ class MainActivity : ComponentActivity() {
                     ),
                 LocalRainCardMotionProgress provides rainCardMotionProgress,
                 LocalRainSceneProgress provides rainSceneProgress,
+                LocalInkStyle provides selectedInkStyle,
+                LocalInkFontEnabled provides (inkInterfaceActive && uiState.inkFontEnabled),
+                LocalInkCardMotionEnabled provides (
+                    inkInterfaceActive && uiState.inkCardMotionEnabled
+                    ),
+                LocalInkCardMotionProgress provides inkCardMotionProgress,
                 LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
                 LocalPixelCardMotionEnabled provides (
                     pixelInterfaceActive && uiState.pixelCardMotionEnabled
@@ -391,12 +503,13 @@ class MainActivity : ComponentActivity() {
                 LocalCustomNavigationIcons provides uiState.customNavigationIcons,
                 LocalSwitchStyle provides SwitchStyle.fromValue(uiState.switchStyle),
                 LocalNightBackgroundEffectActive provides (
-                    darkMode &&
+                        darkMode &&
                         !uiState.nightBackgroundPassthrough &&
-                        NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect) != NightBackgroundEffect.Off
+                        selectedNightBackgroundEffect != NightBackgroundEffect.Off
                     ),
                 LocalScrollAnimation provides uiState.globalScrollEffectEnabled,
                 LocalScrollAnimationEffect provides GlobalScrollEffect.fromValue(uiState.globalScrollEffect),
+                LocalPageTransitionEffect provides PageTransitionEffect.fromValue(uiState.pageTransitionEffect),
             ) {
                 KernelSUTheme(
                     appSettings = appSettings,
@@ -437,8 +550,10 @@ class MainActivity : ComponentActivity() {
                             },
                             entryProvider = entryProvider {
                                 entry<Route.Main> { mainScreenEntry() }
+                                entry<Route.SettingsCategory> { key -> SettingsCategoryScreen(key.category) }
                                 entry<Route.About> { AboutScreen() }
                                 entry<Route.Sulog> { SulogScreen() }
+                                entry<Route.SuperUserTools> { SuperUserToolsScreen() }
                                 entry<Route.AppIdManager> { AppIdManagerScreen() }
                                 entry<Route.AppFreeze> { AppFreezeScreen() }
                                 entry<Route.ColorPalette> { ColorPaletteScreen() }
@@ -474,19 +589,34 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.ImageTool> { ImageToolScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
-                                entry<Route.ThemeStoreAssets> { ThemeStoreScreen(ThemeStorePage.Assets) }
+                                entry<Route.ThemeStoreAssets> {
+                                    ThemeStoreScreen(
+                                        page = ThemeStorePage.Customize,
+                                        customizeSection = ThemeStoreCustomizeSection.Assets,
+                                    )
+                                }
                                 entry<Route.ThemeStoreFonts> { AppFontScreen() }
-                                entry<Route.ThemeStoreBackgrounds> { ThemeStoreScreen(ThemeStorePage.Backgrounds) }
-                                entry<Route.ThemeStoreTransfer> { ThemeStoreScreen(ThemeStorePage.Transfer) }
+                                entry<Route.ThemeStoreBackgrounds> {
+                                    ThemeStoreScreen(
+                                        page = ThemeStorePage.Customize,
+                                        customizeSection = ThemeStoreCustomizeSection.Atmosphere,
+                                    )
+                                }
+                                entry<Route.ThemeStoreTransfer> { ThemeStoreScreen(ThemeStorePage.Library) }
                                 entry<Route.ThemeStoreMy> { ThemeStoreScreen(ThemeStorePage.My) }
                                 entry<Route.ThemeStoreLibrary> { ThemeStoreLibraryScreen() }
                                 entry<Route.CloudThemeDetail> { key -> CloudThemeDetailScreen(key.themeId) }
+                                entry<Route.CloudThemeRanking> { CloudThemeRankingScreen() }
                                 entry<Route.CloudThemeCreator> { CloudThemeCreatorScreen() }
                                 entry<Route.CloudThemeCreatorSubmission> {
                                     CloudThemeCreatorScreen(initialPageIndex = 1)
                                 }
                                 entry<Route.CloudThemeCreatorGuide> { CloudThemeCreatorGuideScreen() }
+                                entry<Route.ModuleTools> { ModuleToolsScreen() }
                                 entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
+                                entry<Route.ModuleWallpaperEditor> { key ->
+                                    ModuleWallpaperEditorScreen(key.moduleId)
+                                }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
                                 entry<Route.AppProfile> { key -> AppProfileScreen(key.uid) }
@@ -524,8 +654,15 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
+                    LaunchedEffect(uiState.customPageBackgrounds) {
+                        preloadCustomPageBackgroundImages(
+                            context = applicationContext,
+                            backgrounds = uiState.customPageBackgrounds,
+                        )
+                    }
                     val seasonalStyleActive = seasonInterfaceActive
                     val rainStyleActive = rainInterfaceActive
+                    val inkStyleActive = inkInterfaceActive
                     val pixelStyleActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
                     val hasCustomBackground =
                         !effectiveBackground.wallpaperUriString.isNullOrBlank() ||
@@ -533,12 +670,12 @@ class MainActivity : ComponentActivity() {
                     val immersiveBackgroundActive =
                         seasonalStyleActive ||
                             rainStyleActive ||
+                            inkStyleActive ||
                             pixelStyleActive ||
                             hasCustomBackground ||
                             (
                                 darkMode &&
-                                    NightBackgroundEffect.fromValue(uiState.nightBackgroundEffect) !=
-                                    NightBackgroundEffect.Off
+                                    selectedNightBackgroundEffect != NightBackgroundEffect.Off
                                 )
                     val globalScrollEffectState = rememberGlobalScrollEffectState(
                         enabled = uiState.globalScrollEffectEnabled && !navigationTransitionActive,
@@ -556,6 +693,7 @@ class MainActivity : ComponentActivity() {
                             videoDurationSeconds = effectiveBackground.videoDurationSeconds,
                             opacity = effectiveBackground.opacity,
                             crop = effectiveBackground.crop,
+                            visualSettings = effectiveBackground.visualSettings,
                             passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
                         ) {
@@ -573,15 +711,21 @@ class MainActivity : ComponentActivity() {
                                     if (rainStyleActive && !hasCustomBackground) {
                                         RainBackdrop(modifier = Modifier.fillMaxSize())
                                     }
+                                    if (inkStyleActive && !hasCustomBackground) {
+                                        InkBackdrop(modifier = Modifier.fillMaxSize())
+                                    }
                                     if (!uiState.nightBackgroundPassthrough) {
                                         NightBackgroundEffectOverlay(
                                             enabled = darkMode,
-                                            effectValue = uiState.nightBackgroundEffect,
+                                            effectValue = selectedNightBackgroundEffect.value,
                                             passthrough = false,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                     UiDecorationBackdrop(modifier = Modifier.fillMaxSize())
+                                    if (immersiveBackgroundActive) {
+                                        StatusBarContrastScrim(darkMode = darkMode)
+                                    }
                                     CompositionLocalProvider(LocalLiquidGlassBackdrop provides globalGlassBackdrop) {
                                         Box(
                                             modifier = Modifier
@@ -605,12 +749,13 @@ class MainActivity : ComponentActivity() {
                         UiDecorationChromeOverlay(modifier = Modifier.fillMaxSize())
                         SeasonChromeOverlay(modifier = Modifier.fillMaxSize())
                         RainChromeOverlay(modifier = Modifier.fillMaxSize())
+                        InkChromeOverlay(modifier = Modifier.fillMaxSize())
                         PixelChromeOverlay(modifier = Modifier.fillMaxSize())
 
                         if (uiState.nightBackgroundPassthrough) {
                             NightBackgroundEffectOverlay(
                                 enabled = darkMode,
-                                effectValue = uiState.nightBackgroundEffect,
+                                effectValue = selectedNightBackgroundEffect.value,
                                 passthrough = true,
                                 passthroughOpacity = uiState.nightBackgroundPassthroughOpacity,
                                 modifier = Modifier.fillMaxSize(),
@@ -635,10 +780,12 @@ class MainActivity : ComponentActivity() {
                         )
 
                         RainForegroundOverlay(modifier = Modifier.fillMaxSize())
+                        ThemeModeTransitionOverlay(darkMode = darkMode)
 
                         if (showStartupAnimation && !startupAnimationUri.isNullOrBlank()) {
                             StartupAnimationOverlay(
                                 uriString = startupAnimationUri,
+                                settings = uiState.startupAnimationSettings,
                                 onFinished = { showStartupAnimation = false },
                                 onError = { showStartupAnimation = false },
                             )
@@ -702,6 +849,29 @@ private fun MainActivityUiState.effectiveCustomBackground(
         opacity = customWallpaperOpacity,
         crop = customWallpaperCrop,
         videoDurationSeconds = customVideoBackgroundDurationSeconds,
+        visualSettings = customWallpaperVisualSettings,
+    )
+}
+
+@Composable
+private fun StatusBarContrastScrim(darkMode: Boolean) {
+    val statusBarHeight = WindowInsets.statusBars
+        .asPaddingValues()
+        .calculateTopPadding()
+    val contrastColor = if (darkMode) Color.Black else Color.White
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(statusBarHeight + 28.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        contrastColor.copy(alpha = if (darkMode) 0.42f else 0.30f),
+                        contrastColor.copy(alpha = if (darkMode) 0.18f else 0.12f),
+                        Color.Transparent,
+                    ),
+                ),
+            ),
     )
 }
 
@@ -760,6 +930,7 @@ private fun ManagerUpdatePrompt() {
 private fun Modifier.customClickSound(uriString: String?, volume: Float): Modifier {
     if (uriString.isNullOrBlank()) return this
     val context = LocalContext.current.applicationContext
+    val haptic = LocalHapticFeedback.current
     return pointerInput(uriString, volume) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -782,13 +953,24 @@ private fun Modifier.customClickSound(uriString: String?, volume: Float): Modifi
             }
 
             if (wasConsumed && completed && !moved) {
+                val audioSettings = readAppAudioSettings(context)
                 ClickSoundPlayer.play(context, uriString, volume)
+                if (audioSettings.hapticWithClick &&
+                    isAudioPlaybackAllowed(context, audioSettings.click)
+                ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                }
             }
         }
     }
 }
 
-private const val NAV_TRANSITION_DURATION_MS = 200
+private const val NAV_TRANSITION_DURATION_MS = 240
+private const val NAV_TRANSITION_FADE_IN_MS = 220
+private const val NAV_TRANSITION_FADE_OUT_MS = 180
+private const val NAV_TRANSITION_ENTER_SCALE = 0.965f
+private const val NAV_TRANSITION_EXIT_SCALE = 0.985f
+private const val LKM_WALLPAPER_SPLASH_TIMEOUT_MS = 1_500L
 private const val MAX_MANAGER_UPDATE_CHANGELOG_LENGTH = 4000
 private const val TAG = "MainActivity"
 
@@ -801,33 +983,51 @@ private fun <T : Any> stableNavPopTransition(): AnimatedContentTransitionScope<S
 }
 
 private fun stableNavForwardTransitionContentTransform(): ContentTransform {
-    val alphaSpec = tween<Float>(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = alphaSpec) +
-            slideInHorizontally(
-                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-            ) { width -> width / 12 },
-        initialContentExit = fadeOut(animationSpec = alphaSpec) +
-            slideOutHorizontally(
-                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-            ) { width -> -width / 16 },
+        targetContentEnter = fadeIn(
+            animationSpec = tween(NAV_TRANSITION_FADE_IN_MS, easing = LinearOutSlowInEasing),
+        ) + scaleIn(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            initialScale = NAV_TRANSITION_ENTER_SCALE,
+        ) + slideInHorizontally(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            initialOffsetX = { width -> width / 8 },
+        ),
+        initialContentExit = fadeOut(
+            animationSpec = tween(NAV_TRANSITION_FADE_OUT_MS, easing = FastOutLinearInEasing),
+        ) + scaleOut(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            targetScale = NAV_TRANSITION_EXIT_SCALE,
+        ) + slideOutHorizontally(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            targetOffsetX = { width -> -width / 18 },
+        ),
         targetContentZIndex = 1f,
         sizeTransform = null,
     )
 }
 
 private fun stableNavPopTransitionContentTransform(): ContentTransform {
-    val alphaSpec = tween<Float>(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
     return ContentTransform(
-        targetContentEnter = fadeIn(animationSpec = alphaSpec) +
-            slideInHorizontally(
-                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-            ) { width -> -width / 12 },
-        initialContentExit = fadeOut(animationSpec = alphaSpec) +
-            slideOutHorizontally(
-                animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-            ) { width -> width / 16 },
-        targetContentZIndex = 1f,
+        targetContentEnter = fadeIn(
+            animationSpec = tween(NAV_TRANSITION_FADE_IN_MS, easing = LinearOutSlowInEasing),
+        ) + scaleIn(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            initialScale = NAV_TRANSITION_ENTER_SCALE,
+        ) + slideInHorizontally(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            initialOffsetX = { width -> -width / 8 },
+        ),
+        initialContentExit = fadeOut(
+            animationSpec = tween(NAV_TRANSITION_FADE_OUT_MS, easing = FastOutLinearInEasing),
+        ) + scaleOut(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            targetScale = NAV_TRANSITION_EXIT_SCALE,
+        ) + slideOutHorizontally(
+            animationSpec = tween(NAV_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing),
+            targetOffsetX = { width -> width / 18 },
+        ),
+        targetContentZIndex = 0f,
         sizeTransform = null,
     )
 }
@@ -863,10 +1063,18 @@ fun MainScreen(
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
     val autoHideNavigationBar = LocalAutoHideNavigationBar.current
     val scrollHideNavigationBar = LocalScrollHideNavigationBar.current
+    val pageTransitionEffect = LocalPageTransitionEffect.current
+    val interfaceStyle = LocalInterfaceStyle.current
+    val seasonStyle = LocalSeasonStyle.current
+    val rainStyle = LocalRainStyle.current
+    val inkStyle = LocalInkStyle.current
+    val pixelStyle = LocalPixelStyle.current
+    val systemAnimationsEnabled = rememberSystemAnimationsEnabled()
     val refreshTick by KernelStatusEvents.refreshTick.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { MainPagerConfig.PAGE_COUNT })
     val mainPagerState = rememberMainPagerState(pagerState)
-    val isFullFeatured by produceState(initialValue = false, refreshTick) {
+    val fullFeaturedResult by produceState<Boolean?>(initialValue = null, refreshTick) {
+        value = null
         val fullFeatured = kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching { Natives.refreshInfo() }
             val managerRegistered = runCatching {
@@ -889,6 +1097,7 @@ fun MainScreen(
         }
         value = fullFeatured
     }
+    val isFullFeatured = fullFeaturedResult == true
     val userScrollEnabled = isFullFeatured
     val moduleViewModel = viewModel<ModuleViewModel>()
     val moduleUiState by moduleViewModel.uiState.collectAsStateWithLifecycle()
@@ -937,8 +1146,8 @@ fun MainScreen(
         mainPagerState.syncPage()
     }
 
-    LaunchedEffect(isFullFeatured) {
-        mainPagerState.updateFeatureAvailability(isFullFeatured)
+    LaunchedEffect(fullFeaturedResult) {
+        mainPagerState.updateFeatureAvailability(fullFeaturedResult)
     }
 
     MainScreenBackHandler(mainPagerState, navController)
@@ -962,20 +1171,52 @@ fun MainScreen(
     ) {
         val contentReady = rememberContentReady()
         val pagerContent = @Composable { bottomInnerPadding: Dp ->
-            Box(modifier = if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop) else Modifier) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop) else Modifier),
+            ) {
                 HorizontalPager(
                     modifier = Modifier
+                        .fillMaxSize()
                         .then(if (floatingBarBackdrop != null) Modifier.layerBackdrop(floatingBarBackdrop) else Modifier),
                     state = mainPagerState.pagerState,
                     beyondViewportPageCount = if (contentReady) 3 else 0,
                     userScrollEnabled = userScrollEnabled,
                 ) { page ->
                     val isCurrentPage = page == settledPage
-                    when (page) {
-                        0 -> if (isCurrentPage || contentReady) HomePager(navController, bottomInnerPadding, isCurrentPage)
-                        1 -> if (isCurrentPage || contentReady) SuperUserPager(navController, bottomInnerPadding, isCurrentPage)
-                        2 -> if (isCurrentPage || contentReady) ModulePager(bottomInnerPadding, isCurrentPage)
-                        3 -> if (isCurrentPage || contentReady) SettingPager(navController, bottomInnerPadding)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .mainPageTransition(
+                                effect = pageTransitionEffect,
+                                interfaceStyle = interfaceStyle,
+                                seasonStyle = seasonStyle,
+                                rainStyle = rainStyle,
+                                inkStyle = inkStyle,
+                                pixelStyle = pixelStyle,
+                                animationsEnabled = systemAnimationsEnabled,
+                                pageOffset = {
+                                    page - (
+                                        mainPagerState.pagerState.currentPage +
+                                            mainPagerState.pagerState.currentPageOffsetFraction
+                                        )
+                                },
+                            ),
+                    ) {
+                        when (page) {
+                            0 -> if (isCurrentPage || contentReady) HomePager(navController, bottomInnerPadding, isCurrentPage)
+                            1 -> if (isCurrentPage || contentReady) {
+                                SuperUserPager(
+                                    navigator = navController,
+                                    bottomInnerPadding = bottomInnerPadding,
+                                    isCurrentPage = isCurrentPage,
+                                    onOpenSecondary = { onPageChanged(1) },
+                                )
+                            }
+                            2 -> if (isCurrentPage || contentReady) ModulePager(bottomInnerPadding, isCurrentPage)
+                            3 -> if (isCurrentPage || contentReady) SettingPager(navController, bottomInnerPadding)
+                        }
                     }
                 }
             }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_ink">Ink landscape</string>
+    <string name="settings_ink_style">Ink landscape mode</string>
+    <string name="settings_ink_font">Ink WenKai typography</string>
+    <string name="settings_ink_font_summary">Use the bundled LXGW WenKai typeface across the interface. Turn it off to restore your selected or custom font.</string>
+    <string name="settings_ink_card_motion">Dynamic ink cards</string>
+    <string name="settings_ink_card_motion_summary">Animate subtle water rings, fine rain, leaves, blossoms, and moonlight on cards and navigation.</string>
+    <string name="ink_style_mist_jiangnan">Misty Jiangnan</string>
+    <string name="ink_style_mist_jiangnan_summary">Fine rain, pale water, distant gray-green ridges, and a quiet cinnabar seal.</string>
+    <string name="ink_style_verdant_landscape">Verdant landscape</string>
+    <string name="ink_style_verdant_landscape_summary">Jade green ridges, stone-blue water, and layered mineral color over translucent ink surfaces.</string>
+    <string name="ink_style_cinnabar_scroll">Cinnabar scroll</string>
+    <string name="ink_style_cinnabar_scroll_summary">Neutral paper gray, charcoal ink, restrained cinnabar branches, and seal details.</string>
+    <string name="ink_style_purple_night_mountain">Purple night mountain</string>
+    <string name="ink_style_purple_night_mountain_summary">Rock-purple night ridges, cold silver mist, muted jade, and a distant moon.</string>
+    <string name="theme_preset_ink">Ink landscape</string>
+    <string name="theme_preset_ink_summary">Four coordinated ink landscapes with decorated cards, typography, navigation, and page transitions.</string>
+</resources>

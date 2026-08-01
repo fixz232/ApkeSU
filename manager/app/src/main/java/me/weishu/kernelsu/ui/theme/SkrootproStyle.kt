@@ -24,6 +24,10 @@ data class TopBarColors(
 
 @Composable
 fun skrootproTopBarColors(defaultContainer: Color, defaultContent: Color): TopBarColors {
+    if (LocalImmersiveBackgroundActive.current) {
+        return TopBarColors(container = Color.Transparent, content = defaultContent)
+    }
+
     if (isRainInterfaceStyle()) {
         return TopBarColors(
             container = rainTopBarContainerColor(),
@@ -78,10 +82,6 @@ fun skrootproTopBarColors(defaultContainer: Color, defaultContent: Color): TopBa
                 PixelStyle.OceanDepths -> defaultContent
             },
         )
-    }
-
-    if (LocalImmersiveBackgroundActive.current) {
-        return TopBarColors(container = Color.Transparent, content = defaultContent)
     }
 
     return when (LocalInterfaceStyle.current) {

@@ -31,8 +31,14 @@ internal val SettingsUiState.isGkiMode: Boolean
 internal val SettingsUiState.canOpenPathConfig: Boolean
     get() = pathConfigBackend == PathConfigBackend.PathmaskLkm || pathConfigBackend == PathConfigBackend.SusfsGki
 
+internal val SettingsUiState.isKPatchNextSwitchChecked: Boolean
+    get() = (isKPatchNextInstalled || isKPatchNextPendingUpdate) && !isKPatchNextPendingRemove
+
 internal val SettingsUiState.canToggleKPatchNext: Boolean
-    get() = runtimeModeResolved && !isLateLoadMode && (kPatchNextConflict == null || isKPatchNextEnabled)
+    get() = runtimeModeResolved &&
+        !isLateLoadMode &&
+        !isKPatchNextOperationRunning &&
+        (kPatchNextConflict == null || isKPatchNextSwitchChecked)
 
 internal val SettingsUiState.canOpenKPatchNextWebUi: Boolean
     get() = runtimeModeResolved && !isLateLoadMode && isKPatchNextEnabled && isKPatchNextWebUiAvailable
@@ -63,6 +69,7 @@ internal fun kPatchNextSummary(uiState: SettingsUiState): String {
     return when {
         !uiState.runtimeModeResolved -> stringResource(R.string.settings_runtime_mode_detecting)
         uiState.isLateLoadMode -> stringResource(R.string.settings_kpatch_next_jailbreak_disabled_summary)
+        uiState.isKPatchNextOperationRunning -> stringResource(R.string.settings_kpatch_next_operation_running)
         uiState.kPatchNextConflict != null -> stringResource(
             R.string.settings_kpatch_next_conflict_summary,
             uiState.kPatchNextConflict

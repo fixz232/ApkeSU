@@ -17,11 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Fingerprint
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -45,7 +42,6 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaShapes
 import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
 import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
-import me.weishu.kernelsu.ui.component.alpha.isStudioStyle
 
 @Composable
 fun SuperUserPagerAlpha(
@@ -55,20 +51,13 @@ fun SuperUserPagerAlpha(
 ) {
     val searchText = uiState.searchStatus.searchText
     val apps = if (searchText.isBlank()) uiState.groupedApps else uiState.searchResults
-    val studioStyle = isStudioStyle()
 
     AlphaScreen(
         title = stringResource(R.string.superuser),
         bottomInnerPadding = bottomInnerPadding,
-        topActionIcon = Icons.Rounded.Fingerprint,
-        onTopActionClick = actions.onOpenAppIdManager,
-        topActionContentDescription = stringResource(R.string.app_id_manager_open),
-        secondaryTopActionIcon = Icons.Rounded.AcUnit,
-        onSecondaryTopActionClick = actions.onOpenAppFreeze,
-        secondaryTopActionContentDescription = stringResource(R.string.app_freeze_open),
-        tertiaryTopActionIcon = if (studioStyle) Icons.Rounded.Refresh else null,
-        onTertiaryTopActionClick = actions.onRefresh,
-        tertiaryTopActionContentDescription = stringResource(R.string.refresh_refresh),
+        topActionIcon = Icons.Rounded.Apps,
+        onTopActionClick = actions.onOpenAppTools,
+        topActionContentDescription = stringResource(R.string.superuser_app_tools_title),
     ) { contentPadding ->
         LazyColumn(
             contentPadding = PaddingValues(
@@ -79,14 +68,6 @@ fun SuperUserPagerAlpha(
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (studioStyle) {
-                item {
-                    StudioSuperUserOverview(
-                        groups = uiState.groupedApps,
-                        onOpenSulog = actions.onOpenSulog,
-                    )
-                }
-            }
             item {
                 AlphaSuperUserSearch(
                     searchText = searchText,
@@ -118,120 +99,6 @@ fun SuperUserPagerAlpha(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun SuperUserPagerStudio(
-    uiState: SuperUserUiState,
-    actions: SuperUserActions,
-    bottomInnerPadding: Dp,
-) {
-    SuperUserPagerAlpha(
-        uiState = uiState,
-        actions = actions,
-        bottomInnerPadding = bottomInnerPadding,
-    )
-}
-
-@Composable
-private fun StudioSuperUserOverview(
-    groups: List<GroupedApps>,
-    onOpenSulog: () -> Unit,
-) {
-    val rootCount = groups.count { it.anyAllowSu }
-    val customCount = groups.count { it.anyCustom }
-    val umountCount = groups.count { it.shouldUmount }
-    AlphaCard {
-        Column {
-            Text(
-                text = stringResource(
-                    if (rootCount > 0) R.string.superuser_dashboard_normal else R.string.superuser_dashboard_empty
-                ),
-                color = AlphaColors.Text,
-                fontSize = alphaSp(16f),
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = stringResource(R.string.superuser_dashboard_summary, rootCount),
-                color = AlphaColors.Muted,
-                fontSize = alphaSp(12f),
-                modifier = Modifier.padding(top = 3.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                StudioSuperUserMetric(
-                    value = rootCount,
-                    label = stringResource(R.string.superuser_stat_authorized),
-                    modifier = Modifier.weight(1f),
-                )
-                StudioSuperUserMetric(
-                    value = customCount,
-                    label = stringResource(R.string.superuser_stat_custom),
-                    modifier = Modifier.weight(1f),
-                )
-                StudioSuperUserMetric(
-                    value = umountCount,
-                    label = stringResource(R.string.superuser_stat_umount),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .clip(AlphaShapes.Control)
-                    .background(AlphaColors.SurfaceStrong)
-                    .clickable(onClick = onOpenSulog)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_sulog),
-                    color = AlphaColors.Text,
-                    fontSize = alphaSp(13.5f),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = null,
-                    tint = AlphaColors.Muted,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StudioSuperUserMetric(
-    value: Int,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = value.toString(),
-            color = AlphaColors.Accent,
-            fontSize = alphaSp(18f, maxScale = 1.0f),
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = label,
-            color = AlphaColors.Muted,
-            fontSize = alphaSp(11f, maxScale = 1.0f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

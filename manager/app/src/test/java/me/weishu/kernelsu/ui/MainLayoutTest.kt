@@ -1,6 +1,8 @@
 package me.weishu.kernelsu.ui
 
 import androidx.compose.ui.unit.dp
+import me.weishu.kernelsu.ui.component.bottombar.shouldResetMainPagerForFeatureAvailability
+import me.weishu.kernelsu.ui.component.bottombar.shouldSnapMainPagerToTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -57,5 +59,22 @@ class MainLayoutTest {
         assertFalse(shouldReturnMainPagerBackToHome(selectedPage = 1))
         assertTrue(shouldReturnMainPagerBackToHome(selectedPage = 2))
         assertTrue(shouldReturnMainPagerBackToHome(selectedPage = 3))
+    }
+
+    @Test
+    fun unresolvedFeatureCheckDoesNotResetSuperuserPage() {
+        assertFalse(shouldResetMainPagerForFeatureAvailability(available = null, selectedPage = 1))
+        assertFalse(shouldResetMainPagerForFeatureAvailability(available = true, selectedPage = 1))
+        assertTrue(shouldResetMainPagerForFeatureAvailability(available = false, selectedPage = 1))
+        assertTrue(shouldResetMainPagerForFeatureAvailability(available = false, selectedPage = 2))
+        assertFalse(shouldResetMainPagerForFeatureAvailability(available = false, selectedPage = 3))
+    }
+
+    @Test
+    fun interruptedPagerNavigationRequiresFinalSnap() {
+        assertFalse(shouldSnapMainPagerToTarget(targetPage = 3, currentPage = 3, currentPageOffsetFraction = 0f))
+        assertTrue(shouldSnapMainPagerToTarget(targetPage = 3, currentPage = 3, currentPageOffsetFraction = -0.42f))
+        assertTrue(shouldSnapMainPagerToTarget(targetPage = 3, currentPage = 2, currentPageOffsetFraction = 0f))
+        assertTrue(shouldSnapMainPagerToTarget(targetPage = 3, currentPage = 3, currentPageOffsetFraction = Float.NaN))
     }
 }

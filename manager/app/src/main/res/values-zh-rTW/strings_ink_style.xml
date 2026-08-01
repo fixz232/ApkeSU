@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_ink">墨境</string>
+    <string name="settings_ink_style">墨境模式</string>
+    <string name="settings_ink_font">霞鶩文楷字體</string>
+    <string name="settings_ink_font_summary">開啟後全域使用內建霞鶩文楷；關閉後恢復目前選擇或自訂字體。</string>
+    <string name="settings_ink_card_motion">動態水墨卡片</string>
+    <string name="settings_ink_card_motion_summary">為卡片與底欄加入克制的水紋、細雨、浮葉、落花及月光動效。</string>
+    <string name="ink_style_mist_jiangnan">煙雨江南</string>
+    <string name="ink_style_mist_jiangnan_summary">細雨、淺水、遠處灰青山影與一枚安靜的朱砂印。</string>
+    <string name="ink_style_verdant_landscape">青綠山水</string>
+    <string name="ink_style_verdant_landscape_summary">玉石青綠、石青水色與層疊礦物色，落在通透水墨表面。</string>
+    <string name="ink_style_cinnabar_scroll">朱砂畫卷</string>
+    <string name="ink_style_cinnabar_scroll_summary">中性紙灰、濃淡墨色、克制朱砂枝與印章細節。</string>
+    <string name="ink_style_purple_night_mountain">紫墨夜山</string>
+    <string name="ink_style_purple_night_mountain_summary">岩紫夜山、冷銀薄霧、低飽和玉色與遠處明月。</string>
+    <string name="theme_preset_ink">墨境</string>
+    <string name="theme_preset_ink_summary">四套水墨山水聯動卡片、字體、一般與浮動底欄及翻頁動效。</string>
+</resources>

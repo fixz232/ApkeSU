@@ -13,6 +13,7 @@ import me.weishu.kernelsu.ui.component.GlobalScrollEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
@@ -20,6 +21,9 @@ import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.snow.DEFAULT_SEASON_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_FONT_ENABLED
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
@@ -35,6 +39,8 @@ import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.LauncherIconOption
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
+import me.weishu.kernelsu.ui.util.StartupAnimationSettings
 
 enum class UiDecorationSaveState {
     Idle,
@@ -51,12 +57,14 @@ data class SettingsUiState(
     val showGkiWarning: Boolean = true,
     val showHomeSupportCard: Boolean = true,
     val showHomeLearnCard: Boolean = true,
+    val miuixClassicHomeLayoutEnabled: Boolean = false,
     val graphicsRendererFeatureEnabled: Boolean = false,
     val themeMode: Int = 0,
     val miuixMonet: Boolean = false,
     val keyColor: Int = 0,
     val colorStyle: String = PaletteStyle.TonalSpot.name,
     val colorSpec: String = ColorSpec.SpecVersion.Default.name,
+    val monetSurfaceOpacity: Float = ThemeAppearanceDefaults.MONET_SURFACE_OPACITY,
     val themePreset: String = ThemePreset.CLEAN_TOOL.value,
     val enablePredictiveBack: Boolean = false,
     val enableBlur: Boolean = true,
@@ -72,6 +80,9 @@ data class SettingsUiState(
     val seasonCardMotionEnabled: Boolean = DEFAULT_SEASON_CARD_MOTION_ENABLED,
     val rainStyle: String = RainStyle.DEFAULT_VALUE,
     val rainCardMotionEnabled: Boolean = DEFAULT_RAIN_CARD_MOTION_ENABLED,
+    val inkStyle: String = InkStyle.DEFAULT_VALUE,
+    val inkFontEnabled: Boolean = DEFAULT_INK_FONT_ENABLED,
+    val inkCardMotionEnabled: Boolean = DEFAULT_INK_CARD_MOTION_ENABLED,
     val pixelStyle: String = PixelStyle.DEFAULT_VALUE,
     val pixelCardMotionEnabled: Boolean = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
     val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
@@ -85,6 +96,7 @@ data class SettingsUiState(
     val nightBackgroundPassthroughOpacity: Float = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
     val globalScrollEffectEnabled: Boolean = false,
     val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
+    val pageTransitionEffect: String = PageTransitionEffect.DEFAULT_VALUE,
     val themeSyncStrategy: ThemeSyncStrategy = ThemeSyncStrategy.SHARED,
     val customThemePresets: List<CustomThemePreset> = emptyList(),
     val enableWebDebugging: Boolean = false,
@@ -93,6 +105,7 @@ data class SettingsUiState(
     val customHomeTitle: String = "",
     val customWallpaperUri: String? = null,
     val customWallpaperOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
+    val customWallpaperVisualSettings: MediaVisualSettings = MediaVisualSettings(),
     val customWallpaperCrop: CustomWallpaperCrop = CustomWallpaperCrop(),
     val customWallpaperPassthroughEnabled: Boolean = false,
     val customWallpaperPassthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
@@ -100,6 +113,7 @@ data class SettingsUiState(
     val customVideoBackgroundDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
     val customPageBackgrounds: CustomPageBackgroundSet = CustomPageBackgroundSet(),
     val customStartupAnimationUri: String? = null,
+    val startupAnimationSettings: StartupAnimationSettings = StartupAnimationSettings(),
     val customStartupSoundUri: String? = null,
     val customStartupSoundDurationSeconds: Int = DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS,
     val customStartupSoundVolume: Float = DEFAULT_CUSTOM_AUDIO_VOLUME,
@@ -148,6 +162,7 @@ data class SettingsUiState(
     // Built-in KPatch Next
     val isKPatchNextInstalled: Boolean = false,
     val isKPatchNextEnabled: Boolean = false,
+    val isKPatchNextOperationRunning: Boolean = false,
     val isKPatchNextPendingUpdate: Boolean = false,
     val isKPatchNextPendingRemove: Boolean = false,
     val isKPatchNextWebUiAvailable: Boolean = false,
@@ -181,6 +196,7 @@ data class SettingsScreenActions(
     val onSetShowGkiWarning: (Boolean) -> Unit,
     val onSetShowHomeSupportCard: (Boolean) -> Unit,
     val onSetShowHomeLearnCard: (Boolean) -> Unit,
+    val onSetMiuixClassicHomeLayoutEnabled: (Boolean) -> Unit,
     val onSetGraphicsRendererFeatureEnabled: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,
     val onOpenThemeStore: () -> Unit,
@@ -191,6 +207,9 @@ data class SettingsScreenActions(
     val onSetSeasonCardMotionEnabled: (Boolean) -> Unit,
     val onSetRainStyleIndex: (Int) -> Unit,
     val onSetRainCardMotionEnabled: (Boolean) -> Unit,
+    val onSetInkStyleIndex: (Int) -> Unit,
+    val onSetInkFontEnabled: (Boolean) -> Unit,
+    val onSetInkCardMotionEnabled: (Boolean) -> Unit,
     val onSetPixelStyleIndex: (Int) -> Unit,
     val onSetPixelCardMotionEnabled: (Boolean) -> Unit,
     val onSetGlobalSnowEnabled: (Boolean) -> Unit,
@@ -209,8 +228,6 @@ data class SettingsScreenActions(
     val onOpenHomeCardWallpapers: () -> Unit,
     val onOpenVisualEffects: () -> Unit,
     val onOpenUiDecorationLibrary: () -> Unit,
-    val onOpenBackgrounds: () -> Unit,
-    val onOpenSoundEffects: () -> Unit,
     val onPickWallpaper: () -> Unit,
     val onPreviewWallpaper: () -> Unit,
     val onEditWallpaperCrop: () -> Unit,
@@ -235,7 +252,6 @@ data class SettingsScreenActions(
     val onDeleteCustomThemePreset: (String) -> Unit,
     val onSetThemeSyncStrategy: (ThemeSyncStrategy) -> Unit,
     val onResetThemeToDefault: () -> Unit,
-    val onOpenStartupAnimation: () -> Unit,
     val onOpenProfileTemplate: () -> Unit,
     val onSetSuCompatMode: (Int) -> Unit,
     val onSetKernelUmountEnabled: (Boolean) -> Unit,

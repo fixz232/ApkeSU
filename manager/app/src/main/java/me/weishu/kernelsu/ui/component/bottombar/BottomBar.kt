@@ -2,7 +2,6 @@ package me.weishu.kernelsu.ui.component.bottombar
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -15,8 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalMainPagerState
@@ -46,6 +47,7 @@ class MainPagerState(
     private var navJob: Job? = null
 
     fun animateToPage(targetIndex: Int) {
+        if (targetIndex !in 0 until pagerState.pageCount) return
         if (targetIndex in 1..2 && !fullFeatured) return
         if (targetIndex == selectedPage) return
 
@@ -56,24 +58,30 @@ class MainPagerState(
 
         val distance = abs(targetIndex - pagerState.currentPage).coerceAtLeast(1)
         val duration = (175 + distance * 45).coerceIn(220, 320)
-        val layoutInfo = pagerState.layoutInfo
-        val pageSize = layoutInfo.pageSize + layoutInfo.pageSpacing
-        val currentDistanceInPages = targetIndex - pagerState.currentPage - pagerState.currentPageOffsetFraction
-        val scrollPixels = currentDistanceInPages * pageSize
-
         navJob = coroutineScope.launch {
             val myJob = coroutineContext.job
             try {
-                pagerState.animateScrollBy(
-                    value = scrollPixels,
+                // Let Pager resolve its measured page size. A manual pixel offset can be
+                // zero before the first layout pass, leaving the selected page unchanged.
+                pagerState.animateScrollToPage(
+                    page = targetIndex,
                     animationSpec = tween(easing = FastOutSlowInEasing, durationMillis = duration)
                 )
             } finally {
                 if (navJob == myJob) {
-                    isNavigating = false
-                    if (pagerState.currentPage != targetIndex) {
-                        selectedPage = pagerState.currentPage
+                    if (
+                        shouldSnapMainPagerToTarget(
+                            targetPage = targetIndex,
+                            currentPage = pagerState.currentPage,
+                            currentPageOffsetFraction = pagerState.currentPageOffsetFraction,
+                        )
+                    ) {
+                        withContext(NonCancellable) {
+                            runCatching { pagerState.scrollToPage(targetIndex) }
+                        }
                     }
+                    isNavigating = false
+                    selectedPage = pagerState.currentPage
                 }
             }
         }
@@ -85,13 +93,27 @@ class MainPagerState(
         }
     }
 
-    fun updateFeatureAvailability(available: Boolean) {
-        fullFeatured = available
-        if (!available && selectedPage in 1..2) {
+    fun updateFeatureAvailability(available: Boolean?) {
+        val resolvedAvailability = available ?: return
+        fullFeatured = resolvedAvailability
+        if (shouldResetMainPagerForFeatureAvailability(resolvedAvailability, selectedPage)) {
             animateToPage(0)
         }
     }
 }
+
+internal fun shouldResetMainPagerForFeatureAvailability(
+    available: Boolean?,
+    selectedPage: Int,
+): Boolean = available == false && selectedPage in 1..2
+
+internal fun shouldSnapMainPagerToTarget(
+    targetPage: Int,
+    currentPage: Int,
+    currentPageOffsetFraction: Float,
+): Boolean = targetPage != currentPage ||
+    !currentPageOffsetFraction.isFinite() ||
+    abs(currentPageOffsetFraction) > MAIN_PAGER_SETTLED_EPSILON
 
 @Composable
 fun rememberMainPagerState(
@@ -102,6 +124,8 @@ fun rememberMainPagerState(
         MainPagerState(pagerState, coroutineScope)
     }
 }
+
+private const val MAIN_PAGER_SETTLED_EPSILON = 0.001f
 
 @Immutable
 data class NavigationBadgeState(
@@ -144,16 +168,6 @@ fun BottomBar(
 
     if (LocalUiMode.current == UiMode.Material) {
         BottomBarMaterial(navigationBadge)
-        return
-    }
-
-    if (LocalInterfaceStyle.current == InterfaceStyle.Studio.value) {
-        val mainState = LocalMainPagerState.current
-        StudioBottomBar(
-            selectedIndex = mainState.selectedPage,
-            onSelected = mainState::animateToPage,
-            modifier = modifier,
-        )
         return
     }
 
@@ -200,16 +214,6 @@ fun SideRail(
 
     if (LocalUiMode.current == UiMode.Material) {
         NavigationRailMaterial(navigationBadge, modifier)
-        return
-    }
-
-    if (LocalInterfaceStyle.current == InterfaceStyle.Studio.value) {
-        val mainState = LocalMainPagerState.current
-        StudioNavigationRail(
-            selectedIndex = mainState.selectedPage,
-            onSelected = mainState::animateToPage,
-            modifier = modifier,
-        )
         return
     }
 

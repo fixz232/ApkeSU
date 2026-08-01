@@ -5,6 +5,11 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.content.edit
+import androidx.core.net.toUri
+import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
+import me.weishu.kernelsu.ui.InterfaceStyle
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_ACTIVE_ID_KEY
@@ -24,6 +29,14 @@ import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UiCardDecoration
 import me.weishu.kernelsu.ui.component.decoration.UiDecorationConfig
 import me.weishu.kernelsu.ui.component.decoration.UiNavigationDecoration
+import me.weishu.kernelsu.ui.theme.ColorMode
+import me.weishu.kernelsu.ui.theme.ThemeAppearanceDefaults
+import me.weishu.kernelsu.ui.theme.ThemePreset
+import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
+import me.weishu.kernelsu.ui.theme.defaultThemePresetForUiMode
+import me.weishu.kernelsu.ui.theme.sanitizeMonetSurfaceOpacity
+import me.weishu.kernelsu.ui.theme.themePreferenceKey
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -38,7 +51,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 private const val THEME_STORE_SCHEMA = "io.github.fixz.apkesu.theme"
-internal const val THEME_STORE_VERSION = 4
+internal const val THEME_STORE_VERSION = 6
 private const val MAX_THEME_STORE_ENTRY_COUNT = 80
 private const val MAX_THEME_STORE_JSON_BYTES = 256L * 1024L
 private const val MAX_THEME_STORE_ASSET_BYTES = 500L * 1024L * 1024L
@@ -62,6 +75,7 @@ enum class ThemeStoreImageSlot(
     val cropTopKey: String,
     val cropRightKey: String,
     val cropBottomKey: String,
+    val introducedInPackageVersion: Int = 5,
 ) {
     Lkm(
         id = "lkm",
@@ -73,11 +87,33 @@ enum class ThemeStoreImageSlot(
         cropRightKey = "home_lkm_card_wallpaper_crop_right",
         cropBottomKey = "home_lkm_card_wallpaper_crop_bottom",
     ),
+    ClassicMiuixLkm(
+        id = "classic_miuix_lkm",
+        group = ThemeStoreImageGroup.Home,
+        uriKey = "home_classic_miuix_lkm_card_wallpaper_uri",
+        videoUriKey = "home_classic_miuix_lkm_card_wallpaper_video_uri",
+        cropLeftKey = "home_classic_miuix_lkm_card_wallpaper_crop_left",
+        cropTopKey = "home_classic_miuix_lkm_card_wallpaper_crop_top",
+        cropRightKey = "home_classic_miuix_lkm_card_wallpaper_crop_right",
+        cropBottomKey = "home_classic_miuix_lkm_card_wallpaper_crop_bottom",
+        introducedInPackageVersion = 6,
+    ),
+    MaterialLkm(
+        id = "material_lkm",
+        group = ThemeStoreImageGroup.Home,
+        uriKey = "home_material_lkm_card_wallpaper_uri",
+        videoUriKey = "home_material_lkm_card_wallpaper_video_uri",
+        cropLeftKey = "home_material_lkm_card_wallpaper_crop_left",
+        cropTopKey = "home_material_lkm_card_wallpaper_crop_top",
+        cropRightKey = "home_material_lkm_card_wallpaper_crop_right",
+        cropBottomKey = "home_material_lkm_card_wallpaper_crop_bottom",
+        introducedInPackageVersion = 6,
+    ),
     Superuser(
         id = "superuser",
         group = ThemeStoreImageGroup.Home,
         uriKey = "home_superuser_card_wallpaper_uri",
-        videoUriKey = null,
+        videoUriKey = "home_superuser_card_wallpaper_video_uri",
         cropLeftKey = "home_superuser_card_wallpaper_crop_left",
         cropTopKey = "home_superuser_card_wallpaper_crop_top",
         cropRightKey = "home_superuser_card_wallpaper_crop_right",
@@ -87,7 +123,7 @@ enum class ThemeStoreImageSlot(
         id = "module",
         group = ThemeStoreImageGroup.Home,
         uriKey = "home_module_card_wallpaper_uri",
-        videoUriKey = null,
+        videoUriKey = "home_module_card_wallpaper_video_uri",
         cropLeftKey = "home_module_card_wallpaper_crop_left",
         cropTopKey = "home_module_card_wallpaper_crop_top",
         cropRightKey = "home_module_card_wallpaper_crop_right",
@@ -97,7 +133,7 @@ enum class ThemeStoreImageSlot(
         id = "status_monitor",
         group = ThemeStoreImageGroup.Home,
         uriKey = "home_status_monitor_wallpaper_uri",
-        videoUriKey = null,
+        videoUriKey = "home_status_monitor_wallpaper_video_uri",
         cropLeftKey = "home_status_monitor_wallpaper_crop_left",
         cropTopKey = "home_status_monitor_wallpaper_crop_top",
         cropRightKey = "home_status_monitor_wallpaper_crop_right",
@@ -107,7 +143,7 @@ enum class ThemeStoreImageSlot(
         id = "system_info",
         group = ThemeStoreImageGroup.Home,
         uriKey = "home_system_info_wallpaper_uri",
-        videoUriKey = null,
+        videoUriKey = "home_system_info_wallpaper_video_uri",
         cropLeftKey = "home_system_info_wallpaper_crop_left",
         cropTopKey = "home_system_info_wallpaper_crop_top",
         cropRightKey = "home_system_info_wallpaper_crop_right",
@@ -162,21 +198,95 @@ enum class ThemeStoreImageSlot(
             add(cropTopKey)
             add(cropRightKey)
             add(cropBottomKey)
+            add(nightUriKey)
+            add(nightVideoUriKey)
+            add(nightCropKey)
+            add(responsiveCropsKey)
+            add(nightResponsiveCropsKey)
+            add(variantSettingsKey)
+            addAll(visualKeys.all)
+            addAll(nightVisualKeys.all)
         }
+
+    val nightUriKey: String get() = "theme_card_${id}_night_uri"
+    val nightVideoUriKey: String get() = "theme_card_${id}_night_video_uri"
+    val nightCropKey: String get() = "theme_card_${id}_night_crop"
+    val responsiveCropsKey: String get() = "theme_card_${id}_responsive_crops"
+    val nightResponsiveCropsKey: String get() = "theme_card_${id}_night_responsive_crops"
+    val variantSettingsKey: String get() = "theme_card_${id}_variant_settings"
+    val visualKeys: MediaVisualPreferenceKeys get() = MediaVisualPreferenceKeys("theme_card_${id}_visual")
+    val nightVisualKeys: MediaVisualPreferenceKeys get() = MediaVisualPreferenceKeys("theme_card_${id}_night_visual")
+
+    val defaultVisualSettings: MediaVisualSettings
+        get() = MediaVisualSettings(
+            overlayAlpha = if (group == ThemeStoreImageGroup.Home) 0.44f else 0.42f,
+        )
 }
 
 data class ThemeStoreImageState(
     val uriString: String?,
     val videoUriString: String?,
     val crop: CustomWallpaperCrop,
+    val visualSettings: MediaVisualSettings = MediaVisualSettings(),
+    val responsiveCrops: ResponsiveCropSet = ResponsiveCropSet(),
+    val nightUriString: String? = null,
+    val nightVideoUriString: String? = null,
+    val nightCrop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
+    val nightVisualSettings: MediaVisualSettings = MediaVisualSettings(),
+    val nightResponsiveCrops: ResponsiveCropSet = ResponsiveCropSet(),
+    val variantSettings: MediaVariantSettings = MediaVariantSettings(),
 ) {
     val hasSelected: Boolean
-        get() = hasImageSelected || hasVideoSelected
+        get() = hasImageSelected || hasVideoSelected || hasNightSelected
     val hasImageSelected: Boolean
         get() = !uriString.isNullOrBlank()
     val hasVideoSelected: Boolean
         get() = !videoUriString.isNullOrBlank()
+
+    val hasNightSelected: Boolean
+        get() = !nightUriString.isNullOrBlank() || !nightVideoUriString.isNullOrBlank()
+
+    fun activeVariant(isDark: Boolean, nowMillis: Long = System.currentTimeMillis(), seed: Int = 0): ActiveMediaVariant {
+        val useNight = hasNightSelected && when (variantSettings.mode) {
+            MediaVariantMode.FollowSystem -> isDark
+            MediaVariantMode.Schedule -> {
+                val minutes = java.util.Calendar.getInstance().run {
+                    timeInMillis = nowMillis
+                    get(java.util.Calendar.HOUR_OF_DAY) * 60 + get(java.util.Calendar.MINUTE)
+                }
+                val settings = variantSettings.normalized()
+                if (settings.dayStartMinutes <= settings.nightStartMinutes) {
+                    minutes !in settings.dayStartMinutes until settings.nightStartMinutes
+                } else {
+                    minutes in settings.nightStartMinutes until settings.dayStartMinutes
+                }
+            }
+            MediaVariantMode.Random -> {
+                val bucket = nowMillis / (variantSettings.normalized().randomIntervalMinutes * 60_000L)
+                ((bucket + seed.toLong()) and 1L) == 1L
+            }
+        }
+        return if (useNight) {
+            ActiveMediaVariant(
+                uriString = nightUriString,
+                videoUriString = nightVideoUriString,
+                crop = nightCrop,
+                responsiveCrops = nightResponsiveCrops,
+                visualSettings = nightVisualSettings,
+            )
+        } else {
+            ActiveMediaVariant(uriString, videoUriString, crop, responsiveCrops, visualSettings)
+        }
+    }
 }
+
+data class ActiveMediaVariant(
+    val uriString: String?,
+    val videoUriString: String?,
+    val crop: CustomWallpaperCrop,
+    val responsiveCrops: ResponsiveCropSet,
+    val visualSettings: MediaVisualSettings,
+)
 
 data class ThemeStoreWallpaperState(
     val uriString: String?,
@@ -184,6 +294,7 @@ data class ThemeStoreWallpaperState(
     val videoDurationSeconds: Int,
     val opacity: Float,
     val crop: CustomWallpaperCrop,
+    val visualSettings: MediaVisualSettings = MediaVisualSettings(),
     val passthroughEnabled: Boolean,
     val passthroughOpacity: Float,
 ) {
@@ -209,8 +320,58 @@ data class ThemeStoreAudioState(
             .count { !it.isNullOrBlank() }
 }
 
+data class ThemeStoreAppearanceState(
+    val themeMode: Int,
+    val miuixMonet: Boolean,
+    val keyColor: Int,
+    val colorStyle: String,
+    val colorSpec: String,
+    val monetSurfaceOpacity: Float,
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("themeMode", themeMode)
+        .put("miuixMonet", miuixMonet)
+        .put("keyColor", keyColor)
+        .put("colorStyle", colorStyle)
+        .put("colorSpec", colorSpec)
+        .put("monetSurfaceOpacity", sanitizeMonetSurfaceOpacity(monetSurfaceOpacity))
+
+    companion object {
+        fun fromJson(json: JSONObject, fallback: ThemeStoreAppearanceState): ThemeStoreAppearanceState {
+            val style = json.optString("colorStyle", fallback.colorStyle)
+                .takeIf { value -> PaletteStyle.entries.any { it.name == value } }
+                ?: fallback.colorStyle
+            val spec = json.optString("colorSpec", fallback.colorSpec)
+                .takeIf { value -> ColorSpec.SpecVersion.entries.any { it.name == value } }
+                ?: fallback.colorSpec
+            val miuixMonet = json.optBoolean("miuixMonet", fallback.miuixMonet)
+            val requestedMode = ColorMode.fromValue(json.optInt("themeMode", fallback.themeMode))
+            val effectiveMode = if (miuixMonet) {
+                if (requestedMode.isMonet) requestedMode.value else requestedMode.toMonetMode()
+            } else {
+                if (requestedMode.isMonet) requestedMode.toNonMonetMode() else requestedMode.value
+            }
+            return ThemeStoreAppearanceState(
+                themeMode = effectiveMode,
+                miuixMonet = miuixMonet,
+                keyColor = json.optInt("keyColor", fallback.keyColor),
+                colorStyle = style,
+                colorSpec = spec,
+                monetSurfaceOpacity = sanitizeMonetSurfaceOpacity(
+                    json.optDouble(
+                        "monetSurfaceOpacity",
+                        fallback.monetSurfaceOpacity.toDouble(),
+                    ).toFloat()
+                ),
+            )
+        }
+    }
+}
+
 data class ThemeStoreSummary(
     val lkmCard: ThemeStoreImageState,
+    val classicMiuixLkmCard: ThemeStoreImageState,
+    val materialLkmCard: ThemeStoreImageState,
     val superuserCard: ThemeStoreImageState,
     val moduleCard: ThemeStoreImageState,
     val statusMonitorCard: ThemeStoreImageState,
@@ -225,6 +386,7 @@ data class ThemeStoreSummary(
     val audio: ThemeStoreAudioState,
     val startupAnimationUri: String?,
     val appFont: AppFontState,
+    val appearance: ThemeStoreAppearanceState,
 ) {
     val startupSoundUri: String?
         get() = audio.startupSoundUri
@@ -234,6 +396,8 @@ data class ThemeStoreSummary(
             CustomPageBackgroundTarget.entries.count { pageBackgrounds[it].hasMedia } +
             listOf(
                 lkmCard.hasSelected,
+                classicMiuixLkmCard.hasSelected,
+                materialLkmCard.hasSelected,
                 superuserCard.hasSelected,
                 moduleCard.hasSelected,
                 statusMonitorCard.hasSelected,
@@ -245,7 +409,8 @@ data class ThemeStoreSummary(
                 wallpaper.hasSelected,
                 !startupAnimationUri.isNullOrBlank(),
             ).count { it } + audio.configuredCount +
-            if (appFont.preset != AppFontPreset.System) 1 else 0
+            (if (appFont.preset != AppFontPreset.System) 1 else 0) +
+            1
 }
 
 data class ThemeStorePackageResult(
@@ -317,6 +482,8 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
     val prefs = themeStorePrefs(context)
     return ThemeStoreSummary(
         lkmCard = prefs.readImageSlot(ThemeStoreImageSlot.Lkm),
+        classicMiuixLkmCard = prefs.readImageSlot(ThemeStoreImageSlot.ClassicMiuixLkm),
+        materialLkmCard = prefs.readImageSlot(ThemeStoreImageSlot.MaterialLkm),
         superuserCard = prefs.readImageSlot(ThemeStoreImageSlot.Superuser),
         moduleCard = prefs.readImageSlot(ThemeStoreImageSlot.Module),
         statusMonitorCard = prefs.readImageSlot(ThemeStoreImageSlot.StatusMonitor),
@@ -340,6 +507,7 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
                 prefs.getFloat(CUSTOM_WALLPAPER_OPACITY_KEY, DEFAULT_CUSTOM_WALLPAPER_OPACITY)
             ),
             crop = prefs.readCustomWallpaperCrop(),
+            visualSettings = prefs.readMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS),
             passthroughEnabled = prefs.getBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, false),
             passthroughOpacity = sanitizeCustomWallpaperPassthroughOpacity(
                 prefs.getFloat(
@@ -373,6 +541,7 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
         ),
         startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null),
         appFont = readAppFontState(context),
+        appearance = prefs.readThemeStoreAppearance(),
     )
 }
 
@@ -427,6 +596,77 @@ fun setThemeStoreImageSlotVideo(context: Context, slot: ThemeStoreImageSlot, uri
 fun setThemeStoreImageSlotCrop(context: Context, slot: ThemeStoreImageSlot, crop: CustomWallpaperCrop) {
     themeStorePrefs(context).edit(commit = true) {
         putImageSlotCrop(slot, crop)
+    }
+}
+
+fun setThemeStoreImageSlotVisualSettings(
+    context: Context,
+    slot: ThemeStoreImageSlot,
+    settings: MediaVisualSettings,
+    night: Boolean = false,
+) {
+    themeStorePrefs(context).edit {
+        putMediaVisualSettings(if (night) slot.nightVisualKeys else slot.visualKeys, settings)
+    }
+}
+
+fun setThemeStoreImageSlotResponsiveCrops(
+    context: Context,
+    slot: ThemeStoreImageSlot,
+    crops: ResponsiveCropSet,
+    night: Boolean = false,
+) {
+    themeStorePrefs(context).edit(commit = true) {
+        putString(
+            if (night) slot.nightResponsiveCropsKey else slot.responsiveCropsKey,
+            crops.normalized().toJson().toString(),
+        )
+    }
+}
+
+fun setThemeStoreImageSlotVariantSettings(
+    context: Context,
+    slot: ThemeStoreImageSlot,
+    settings: MediaVariantSettings,
+) {
+    themeStorePrefs(context).edit(commit = true) {
+        putString(slot.variantSettingsKey, settings.normalized().toJson().toString())
+    }
+}
+
+fun setThemeStoreImageSlotNightMedia(
+    context: Context,
+    slot: ThemeStoreImageSlot,
+    uriString: String?,
+    video: Boolean,
+) {
+    val prefs = themeStorePrefs(context)
+    val previousImage = prefs.getString(slot.nightUriKey, null)
+    val previousVideo = prefs.getString(slot.nightVideoUriKey, null)
+    prefs.edit(commit = true) {
+        if (uriString.isNullOrBlank()) {
+            remove(slot.nightUriKey)
+            remove(slot.nightVideoUriKey)
+            remove(slot.nightCropKey)
+        } else if (video) {
+            remove(slot.nightUriKey)
+            putString(slot.nightVideoUriKey, uriString)
+            putString(slot.nightCropKey, DEFAULT_CUSTOM_WALLPAPER_CROP.toJson().toString())
+        } else {
+            putString(slot.nightUriKey, uriString)
+            remove(slot.nightVideoUriKey)
+            putString(slot.nightCropKey, DEFAULT_CUSTOM_WALLPAPER_CROP.toJson().toString())
+        }
+    }
+    if (!video && previousImage != uriString) releaseCustomImageReference(context, previousImage)
+    if (video || uriString.isNullOrBlank()) releaseCustomImageReference(context, previousImage)
+    if (video && previousVideo != uriString) releasePersistableVideoBackgroundReadPermission(context, previousVideo)
+    if (!video || uriString.isNullOrBlank()) releasePersistableVideoBackgroundReadPermission(context, previousVideo)
+}
+
+fun setThemeStoreImageSlotNightCrop(context: Context, slot: ThemeStoreImageSlot, crop: CustomWallpaperCrop) {
+    themeStorePrefs(context).edit(commit = true) {
+        putString(slot.nightCropKey, crop.toJson().toString())
     }
 }
 
@@ -523,8 +763,8 @@ fun setThemeStoreVideoBackgroundDurationSeconds(context: Context, seconds: Int) 
 fun setThemeStoreStartupSound(context: Context, uriString: String?) {
     val prefs = themeStorePrefs(context)
     val previous = prefs.getString(CUSTOM_STARTUP_SOUND_URI_KEY, null)
-    if (previous != uriString) {
-        releasePersistableAudioReadPermission(context, previous)
+    if (previous != uriString && !isAudioUriReferencedBySavedScheme(context, previous)) {
+        releaseCustomAudioReference(context, previous)
     }
     prefs.edit {
         if (uriString.isNullOrBlank()) {
@@ -598,6 +838,20 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         warnings = warnings,
                         budget = assetBudget,
                     )
+                    val nightAsset = zip.writeUriAsset(
+                        context = appContext,
+                        uriString = state.nightUriString,
+                        assetId = "card_${slot.id}_night",
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
+                    val nightVideoAsset = zip.writeUriAsset(
+                        context = appContext,
+                        uriString = state.nightVideoUriString,
+                        assetId = "card_${slot.id}_night_video",
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
                     cardsJson.put(
                         slot.id,
                         JSONObject()
@@ -605,7 +859,17 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                             .put("uri", state.uriString)
                             .put("videoAsset", videoAsset?.toJson())
                             .put("videoUri", state.videoUriString)
-                            .put("crop", state.crop.toJson()),
+                            .put("crop", state.crop.toJson())
+                            .put("visualSettings", state.visualSettings.toJson())
+                            .put("responsiveCrops", state.responsiveCrops.toJson())
+                            .put("nightAsset", nightAsset?.toJson())
+                            .put("nightUri", state.nightUriString)
+                            .put("nightVideoAsset", nightVideoAsset?.toJson())
+                            .put("nightVideoUri", state.nightVideoUriString)
+                            .put("nightCrop", state.nightCrop.toJson())
+                            .put("nightVisualSettings", state.nightVisualSettings.toJson())
+                            .put("nightResponsiveCrops", state.nightResponsiveCrops.toJson())
+                            .put("variantSettings", state.variantSettings.toJson()),
                     )
                 }
                 config.put("cards", cardsJson)
@@ -625,7 +889,8 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         JSONObject()
                             .put("asset", asset?.toJson())
                             .put("uri", state.uriString)
-                            .put("crop", state.crop.toJson()),
+                            .put("crop", state.crop.toJson())
+                            .put("presentation", state.presentationToJson()),
                     )
                 }
                 config.put("navigationIcons", navigationIconsJson)
@@ -657,7 +922,8 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                             .put("videoUri", state.videoUriString)
                             .put("videoDurationSeconds", state.videoDurationSeconds)
                             .put("opacity", state.opacity)
-                            .put("crop", state.crop.toJson()),
+                            .put("crop", state.crop.toJson())
+                            .put("visualSettings", state.visualSettings.toJson()),
                     )
                 }
                 config.put("pageBackgrounds", pageBackgroundsJson)
@@ -675,6 +941,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         prefs.getFloat(CUSTOM_WALLPAPER_OPACITY_KEY, DEFAULT_CUSTOM_WALLPAPER_OPACITY)
                     ),
                     crop = prefs.readCustomWallpaperCrop(),
+                    visualSettings = prefs.readMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS),
                     passthroughEnabled = prefs.getBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, false),
                     passthroughOpacity = sanitizeCustomWallpaperPassthroughOpacity(
                         prefs.getFloat(
@@ -707,6 +974,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         .put("videoDurationSeconds", wallpaperState.videoDurationSeconds)
                         .put("opacity", wallpaperState.opacity)
                         .put("crop", wallpaperState.crop.toJson())
+                        .put("visualSettings", wallpaperState.visualSettings.toJson())
                         .put("passthroughEnabled", wallpaperState.passthroughEnabled)
                         .put("passthroughOpacity", wallpaperState.passthroughOpacity),
                 )
@@ -791,6 +1059,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                             ),
                         ),
                 )
+                config.put("audioSettings", readAppAudioSettings(appContext).toJson())
 
                 val startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null)
                 val startupAnimationAsset = zip.writeUriAsset(
@@ -804,7 +1073,8 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                     "startupAnimation",
                     JSONObject()
                         .put("asset", startupAnimationAsset?.toJson())
-                        .put("uri", startupAnimationUri),
+                        .put("uri", startupAnimationUri)
+                        .put("settings", readStartupAnimationSettings(appContext).toJson()),
                 )
 
                 config.put(
@@ -824,6 +1094,30 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         warnings = warnings,
                         budget = assetBudget,
                     ),
+                )
+                config.put("appearance", prefs.readThemeStoreAppearance().toJson())
+
+                val layoutStickerAssets = mutableMapOf<String, JSONObject?>()
+                var layoutStickerIndex = 0
+                config.put(
+                    "homeLayout",
+                    homeLayoutStateToJson(readHomeLayoutState(appContext)) { sticker ->
+                        val key = sticker.uriString
+                        val asset = layoutStickerAssets.getOrPut(key) {
+                            zip.writeUriAsset(
+                                context = appContext,
+                                uriString = sticker.uriString,
+                                assetId = "home_layout_sticker_${layoutStickerIndex++}",
+                                warnings = warnings,
+                                budget = assetBudget,
+                            )?.toJson()
+                        }
+                        if (asset != null) {
+                            JSONObject().put("asset", JSONObject(asset.toString()))
+                        } else {
+                            JSONObject().put("uri", sticker.uriString)
+                        }
+                    },
                 )
 
                 val configBytes = config.toString(2).toByteArray(Charsets.UTF_8)
@@ -931,6 +1225,7 @@ fun readComponentStylePackage(
         val config = JSONObject(extracted.themeJson)
         validateThemeStoreConfig(config)
         validateEmbeddedThemeStoreAssets(config, assetsDir)
+        validateEmbeddedThemeStoreMedia(appContext, config, assetsDir)
         val components = config.optJSONObject("components")
             ?: error("Theme package does not contain a component style")
         val hasCardStyle = components.optJSONObject("cardStyle") != null
@@ -969,6 +1264,7 @@ fun exportCloudThemeStorePackage(context: Context, destination: Uri): ThemeStore
         val config = JSONObject(extracted.themeJson)
         validateThemeStoreConfig(config)
         validateEmbeddedThemeStoreAssets(config, assetsDir)
+        validateEmbeddedThemeStoreMedia(appContext, config, assetsDir)
         sanitizeThemeStoreConfigForCloud(config)
         validateThemeStoreConfigForCloud(config)
 
@@ -1011,6 +1307,7 @@ fun validateThemeStorePackage(context: Context, source: Uri): ThemeStorePackageR
             val config = JSONObject(extracted.themeJson)
             validateThemeStoreConfig(config)
             validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            validateEmbeddedThemeStoreMedia(appContext, config, tempAssetsDir)
             collectLegacyThemeStoreUriWarnings(appContext, config, warnings)
             ThemeStorePackageResult(success = true, warnings = warnings)
         } finally {
@@ -1039,6 +1336,7 @@ fun previewThemeStorePackage(
             val config = JSONObject(extracted.themeJson)
             validateThemeStoreConfig(config)
             validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            validateEmbeddedThemeStoreMedia(appContext, config, tempAssetsDir)
             if (requireCloudSafe) {
                 validateThemeStoreConfigForCloud(config)
             }
@@ -1075,6 +1373,23 @@ fun previewThemeStorePackage(
     }
 }
 
+internal fun resolveImportedAudioSettings(
+    current: AppAudioSettings,
+    packaged: AppAudioSettings?,
+    startupImported: Boolean,
+    clickImported: Boolean,
+    backgroundImported: Boolean,
+): AppAudioSettings? {
+    packaged?.let { return it.normalized() }
+    if (!startupImported && !clickImported && !backgroundImported) return null
+    return current.copy(
+        masterEnabled = true,
+        startup = if (startupImported) current.startup.copy(enabled = true) else current.startup,
+        click = if (clickImported) current.click.copy(enabled = true) else current.click,
+        background = if (backgroundImported) current.background.copy(enabled = true) else current.background,
+    ).normalized()
+}
+
 fun importThemeStorePackage(
     context: Context,
     source: Uri,
@@ -1083,7 +1398,7 @@ fun importThemeStorePackage(
     val appContext = context.applicationContext
     val warnings = mutableListOf<ThemeStorePackageWarning>()
     val componentStyleStore = ComponentStyleStore(appContext)
-    var pendingComponentImageUri: String? = null
+    var pendingComponentImageUris: List<String> = emptyList()
     var replacedSwitchStyles: Pair<List<CustomSwitchStyle>, List<CustomSwitchStyle>>? = null
     val tempDir = File(appContext.cacheDir, "theme-store-import").apply {
         deleteRecursively()
@@ -1098,6 +1413,13 @@ fun importThemeStorePackage(
             val config = JSONObject(extracted.themeJson)
             validateThemeStoreConfig(config)
             validateEmbeddedThemeStoreAssets(config, tempAssetsDir)
+            val packageVersion = config.getInt("version")
+            val supportsMediaPolicies = packageVersion >= 5
+            val previousSummary = readThemeStoreSummary(appContext)
+            val previousHomeLayout = readHomeLayoutState(appContext)
+            val pendingAppearance = config.optJSONObject("appearance")?.let { appearanceJson ->
+                ThemeStoreAppearanceState.fromJson(appearanceJson, previousSummary.appearance)
+            }
 
             val componentOnlyPackage = config.optString("packageType") == COMPONENT_ONLY_PACKAGE_TYPE
             val componentsJson = config.optJSONObject("components")
@@ -1106,7 +1428,9 @@ fun importThemeStorePackage(
                 componentsJson?.optJSONObject("switchStyle") != null
             ) {
                 parseComponentStyleContent(appContext, config, tempAssetsDir).also { content ->
-                    pendingComponentImageUri = content.switchStyle?.imageUri
+                    pendingComponentImageUris = content.switchStyle
+                        ?.let { listOfNotNull(it.imageUri, it.imageOnUri).distinct() }
+                        .orEmpty()
                 }
             } else {
                 null
@@ -1143,7 +1467,7 @@ fun importThemeStorePackage(
             val cardsJson = config.optJSONObject("cards") ?: JSONObject()
             val pendingCards = mutableMapOf<ThemeStoreImageSlot, ThemeStoreImageState>()
             val navigationIconsJson = config.optJSONObject("navigationIcons") ?: JSONObject()
-            val pendingNavigationIcons = mutableMapOf<CustomNavigationIconSlot, Pair<String?, CustomWallpaperCrop>>()
+            val pendingNavigationIcons = mutableMapOf<CustomNavigationIconSlot, CustomNavigationIconState>()
             val pageBackgroundsJson = config.optJSONObject("pageBackgrounds") ?: JSONObject()
             val pendingPageBackgrounds = mutableMapOf<CustomPageBackgroundTarget, CustomBackgroundState>()
             var pendingWallpaper: ThemeStoreWallpaperState? = null
@@ -1157,9 +1481,12 @@ fun importThemeStorePackage(
             var hasBackgroundMusic = false
             var pendingBackgroundMusicUri: String? = null
             var pendingBackgroundMusicVolume = DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
+            var pendingAudioSettings: AppAudioSettings? = null
             var hasStartupAnimation = false
             var pendingStartupAnimationUri: String? = null
+            var pendingStartupAnimationSettings: StartupAnimationSettings? = null
             var pendingAppFont: AppFontState? = null
+            var pendingHomeLayout: HomeLayoutState? = null
 
             ThemeStoreImageSlot.entries.forEach { slot ->
                 val slotJson = cardsJson.optJSONObject(slot.id)
@@ -1190,17 +1517,90 @@ fun importThemeStorePackage(
                     } else {
                         ImportedThemeAsset.Resolved(null)
                     }
+                    val importedNightImage = importAssetUri(
+                        context = appContext,
+                        assetOwnerJson = slotJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        assetId = "card_${slot.id}_night",
+                        warnings = warnings,
+                        budget = assetBudget,
+                        assetKey = "nightAsset",
+                        uriKey = "nightUri",
+                    )
+                    val importedNightVideo = importAssetUri(
+                        context = appContext,
+                        assetOwnerJson = slotJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        assetId = "card_${slot.id}_night_video",
+                        warnings = warnings,
+                        budget = assetBudget,
+                        assetKey = "nightVideoAsset",
+                        uriKey = "nightVideoUri",
+                    )
                     if (importedImage is ImportedThemeAsset.Unavailable ||
-                        importedVideo is ImportedThemeAsset.Unavailable
+                        importedVideo is ImportedThemeAsset.Unavailable ||
+                        importedNightImage is ImportedThemeAsset.Unavailable ||
+                        importedNightVideo is ImportedThemeAsset.Unavailable
                     ) {
                         return@forEach
                     }
                     val importedUri = (importedImage as ImportedThemeAsset.Resolved).uriString
                     val importedVideoUri = (importedVideo as ImportedThemeAsset.Resolved).uriString
+                    val importedNightUri = (importedNightImage as ImportedThemeAsset.Resolved).uriString
+                    val importedNightVideoUri = (importedNightVideo as ImportedThemeAsset.Resolved).uriString
+                    val crop = slotJson.optCrop("crop", DEFAULT_CUSTOM_WALLPAPER_CROP)
+                    val nightCrop = slotJson.optCrop("nightCrop", crop)
+                    val previous = previousSummary.imageState(slot)
                     pendingCards[slot] = ThemeStoreImageState(
                         uriString = importedUri.takeUnless { !importedVideoUri.isNullOrBlank() },
                         videoUriString = importedVideoUri,
-                        crop = slotJson.optCrop("crop", DEFAULT_CUSTOM_WALLPAPER_CROP),
+                        crop = crop,
+                        visualSettings = if (supportsMediaPolicies) {
+                            MediaVisualSettings.fromJson(
+                                slotJson.optJSONObject("visualSettings"),
+                                slot.defaultVisualSettings,
+                            )
+                        } else {
+                            previous.visualSettings
+                        },
+                        responsiveCrops = if (supportsMediaPolicies) {
+                            ResponsiveCropSet.fromJson(slotJson.optJSONObject("responsiveCrops"), crop)
+                        } else {
+                            previous.responsiveCrops
+                        },
+                        nightUriString = if (supportsMediaPolicies) {
+                            importedNightUri.takeUnless { !importedNightVideoUri.isNullOrBlank() }
+                        } else {
+                            previous.nightUriString
+                        },
+                        nightVideoUriString = if (supportsMediaPolicies) {
+                            importedNightVideoUri
+                        } else {
+                            previous.nightVideoUriString
+                        },
+                        nightCrop = if (supportsMediaPolicies) nightCrop else previous.nightCrop,
+                        nightVisualSettings = if (supportsMediaPolicies) {
+                            MediaVisualSettings.fromJson(
+                                slotJson.optJSONObject("nightVisualSettings"),
+                                slot.defaultVisualSettings,
+                            )
+                        } else {
+                            previous.nightVisualSettings
+                        },
+                        nightResponsiveCrops = if (supportsMediaPolicies) {
+                            ResponsiveCropSet.fromJson(slotJson.optJSONObject("nightResponsiveCrops"), nightCrop)
+                        } else {
+                            previous.nightResponsiveCrops
+                        },
+                        variantSettings = if (supportsMediaPolicies) {
+                            MediaVariantSettings.fromJson(slotJson.optJSONObject("variantSettings"))
+                        } else {
+                            previous.variantSettings
+                        },
                     )
                 }
             }
@@ -1219,11 +1619,13 @@ fun importThemeStorePackage(
                         budget = assetBudget,
                     )
                     if (importedAsset is ImportedThemeAsset.Unavailable) return@forEach
-                    pendingNavigationIcons[slot] =
-                        (importedAsset as ImportedThemeAsset.Resolved).uriString to slotJson.optCrop(
-                        "crop",
-                        DEFAULT_CUSTOM_NAVIGATION_ICON_CROP,
-                    )
+                    val uriString = (importedAsset as ImportedThemeAsset.Resolved).uriString
+                    val crop = slotJson.optCrop("crop", DEFAULT_CUSTOM_NAVIGATION_ICON_CROP)
+                    pendingNavigationIcons[slot] = if (supportsMediaPolicies) {
+                        slotJson.optJSONObject("presentation").toNavigationIconState(uriString, crop)
+                    } else {
+                        previousSummary.navigationIcons[slot].copy(uriString = uriString, crop = crop)
+                    }
                 }
             }
 
@@ -1275,6 +1677,11 @@ fun importThemeStorePackage(
                                 DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
                             )
                         ),
+                        visualSettings = if (supportsMediaPolicies) {
+                            MediaVisualSettings.fromJson(targetJson.optJSONObject("visualSettings"))
+                        } else {
+                            previousSummary.pageBackgrounds[target].visualSettings
+                        },
                     )
                 }
             }
@@ -1325,6 +1732,11 @@ fun importThemeStorePackage(
                         ).toFloat()
                     ),
                     crop = wallpaperJson.optCrop("crop", DEFAULT_CUSTOM_WALLPAPER_CROP),
+                    visualSettings = if (supportsMediaPolicies) {
+                        MediaVisualSettings.fromJson(wallpaperJson.optJSONObject("visualSettings"))
+                    } else {
+                        previousSummary.wallpaper.visualSettings
+                    },
                     passthroughEnabled = wallpaperJson.optBoolean("passthroughEnabled", false),
                     passthroughOpacity = sanitizeCustomWallpaperPassthroughOpacity(
                         wallpaperJson.optDouble(
@@ -1411,6 +1823,17 @@ fun importThemeStorePackage(
                 )
             }
 
+            config.optJSONObject("audioSettings")?.takeUnless { componentOnlyPackage }?.let { settingsJson ->
+                pendingAudioSettings = AppAudioSettings.fromJson(settingsJson)
+            }
+            pendingAudioSettings = resolveImportedAudioSettings(
+                current = readAppAudioSettings(appContext),
+                packaged = pendingAudioSettings,
+                startupImported = hasStartupSound && !pendingStartupSoundUri.isNullOrBlank(),
+                clickImported = hasClickSound && !pendingClickSoundUri.isNullOrBlank(),
+                backgroundImported = hasBackgroundMusic && !pendingBackgroundMusicUri.isNullOrBlank(),
+            )
+
             config.optJSONObject("startupAnimation")?.takeUnless { componentOnlyPackage }?.let { animationJson ->
                 val importedAsset = importAssetUri(
                     context = appContext,
@@ -1425,6 +1848,11 @@ fun importThemeStorePackage(
                 if (importedAsset is ImportedThemeAsset.Unavailable) return@let
                 hasStartupAnimation = true
                 pendingStartupAnimationUri = (importedAsset as ImportedThemeAsset.Resolved).uriString
+                pendingStartupAnimationSettings = if (supportsMediaPolicies) {
+                    StartupAnimationSettings.fromJson(animationJson.optJSONObject("settings"))
+                } else {
+                    readStartupAnimationSettings(appContext)
+                }
             }
 
             config.optJSONObject("font")?.let { fontJson ->
@@ -1441,8 +1869,23 @@ fun importThemeStorePackage(
                 }
             }
 
+            config.optJSONObject("homeLayout")
+                ?.takeUnless { componentOnlyPackage }
+                ?.let { layoutJson ->
+                    pendingHomeLayout = importThemeStoreHomeLayout(
+                        context = appContext,
+                        layoutJson = layoutJson,
+                        tempAssetsDir = tempAssetsDir,
+                        stagingAssetsDir = stagingAssetsDir,
+                        targetAssetsDir = targetAssetsDir,
+                        warnings = warnings,
+                        budget = assetBudget,
+                    )
+                }
+
             val prefs = themeStorePrefs(appContext)
             val editor = prefs.edit()
+            pendingAppearance?.let { editor.putThemeStoreAppearance(prefs, it) }
             pendingCards.forEach { (slot, pending) ->
                 val importedUri = pending.uriString.takeUnless { pending.hasVideoSelected }
                 val importedVideoUri = pending.videoUriString.takeIf { slot.videoUriKey != null }
@@ -1462,17 +1905,29 @@ fun importThemeStorePackage(
                         editor.putString(videoUriKey, importedVideoUri)
                     }
                 }
+                editor.putMediaVisualSettings(slot.visualKeys, pending.visualSettings)
+                editor.putString(slot.responsiveCropsKey, pending.responsiveCrops.toJson().toString())
+                editor.putOptionalString(slot.nightUriKey, pending.nightUriString)
+                editor.putOptionalString(slot.nightVideoUriKey, pending.nightVideoUriString)
+                editor.putString(slot.nightCropKey, pending.nightCrop.toJson().toString())
+                editor.putMediaVisualSettings(slot.nightVisualKeys, pending.nightVisualSettings)
+                editor.putString(
+                    slot.nightResponsiveCropsKey,
+                    pending.nightResponsiveCrops.toJson().toString(),
+                )
+                editor.putString(slot.variantSettingsKey, pending.variantSettings.toJson().toString())
             }
 
             pendingNavigationIcons.forEach { (slot, pending) ->
-                val (importedUri, crop) = pending
+                val importedUri = pending.uriString
                 if (importedUri.isNullOrBlank()) {
                     editor.remove(slot.uriKey)
                     editor.removeCustomNavigationIconCrop(slot)
                 } else {
                     editor.putString(slot.uriKey, importedUri)
-                    editor.putCustomNavigationIconCrop(slot, crop)
+                    editor.putCustomNavigationIconCrop(slot, pending.crop)
                 }
+                editor.putNavigationIconPresentation(slot, pending)
             }
 
             pendingPageBackgrounds.forEach { (target, pending) ->
@@ -1503,11 +1958,19 @@ fun importThemeStorePackage(
                 editor.putFloat(CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY, pendingBackgroundMusicVolume)
             }
 
+            pendingAudioSettings?.let { settings ->
+                editor.putString(CUSTOM_AUDIO_SETTINGS_KEY, settings.toJson().toString())
+            }
+
             if (hasStartupAnimation) {
                 editor.putOptionalString(CUSTOM_STARTUP_ANIMATION_URI_KEY, pendingStartupAnimationUri)
+                pendingStartupAnimationSettings?.let { settings ->
+                    editor.putString(CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY, settings.toJson().toString())
+                }
             }
 
             pendingAppFont?.let(editor::putAppFontState)
+            pendingHomeLayout?.let(editor::putHomeLayoutState)
 
             pendingComponentStyles?.let { content ->
                 replacedSwitchStyles = stageImportedComponentStyles(
@@ -1518,7 +1981,6 @@ fun importThemeStorePackage(
                 )
             }
 
-            val previousSummary = readThemeStoreSummary(appContext)
             val directorySwap = beginThemeStoreDirectorySwap(targetDir, nextStagingDir)
             stagingDir = null
             var preferencesCommitted = false
@@ -1541,6 +2003,11 @@ fun importThemeStorePackage(
                 previous = previousSummary,
                 current = readThemeStoreSummary(appContext),
             )
+            releaseReplacedHomeLayoutStickerReferences(
+                context = appContext,
+                previous = previousHomeLayout,
+                current = readHomeLayoutState(appContext),
+            )
             if (clearCloudThemeState && !componentOnlyPackage) {
                 runCatching {
                     CloudThemeRepository(appContext).recordExternalThemeApplied()
@@ -1558,13 +2025,52 @@ fun importThemeStorePackage(
             stagingDir?.deleteRecursively()
         }
     }.getOrElse { error ->
-        componentStyleStore.discardSwitchImageIfUnreferenced(pendingComponentImageUri)
+        pendingComponentImageUris.forEach(componentStyleStore::discardSwitchImageIfUnreferenced)
         ThemeStorePackageResult(success = false, warnings = warnings, error = error)
     }
 }
 
 private fun themeStorePrefs(context: Context): SharedPreferences {
     return context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+}
+
+private fun SharedPreferences.readThemeStoreAppearance(): ThemeStoreAppearanceState {
+    val uiMode = InterfaceStyle.normalizeValue(getString("ui_mode", UiMode.DEFAULT_VALUE))
+    val defaultPreset = defaultThemePresetForUiMode(uiMode)
+    val strategy = ThemeSyncStrategy.fromValue(
+        getString("theme_sync_strategy", ThemeSyncStrategy.SHARED.value)
+    )
+    fun key(base: String) = themePreferenceKey(base, strategy, uiMode)
+    return ThemeStoreAppearanceState(
+        themeMode = getInt(key("color_mode"), defaultPreset.colorMode.value),
+        miuixMonet = getBoolean(key("miuix_monet"), defaultPreset.miuixMonet),
+        keyColor = getInt(key("key_color"), defaultPreset.keyColor),
+        colorStyle = getString(key("color_style"), defaultPreset.paletteStyle.name)
+            ?: defaultPreset.paletteStyle.name,
+        colorSpec = getString(key("color_spec"), defaultPreset.colorSpec.name)
+            ?: defaultPreset.colorSpec.name,
+        monetSurfaceOpacity = sanitizeMonetSurfaceOpacity(
+            getFloat(key("monet_surface_opacity"), defaultPreset.monetSurfaceOpacity)
+        ),
+    )
+}
+
+private fun SharedPreferences.Editor.putThemeStoreAppearance(
+    prefs: SharedPreferences,
+    appearance: ThemeStoreAppearanceState,
+) {
+    val uiMode = InterfaceStyle.normalizeValue(prefs.getString("ui_mode", UiMode.DEFAULT_VALUE))
+    val strategy = ThemeSyncStrategy.fromValue(
+        prefs.getString("theme_sync_strategy", ThemeSyncStrategy.SHARED.value)
+    )
+    fun key(base: String) = themePreferenceKey(base, strategy, uiMode)
+    putInt(key("color_mode"), appearance.themeMode)
+    putBoolean(key("miuix_monet"), appearance.miuixMonet)
+    putInt(key("key_color"), appearance.keyColor)
+    putString(key("color_style"), appearance.colorStyle)
+    putString(key("color_spec"), appearance.colorSpec)
+    putFloat(key("monet_surface_opacity"), sanitizeMonetSurfaceOpacity(appearance.monetSurfaceOpacity))
+    putString(key("theme_preset"), ThemePreset.CUSTOM.value)
 }
 
 private fun stageImportedComponentStyles(
@@ -1629,6 +2135,7 @@ private fun SharedPreferences.Editor.putImportedPageBackground(
             remove(target.opacityKey)
             remove(target.videoDurationSecondsKey)
             removeImportedPageBackgroundCrop(target)
+            removeMediaVisualSettings(target.visualKeys)
             return
         }
     }
@@ -1638,6 +2145,7 @@ private fun SharedPreferences.Editor.putImportedPageBackground(
         target.videoDurationSecondsKey,
         sanitizeCustomVideoBackgroundDurationSeconds(state.videoDurationSeconds),
     )
+    putMediaVisualSettings(target.visualKeys, state.visualSettings)
 }
 
 private fun SharedPreferences.Editor.putImportedPageBackgroundCrop(
@@ -1678,6 +2186,7 @@ private fun SharedPreferences.Editor.putImportedWallpaper(state: ThemeStoreWallp
         CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY,
         sanitizeCustomWallpaperPassthroughOpacity(state.passthroughOpacity),
     )
+    putMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS, state.visualSettings)
 }
 
 private fun SharedPreferences.Editor.putOptionalString(key: String, value: String?) {
@@ -1685,6 +2194,68 @@ private fun SharedPreferences.Editor.putOptionalString(key: String, value: Strin
         remove(key)
     } else {
         putString(key, value)
+    }
+}
+
+private fun SharedPreferences.Editor.putNavigationIconPresentation(
+    slot: CustomNavigationIconSlot,
+    state: CustomNavigationIconState,
+) {
+    val value = state.normalized()
+    putFloat(slot.sizeScaleKey, value.sizeScale)
+    putFloat(slot.innerPaddingKey, value.innerPaddingDp)
+    putFloat(slot.verticalOffsetKey, value.verticalOffsetDp)
+    putFloat(slot.opacityKey, value.opacity)
+    if (value.tintArgb == null) remove(slot.tintArgbKey) else putLong(slot.tintArgbKey, value.tintArgb)
+    putString(slot.maskKey, value.mask.value)
+    putOptionalString(slot.labelKey, value.labelOverride)
+}
+
+private fun importThemeStoreHomeLayout(
+    context: Context,
+    layoutJson: JSONObject,
+    tempAssetsDir: File,
+    stagingAssetsDir: File,
+    targetAssetsDir: File,
+    warnings: MutableList<ThemeStorePackageWarning>,
+    budget: ThemeStoreAssetBudget,
+): HomeLayoutState {
+    var stickerIndex = 0
+    return requireNotNull(
+        homeLayoutStateFromJson(layoutJson) { stickerJson ->
+            when (
+                val imported = importAssetUri(
+                    context = context,
+                    assetOwnerJson = stickerJson,
+                    tempAssetsDir = tempAssetsDir,
+                    stagingAssetsDir = stagingAssetsDir,
+                    targetAssetsDir = targetAssetsDir,
+                    assetId = "home_layout_sticker_${stickerIndex++}",
+                    warnings = warnings,
+                    budget = budget,
+                )
+            ) {
+                is ImportedThemeAsset.Resolved -> imported.uriString
+                ImportedThemeAsset.Unavailable -> null
+            }
+        },
+    ) { "Theme package home layout is invalid" }
+}
+
+private fun releaseReplacedHomeLayoutStickerReferences(
+    context: Context,
+    previous: HomeLayoutState,
+    current: HomeLayoutState,
+) {
+    fun stickerUris(state: HomeLayoutState): Set<String> =
+        (state.items + state.landscapeItems)
+            .flatMap { it.stickers }
+            .map { it.uriString }
+            .filter(String::isNotBlank)
+            .toSet()
+
+    (stickerUris(previous) - stickerUris(current)).forEach { uriString ->
+        releaseCustomImageReference(context, uriString)
     }
 }
 
@@ -1701,6 +2272,12 @@ private fun releaseReplacedThemeStoreReferences(
         }
         if (oldState.videoUriString != newState.videoUriString) {
             releasePersistableVideoBackgroundReadPermission(context, oldState.videoUriString)
+        }
+        if (oldState.nightUriString != newState.nightUriString) {
+            releaseCustomImageReference(context, oldState.nightUriString)
+        }
+        if (oldState.nightVideoUriString != newState.nightVideoUriString) {
+            releasePersistableVideoBackgroundReadPermission(context, oldState.nightVideoUriString)
         }
     }
     CustomNavigationIconSlot.entries.forEach { slot ->
@@ -1726,22 +2303,32 @@ private fun releaseReplacedThemeStoreReferences(
         releasePersistableVideoBackgroundReadPermission(context, previous.wallpaper.videoUriString)
     }
     if (previous.startupSoundUri != current.startupSoundUri) {
-        releasePersistableAudioReadPermission(context, previous.startupSoundUri)
+        if (!isAudioUriReferencedBySavedScheme(context, previous.startupSoundUri)) {
+            releaseCustomAudioReference(context, previous.startupSoundUri)
+        }
     }
     if (previous.audio.clickSoundUri != current.audio.clickSoundUri) {
-        releasePersistableAudioReadPermission(context, previous.audio.clickSoundUri)
+        if (!isAudioUriReferencedBySavedScheme(context, previous.audio.clickSoundUri)) {
+            releaseCustomAudioReference(context, previous.audio.clickSoundUri)
+        }
     }
     if (previous.audio.backgroundMusicUri != current.audio.backgroundMusicUri) {
-        releasePersistableAudioReadPermission(context, previous.audio.backgroundMusicUri)
+        if (!isAudioUriReferencedBySavedScheme(context, previous.audio.backgroundMusicUri)) {
+            releaseCustomAudioReference(context, previous.audio.backgroundMusicUri)
+        }
     }
     if (previous.startupAnimationUri != current.startupAnimationUri) {
-        releasePersistableStartupAnimationReadPermission(context, previous.startupAnimationUri)
+        if (!isStartupAnimationUriReferencedByPreset(context, previous.startupAnimationUri)) {
+            releasePersistableStartupAnimationReadPermission(context, previous.startupAnimationUri)
+        }
     }
 }
 
 private fun ThemeStoreSummary.imageState(slot: ThemeStoreImageSlot): ThemeStoreImageState {
     return when (slot) {
         ThemeStoreImageSlot.Lkm -> lkmCard
+        ThemeStoreImageSlot.ClassicMiuixLkm -> classicMiuixLkmCard
+        ThemeStoreImageSlot.MaterialLkm -> materialLkmCard
         ThemeStoreImageSlot.Superuser -> superuserCard
         ThemeStoreImageSlot.Module -> moduleCard
         ThemeStoreImageSlot.StatusMonitor -> statusMonitorCard
@@ -1754,17 +2341,33 @@ private fun ThemeStoreSummary.imageState(slot: ThemeStoreImageSlot): ThemeStoreI
 }
 
 private fun SharedPreferences.readImageSlot(slot: ThemeStoreImageSlot): ThemeStoreImageState {
+    val crop = sanitizeCustomWallpaperCrop(
+        CustomWallpaperCrop(
+            left = getFloat(slot.cropLeftKey, DEFAULT_CUSTOM_WALLPAPER_CROP.left),
+            top = getFloat(slot.cropTopKey, DEFAULT_CUSTOM_WALLPAPER_CROP.top),
+            right = getFloat(slot.cropRightKey, DEFAULT_CUSTOM_WALLPAPER_CROP.right),
+            bottom = getFloat(slot.cropBottomKey, DEFAULT_CUSTOM_WALLPAPER_CROP.bottom),
+        )
+    )
+    fun objectValue(key: String): JSONObject? = getString(key, null)?.let { value ->
+        runCatching { JSONObject(value) }.getOrNull()
+    }
     return ThemeStoreImageState(
         uriString = getString(slot.uriKey, null),
         videoUriString = slot.videoUriKey?.let { getString(it, null) },
-        crop = sanitizeCustomWallpaperCrop(
-            CustomWallpaperCrop(
-                left = getFloat(slot.cropLeftKey, DEFAULT_CUSTOM_WALLPAPER_CROP.left),
-                top = getFloat(slot.cropTopKey, DEFAULT_CUSTOM_WALLPAPER_CROP.top),
-                right = getFloat(slot.cropRightKey, DEFAULT_CUSTOM_WALLPAPER_CROP.right),
-                bottom = getFloat(slot.cropBottomKey, DEFAULT_CUSTOM_WALLPAPER_CROP.bottom),
-            )
+        crop = crop,
+        visualSettings = readMediaVisualSettings(slot.visualKeys, slot.defaultVisualSettings),
+        responsiveCrops = ResponsiveCropSet.fromJson(objectValue(slot.responsiveCropsKey), crop),
+        nightUriString = getString(slot.nightUriKey, null),
+        nightVideoUriString = getString(slot.nightVideoUriKey, null),
+        nightCrop = objectValue(slot.nightCropKey)?.let { value -> value.optCropValue(DEFAULT_CUSTOM_WALLPAPER_CROP) }
+            ?: DEFAULT_CUSTOM_WALLPAPER_CROP,
+        nightVisualSettings = readMediaVisualSettings(slot.nightVisualKeys, slot.defaultVisualSettings),
+        nightResponsiveCrops = ResponsiveCropSet.fromJson(
+            objectValue(slot.nightResponsiveCropsKey),
+            DEFAULT_CUSTOM_WALLPAPER_CROP,
         ),
+        variantSettings = MediaVariantSettings.fromJson(objectValue(slot.variantSettingsKey)),
     )
 }
 
@@ -1893,26 +2496,25 @@ private fun ZipOutputStream.writeComponentStyles(
             put("cardStyle", style.toJson())
         }
         content.switchStyle?.normalized()?.let { style ->
-            val imageAsset = if (style.source == CustomSwitchSource.Image) {
-                val imageFile = ComponentStyleStore(context).resolveImageFile(style.imageUri)
-                    ?: error("Image-based switch style is missing its image")
-                require(
-                    fileSha256(imageFile).equals(style.imageSha256, ignoreCase = true)
-                ) { "Switch style image hash does not match" }
-                writeUriAsset(
-                    context = context,
-                    uriString = style.imageUri,
-                    assetId = "component_switch_image",
-                    warnings = warnings,
-                    budget = budget,
-                )
-            } else {
-                null
+            fun writeSwitchImage(uri: String?, sha256: String?, assetId: String): ExportedThemeAsset? {
+                if (uri.isNullOrBlank()) return null
+                val imageFile = ComponentStyleStore(context).resolveImageFile(uri)
+                    ?: error("Image-based switch style is missing an image")
+                require(fileSha256(imageFile).equals(sha256, ignoreCase = true)) {
+                    "Switch style image hash does not match"
+                }
+                return writeUriAsset(context, uri, assetId, warnings, budget)
             }
-            if (style.source == CustomSwitchSource.Image && imageAsset == null) {
+            val imageAsset = if (style.source == CustomSwitchSource.Image) {
+                writeSwitchImage(style.imageUri, style.imageSha256, "component_switch_image")
+            } else null
+            val imageOnAsset = if (style.source == CustomSwitchSource.Image) {
+                writeSwitchImage(style.imageOnUri, style.imageOnSha256, "component_switch_image_on")
+            } else null
+            if (style.source == CustomSwitchSource.Image && imageAsset == null && imageOnAsset == null) {
                 warnings += ThemeStorePackageWarning(
-                    assetId = "component_switch_image",
-                    reason = "Image-based switch style is missing its image",
+                    assetId = "component_switch_images",
+                    reason = "Image-based switch style is missing its state images",
                 )
             }
             put(
@@ -1920,7 +2522,9 @@ private fun ZipOutputStream.writeComponentStyles(
                 JSONObject()
                     .put("style", style.toJson(includeLocalImageUri = false))
                     .put("imageAsset", imageAsset?.toJson())
-                    .put("imageUri", null),
+                    .put("imageUri", null)
+                    .put("imageOnAsset", imageOnAsset?.toJson())
+                    .put("imageOnUri", null),
             )
         }
     }
@@ -1941,25 +2545,40 @@ private fun parseComponentStyleContent(
             allowLocalImageUri = false,
         )
         if (packaged.source == CustomSwitchSource.Image) {
-            val asset = owner.optJSONObject("imageAsset")
-                ?: error("Image-based switch style is missing its image")
-            val path = asset.optString("path")
-            val imageFile = safeComponentAssetFile(assetsDir, path)
             val store = ComponentStyleStore(context)
-            val stored = store.persistSwitchImage(Uri.fromFile(imageFile))
+            fun persistAsset(key: String) = owner.optJSONObject(key)?.let { asset ->
+                val imageFile = safeComponentAssetFile(assetsDir, asset.optString("path"))
+                store.persistSwitchImage(Uri.fromFile(imageFile)) to asset
+            }
+            val off = persistAsset("imageAsset")
+            val on = persistAsset("imageOnAsset")
+            require(off != null || on != null) { "Image-based switch style is missing its state images" }
             try {
-                require(
-                    packaged.imageSha256.isNullOrBlank() ||
-                        packaged.imageSha256.equals(stored.sha256, ignoreCase = true)
-                ) { "Switch style image hash does not match" }
+                off?.let { (stored, _) ->
+                    require(
+                        packaged.imageSha256.isNullOrBlank() ||
+                            packaged.imageSha256.equals(stored.sha256, ignoreCase = true)
+                    ) { "Switch style off image hash does not match" }
+                }
+                on?.let { (stored, _) ->
+                    require(
+                        packaged.imageOnSha256.isNullOrBlank() ||
+                            packaged.imageOnSha256.equals(stored.sha256, ignoreCase = true)
+                    ) { "Switch style on image hash does not match" }
+                }
                 packaged.copy(
-                    imageUri = stored.uriString,
-                    imageSha256 = stored.sha256,
-                    imageMimeType = asset.optString("mimeType").takeIf(String::isNotBlank)
-                        ?: stored.mimeType,
+                    imageUri = off?.first?.uriString,
+                    imageSha256 = off?.first?.sha256,
+                    imageMimeType = off?.second?.optString("mimeType")?.takeIf(String::isNotBlank)
+                        ?: off?.first?.mimeType,
+                    imageOnUri = on?.first?.uriString,
+                    imageOnSha256 = on?.first?.sha256,
+                    imageOnMimeType = on?.second?.optString("mimeType")?.takeIf(String::isNotBlank)
+                        ?: on?.first?.mimeType,
                 ).normalized()
             } catch (error: Throwable) {
-                store.discardSwitchImageIfUnreferenced(stored.uriString)
+                listOfNotNull(off?.first?.uriString, on?.first?.uriString)
+                    .forEach(store::discardSwitchImageIfUnreferenced)
                 throw error
             }
         } else {
@@ -1967,6 +2586,9 @@ private fun parseComponentStyleContent(
                 imageUri = null,
                 imageSha256 = null,
                 imageMimeType = null,
+                imageOnUri = null,
+                imageOnSha256 = null,
+                imageOnMimeType = null,
             ).normalized()
         }
     }
@@ -2008,6 +2630,37 @@ private fun ExportedThemeAsset.toJson(): JSONObject {
         .put("path", path)
         .put("displayName", displayName)
         .put("mimeType", mimeType)
+}
+
+internal fun CustomNavigationIconState.presentationToJson(): JSONObject = normalized().let { value ->
+    JSONObject()
+        .put("sizeScale", value.sizeScale.toDouble())
+        .put("innerPaddingDp", value.innerPaddingDp.toDouble())
+        .put("verticalOffsetDp", value.verticalOffsetDp.toDouble())
+        .put("opacity", value.opacity.toDouble())
+        .put("tintArgb", value.tintArgb)
+        .put("mask", value.mask.value)
+        .put("label", value.labelOverride)
+}
+
+internal fun JSONObject?.toNavigationIconState(
+    uriString: String?,
+    crop: CustomWallpaperCrop,
+): CustomNavigationIconState {
+    val json = this ?: return CustomNavigationIconState(uriString = uriString, crop = crop)
+    return CustomNavigationIconState(
+        uriString = uriString,
+        crop = crop,
+        sizeScale = json.optDouble("sizeScale", 1.0).toFloat(),
+        innerPaddingDp = json.optDouble("innerPaddingDp", 0.0).toFloat(),
+        verticalOffsetDp = json.optDouble("verticalOffsetDp", 0.0).toFloat(),
+        opacity = json.optDouble("opacity", 1.0).toFloat(),
+        tintArgb = json.opt("tintArgb")?.takeUnless { it === JSONObject.NULL }?.let {
+            (it as? Number)?.toLong()
+        },
+        mask = CustomNavigationIconMask.fromValue(json.optString("mask")),
+        labelOverride = json.optString("label").takeIf(String::isNotBlank),
+    ).normalized()
 }
 
 private fun ZipOutputStream.writeAppFont(
@@ -2077,7 +2730,7 @@ private fun ZipOutputStream.writeUriAsset(
     budget: ThemeStoreAssetBudget,
 ): ExportedThemeAsset? {
     if (uriString.isNullOrBlank()) return null
-    val uri = Uri.parse(uriString)
+    val uri = uriString.toUri()
     val displayName = queryDisplayName(context, uri) ?: uri.lastPathSegment
     val mimeType = runCatching { context.contentResolver.getType(uri) }.getOrNull()
     val extension = safeAssetExtension(displayName, mimeType)
@@ -2253,6 +2906,29 @@ internal fun validateThemeStoreConfig(config: JSONObject) {
             }
         ) { "Theme author gender is invalid" }
     }
+    if (version >= 5 && config.optString("packageType") != COMPONENT_ONLY_PACKAGE_TYPE) {
+        require(config.optJSONObject("audioSettings") != null) {
+            "Theme package is missing audio settings"
+        }
+        require(config.getJSONObject("startupAnimation").optJSONObject("settings") != null) {
+            "Theme package is missing startup animation settings"
+        }
+        val cards = config.optJSONObject("cards") ?: error("Theme package is missing cards")
+        ThemeStoreImageSlot.entries
+            .filter { slot -> version >= slot.introducedInPackageVersion }
+            .forEach { slot ->
+                val card = cards.optJSONObject(slot.id) ?: error("Theme package is missing card ${slot.id}")
+                listOf(
+                    "visualSettings",
+                    "responsiveCrops",
+                    "nightVisualSettings",
+                    "nightResponsiveCrops",
+                    "variantSettings",
+                ).forEach { key ->
+                    require(card.optJSONObject(key) != null) { "Theme card ${slot.id} is missing $key" }
+                }
+            }
+    }
     if (config.has("font")) {
         val font = config.optJSONObject("font")
             ?: error("Theme package font settings are invalid")
@@ -2292,7 +2968,147 @@ internal fun validateThemeStoreConfig(config: JSONObject) {
             }
         }
     }
+    config.optJSONObject("appearance")?.let(::validateThemeStoreAppearance)
+    config.optJSONObject("homeLayout")?.let(::validateThemeStoreHomeLayout)
     validateComponentStyleConfig(config)
+}
+
+private fun validateThemeStoreHomeLayout(layout: JSONObject) {
+    require(layout.optString("schema") == HOME_LAYOUT_TRANSFER_SCHEMA) {
+        "Theme package home layout schema is invalid"
+    }
+    require(layout.optInt("version", 0) in 1..HOME_LAYOUT_TRANSFER_VERSION) {
+        "Theme package home layout version is invalid"
+    }
+    listOf("enabled", "autoSnap", "autoAvoidOverlap").forEach { key ->
+        require(layout.opt(key) is Boolean) { "Theme package home layout $key is invalid" }
+    }
+
+    fun validateSection(name: String) {
+        val section = layout.optJSONObject(name)
+            ?: error("Theme package home layout is missing $name")
+        val records = section.optJSONArray("items")
+            ?: error("Theme package home layout $name is missing cards")
+        require(records.length() <= HomeLayoutCard.entries.size) {
+            "Theme package home layout contains too many cards"
+        }
+        val seenCards = mutableSetOf<HomeLayoutCard>()
+        for (index in 0 until records.length()) {
+            val record = records.optJSONObject(index)
+                ?: error("Theme package home layout card is invalid")
+            val card = HomeLayoutCard.fromValue(record.optString("card"))
+                ?: error("Theme package home layout card is unknown")
+            require(seenCards.add(card)) { "Theme package home layout repeats a card" }
+            listOf("x", "y", "width", "scale", "aspectRatio", "height", "textScale").forEach { key ->
+                val value = record.opt(key) as? Number
+                require(value?.toDouble()?.isFinite() == true) {
+                    "Theme package home layout card $key is invalid"
+                }
+            }
+            require(record.opt("visible") is Boolean) {
+                "Theme package home layout card visibility is invalid"
+            }
+            require(record.opt("zIndex") is Number) {
+                "Theme package home layout card layer is invalid"
+            }
+            require(record.optString("customTitle").length <= 80) {
+                "Theme package home layout title is too long"
+            }
+            require(record.optString("customSubtitle").length <= 160) {
+                "Theme package home layout subtitle is too long"
+            }
+            require(HomeLayoutWallpaperFit.entries.any { it.value == record.optString("wallpaperFit") }) {
+                "Theme package home layout wallpaper fit is invalid"
+            }
+            val stickers = record.optJSONArray("stickers") ?: JSONArray()
+            require(stickers.length() <= 12) { "Theme package home layout has too many stickers" }
+            for (stickerIndex in 0 until stickers.length()) {
+                val sticker = stickers.optJSONObject(stickerIndex)
+                    ?: error("Theme package home layout sticker is invalid")
+                require(sticker.optString("id").length <= 80) {
+                    "Theme package home layout sticker ID is invalid"
+                }
+                require(sticker.optString("uri").length <= 2048) {
+                    "Theme package home layout sticker URI is invalid"
+                }
+                val asset = sticker.opt("asset")
+                require(asset == null || asset === JSONObject.NULL || asset is JSONObject) {
+                    "Theme package home layout sticker asset is invalid"
+                }
+                require(asset is JSONObject || sticker.optString("uri").isNotBlank()) {
+                    "Theme package home layout sticker is missing its image"
+                }
+                listOf("x", "y", "width", "opacity").forEach { key ->
+                    val value = sticker.opt(key) as? Number
+                    require(value?.toDouble()?.isFinite() == true) {
+                        "Theme package home layout sticker $key is invalid"
+                    }
+                }
+            }
+        }
+    }
+
+    validateSection("portrait")
+    validateSection("landscape")
+    require(homeLayoutStateFromJson(layout) != null) {
+        "Theme package home layout cannot be decoded"
+    }
+}
+
+private fun homeLayoutStickerRecords(layout: JSONObject?): List<JSONObject> = buildList {
+    if (layout == null) return@buildList
+    listOf("portrait", "landscape").forEach { sectionName ->
+        val items = layout.optJSONObject(sectionName)?.optJSONArray("items") ?: return@forEach
+        for (itemIndex in 0 until items.length()) {
+            val stickers = items.optJSONObject(itemIndex)?.optJSONArray("stickers") ?: continue
+            for (stickerIndex in 0 until stickers.length()) {
+                stickers.optJSONObject(stickerIndex)?.let(::add)
+            }
+        }
+    }
+}
+
+private fun validateThemeStoreAppearance(appearance: JSONObject) {
+    val allowedKeys = setOf(
+        "themeMode",
+        "miuixMonet",
+        "keyColor",
+        "colorStyle",
+        "colorSpec",
+        "monetSurfaceOpacity",
+    )
+    require(appearance.keys().asSequence().all { it in allowedKeys }) {
+        "Theme package contains unknown appearance settings"
+    }
+    appearance.opt("themeMode")?.let { raw ->
+        require(raw is Number && ColorMode.entries.any { it.value == raw.toInt() }) {
+            "Theme color mode is invalid"
+        }
+    }
+    appearance.opt("miuixMonet")?.let { raw ->
+        require(raw is Boolean) { "Theme Monet setting is invalid" }
+    }
+    appearance.opt("keyColor")?.let { raw ->
+        require(raw is Number) { "Theme key color is invalid" }
+    }
+    appearance.opt("colorStyle")?.let { raw ->
+        require(raw is String && PaletteStyle.entries.any { it.name == raw }) {
+            "Theme palette style is invalid"
+        }
+    }
+    appearance.opt("colorSpec")?.let { raw ->
+        require(raw is String && ColorSpec.SpecVersion.entries.any { it.name == raw }) {
+            "Theme color specification is invalid"
+        }
+    }
+    appearance.opt("monetSurfaceOpacity")?.let { raw ->
+        val value = (raw as? Number)?.toDouble()
+        require(
+            value != null && value.isFinite() &&
+                value >= ThemeAppearanceDefaults.MIN_MONET_SURFACE_OPACITY &&
+                value <= ThemeAppearanceDefaults.MAX_MONET_SURFACE_OPACITY
+        ) { "Theme Monet surface opacity is invalid" }
+    }
 }
 
 private fun validateComponentStyleConfig(config: JSONObject) {
@@ -2307,19 +3123,35 @@ private fun validateComponentStyleConfig(config: JSONObject) {
         require(styleJson.optString("image_uri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
             "Switch style local image URI is too long"
         }
+        require(styleJson.optString("image_on_uri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
+            "Switch style local on-image URI is too long"
+        }
         val style = CustomSwitchStyle.fromJson(styleJson, allowLocalImageUri = false)
         require(owner.optString("imageUri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
             "Switch style image URI is too long"
         }
+        require(owner.optString("imageOnUri").length <= MAX_COMPONENT_PACKAGE_URI_LENGTH) {
+            "Switch style on-image URI is too long"
+        }
         if (style.source == CustomSwitchSource.Image) {
-            require(owner.optJSONObject("imageAsset") != null || owner.optString("imageUri").isNotBlank()) {
-                "Image-based switch style is missing its image"
+            val hasOff = owner.optJSONObject("imageAsset") != null || owner.optString("imageUri").isNotBlank()
+            val hasOn = owner.optJSONObject("imageOnAsset") != null || owner.optString("imageOnUri").isNotBlank()
+            require(hasOff || hasOn) {
+                "Image-based switch style is missing its state images"
             }
-            require(COMPONENT_PACKAGE_SHA256.matches(styleJson.optString("image_sha256"))) {
+            require(!hasOff || COMPONENT_PACKAGE_SHA256.matches(styleJson.optString("image_sha256"))) {
                 "Switch style image hash is invalid"
             }
+            require(!hasOn || COMPONENT_PACKAGE_SHA256.matches(styleJson.optString("image_on_sha256"))) {
+                "Switch style on-image hash is invalid"
+            }
         } else {
-            require(owner.optJSONObject("imageAsset") == null && owner.optString("imageUri").isBlank()) {
+            require(
+                owner.optJSONObject("imageAsset") == null &&
+                    owner.optString("imageUri").isBlank() &&
+                    owner.optJSONObject("imageOnAsset") == null &&
+                    owner.optString("imageOnUri").isBlank()
+            ) {
                 "Pixel switch style contains an unexpected image"
             }
         }
@@ -2344,7 +3176,13 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
 
     val cards = config.optJSONObject("cards")
     ThemeStoreImageSlot.entries.forEach { slot ->
-        validateOwner(cards?.optJSONObject(slot.id), "asset", "videoAsset")
+        validateOwner(
+            cards?.optJSONObject(slot.id),
+            "asset",
+            "videoAsset",
+            "nightAsset",
+            "nightVideoAsset",
+        )
     }
     val navigationIcons = config.optJSONObject("navigationIcons")
     CustomNavigationIconSlot.entries.forEach { slot ->
@@ -2360,6 +3198,9 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
     validateOwner(config.optJSONObject("backgroundMusic"), "asset")
     validateOwner(config.optJSONObject("startupAnimation"), "asset")
     validateOwner(config.optJSONObject("author"), "avatar")
+    homeLayoutStickerRecords(config.optJSONObject("homeLayout")).forEach { sticker ->
+        validateOwner(sticker, "asset")
+    }
     val fontOwner = config.optJSONObject("font")
     validateOwner(fontOwner, "asset")
     if (AppFontPreset.fromValue(fontOwner?.optString("preset")) == AppFontPreset.Custom) {
@@ -2375,19 +3216,22 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
         )
     }
     val switchOwner = config.optJSONObject("components")?.optJSONObject("switchStyle")
-    validateOwner(switchOwner, "imageAsset")
+    validateOwner(switchOwner, "imageAsset", "imageOnAsset")
     switchOwner?.let { owner ->
         val style = owner.optJSONObject("style") ?: return@let
         if (CustomSwitchSource.fromValue(style.optString("source")) == CustomSwitchSource.Image) {
-            val asset = owner.optJSONObject("imageAsset") ?: return@let
-            val path = asset.optString("path")
-            val imageFile = safeComponentAssetFile(tempAssetsDir, path)
-            require(imageFile.length() in 1..MAX_COMPONENT_IMAGE_BYTES) {
-                "Component switch image is too large"
+            fun validateSwitchImage(assetKey: String, hashKey: String) {
+                val asset = owner.optJSONObject(assetKey) ?: return
+                val imageFile = safeComponentAssetFile(tempAssetsDir, asset.optString("path"))
+                require(imageFile.length() in 1..MAX_COMPONENT_IMAGE_BYTES) {
+                    "Component switch image is too large"
+                }
+                require(fileSha256(imageFile).equals(style.optString(hashKey), ignoreCase = true)) {
+                    "Switch style image hash does not match"
+                }
             }
-            require(
-                fileSha256(imageFile).equals(style.optString("image_sha256"), ignoreCase = true)
-            ) { "Switch style image hash does not match" }
+            validateSwitchImage("imageAsset", "image_sha256")
+            validateSwitchImage("imageOnAsset", "image_on_sha256")
         }
     }
     config.optJSONObject("author")
@@ -2400,6 +3244,61 @@ internal fun validateEmbeddedThemeStoreAssets(config: JSONObject, tempAssetsDir:
                 "Theme author avatar is too large"
             }
         }
+}
+
+private fun validateEmbeddedThemeStoreMedia(
+    context: Context,
+    config: JSONObject,
+    tempAssetsDir: File,
+) {
+    fun validateOwner(owner: JSONObject?, vararg assetKeys: String) {
+        if (owner == null) return
+        assetKeys.forEach { assetKey ->
+            val asset = owner.optJSONObject(assetKey) ?: return@forEach
+            val path = asset.optString("path")
+            if (!path.startsWith("assets/")) return@forEach
+            val file = safeAssetFile(tempAssetsDir, path.removePrefix("assets/"))
+            requireImportedMediaDecodable(
+                context = context,
+                file = file,
+                assetId = path,
+                mimeType = asset.optString("mimeType").takeIf(String::isNotBlank),
+            )
+        }
+    }
+
+    val cards = config.optJSONObject("cards")
+    ThemeStoreImageSlot.entries.forEach { slot ->
+        validateOwner(
+            cards?.optJSONObject(slot.id),
+            "asset",
+            "videoAsset",
+            "nightAsset",
+            "nightVideoAsset",
+        )
+    }
+    val navigationIcons = config.optJSONObject("navigationIcons")
+    CustomNavigationIconSlot.entries.forEach { slot ->
+        validateOwner(navigationIcons?.optJSONObject(slot.id), "asset")
+    }
+    val pageBackgrounds = config.optJSONObject("pageBackgrounds")
+    CustomPageBackgroundTarget.entries.forEach { target ->
+        validateOwner(pageBackgrounds?.optJSONObject(target.id), "asset", "videoAsset")
+    }
+    validateOwner(config.optJSONObject("wallpaper"), "asset", "videoAsset")
+    validateOwner(config.optJSONObject("startupSound"), "asset")
+    validateOwner(config.optJSONObject("clickSound"), "asset")
+    validateOwner(config.optJSONObject("backgroundMusic"), "asset")
+    validateOwner(config.optJSONObject("startupAnimation"), "asset")
+    validateOwner(config.optJSONObject("author"), "avatar")
+    homeLayoutStickerRecords(config.optJSONObject("homeLayout")).forEach { sticker ->
+        validateOwner(sticker, "asset")
+    }
+    validateOwner(
+        config.optJSONObject("components")?.optJSONObject("switchStyle"),
+        "imageAsset",
+        "imageOnAsset",
+    )
 }
 
 internal fun sanitizeThemeStoreConfigForCloud(config: JSONObject) {
@@ -2424,7 +3323,12 @@ internal fun sanitizeThemeStoreConfigForCloud(config: JSONObject) {
     val mediaPairs = arrayOf("asset" to "uri", "videoAsset" to "videoUri")
     val cards = config.optJSONObject("cards")
     ThemeStoreImageSlot.entries.forEach { slot ->
-        sanitizeOwner(cards?.optJSONObject(slot.id), *mediaPairs)
+        sanitizeOwner(
+            cards?.optJSONObject(slot.id),
+            *mediaPairs,
+            "nightAsset" to "nightUri",
+            "nightVideoAsset" to "nightVideoUri",
+        )
     }
     val navigationIcons = config.optJSONObject("navigationIcons")
     CustomNavigationIconSlot.entries.forEach { slot ->
@@ -2439,14 +3343,21 @@ internal fun sanitizeThemeStoreConfigForCloud(config: JSONObject) {
     sanitizeOwner(config.optJSONObject("clickSound"), "asset" to "uri")
     sanitizeOwner(config.optJSONObject("backgroundMusic"), "asset" to "uri")
     sanitizeOwner(config.optJSONObject("startupAnimation"), "asset" to "uri")
+    homeLayoutStickerRecords(config.optJSONObject("homeLayout")).forEach { sticker ->
+        sanitizeOwner(sticker, "asset" to "uri")
+    }
     sanitizeOwner(
         config.optJSONObject("components")?.optJSONObject("switchStyle"),
         "imageAsset" to "imageUri",
+        "imageOnAsset" to "imageOnUri",
     )
     config.optJSONObject("components")
         ?.optJSONObject("switchStyle")
         ?.optJSONObject("style")
-        ?.put("image_uri", null)
+        ?.apply {
+            put("image_uri", null)
+            put("image_on_uri", null)
+        }
 }
 
 internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
@@ -2472,7 +3383,7 @@ internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
     val uriKeys = arrayOf("uri", "videoUri")
     val cards = config.optJSONObject("cards")
     ThemeStoreImageSlot.entries.forEach { slot ->
-        validateOwner(cards?.optJSONObject(slot.id), *uriKeys)
+        validateOwner(cards?.optJSONObject(slot.id), *uriKeys, "nightUri", "nightVideoUri")
     }
     val navigationIcons = config.optJSONObject("navigationIcons")
     CustomNavigationIconSlot.entries.forEach { slot ->
@@ -2487,7 +3398,14 @@ internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
     validateOwner(config.optJSONObject("clickSound"), "uri")
     validateOwner(config.optJSONObject("backgroundMusic"), "uri")
     validateOwner(config.optJSONObject("startupAnimation"), "uri")
-    validateOwner(config.optJSONObject("components")?.optJSONObject("switchStyle"), "imageUri")
+    homeLayoutStickerRecords(config.optJSONObject("homeLayout")).forEach { sticker ->
+        validateOwner(sticker, "uri")
+    }
+    validateOwner(
+        config.optJSONObject("components")?.optJSONObject("switchStyle"),
+        "imageUri",
+        "imageOnUri",
+    )
     require(
         config.optJSONObject("components")
             ?.optJSONObject("switchStyle")
@@ -2495,6 +3413,13 @@ internal fun validateThemeStoreConfigForCloud(config: JSONObject) {
             ?.optString("image_uri")
             .isNullOrBlank()
     ) { "Cloud theme package contains a device-specific image_uri" }
+    require(
+        config.optJSONObject("components")
+            ?.optJSONObject("switchStyle")
+            ?.optJSONObject("style")
+            ?.optString("image_on_uri")
+            .isNullOrBlank()
+    ) { "Cloud theme package contains a device-specific image_on_uri" }
 }
 
 private fun writeThemeStoreAssetDirectory(
@@ -2545,10 +3470,15 @@ internal fun countConfiguredThemeStoreResources(config: JSONObject): Int {
     }
 
     fun hasImageOrVideo(owner: JSONObject?): Boolean {
-        return hasResource(owner) || hasResource(owner, "videoAsset", "videoUri")
+        return hasResource(owner) ||
+            hasResource(owner, "videoAsset", "videoUri") ||
+            hasResource(owner, "nightAsset", "nightUri") ||
+            hasResource(owner, "nightVideoAsset", "nightVideoUri")
     }
 
     var count = 0
+    if (config.optJSONObject("appearance") != null) count++
+    if (config.optJSONObject("homeLayout") != null) count++
     val cards = config.optJSONObject("cards")
     ThemeStoreImageSlot.entries.forEach { slot ->
         if (hasImageOrVideo(cards?.optJSONObject(slot.id))) count++
@@ -2596,6 +3526,7 @@ private fun findThemeStorePreviewCover(
     }
     return owners.firstNotNullOfOrNull { owner ->
         readThemeStorePreviewImage(owner, "asset", tempAssetsDir)
+            ?: readThemeStorePreviewImage(owner, "nightAsset", tempAssetsDir)
             ?: readThemeStorePreviewImage(owner, "imageAsset", tempAssetsDir)
     }
 }
@@ -2632,7 +3563,7 @@ private fun collectLegacyThemeStoreUriWarnings(
         if (embedded != null && embedded !== JSONObject.NULL) return
         val uriString = owner.optString(uriKey).takeIf { it.isNotBlank() } ?: return
         runCatching {
-            openThemeStoreUriInputStream(context, Uri.parse(uriString)).use { }
+            openThemeStoreUriInputStream(context, uriString.toUri()).use { }
         }.onFailure { error ->
             warnings += ThemeStorePackageWarning(
                 assetId = assetId,
@@ -2646,6 +3577,8 @@ private fun collectLegacyThemeStoreUriWarnings(
         val owner = cards?.optJSONObject(slot.id)
         checkOwner(owner, "card_${slot.id}")
         checkOwner(owner, "card_${slot.id}_video", "videoAsset", "videoUri")
+        checkOwner(owner, "card_${slot.id}_night", "nightAsset", "nightUri")
+        checkOwner(owner, "card_${slot.id}_night_video", "nightVideoAsset", "nightVideoUri")
     }
     val navigationIcons = config.optJSONObject("navigationIcons")
     CustomNavigationIconSlot.entries.forEach { slot ->
@@ -2670,6 +3603,12 @@ private fun collectLegacyThemeStoreUriWarnings(
         "component_switch_image",
         "imageAsset",
         "imageUri",
+    )
+    checkOwner(
+        config.optJSONObject("components")?.optJSONObject("switchStyle"),
+        "component_switch_image_on",
+        "imageOnAsset",
+        "imageOnUri",
     )
 }
 
@@ -2780,6 +3719,12 @@ private fun importAssetUri(
                 input.copyTo(output)
             }
         }
+        requireImportedMediaDecodable(
+            context = context,
+            file = stagingFile,
+            assetId = assetId,
+            mimeType = rawAsset.optString("mimeType").takeIf(String::isNotBlank),
+        )
         val targetFile = safeAssetFile(targetAssetsDir, relativePath)
         return ImportedThemeAsset.Resolved(Uri.fromFile(targetFile).toString())
     }
@@ -2788,10 +3733,11 @@ private fun importAssetUri(
         ?: return ImportedThemeAsset.Resolved(null)
     val startingBudget = budget.totalBytes
     return runCatching {
-        val legacyUri = Uri.parse(legacyUriString)
+        val legacyUri = legacyUriString.toUri()
+        val mimeType = runCatching { context.contentResolver.getType(legacyUri) }.getOrNull()
         val extension = safeAssetExtension(
             displayName = queryDisplayName(context, legacyUri) ?: legacyUri.lastPathSegment,
-            mimeType = runCatching { context.contentResolver.getType(legacyUri) }.getOrNull(),
+            mimeType = mimeType,
         )
         val safeAssetId = assetId.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         val relativePath = "legacy/$safeAssetId$extension"
@@ -2808,6 +3754,7 @@ private fun importAssetUri(
                 temporaryFile.copyTo(stagingFile, overwrite = true)
                 temporaryFile.delete()
             }
+            requireImportedMediaDecodable(context, stagingFile, assetId, mimeType)
         } finally {
             temporaryFile.delete()
         }
@@ -2821,6 +3768,18 @@ private fun importAssetUri(
             reason = it.message?.lineSequence()?.firstOrNull()?.take(160),
         )
         ImportedThemeAsset.Unavailable
+    }
+}
+
+private fun requireImportedMediaDecodable(
+    context: Context,
+    file: File,
+    assetId: String,
+    mimeType: String?,
+) {
+    val info = inspectMediaFileBlocking(context, Uri.fromFile(file), mimeType)
+    require(info.decodable) {
+        "Unable to decode imported media $assetId: ${info.error ?: info.displayName}"
     }
 }
 
@@ -2950,6 +3909,17 @@ private fun JSONObject.optCrop(key: String, fallback: CustomWallpaperCrop): Cust
             top = cropJson.optDouble("top", fallback.top.toDouble()).toFloat(),
             right = cropJson.optDouble("right", fallback.right.toDouble()).toFloat(),
             bottom = cropJson.optDouble("bottom", fallback.bottom.toDouble()).toFloat(),
+        )
+    )
+}
+
+private fun JSONObject.optCropValue(fallback: CustomWallpaperCrop): CustomWallpaperCrop {
+    return sanitizeCustomWallpaperCrop(
+        CustomWallpaperCrop(
+            left = optDouble("left", fallback.left.toDouble()).toFloat(),
+            top = optDouble("top", fallback.top.toDouble()).toFloat(),
+            right = optDouble("right", fallback.right.toDouble()).toFloat(),
+            bottom = optDouble("bottom", fallback.bottom.toDouble()).toFloat(),
         )
     )
 }

@@ -9,15 +9,19 @@ import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.util.BuiltinMountStatus
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
+import me.weishu.kernelsu.ui.util.CustomNavigationIconState
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.KPatchNextStatus
+import me.weishu.kernelsu.ui.util.StartupAnimationSettings
 
 const val SHOW_VERSION_MISMATCH_WARNING_KEY = "show_version_mismatch_warning"
 const val SHOW_GKI_WARNING_KEY = "show_gki_warning"
 const val SHOW_HOME_SUPPORT_CARD_KEY = "show_home_support_card"
 const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
+const val MIUIX_CLASSIC_HOME_LAYOUT_KEY = "miuix_classic_home_layout"
 const val GRAPHICS_RENDERER_FEATURE_ENABLED_KEY = "graphics_renderer_feature_enabled"
 const val CUSTOM_HOME_TITLE_KEY = "custom_home_title"
 
@@ -28,12 +32,14 @@ interface SettingsRepository {
     var showGkiWarning: Boolean
     var showHomeSupportCard: Boolean
     var showHomeLearnCard: Boolean
+    var miuixClassicHomeLayoutEnabled: Boolean
     var graphicsRendererFeatureEnabled: Boolean
     var themeMode: Int
     var miuixMonet: Boolean
     var keyColor: Int
     var colorStyle: String
     var colorSpec: String
+    var monetSurfaceOpacity: Float
     var themePreset: String
     var enablePredictiveBack: Boolean
     var enableBlur: Boolean
@@ -49,6 +55,9 @@ interface SettingsRepository {
     var seasonCardMotionEnabled: Boolean
     var rainStyle: String
     var rainCardMotionEnabled: Boolean
+    var inkStyle: String
+    var inkFontEnabled: Boolean
+    var inkCardMotionEnabled: Boolean
     var pixelStyle: String
     var pixelCardMotionEnabled: Boolean
     val uiDecorationConfig: UiDecorationConfig
@@ -66,6 +75,7 @@ interface SettingsRepository {
     var nightBackgroundPassthroughOpacity: Float
     var globalScrollEffectEnabled: Boolean
     var globalScrollEffect: String
+    var pageTransitionEffect: String
     var themeSyncStrategy: ThemeSyncStrategy
     var enableWebDebugging: Boolean
     var autoJailbreak: Boolean
@@ -74,6 +84,7 @@ interface SettingsRepository {
     var customHomeTitle: String
     var customWallpaperUri: String?
     var customWallpaperOpacity: Float
+    var customWallpaperVisualSettings: MediaVisualSettings
     var customWallpaperCrop: CustomWallpaperCrop
     var customWallpaperPassthroughEnabled: Boolean
     var customWallpaperPassthroughOpacity: Float
@@ -81,6 +92,7 @@ interface SettingsRepository {
     var customVideoBackgroundDurationSeconds: Int
     val customPageBackgrounds: CustomPageBackgroundSet
     var customStartupAnimationUri: String?
+    var startupAnimationSettings: StartupAnimationSettings
     var customStartupSoundUri: String?
     var customStartupSoundDurationSeconds: Int
     var customStartupSoundVolume: Float
@@ -95,9 +107,11 @@ interface SettingsRepository {
     fun setCustomPageBackgroundOpacity(target: CustomPageBackgroundTarget, opacity: Float)
     fun setCustomPageBackgroundCrop(target: CustomPageBackgroundTarget, crop: CustomWallpaperCrop)
     fun setCustomPageBackgroundVideoDurationSeconds(target: CustomPageBackgroundTarget, seconds: Int)
+    fun setCustomPageBackgroundVisualSettings(target: CustomPageBackgroundTarget, settings: MediaVisualSettings)
     fun clearCustomPageBackground(target: CustomPageBackgroundTarget)
     fun setCustomNavigationIcon(slot: CustomNavigationIconSlot, uriString: String?)
     fun setCustomNavigationIconCrop(slot: CustomNavigationIconSlot, crop: CustomWallpaperCrop)
+    fun setCustomNavigationIconPresentation(slot: CustomNavigationIconSlot, state: CustomNavigationIconState)
 
     suspend fun getSuCompatStatus(): String
     suspend fun getSuCompatPersistValue(): Long?

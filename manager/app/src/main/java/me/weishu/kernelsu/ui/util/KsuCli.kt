@@ -65,6 +65,10 @@ private const val GRAPHICS_RENDERER_SERVICE_ASSET = "graphics_renderer_service.s
 private const val GRAPHICS_RENDERER_VERIFICATION_ATTEMPTS = 8
 private const val GRAPHICS_RENDERER_VERIFICATION_DELAY_MILLIS = 250L
 
+internal fun isManagerHiddenModuleId(moduleId: String): Boolean {
+    return moduleId.equals(KPATCH_NEXT_MODULE_ID, ignoreCase = true)
+}
+
 private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
 }
@@ -244,6 +248,8 @@ data class RescueConfigState(
 )
 
 data class RescueStatus(
+    val available: Boolean = false,
+    val statusError: String = "",
     val enabled: Boolean = false,
     val config: RescueConfigState = RescueConfigState(),
     val images: List<RescueImageState> = emptyList(),
@@ -1326,25 +1332,42 @@ suspend fun saveAndApplySusfsPathConfig(paths: List<String>): SusfsPathApplyResu
     )
 }
 
-private fun susfsPathServiceScript(): String = """#!/system/bin/sh
+internal fun susfsPathServiceScript(): String = """#!/system/bin/sh
 CONFIG=$SUSFS_PATH_CONFIG_FILE
-TOOL=
-for candidate in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs /system/bin/ksu_susfs; do
-    if [ -x "${'$'}candidate" ]; then
-        TOOL="${'$'}candidate"
-        break
+find_tool() {
+    TOOL=
+    for candidate in /data/adb/ksu/bin/ksu_susfs /data/adb/ap/bin/ksu_susfs /system/bin/ksu_susfs; do
+        if [ -x "${'$'}candidate" ]; then
+            TOOL="${'$'}candidate"
+            break
+        fi
+    done
+    if [ -z "${'$'}TOOL" ]; then
+        TOOL=\$(command -v ksu_susfs 2>/dev/null)
     fi
+    [ -x "${'$'}TOOL" ]
+}
+
+apply_paths() {
+    failed=0
+    while IFS= read -r target_path; do
+        case "${'$'}target_path" in
+            /*) "${'$'}TOOL" add_sus_path "${'$'}target_path" >/dev/null 2>&1 || failed=1 ;;
+        esac
+    done < "${'$'}CONFIG"
+    [ "${'$'}failed" -eq 0 ]
+}
+
+attempt=0
+while [ "${'$'}attempt" -lt 30 ]; do
+    [ -f "${'$'}CONFIG" ] || exit 0
+    if find_tool && apply_paths; then
+        exit 0
+    fi
+    attempt=${'$'}((attempt + 1))
+    sleep 1
 done
-if [ -z "${'$'}TOOL" ]; then
-    TOOL=\$(command -v ksu_susfs 2>/dev/null)
-fi
-[ -x "${'$'}TOOL" ] || exit 0
-[ -f "${'$'}CONFIG" ] || exit 0
-while IFS= read -r target_path; do
-    case "${'$'}target_path" in
-        /*) "${'$'}TOOL" add_sus_path "${'$'}target_path" >/dev/null 2>&1 ;;
-    esac
-done < "${'$'}CONFIG"
+exit 0
 """
 
 suspend fun getHiddenPathLogs(): String = withContext(Dispatchers.IO) {
@@ -1438,7 +1461,7 @@ suspend fun testHiddenPathVisibility(uid: Int, path: String): HiddenPathVisibili
 
 suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext RescueStatus()
+        return@withContext RescueStatus(statusError = "ksud command unavailable")
     }
 
     runCatching {
@@ -1454,18 +1477,21 @@ suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
         if (result == null) {
             Log.w(TAG, "rescue status timed out")
             KsuCli.reset()
-            return@runCatching RescueStatus()
+            return@runCatching RescueStatus(statusError = "rescue status timed out")
         }
 
         if (!result.isSuccess) {
-            Log.w(TAG, "rescue status failed: ${stderr.joinToString("\n")}")
-            return@runCatching RescueStatus()
+            val error = stderr.joinToString("\n").ifBlank { "rescue status command failed" }
+            Log.w(TAG, "rescue status failed: $error")
+            return@runCatching RescueStatus(statusError = error)
         }
 
         val obj = JSONObject(stdout.joinToString("\n"))
         val manifest = obj.optJSONObject("manifest")
         val device = obj.optJSONObject("device")
         RescueStatus(
+            available = obj.optBoolean("statusOk", true),
+            statusError = obj.optString("statusError", ""),
             enabled = obj.optBoolean("enabled", false),
             config = obj.optJSONObject("config").toRescueConfigState(),
             images = obj.optJSONArray("images").toRescueImageList(),
@@ -1487,7 +1513,7 @@ suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
     }.getOrElse {
         Log.w(TAG, "rescue status unavailable", it)
         KsuCli.reset()
-        RescueStatus()
+        RescueStatus(statusError = it.message.orEmpty().ifBlank { "rescue status unavailable" })
     }
 }
 
@@ -1553,13 +1579,20 @@ suspend fun importRescueImage(partition: String, sourcePath: String, force: Bool
     runCatching {
         val stderr = ArrayList<String>()
         val forceArg = if (force) " --force" else ""
-        val result = getRootShell().newJob()
-            .add(
-                "${getKsuDaemonPath()} rescue import-image " +
-                    "${shellQuote(partition)} ${shellQuote(sourcePath)}$forceArg"
-            )
-            .to(null, stderr)
-            .exec()
+        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * 30) {
+            getRootShell().newJob()
+                .add(
+                    "${getKsuDaemonPath()} rescue import-image " +
+                        "${shellQuote(partition)} ${shellQuote(sourcePath)}$forceArg"
+                )
+                .to(null, stderr)
+                .exec()
+        }
+        if (result == null) {
+            Log.w(TAG, "rescue image import timed out")
+            KsuCli.reset()
+            return@runCatching false
+        }
         if (!result.isSuccess) {
             Log.w(TAG, "rescue image import failed: ${stderr.joinToString("\n")}")
         }
@@ -1713,7 +1746,10 @@ fun getModuleCount(): Int {
     val result = listModules()
     runCatching {
         val array = JSONArray(result)
-        return array.length()
+        return (0 until array.length()).count { index ->
+            val id = array.optJSONObject(index)?.optString("id").orEmpty()
+            id.isNotBlank() && !isManagerHiddenModuleId(id)
+        }
     }.getOrElse { return 0 }
 }
 

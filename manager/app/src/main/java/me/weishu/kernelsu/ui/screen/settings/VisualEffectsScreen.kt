@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Card
@@ -65,11 +66,13 @@ import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.MAX_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.MIN_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.custom.LocalCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
@@ -101,6 +104,7 @@ fun VisualEffectsScreen() {
         onSetNightBackgroundPassthroughOpacity = viewModel::setNightBackgroundPassthroughOpacity,
         onSetGlobalScrollEffectEnabled = viewModel::setGlobalScrollEffectEnabled,
         onSetGlobalScrollEffectIndex = viewModel::setGlobalScrollEffectIndex,
+        onSetPageTransitionEffectIndex = viewModel::setPageTransitionEffectIndex,
     )
 
     VisualEffectsScreenMiuix(
@@ -168,7 +172,6 @@ private fun VisualEffectsContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
-
         VisualEffectCard(
             title = stringResource(R.string.settings_switch_style),
             icon = Icons.Rounded.Palette,
@@ -264,6 +267,19 @@ private fun VisualEffectsContent(
                 onItemSelected = actions.onSetGlobalScrollEffectIndex,
             )
         }
+
+        VisualEffectCard(
+            title = stringResource(R.string.settings_page_transition),
+            icon = Icons.Rounded.SwapHoriz,
+        ) {
+            VisualChoiceRow(
+                title = stringResource(R.string.settings_page_transition_effect),
+                summary = stringResource(R.string.settings_page_transition_effect_summary),
+                items = PageTransitionEffect.entries.map { stringResource(it.labelRes) },
+                selectedIndex = PageTransitionEffect.selectedIndex(uiState.pageTransitionEffect),
+                onItemSelected = actions.onSetPageTransitionEffectIndex,
+            )
+        }
     }
 }
 
@@ -277,7 +293,9 @@ private fun VisualEffectCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+            containerColor = immersiveSurfaceColor(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+            ),
         ),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -406,17 +424,37 @@ private fun SwitchStyleButton(
 
 @Composable
 private fun SwitchStylePreview(style: SwitchStyle) {
-    if (style == SwitchStyle.Original) {
-        Switch(
-            checked = true,
-            onCheckedChange = null,
-        )
-    } else {
-        StyledSwitch(
-            checked = true,
-            onCheckedChange = null,
-            style = style,
-        )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        listOf(false, true).forEach { checked ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (style == SwitchStyle.Original) {
+                    Switch(
+                        checked = checked,
+                        onCheckedChange = null,
+                    )
+                } else {
+                    StyledSwitch(
+                        checked = checked,
+                        onCheckedChange = null,
+                        style = style,
+                    )
+                }
+                Text(
+                    text = stringResource(
+                        if (checked) {
+                            R.string.switch_style_creator_state_on
+                        } else {
+                            R.string.switch_style_creator_state_off
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -573,4 +611,5 @@ private data class VisualEffectsActions(
     val onSetNightBackgroundPassthroughOpacity: (Float) -> Unit,
     val onSetGlobalScrollEffectEnabled: (Boolean) -> Unit,
     val onSetGlobalScrollEffectIndex: (Int) -> Unit,
+    val onSetPageTransitionEffectIndex: (Int) -> Unit,
 )

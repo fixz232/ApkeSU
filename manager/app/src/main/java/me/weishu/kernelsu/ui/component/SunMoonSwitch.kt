@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -31,7 +32,8 @@ import me.weishu.kernelsu.ui.component.custom.LocalCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.custom.PixelMotionRule
 import me.weishu.kernelsu.ui.component.custom.drawCustomSwitchStyle
 import me.weishu.kernelsu.ui.component.custom.rememberComponentMotionProgress
-import me.weishu.kernelsu.ui.component.custom.rememberCustomSwitchImage
+import me.weishu.kernelsu.ui.component.custom.composeEasing
+import me.weishu.kernelsu.ui.component.custom.rememberCustomSwitchImages
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -83,13 +85,15 @@ fun StyledSwitch(
         SwitchStyle.Custom -> if (customStyle == null) SwitchStyle.CloudStar else SwitchStyle.Custom
         else -> style
     }
-    val customImage = rememberCustomSwitchImage(
-        customStyle.takeIf { resolvedStyle == SwitchStyle.Custom }
-    )
+    val activeCustomStyle = customStyle.takeIf { resolvedStyle == SwitchStyle.Custom }
+    val customImages = rememberCustomSwitchImages(activeCustomStyle)
     val progressTarget = if (checked) 1f else 0f
     val knobProgress by animateFloatAsState(
         targetValue = progressTarget,
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(
+            durationMillis = activeCustomStyle?.transitionDurationMillis ?: 220,
+            easing = activeCustomStyle?.transitionEasing?.composeEasing() ?: FastOutSlowInEasing,
+        ),
         label = "sunMoonSwitchKnob",
     )
     val trackColor by animateColorAsState(
@@ -117,7 +121,7 @@ fun StyledSwitch(
         0f
     }
     val customMotionProgress = rememberComponentMotionProgress(
-        rule = customStyle?.motion ?: PixelMotionRule(),
+        rule = activeCustomStyle?.motion ?: PixelMotionRule(),
         enabled = resolvedStyle == SwitchStyle.Custom,
         label = "customSwitchMotion",
     )
@@ -137,7 +141,7 @@ fun StyledSwitch(
             .size(width = 74.dp, height = 38.dp)
             .then(toggleModifier)
     ) {
-        val alpha = if (enabled) 1f else 0.45f
+        val alpha = if (enabled) 1f else activeCustomStyle?.disabledAlpha ?: 0.45f
 
         if (resolvedStyle == SwitchStyle.Custom && customStyle != null) {
             drawCustomSwitchStyle(
@@ -145,7 +149,7 @@ fun StyledSwitch(
                 checkedProgress = knobProgress,
                 enabledAlpha = alpha,
                 motionProgress = customMotionProgress,
-                image = customImage,
+                images = customImages,
             )
             return@Canvas
         }

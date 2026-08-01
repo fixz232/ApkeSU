@@ -44,9 +44,47 @@ class ComponentStyleStore(context: Context) {
         return readCardStyles().firstOrNull { it.id == activeId }
     }
 
+    fun readCardEditorDraft(): CustomCardStyle? = synchronized(componentStyleLock) {
+        prefs.getString(CUSTOM_CARD_EDITOR_DRAFT_KEY, null)?.let { raw ->
+            runCatching { CustomCardStyle.fromJsonString(raw) }.getOrNull()
+        }
+    }
+
+    fun saveCardEditorDraft(style: CustomCardStyle): Boolean = synchronized(componentStyleLock) {
+        prefs.edit()
+            .putString(CUSTOM_CARD_EDITOR_DRAFT_KEY, style.normalized().toJsonString())
+            .commit()
+    }
+
+    fun clearCardEditorDraft(): Boolean = synchronized(componentStyleLock) {
+        prefs.edit().remove(CUSTOM_CARD_EDITOR_DRAFT_KEY).commit()
+    }
+
     fun readActiveSwitchStyle(): CustomSwitchStyle? {
         val activeId = prefs.getString(CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY, null) ?: return null
         return readSwitchStyles().firstOrNull { it.id == activeId }
+    }
+
+    fun readSwitchEditorDraft(): CustomSwitchStyle? = synchronized(componentStyleLock) {
+        prefs.getString(CUSTOM_SWITCH_EDITOR_DRAFT_KEY, null)?.let { raw ->
+            runCatching { CustomSwitchStyle.fromJsonString(raw, allowLocalImageUri = true) }.getOrNull()
+        }
+    }
+
+    fun saveSwitchEditorDraft(style: CustomSwitchStyle): Boolean = synchronized(componentStyleLock) {
+        prefs.edit()
+            .putString(
+                CUSTOM_SWITCH_EDITOR_DRAFT_KEY,
+                style.normalized().toJsonString(includeLocalImageUri = true),
+            )
+            .commit()
+    }
+
+    fun clearSwitchEditorDraft(): Boolean = synchronized(componentStyleLock) {
+        val draftUris = readSwitchEditorDraft()?.imageUris().orEmpty()
+        val committed = prefs.edit().remove(CUSTOM_SWITCH_EDITOR_DRAFT_KEY).commit()
+        if (committed) draftUris.forEach(::discardSwitchImageIfUnreferenced)
+        committed
     }
 
     fun saveCardStyle(style: CustomCardStyle, apply: Boolean): Boolean = synchronized(componentStyleLock) {
@@ -139,10 +177,12 @@ class ComponentStyleStore(context: Context) {
         current: List<CustomSwitchStyle>,
     ) {
         runCatching {
-            val referenced = current.mapNotNull { style ->
-                resolveImageFile(style.imageUri)?.canonicalPath
-            }.toSet()
-            previous.mapNotNull { style -> resolveImageFile(style.imageUri) }
+            val referenced = (current.flatMap(CustomSwitchStyle::imageUris) +
+                readSwitchEditorDraft()?.imageUris().orEmpty())
+                .mapNotNull { resolveImageFile(it)?.canonicalPath }
+                .toSet()
+            previous.flatMap(CustomSwitchStyle::imageUris)
+                .mapNotNull(::resolveImageFile)
                 .distinctBy(File::getCanonicalPath)
                 .filterNot { it.canonicalPath in referenced }
                 .forEach(File::delete)
@@ -226,12 +266,19 @@ class ComponentStyleStore(context: Context) {
         val candidate = resolveImageFile(uriString) ?: return@synchronized false
         val candidatePath = runCatching { candidate.canonicalPath }.getOrNull()
             ?: return@synchronized false
-        val referenced = readSwitchStyles().any { style ->
-            resolveImageFile(style.imageUri)?.let { file ->
+        val referencedByLibrary = readSwitchStyles().any { style ->
+            style.imageUris().any { uri ->
+                resolveImageFile(uri)?.let { file ->
+                    runCatching { file.canonicalPath == candidatePath }.getOrDefault(false)
+                } == true
+            }
+        }
+        val referencedByDraft = readSwitchEditorDraft()?.imageUris().orEmpty().any { uri ->
+            resolveImageFile(uri)?.let { file ->
                 runCatching { file.canonicalPath == candidatePath }.getOrDefault(false)
             } == true
         }
-        !referenced && candidate.delete()
+        !referencedByLibrary && !referencedByDraft && candidate.delete()
     }
 
     private fun openInput(uri: Uri): InputStream {
@@ -263,4 +310,8 @@ class ComponentStyleStore(context: Context) {
 
 private const val SETTINGS_PREFERENCES = "settings"
 private const val COMPONENT_IMAGE_DIRECTORY = "component-styles/images"
+private const val CUSTOM_CARD_EDITOR_DRAFT_KEY = "custom_card_editor_draft"
+private const val CUSTOM_SWITCH_EDITOR_DRAFT_KEY = "custom_switch_editor_draft"
 private val componentStyleLock = Any()
+
+private fun CustomSwitchStyle.imageUris(): List<String> = listOfNotNull(imageUri, imageOnUri).distinct()

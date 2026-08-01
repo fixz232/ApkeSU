@@ -130,6 +130,7 @@ import me.weishu.kernelsu.ui.component.decoration.forPreview
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.screen.colorpalette.ThemePresetNameDialog
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
@@ -651,7 +652,7 @@ private fun CompactDecorationPreview(
     conflicts: List<Int>,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.94f),
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth(),
     ) {
@@ -836,7 +837,7 @@ private fun DecorationCategoryRow(
     val shape = RoundedCornerShape(8.dp)
     val effective = category.isEffective(config, effectiveConfig)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.86f),
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
@@ -1667,7 +1668,7 @@ private fun DecorationMiniPreview(config: UiDecorationConfig, modifier: Modifier
         ) {
             UiDecorationBackdrop(Modifier.fillMaxSize())
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+                color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerHigh),
                 shape = RoundedCornerShape(5.dp),
                 modifier = Modifier
                     .align(Alignment.Center)

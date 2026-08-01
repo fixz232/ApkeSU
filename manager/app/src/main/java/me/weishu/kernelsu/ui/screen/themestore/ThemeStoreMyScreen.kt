@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -145,6 +146,16 @@ fun ThemeStoreLibraryScreen() {
                     if (result.success) R.string.theme_store_transfer_completed else R.string.theme_store_transfer_failed,
                     Toast.LENGTH_SHORT,
                 ).show()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                detailIsError = true
+                detailMessage = error.localizedMessage
+                    ?.lineSequence()
+                    ?.firstOrNull()
+                    ?.take(240)
+                    ?: fallbackMessage
+                Toast.makeText(context, R.string.theme_store_transfer_failed, Toast.LENGTH_SHORT).show()
             } finally {
                 busy = false
             }
@@ -176,6 +187,15 @@ fun ThemeStoreLibraryScreen() {
                         ?.take(240)
                         ?: resources.getString(R.string.theme_store_my_import_failed)
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                detailIsError = true
+                detailMessage = error.localizedMessage
+                    ?.lineSequence()
+                    ?.firstOrNull()
+                    ?.take(240)
+                    ?: resources.getString(R.string.theme_store_my_import_failed)
             } finally {
                 busy = false
             }

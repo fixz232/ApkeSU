@@ -58,6 +58,7 @@ data class AppSettings(
     val keyColor: Int,
     val paletteStyle: PaletteStyle,
     val colorSpec: ColorSpec.SpecVersion,
+    val monetSurfaceOpacity: Float = ThemeAppearanceDefaults.MONET_SURFACE_OPACITY,
 )
 
 val PaletteStyle.supportsSpec2025: Boolean
@@ -82,13 +83,13 @@ object ThemeController {
             prefs.edit().putString("ui_mode", uiMode).apply()
         }
         val defaultPreset = when (uiMode) {
-            InterfaceStyle.Studio.value -> ThemePreset.STUDIO
             InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
             InterfaceStyle.Alpha.value -> ThemePreset.ALPHA
             InterfaceStyle.Delta.value -> ThemePreset.DELTA
             InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
             InterfaceStyle.Snow.value -> ThemePreset.SNOW
             InterfaceStyle.Rain.value -> ThemePreset.RAIN
+            InterfaceStyle.Ink.value -> ThemePreset.INK
             InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
             else -> ThemePreset.CLEAN_TOOL
         }
@@ -126,7 +127,14 @@ object ThemeController {
             defaultPreset.colorSpec
         }
 
-        return AppSettings(colorMode, keyColor, paletteStyle, colorSpec)
+        val monetSurfaceOpacity = sanitizeMonetSurfaceOpacity(
+            prefs.getFloat(
+                key("monet_surface_opacity"),
+                defaultPreset.monetSurfaceOpacity,
+            )
+        )
+
+        return AppSettings(colorMode, keyColor, paletteStyle, colorSpec, monetSurfaceOpacity)
     }
 }
 
@@ -175,6 +183,26 @@ fun isInDarkTheme(): Boolean {
         2, 5, 6 -> true   // Force dark mode
         else -> isSystemInDarkTheme()  // Follow system (0 or default)
     }
+}
+
+fun isInterfaceForcedDark(
+    interfaceStyle: String,
+    rainStyle: RainStyle,
+    pixelStyle: PixelStyle,
+): Boolean {
+    return interfaceStyle == InterfaceStyle.Rain.value && forceRainDarkTheme(rainStyle) ||
+        interfaceStyle == InterfaceStyle.Pixel.value && pixelStyle == PixelStyle.CyberHacker
+}
+
+fun resolveEffectiveDarkMode(
+    colorMode: ColorMode,
+    systemDark: Boolean,
+    interfaceStyle: String,
+    rainStyle: RainStyle,
+    pixelStyle: PixelStyle,
+): Boolean {
+    return isInterfaceForcedDark(interfaceStyle, rainStyle, pixelStyle) ||
+        colorMode.isDark || colorMode.isSystem && systemDark
 }
 
 val LocalColorMode = staticCompositionLocalOf { 0 }

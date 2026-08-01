@@ -73,6 +73,7 @@ import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.rememberCustomVideoFrameBitmap
 import me.weishu.kernelsu.ui.component.rememberCustomWallpaperPreviewBitmap
+import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
@@ -139,7 +140,7 @@ fun BackgroundSettingsScreen() {
             val target = pageTargetFromScopeKey(scopeKey) ?: return@rememberLauncherForActivityResult
             viewModel.setCustomPageBackgroundVideo(target, uri.toString())
         }
-        previewScopeKey = scopeKey
+        cropScopeKey = scopeKey
     }
 
     LifecycleResumeEffect(Unit) {
@@ -185,6 +186,15 @@ fun BackgroundSettingsScreen() {
                     }
                 }
             },
+            onVisualSettingsChange = { scopeKey, settings ->
+                if (scopeKey == GLOBAL_BACKGROUND_SCOPE_KEY) {
+                    viewModel.setCustomWallpaperVisualSettings(settings)
+                } else {
+                    pageTargetFromScopeKey(scopeKey)?.let { target ->
+                        viewModel.setCustomPageBackgroundVisualSettings(target, settings)
+                    }
+                }
+            },
             onCropChange = { scopeKey, crop ->
                 if (scopeKey == GLOBAL_BACKGROUND_SCOPE_KEY) {
                     viewModel.setCustomWallpaperCrop(crop)
@@ -207,14 +217,23 @@ fun BackgroundSettingsScreen() {
     )
 
     val cropState = cropScopeKey?.let(uiState::backgroundStateForScope)
+    val cropVideoFrame = rememberCustomVideoFrameBitmap(cropState?.videoUriString)
     SettingsWallpaperCropDialog(
-        show = cropState?.hasWallpaper == true,
-        uriString = cropState?.wallpaperUriString,
+        show = cropState?.hasMedia == true,
+        uriString = cropState?.wallpaperUriString ?: cropState?.videoUriString,
         crop = cropState?.crop ?: CustomBackgroundState().crop,
         onCropChange = { crop ->
             cropScopeKey?.let { actions.onCropChange(it, crop) }
         },
         onDismissRequest = { cropScopeKey = null },
+        previewBitmap = cropVideoFrame.takeIf { cropState?.hasVideo == true },
+        transform = cropState?.visualSettings?.transform ?: me.weishu.kernelsu.ui.util.MediaTransform(),
+        onTransformChange = { transform ->
+            cropScopeKey?.let { scopeKey ->
+                val current = uiState.backgroundStateForScope(scopeKey)
+                actions.onVisualSettingsChange(scopeKey, current.visualSettings.copy(transform = transform))
+            }
+        },
     )
 
     val previewState = previewScopeKey?.let(uiState::backgroundStateForScope)
@@ -223,6 +242,7 @@ fun BackgroundSettingsScreen() {
         uriString = previewState?.wallpaperUriString,
         opacity = previewState?.opacity ?: CustomBackgroundState().opacity,
         crop = previewState?.crop ?: CustomBackgroundState().crop,
+        visualSettings = previewState?.visualSettings ?: me.weishu.kernelsu.ui.util.MediaVisualSettings(),
         passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
         passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
         onDismissRequest = { previewScopeKey = null },
@@ -232,6 +252,8 @@ fun BackgroundSettingsScreen() {
         uriString = previewState?.videoUriString,
         durationSeconds = previewState?.videoDurationSeconds ?: CustomBackgroundState().videoDurationSeconds,
         opacity = previewState?.opacity ?: CustomBackgroundState().opacity,
+        crop = previewState?.crop ?: CustomBackgroundState().crop,
+        visualSettings = previewState?.visualSettings ?: me.weishu.kernelsu.ui.util.MediaVisualSettings(),
         passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
         passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
         onDismissRequest = { previewScopeKey = null },
@@ -391,6 +413,10 @@ private fun BackgroundEditorCard(
                 imageBitmap = imageBitmap,
                 videoFrameBitmap = videoFrameBitmap,
                 hasMedia = state.hasMedia,
+                visualSettings = state.visualSettings,
+            )
+            MediaFileInfoSummary(
+                rememberMediaFileInfo(state.wallpaperUriString ?: state.videoUriString)
             )
 
             Row(
@@ -438,18 +464,25 @@ private fun BackgroundEditorCard(
                     )
                 }
 
+                MediaVisualControls(
+                    value = state.visualSettings,
+                    onValueChange = { actions.onVisualSettingsChange(scopeKey, it) },
+                    showContrast = true,
+                    showTemperature = true,
+                    showNoise = true,
+                    showMotion = true,
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    if (state.hasWallpaper) {
-                        BackgroundTextButton(
-                            text = stringResource(R.string.settings_page_background_crop_action),
-                            icon = Icons.Rounded.ImageSearch,
-                            onClick = { actions.onCrop(scopeKey) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    BackgroundTextButton(
+                        text = stringResource(R.string.settings_page_background_crop_action),
+                        icon = Icons.Rounded.ImageSearch,
+                        onClick = { actions.onCrop(scopeKey) },
+                        modifier = Modifier.weight(1f),
+                    )
                     BackgroundTextButton(
                         text = stringResource(R.string.settings_page_background_preview_action),
                         icon = Icons.Rounded.Visibility,
@@ -475,6 +508,7 @@ private fun BackgroundPreviewFrame(
     imageBitmap: ImageBitmap?,
     videoFrameBitmap: ImageBitmap?,
     hasMedia: Boolean,
+    visualSettings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
 ) {
     val bitmap = imageBitmap ?: videoFrameBitmap
     Box(
@@ -486,12 +520,18 @@ private fun BackgroundPreviewFrame(
         contentAlignment = Alignment.Center,
     ) {
         when {
-            bitmap != null -> Image(
+            bitmap != null -> MediaVisualLayer(
+                settings = visualSettings,
                 modifier = Modifier.fillMaxSize(),
-                bitmap = bitmap,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-            )
+            ) { colorFilter ->
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    bitmap = bitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = colorFilter,
+                )
+            }
 
             hasMedia -> CircularProgressIndicator()
 
@@ -504,11 +544,6 @@ private fun BackgroundPreviewFrame(
         }
 
         if (bitmap != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.36f))
-            )
             Text(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -681,6 +716,7 @@ private data class BackgroundSettingsActions(
     val onClear: (String) -> Unit,
     val onOpacityChange: (String, Float) -> Unit,
     val onDurationChange: (String, Int) -> Unit,
+    val onVisualSettingsChange: (String, me.weishu.kernelsu.ui.util.MediaVisualSettings) -> Unit,
     val onCropChange: (String, me.weishu.kernelsu.ui.util.CustomWallpaperCrop) -> Unit,
     val onPassthroughEnabledChange: (Boolean) -> Unit,
     val onPassthroughOpacityChange: (Float) -> Unit,
@@ -694,6 +730,7 @@ private fun SettingsUiState.backgroundStateForScope(scopeKey: String): CustomBac
             opacity = customWallpaperOpacity,
             crop = customWallpaperCrop,
             videoDurationSeconds = customVideoBackgroundDurationSeconds,
+            visualSettings = customWallpaperVisualSettings,
         )
     }
     val target = pageTargetFromScopeKey(scopeKey) ?: return CustomBackgroundState()

@@ -1,6 +1,8 @@
 package me.weishu.kernelsu.ui.component.rain
 
 import android.animation.ValueAnimator
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -22,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -95,7 +98,24 @@ fun rememberRainCardMotionProgress(enabled: Boolean): State<Float> {
 fun rememberRainSceneProgress(enabled: Boolean, style: RainStyle): State<Float> {
     val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
     if (!enabled || !animationsEnabled) {
-        return remember { mutableFloatStateOf(STATIC_PROGRESS) }
+        return remember(style) {
+            mutableFloatStateOf(if (style == RainStyle.AfterRain) 1f else STATIC_PROGRESS)
+        }
+    }
+    if (style == RainStyle.AfterRain) {
+        val clearing = remember(style) { Animatable(0f) }
+        val clearingState = remember(clearing) { derivedStateOf { clearing.value } }
+        LaunchedEffect(clearing) {
+            clearing.snapTo(0f)
+            clearing.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = AFTER_RAIN_CLEARING_DURATION_MILLIS,
+                    easing = FastOutSlowInEasing,
+                ),
+            )
+        }
+        return clearingState
     }
     val cycleMillis = remember(style) { RainSceneSpec.forStyle(style).cycleMillis }
     val transition = rememberInfiniteTransition(label = "rainScene")
@@ -124,6 +144,7 @@ fun RainBackdrop(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize()) {
         if (size.width <= 1f || size.height <= 1f) return@Canvas
         drawRainBackground(style, palette, mist, progress.value)
+        val clearingAlpha = afterRainRainAlpha(style, progress.value)
         drawRainField(
             drops = drops,
             spec = spec,
@@ -131,7 +152,7 @@ fun RainBackdrop(modifier: Modifier = Modifier) {
             progress = progress.value,
             minimumDepth = 0f,
             maximumDepth = 0.50f,
-            alphaMultiplier = 0.34f,
+            alphaMultiplier = 0.34f * clearingAlpha,
             lengthMultiplier = 0.78f,
             strokeMultiplier = 0.82f,
         )
@@ -173,6 +194,7 @@ fun RainForegroundOverlay(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (size.width <= 1f || size.height <= 1f) return@Canvas
+            val clearingAlpha = afterRainRainAlpha(style, progress.value)
             drawRainField(
                 drops = drops,
                 spec = spec,
@@ -180,7 +202,7 @@ fun RainForegroundOverlay(modifier: Modifier = Modifier) {
                 progress = progress.value,
                 minimumDepth = 0.56f,
                 maximumDepth = 1f,
-                alphaMultiplier = foregroundRainAlpha(style),
+                alphaMultiplier = foregroundRainAlpha(style) * clearingAlpha,
                 lengthMultiplier = 1.12f,
                 strokeMultiplier = 1f,
             )
@@ -189,13 +211,18 @@ fun RainForegroundOverlay(modifier: Modifier = Modifier) {
                 spec = spec,
                 palette = palette,
                 progress = progress.value,
-                alphaMultiplier = 0.64f,
+                alphaMultiplier = 0.54f * clearingAlpha,
             )
-            drawLensDrops(lensDrops, palette, progress.value)
+            drawLensDrops(
+                drops = lensDrops,
+                palette = palette,
+                progress = progress.value,
+                alphaMultiplier = if (style == RainStyle.AfterRain) 0.74f else 1f,
+            )
         }
         if (lightningAlpha > 0f) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                drawRect(Color.White.copy(alpha = lightningAlpha))
+                drawLightningIllumination(palette, lightningAlpha)
                 drawLightningBranch(lightningAlpha)
             }
         }
@@ -208,6 +235,7 @@ fun RainChromeOverlay(modifier: Modifier = Modifier) {
     val style = LocalRainStyle.current
     val palette = rainPalette(style, isInDarkTheme())
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val progress = LocalRainCardMotionProgress.current
     Canvas(modifier = modifier.fillMaxSize()) {
         val inset = 16.dp.toPx()
         val top = topPadding.toPx() + 5.dp.toPx()
@@ -219,40 +247,26 @@ fun RainChromeOverlay(modifier: Modifier = Modifier) {
             strokeWidth = 0.75.dp.toPx(),
             cap = StrokeCap.Round,
         )
+        val travel = (size.width - inset * 2f).coerceAtLeast(1f)
+        val x = inset + travel * (0.08f + progress.value * 0.84f)
+        val radius = 1.15.dp.toPx()
         drawLine(
-            color = palette.rainAccent.copy(alpha = 0.48f),
-            start = Offset(inset, lineY + 2.dp.toPx()),
-            end = Offset(size.width * 0.36f, lineY + 2.dp.toPx()),
-            strokeWidth = 0.8.dp.toPx(),
+            color = palette.rain.copy(alpha = 0.24f),
+            start = Offset(x, lineY),
+            end = Offset(x - 0.35.dp.toPx(), lineY + radius * 1.7f),
+            strokeWidth = 0.55.dp.toPx(),
             cap = StrokeCap.Round,
         )
-        val drops = when (style) {
-            RainStyle.LightRain -> listOf(0.24f, 0.78f)
-            RainStyle.MediumRain -> listOf(0.18f, 0.56f, 0.84f)
-            RainStyle.HeavyRain -> listOf(0.16f, 0.49f, 0.80f)
-            RainStyle.Thunderstorm -> listOf(0.13f, 0.44f, 0.74f)
-        }
-        drops.forEachIndexed { index, fraction ->
-            val x = inset + (size.width - inset * 2f) * fraction
-            val radius = if (index == 1) 1.25.dp.toPx() else 0.9.dp.toPx()
-            drawLine(
-                color = palette.rain.copy(alpha = 0.28f),
-                start = Offset(x, lineY),
-                end = Offset(x - 0.35.dp.toPx(), lineY + radius * 1.5f),
-                strokeWidth = 0.55.dp.toPx(),
-                cap = StrokeCap.Round,
-            )
-            drawCircle(
-                color = palette.rain.copy(alpha = 0.48f),
-                radius = radius,
-                center = Offset(x - 0.35.dp.toPx(), lineY + radius * 2f),
-            )
-            drawCircle(
-                color = palette.highlight.copy(alpha = 0.68f),
-                radius = radius * 0.26f,
-                center = Offset(x - radius * 0.52f, lineY + radius * 1.56f),
-            )
-        }
+        drawCircle(
+            color = palette.rain.copy(alpha = 0.52f),
+            radius = radius,
+            center = Offset(x - 0.35.dp.toPx(), lineY + radius * 2.2f),
+        )
+        drawCircle(
+            color = palette.highlight.copy(alpha = 0.72f),
+            radius = radius * 0.25f,
+            center = Offset(x - radius * 0.60f, lineY + radius * 1.72f),
+        )
     }
 }
 
@@ -261,35 +275,35 @@ fun RainMotto(modifier: Modifier = Modifier) {
     if (!isRainInterfaceStyle()) return
     val style = LocalRainStyle.current
     val palette = rainPalette(style, isInDarkTheme())
-    val shape = RoundedCornerShape(9.dp)
+    val motionProgress = LocalRainCardMotionProgress.current
+    val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = modifier
-            .height(28.dp)
-            .shadow(2.dp, shape, ambientColor = palette.shadow.copy(alpha = 0.18f))
+            .height(22.dp)
+            .shadow(1.dp, shape, ambientColor = palette.shadow.copy(alpha = 0.14f))
             .clip(shape)
             .background(
-                Brush.horizontalGradient(
+                Brush.verticalGradient(
                     listOf(
-                        palette.surfaceBottom.copy(alpha = 0.78f),
-                        palette.surfaceTop.copy(alpha = 0.84f),
-                        palette.surfaceBottom.copy(alpha = 0.78f),
+                        palette.surfaceTop.copy(alpha = 0.72f),
+                        palette.surfaceBottom.copy(alpha = 0.56f),
                     ),
                 ),
                 shape,
             )
-            .border(1.dp, palette.outline.copy(alpha = 0.58f), shape)
+            .border(0.75.dp, palette.outline.copy(alpha = 0.48f), shape)
             .drawWithContent {
-                drawRainMottoDetails(palette)
+                drawRainMottoDetails(palette, motionProgress.value)
                 drawContent()
             },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = stringResource(style.mottoRes),
-            modifier = Modifier.padding(horizontal = 34.dp),
+            modifier = Modifier.padding(horizontal = 28.dp),
             color = palette.content,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -298,9 +312,8 @@ fun RainMotto(modifier: Modifier = Modifier) {
 
 @Composable
 fun Modifier.rainMiuixCardSurface(
-    shape: Shape = RoundedCornerShape(18.dp),
     enabled: Boolean = true,
-    capHeight: Dp = 13.dp,
+    capHeight: Dp = 11.dp,
     customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
     if (!enabled || !isRainInterfaceStyle()) return this
@@ -309,14 +322,19 @@ fun Modifier.rainMiuixCardSurface(
     val palette = rainPalette(style, dark)
     val motionEnabled = LocalRainCardMotionEnabled.current
     val motionProgress = LocalRainCardMotionProgress.current
+    val shape = RoundedCornerShape(14.dp)
     val surfaceBrush = Brush.verticalGradient(
-        listOf(palette.surfaceTop, palette.surfaceBottom),
+        listOf(
+            palette.surfaceTop,
+            palette.surfaceBottom,
+            palette.surfaceBottom.copy(alpha = palette.surfaceBottom.alpha * 0.92f),
+        ),
     )
     return this
-        .shadow(4.dp, shape, ambientColor = palette.shadow.copy(alpha = 0.28f))
+        .shadow(2.dp, shape, ambientColor = palette.shadow.copy(alpha = 0.22f))
         .clip(shape)
         .background(surfaceBrush, shape)
-        .border(1.dp, palette.outline.copy(alpha = if (dark) 0.58f else 0.72f), shape)
+        .border(0.85.dp, palette.outline.copy(alpha = if (dark) 0.54f else 0.66f), shape)
         .drawWithContent {
             val progress = motionProgress.value
             drawRainCardInterior(style, palette, progress, motionEnabled)
@@ -341,7 +359,8 @@ fun rainMiuixCardColors(
     CardDefaults.defaultColors(color = color)
 }
 
-internal fun rainCardContentLayerColor(baseColor: Color): Color = baseColor.copy(alpha = 0f)
+internal fun rainCardContentLayerColor(baseColor: Color): Color =
+    baseColor.copy(alpha = baseColor.alpha * 0.14f)
 
 internal fun rainCardDecorationHeight(
     requestedHeight: Float,
@@ -355,7 +374,7 @@ internal fun rainCardDecorationHeight(
 @Composable
 fun rainNavigationContainerColor(): Color {
     val palette = rainPalette(LocalRainStyle.current, isInDarkTheme())
-    return palette.surfaceBottom.copy(alpha = 0.88f)
+    return palette.surfaceBottom.copy(alpha = if (isInDarkTheme()) 0.66f else 0.58f)
 }
 
 @Composable
@@ -370,12 +389,12 @@ fun Modifier.rainNavigationSurface(
     val motionProgress = LocalRainCardMotionProgress.current
     return clip(shape)
         .then(if (paintBackground) Modifier.background(rainNavigationContainerColor(), shape) else Modifier)
-        .border(1.dp, palette.outline.copy(alpha = 0.76f), shape)
+        .border(0.8.dp, palette.outline.copy(alpha = 0.58f), shape)
         .drawWithContent {
             val progress = motionProgress.value
             drawRainNavigationUnderlay(style, palette, progress, motionEnabled)
             drawContent()
-            drawRainNavigationFrame(palette, progress, motionEnabled)
+            drawRainNavigationFrame(palette)
         }
 }
 
@@ -383,22 +402,33 @@ fun Modifier.rainNavigationSurface(
 fun Modifier.rainNavigationIndicator(
     shape: Shape,
     paintBackground: Boolean = true,
+    interactionKey: Any? = Unit,
 ): Modifier {
     if (!isRainInterfaceStyle()) return this
     val palette = rainPalette(LocalRainStyle.current, isInDarkTheme())
-    val motionEnabled = LocalRainCardMotionEnabled.current
-    val motionProgress = LocalRainCardMotionProgress.current
+    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val rippleProgress = remember { Animatable(if (animationsEnabled) 0f else 1f) }
+    LaunchedEffect(interactionKey, animationsEnabled) {
+        if (!animationsEnabled) {
+            rippleProgress.snapTo(1f)
+        } else {
+            rippleProgress.snapTo(0f)
+            rippleProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(420, easing = FastOutSlowInEasing),
+            )
+        }
+    }
     return clip(shape)
         .then(
             if (paintBackground) {
-                Modifier.background(palette.ripple.copy(alpha = 0.17f), shape)
+                Modifier.background(palette.ripple.copy(alpha = 0.14f), shape)
             } else {
                 Modifier
             },
         )
-        .border(1.dp, palette.rainAccent.copy(alpha = 0.62f), shape)
+        .border(0.8.dp, palette.rainAccent.copy(alpha = 0.52f), shape)
         .drawWithContent {
-            val progress = motionProgress.value
             drawRoundRect(
                 brush = Brush.verticalGradient(
                     listOf(
@@ -409,26 +439,23 @@ fun Modifier.rainNavigationIndicator(
                 ),
             )
             drawContent()
-            val highlightWidth = size.width * 0.28f
-            val highlightStart = if (motionEnabled) {
-                -highlightWidth + progress * (size.width + highlightWidth)
-            } else {
-                size.width * 0.20f
+            val progress = rippleProgress.value
+            if (progress < 1f) {
+                val radius = size.maxDimension * (0.22f + progress * 0.84f)
+                drawOval(
+                    color = palette.rainAccent.copy(alpha = (1f - progress) * 0.34f),
+                    topLeft = Offset(size.width / 2f - radius, size.height / 2f - radius * 0.42f),
+                    size = Size(radius * 2f, radius * 0.84f),
+                    style = Stroke(width = 0.9.dp.toPx()),
+                )
             }
-            drawLine(
-                color = palette.highlight.copy(alpha = 0.52f),
-                start = Offset(highlightStart, 1.dp.toPx()),
-                end = Offset(highlightStart + highlightWidth, 1.dp.toPx()),
-                strokeWidth = 0.7.dp.toPx(),
-                cap = StrokeCap.Round,
-            )
         }
 }
 
 @Composable
 fun rainTopBarContainerColor(): Color {
     val palette = rainPalette(LocalRainStyle.current, isInDarkTheme())
-    return palette.surfaceBottom.copy(alpha = 0.76f)
+    return palette.surfaceBottom.copy(alpha = 0.58f)
 }
 
 @Composable
@@ -532,6 +559,7 @@ private fun DrawScope.drawRainBackground(
     mist: List<MistParticle>,
     progress: Float,
 ) {
+    val clearing = if (style == RainStyle.AfterRain) progress.coerceIn(0f, 1f) else 0f
     drawRect(brush = Brush.verticalGradient(listOf(palette.backgroundTop, palette.backgroundBottom)))
     drawRect(
         brush = Brush.verticalGradient(
@@ -545,12 +573,18 @@ private fun DrawScope.drawRainBackground(
     drawRect(
         brush = Brush.radialGradient(
             colors = listOf(
-                palette.highlight.copy(alpha = if (style == RainStyle.LightRain) 0.14f else 0.08f),
+                palette.highlight.copy(
+                    alpha = when (style) {
+                        RainStyle.LightRain -> 0.14f
+                        RainStyle.AfterRain -> 0.12f + clearing * 0.16f
+                        else -> 0.08f
+                    },
+                ),
                 palette.fog.copy(alpha = 0.055f),
                 Color.Transparent,
             ),
-            center = Offset(size.width * 0.28f, size.height * 0.72f),
-            radius = size.maxDimension * 0.62f,
+            center = Offset(size.width * 0.27f, size.height * (0.70f - clearing * 0.42f)),
+            radius = size.maxDimension * (0.62f + clearing * 0.12f),
         ),
     )
 
@@ -559,23 +593,25 @@ private fun DrawScope.drawRainBackground(
         RainStyle.MediumRain -> 0.23f
         RainStyle.HeavyRain -> 0.28f
         RainStyle.Thunderstorm -> 0.32f
+        RainStyle.AfterRain -> 0.22f * (1f - clearing * 0.72f)
     }
+    val cloudLift = size.height * clearing * 0.055f
     drawRainCloudLayer(
-        baseline = size.height * 0.12f,
+        baseline = size.height * 0.12f - cloudLift,
         depth = size.height * 0.075f,
         color = palette.cloud,
         alpha = cloudAlpha,
         phase = 0.2f + progress * PI.toFloat() * 0.20f,
     )
     drawRainCloudLayer(
-        baseline = size.height * 0.21f,
+        baseline = size.height * 0.21f - cloudLift * 0.72f,
         depth = size.height * 0.09f,
         color = palette.fog,
         alpha = cloudAlpha * 0.58f,
         phase = 1.1f - progress * PI.toFloat() * 0.13f,
     )
     drawRainCloudLayer(
-        baseline = size.height * 0.29f,
+        baseline = size.height * 0.29f - cloudLift * 0.48f,
         depth = size.height * 0.065f,
         color = palette.cloud,
         alpha = cloudAlpha * 0.32f,
@@ -584,7 +620,7 @@ private fun DrawScope.drawRainBackground(
     mist.forEachIndexed { index, particle ->
         val drift = sin(progress * PI.toFloat() * 2f + index * 0.73f) * size.width * 0.012f
         drawCircle(
-            color = palette.highlight.copy(alpha = particle.alpha),
+            color = palette.highlight.copy(alpha = particle.alpha * (1f - clearing * 0.46f)),
             radius = particle.radiusDp.dp.toPx(),
             center = Offset(particle.x * size.width + drift, particle.y * size.height),
         )
@@ -623,9 +659,33 @@ private fun DrawScope.drawRainBackground(
         color = palette.highlight.copy(alpha = 0.10f),
         style = Stroke(width = 0.8.dp.toPx(), cap = StrokeCap.Round),
     )
+    if (style == RainStyle.AfterRain) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.72f to Color.Transparent,
+                    0.90f to palette.highlight.copy(alpha = 0.035f + clearing * 0.065f),
+                    1f to palette.ripple.copy(alpha = 0.12f + clearing * 0.09f),
+                ),
+            ),
+        )
+        repeat(3) { index ->
+            val y = size.height * (0.88f + index * 0.034f)
+            val halfWidth = size.width * (0.10f + index * 0.07f)
+            drawOval(
+                color = palette.highlight.copy(alpha = clearing * (0.075f - index * 0.014f)),
+                topLeft = Offset(size.width * 0.34f - halfWidth, y - 1.5.dp.toPx()),
+                size = Size(halfWidth * 2f, 3.dp.toPx()),
+            )
+        }
+    }
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(Color.Transparent, palette.shadow.copy(alpha = 0.20f)),
+            colors = listOf(
+                Color.Transparent,
+                palette.shadow.copy(alpha = 0.20f - clearing * 0.11f),
+            ),
             center = Offset(size.width * 0.5f, size.height * 0.44f),
             radius = size.maxDimension * 0.78f,
         ),
@@ -799,10 +859,41 @@ private fun DrawScope.drawLightningBranch(alpha: Float) {
     )
 }
 
+private fun DrawScope.drawLightningIllumination(
+    palette: RainPalette,
+    alpha: Float,
+) {
+    drawRect(palette.highlight.copy(alpha = alpha * 0.11f))
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                palette.rainAccent.copy(alpha = alpha * 0.22f),
+                palette.highlight.copy(alpha = alpha * 0.07f),
+                Color.Transparent,
+            ),
+            endY = size.height * 0.46f,
+        ),
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                palette.highlight.copy(alpha = alpha * 0.72f),
+                palette.rainAccent.copy(alpha = alpha * 0.24f),
+                Color.Transparent,
+            ),
+            center = Offset(size.width * 0.70f, size.height * 0.10f),
+            radius = size.maxDimension * 0.34f,
+        ),
+        radius = size.maxDimension * 0.34f,
+        center = Offset(size.width * 0.70f, size.height * 0.10f),
+    )
+}
+
 private fun DrawScope.drawLensDrops(
     drops: List<LensDrop>,
     palette: RainPalette,
     progress: Float,
+    alphaMultiplier: Float,
 ) {
     drops.forEachIndexed { index, drop ->
         val radius = drop.radiusDp.dp.toPx()
@@ -831,14 +922,14 @@ private fun DrawScope.drawLensDrops(
             )
             close()
         }
-        drawPath(path, color = palette.rain.copy(alpha = 0.11f))
+        drawPath(path, color = palette.rain.copy(alpha = 0.11f * alphaMultiplier))
         drawPath(
             path = path,
-            color = palette.highlight.copy(alpha = 0.19f),
+            color = palette.highlight.copy(alpha = 0.19f * alphaMultiplier),
             style = Stroke(width = 0.55.dp.toPx()),
         )
         drawCircle(
-            color = palette.highlight.copy(alpha = 0.31f),
+            color = palette.highlight.copy(alpha = 0.31f * alphaMultiplier),
             radius = radius * 0.17f,
             center = Offset(center.x - radius * 0.28f, center.y - radius * 0.47f),
         )
@@ -853,15 +944,18 @@ private fun DrawScope.drawRainCardInterior(
 ) {
     if (size.width < 72.dp.toPx() || size.height < 48.dp.toPx()) return
     drawRect(
-        brush = Brush.horizontalGradient(
+        brush = Brush.linearGradient(
             colorStops = arrayOf(
-                0f to palette.highlight.copy(alpha = 0.055f),
-                0.56f to Color.Transparent,
-                1f to palette.ripple.copy(alpha = 0.065f),
+                0f to palette.highlight.copy(alpha = 0.075f),
+                0.34f to Color.Transparent,
+                0.80f to palette.ripple.copy(alpha = 0.038f),
+                1f to palette.shadow.copy(alpha = 0.045f),
             ),
+            start = Offset.Zero,
+            end = Offset(size.width, size.height),
         ),
     )
-    val sweepWidth = minOf(size.width * 0.18f, 72.dp.toPx())
+    val sweepWidth = minOf(size.width * 0.11f, 44.dp.toPx())
     val sweepCenter = if (motionEnabled) {
         -sweepWidth + progress * (size.width + sweepWidth * 2f)
     } else {
@@ -871,7 +965,7 @@ private fun DrawScope.drawRainCardInterior(
         brush = Brush.linearGradient(
             colors = listOf(
                 Color.Transparent,
-                palette.highlight.copy(alpha = 0.065f),
+                palette.highlight.copy(alpha = 0.045f),
                 Color.Transparent,
             ),
             start = Offset(sweepCenter - sweepWidth, 0f),
@@ -879,13 +973,14 @@ private fun DrawScope.drawRainCardInterior(
         ),
     )
     val dropCount = when (style) {
-        RainStyle.LightRain -> 2
-        RainStyle.MediumRain -> 3
-        RainStyle.HeavyRain -> 3
-        RainStyle.Thunderstorm -> 4
+        RainStyle.LightRain -> 1
+        RainStyle.MediumRain -> 2
+        RainStyle.HeavyRain -> 2
+        RainStyle.Thunderstorm -> 2
+        RainStyle.AfterRain -> 1
     }
     repeat(dropCount) { index ->
-        val x = size.width * (0.875f + index * 0.027f)
+        val x = size.width * (0.89f + index * 0.036f)
         val laneStart = size.height * (0.24f + (index % 3) * 0.14f)
         val laneProgress = if (motionEnabled) {
             (progress * (0.54f + index * 0.08f) + index * 0.23f) % 1f
@@ -896,14 +991,14 @@ private fun DrawScope.drawRainCardInterior(
         val radius = (1.05f + (index % 2) * 0.52f).dp.toPx()
         val streak = (4.5f + index * 1.4f).dp.toPx()
         drawLine(
-            color = palette.rain.copy(alpha = 0.085f),
+            color = palette.rain.copy(alpha = 0.075f),
             start = Offset(x, y - streak),
             end = Offset(x, y - radius * 0.8f),
             strokeWidth = 0.62.dp.toPx(),
             cap = StrokeCap.Round,
         )
         drawOval(
-            color = palette.rain.copy(alpha = 0.14f),
+            color = palette.rain.copy(alpha = 0.12f),
             topLeft = Offset(x - radius * 0.70f, y - radius),
             size = Size(radius * 1.32f, radius * 1.85f),
         )
@@ -913,12 +1008,18 @@ private fun DrawScope.drawRainCardInterior(
             center = Offset(x - radius * 0.26f, y - radius * 0.48f),
         )
     }
-    val rippleRadius = minOf(size.width * 0.16f, 46.dp.toPx())
+    val reflectionAlpha = if (style == RainStyle.AfterRain) 0.16f else 0.08f
     drawOval(
-        color = palette.ripple.copy(alpha = 0.085f),
-        topLeft = Offset(size.width * 0.70f - rippleRadius, size.height - 7.dp.toPx()),
-        size = Size(rippleRadius * 2f, 5.dp.toPx()),
-        style = Stroke(width = 0.7.dp.toPx()),
+        brush = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                palette.highlight.copy(alpha = reflectionAlpha),
+                palette.ripple.copy(alpha = reflectionAlpha * 0.62f),
+                Color.Transparent,
+            ),
+        ),
+        topLeft = Offset(size.width * 0.12f, size.height - 5.dp.toPx()),
+        size = Size(size.width * 0.62f, 3.5.dp.toPx()),
     )
 }
 
@@ -930,91 +1031,97 @@ private fun DrawScope.drawRainCardCanopy(
     motionEnabled: Boolean,
 ) {
     val phase = if (motionEnabled) progress * PI.toFloat() * 2f else PI.toFloat() * 0.62f
-    val waterline = Path()
+    val breathing = sin(phase) * height * 0.018f
+    val y0 = height * 0.22f + breathing
+    val y1 = height * 0.31f - breathing * 0.45f
+    val y2 = height * 0.22f + breathing * 0.35f
+    val y3 = height * 0.29f - breathing * 0.25f
+    val y4 = height * 0.24f + breathing * 0.40f
+    val waterline = Path().apply {
+        moveTo(0f, y0)
+        cubicTo(size.width * 0.08f, height * 0.18f, size.width * 0.15f, height * 0.36f, size.width * 0.24f, y1)
+        cubicTo(size.width * 0.33f, height * 0.24f, size.width * 0.41f, height * 0.17f, size.width * 0.49f, y2)
+        cubicTo(size.width * 0.58f, height * 0.31f, size.width * 0.66f, height * 0.34f, size.width * 0.74f, y3)
+        cubicTo(size.width * 0.83f, height * 0.15f, size.width * 0.92f, height * 0.29f, size.width, y4)
+    }
     val fill = Path().apply {
-        moveTo(0f, 0f)
+        moveTo(0f, y0)
+        cubicTo(size.width * 0.08f, height * 0.18f, size.width * 0.15f, height * 0.36f, size.width * 0.24f, y1)
+        cubicTo(size.width * 0.33f, height * 0.24f, size.width * 0.41f, height * 0.17f, size.width * 0.49f, y2)
+        cubicTo(size.width * 0.58f, height * 0.31f, size.width * 0.66f, height * 0.34f, size.width * 0.74f, y3)
+        cubicTo(size.width * 0.83f, height * 0.15f, size.width * 0.92f, height * 0.29f, size.width, y4)
         lineTo(size.width, 0f)
-        lineTo(size.width, height * 0.46f)
+        lineTo(0f, 0f)
+        close()
     }
-    val segments = 12
-    for (index in segments downTo 0) {
-        val fraction = index / segments.toFloat()
-        val y = height * 0.43f +
-            sin(fraction * PI.toFloat() * 3.4f + phase) * height * 0.075f +
-            sin(fraction * PI.toFloat() * 7.2f - phase * 0.45f) * height * 0.028f
-        fill.lineTo(size.width * fraction, y)
-    }
-    fill.close()
+    val waterAlpha = if (style == RainStyle.AfterRain) 0.76f else 1f
     drawPath(
         path = fill,
         brush = Brush.verticalGradient(
             colors = listOf(
-                palette.highlight.copy(alpha = 0.28f),
-                palette.rainAccent.copy(alpha = 0.13f),
+                palette.highlight.copy(alpha = 0.23f * waterAlpha),
+                palette.rainAccent.copy(alpha = 0.11f * waterAlpha),
                 Color.Transparent,
             ),
-            endY = height,
+            endY = height * 0.82f,
         ),
     )
-    for (index in 0..segments) {
-        val fraction = index / segments.toFloat()
-        val y = height * 0.43f +
-            sin(fraction * PI.toFloat() * 3.4f + phase) * height * 0.075f +
-            sin(fraction * PI.toFloat() * 7.2f - phase * 0.45f) * height * 0.028f
-        if (index == 0) waterline.moveTo(0f, y) else waterline.lineTo(size.width * fraction, y)
-    }
     drawPath(
         path = waterline,
-        color = palette.highlight.copy(alpha = 0.38f),
-        style = Stroke(width = 0.72.dp.toPx(), cap = StrokeCap.Round),
+        color = palette.highlight.copy(alpha = 0.34f * waterAlpha),
+        style = Stroke(width = 0.68.dp.toPx(), cap = StrokeCap.Round),
     )
     val dripCount = when (style) {
         RainStyle.LightRain -> 1
         RainStyle.MediumRain -> 2
         RainStyle.HeavyRain -> 2
         RainStyle.Thunderstorm -> 3
+        RainStyle.AfterRain -> 1
     }
+    val dripFractions = floatArrayOf(0.24f, 0.66f, 0.84f)
+    val dripWaterlines = floatArrayOf(y1, y3, height * 0.21f)
     repeat(dripCount) { index ->
-        val x = size.width * ((index + 1.35f) / (dripCount + 1.7f))
+        val x = size.width * dripFractions[index]
         val radius = height * if (index % 2 == 0) 0.105f else 0.082f
         val beadProgress = if (motionEnabled) {
             (progress * (0.42f + index * 0.047f) + index * 0.27f) % 1f
         } else {
             0.18f + (index % 3) * 0.22f
         }
-        val waterY = height * 0.44f + sin((x / size.width) * PI.toFloat() * 3.4f + phase) * height * 0.07f
-        val dripLength = height * (0.14f + beadProgress * 0.30f)
+        val waterY = dripWaterlines[index]
+        val dripLength = height * (0.12f + beadProgress * 0.26f)
         drawLine(
-            color = palette.rain.copy(alpha = 0.30f),
+            color = palette.rain.copy(alpha = 0.25f * waterAlpha),
             start = Offset(x, waterY),
             end = Offset(x, waterY + dripLength),
             strokeWidth = radius * 0.54f,
             cap = StrokeCap.Round,
         )
         drawCircle(
-            color = palette.rain.copy(alpha = 0.55f),
+            color = palette.rain.copy(alpha = 0.48f * waterAlpha),
             radius = radius,
             center = Offset(x, waterY + dripLength),
         )
         drawCircle(
-            color = palette.highlight.copy(alpha = 0.66f),
+            color = palette.highlight.copy(alpha = 0.62f * waterAlpha),
             radius = radius * 0.25f,
             center = Offset(x - radius * 0.28f, waterY + dripLength - radius * 0.26f),
         )
     }
     drawLine(
-        color = palette.highlight.copy(alpha = 0.48f),
-        start = Offset(8.dp.toPx(), 1.dp.toPx()),
-        end = Offset(size.width - 8.dp.toPx(), 1.dp.toPx()),
-        strokeWidth = 0.75.dp.toPx(),
+        color = palette.highlight.copy(alpha = 0.38f),
+        start = Offset(10.dp.toPx(), 0.8.dp.toPx()),
+        end = Offset(size.width * 0.42f, 0.8.dp.toPx()),
+        strokeWidth = 0.65.dp.toPx(),
     )
 }
 
 private fun foregroundRainAlpha(style: RainStyle): Float = when (style) {
-    RainStyle.LightRain -> 0.82f
-    RainStyle.MediumRain -> 0.74f
-    RainStyle.HeavyRain -> 0.68f
-    RainStyle.Thunderstorm -> 0.64f
+    RainStyle.LightRain -> 0.62f
+    RainStyle.MediumRain -> 0.52f
+    RainStyle.HeavyRain -> 0.44f
+    RainStyle.Thunderstorm -> 0.40f
+    RainStyle.AfterRain -> 0.30f
 }
 
 private fun DrawScope.drawRainCardFrame(
@@ -1050,27 +1157,39 @@ private fun DrawScope.drawRainCardFrame(
     )
 }
 
-private fun DrawScope.drawRainMottoDetails(palette: RainPalette) {
+private fun DrawScope.drawRainMottoDetails(
+    palette: RainPalette,
+    progress: Float,
+) {
     val y = size.height * 0.50f
-    listOf(9.dp.toPx(), size.width - 9.dp.toPx()).forEachIndexed { index, x ->
-        drawCircle(
-            color = palette.rainAccent.copy(alpha = 0.66f),
-            radius = 1.35.dp.toPx(),
-            center = Offset(x, y),
-        )
-        drawCircle(
-            color = palette.highlight.copy(alpha = 0.76f),
-            radius = 0.42.dp.toPx(),
-            center = Offset(x - 0.55.dp.toPx(), y - 0.55.dp.toPx()),
-        )
-        val direction = if (index == 0) 1f else -1f
-        drawLine(
-            color = palette.outline.copy(alpha = 0.55f),
-            start = Offset(x + direction * 4.dp.toPx(), y),
-            end = Offset(x + direction * 15.dp.toPx(), y),
-            strokeWidth = 0.75.dp.toPx(),
-        )
-    }
+    val start = 8.dp.toPx()
+    val end = size.width - 8.dp.toPx()
+    drawLine(
+        color = palette.highlight.copy(alpha = 0.28f),
+        start = Offset(start, y),
+        end = Offset(end, y),
+        strokeWidth = 0.58.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
+    val x = start + (end - start) * (0.06f + progress * 0.88f)
+    val radius = 1.2.dp.toPx()
+    drawLine(
+        color = palette.rainAccent.copy(alpha = 0.34f),
+        start = Offset(x, y - radius * 1.6f),
+        end = Offset(x, y + radius * 0.6f),
+        strokeWidth = 0.55.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
+    drawCircle(
+        color = palette.rainAccent.copy(alpha = 0.66f),
+        radius = radius,
+        center = Offset(x, y + radius),
+    )
+    drawCircle(
+        color = palette.highlight.copy(alpha = 0.78f),
+        radius = radius * 0.25f,
+        center = Offset(x - radius * 0.35f, y + radius * 0.62f),
+    )
 }
 
 private fun DrawScope.drawRainNavigationUnderlay(
@@ -1114,22 +1233,14 @@ private fun DrawScope.drawRainNavigationUnderlay(
     )
 }
 
-private fun DrawScope.drawRainNavigationFrame(
-    palette: RainPalette,
-    progress: Float,
-    motionEnabled: Boolean,
-) {
-    val y = size.height - 3.dp.toPx()
-    repeat(2) { index ->
-        val radius = (22 + index * 18).dp.toPx()
-        val offset = if (motionEnabled) sin(progress * PI.toFloat() * 2f + index) * 4.dp.toPx() else 0f
-        drawOval(
-            color = palette.ripple.copy(alpha = 0.085f),
-            topLeft = Offset(size.width * 0.50f - radius + offset, y - radius * 0.20f),
-            size = Size(radius * 2f, radius * 0.40f),
-            style = Stroke(width = 0.6.dp.toPx()),
-        )
-    }
+private fun DrawScope.drawRainNavigationFrame(palette: RainPalette) {
+    drawLine(
+        color = palette.highlight.copy(alpha = 0.20f),
+        start = Offset(size.width * 0.12f, 1.dp.toPx()),
+        end = Offset(size.width * 0.46f, 1.dp.toPx()),
+        strokeWidth = 0.62.dp.toPx(),
+        cap = StrokeCap.Round,
+    )
 }
 
 private fun Random.nextFloatRange(start: Float, end: Float): Float {

@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.screen.settings
 
+import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,14 +12,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.RotateRight
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material.icons.rounded.Flip
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,17 +44,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -48,10 +67,18 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.rememberCustomImageBitmap
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
+import me.weishu.kernelsu.ui.util.FULL_CUSTOM_WALLPAPER_CROP
+import me.weishu.kernelsu.ui.util.MediaTransform
+import me.weishu.kernelsu.ui.util.ResponsiveCropSet
+import me.weishu.kernelsu.ui.util.centeredCropForAspect
+import me.weishu.kernelsu.ui.util.generateResponsiveCrops
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
+
+private const val WALLPAPER_CROP_EDITOR_PREFERENCES = "wallpaper_crop_editor"
+private const val SMART_SUBJECT_ENABLED_KEY = "smart_subject_enabled"
 
 @Composable
 fun SettingsWallpaperCropDialog(
@@ -66,29 +93,108 @@ fun SettingsWallpaperCropDialog(
     cropAspectRatio: Float? = null,
     defaultCrop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
     previewBitmap: ImageBitmap? = null,
+    transform: MediaTransform = MediaTransform(),
+    onTransformChange: (MediaTransform) -> Unit = {},
+    onGenerateResponsiveCrops: ((ResponsiveCropSet) -> Unit)? = null,
 ) {
     if (!show) return
 
-    val imageBitmap = previewBitmap ?: rememberCustomImageBitmap(uriString)
+    val context = LocalContext.current
+    val cropEditorPreferences = remember(context) {
+        context.applicationContext.getSharedPreferences(
+            WALLPAPER_CROP_EDITOR_PREFERENCES,
+            Context.MODE_PRIVATE,
+        )
+    }
+    val imageBitmap = previewBitmap ?: rememberCustomImageBitmap(
+        uriString = uriString,
+        crop = FULL_CUSTOM_WALLPAPER_CROP,
+    )
     var editCrop by remember(uriString) { mutableStateOf(initialEditableCrop(crop, defaultCrop)) }
+    var editTransform by remember(uriString) { mutableStateOf(transform.normalized()) }
+    var history by remember(uriString) { mutableStateOf(emptyList<CropEditSnapshot>()) }
+    var pendingResponsiveCrops by remember(uriString) { mutableStateOf<ResponsiveCropSet?>(null) }
+    var smartSubjectEnabled by remember(cropEditorPreferences) {
+        mutableStateOf(cropEditorPreferences.getBoolean(SMART_SUBJECT_ENABLED_KEY, true))
+    }
     val dialogTitle = title ?: stringResource(R.string.settings_wallpaper_crop)
     val dialogEmptyText = emptyText ?: stringResource(R.string.settings_wallpaper_not_selected)
+    val maxDialogContentHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.72f)
+        .coerceAtLeast(360.dp)
 
     OverlayDialog(
         show = true,
         title = dialogTitle,
         onDismissRequest = onDismissRequest,
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                WallpaperCropEditor(
-                    imageBitmap = imageBitmap,
-                    uriString = uriString,
-                    crop = editCrop,
-                    emptyText = dialogEmptyText,
-                    editorAspectRatio = editorAspectRatio,
-                    cropAspectRatio = cropAspectRatio,
-                    onCropChange = { editCrop = it },
-                )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxDialogContentHeight),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    WallpaperCropEditor(
+                        imageBitmap = imageBitmap,
+                        uriString = uriString,
+                        crop = editCrop,
+                        emptyText = dialogEmptyText,
+                        editorAspectRatio = editorAspectRatio,
+                        cropAspectRatio = cropAspectRatio,
+                        transform = editTransform,
+                        onCropChange = { editCrop = it },
+                        onEditStart = {
+                            history = (
+                                history + CropEditSnapshot(editCrop, editTransform, pendingResponsiveCrops)
+                                ).takeLast(20)
+                        },
+                    )
+                    if (imageBitmap != null) {
+                        WallpaperCropTools(
+                            imageBitmap = imageBitmap,
+                            crop = editCrop,
+                            transform = editTransform,
+                            cropAspectRatio = cropAspectRatio,
+                            smartSubjectEnabled = smartSubjectEnabled,
+                            canUndo = history.isNotEmpty(),
+                            onSmartSubjectEnabledChange = { enabled ->
+                                smartSubjectEnabled = enabled
+                                cropEditorPreferences.edit()
+                                    .putBoolean(SMART_SUBJECT_ENABLED_KEY, enabled)
+                                    .apply()
+                                if (!enabled) pendingResponsiveCrops = null
+                            },
+                            onCommitBeforeChange = {
+                                history = (
+                                    history + CropEditSnapshot(editCrop, editTransform, pendingResponsiveCrops)
+                                    ).takeLast(20)
+                            },
+                            onCropChange = { editCrop = it },
+                            onTransformChange = { editTransform = it.normalized() },
+                            onUndo = {
+                                val previous = history.lastOrNull() ?: return@WallpaperCropTools
+                                history = history.dropLast(1)
+                                editCrop = previous.crop
+                                editTransform = previous.transform
+                                pendingResponsiveCrops = previous.responsiveCrops
+                            },
+                            onReset = {
+                                history = (
+                                    history + CropEditSnapshot(editCrop, editTransform, pendingResponsiveCrops)
+                                    ).takeLast(20)
+                                editCrop = initialEditableCrop(defaultCrop, defaultCrop)
+                                editTransform = MediaTransform()
+                                pendingResponsiveCrops = null
+                            },
+                            onGenerateResponsiveCrops = { pendingResponsiveCrops = it },
+                        )
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -104,6 +210,10 @@ fun SettingsWallpaperCropDialog(
                         colors = ButtonDefaults.textButtonColorsPrimary(),
                         onClick = {
                             onCropChange(editCrop)
+                            pendingResponsiveCrops
+                                ?.withCropForAspectRatio(cropAspectRatio ?: editorAspectRatio, editCrop)
+                                ?.let { onGenerateResponsiveCrops?.invoke(it) }
+                            onTransformChange(editTransform)
                             onDismissRequest()
                         },
                     )
@@ -121,7 +231,9 @@ private fun WallpaperCropEditor(
     emptyText: String,
     editorAspectRatio: Float,
     cropAspectRatio: Float?,
+    transform: MediaTransform,
     onCropChange: (CustomWallpaperCrop) -> Unit,
+    onEditStart: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -137,7 +249,9 @@ private fun WallpaperCropEditor(
                 imageBitmap = imageBitmap,
                 crop = crop,
                 cropAspectRatio = cropAspectRatio,
+                transform = transform,
                 onCropChange = onCropChange,
+                onEditStart = onEditStart,
             )
 
             uriString.isNullOrBlank() -> Text(
@@ -156,7 +270,9 @@ private fun CropBox(
     imageBitmap: ImageBitmap,
     crop: CustomWallpaperCrop,
     cropAspectRatio: Float?,
+    transform: MediaTransform,
     onCropChange: (CustomWallpaperCrop) -> Unit,
+    onEditStart: () -> Unit,
 ) {
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var dragMode by remember { mutableStateOf(CropDragMode.Move) }
@@ -183,6 +299,7 @@ private fun CropBox(
     ) {
         detectDragGestures(
             onDragStart = { start ->
+                onEditStart()
                 val imageRect = fittedImageRect(boxSize, imageBitmap)
                 val startCrop = currentCrop
                 dragMode = detectCropDragMode(
@@ -244,7 +361,12 @@ private fun CropBox(
             .onSizeChanged { boxSize = it },
     ) {
         Image(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    rotationZ = transform.quarterTurns * 90f
+                    scaleX = if (transform.flipHorizontal) -1f else 1f
+                },
             bitmap = imageBitmap,
             contentDescription = null,
             contentScale = ContentScale.Fit,
@@ -301,6 +423,209 @@ private fun CropBox(
                 .then(cropGestureModifier)
         )
     }
+}
+
+@Composable
+private fun WallpaperCropTools(
+    imageBitmap: ImageBitmap,
+    crop: CustomWallpaperCrop,
+    transform: MediaTransform,
+    cropAspectRatio: Float?,
+    smartSubjectEnabled: Boolean,
+    canUndo: Boolean,
+    onSmartSubjectEnabledChange: (Boolean) -> Unit,
+    onCommitBeforeChange: () -> Unit,
+    onCropChange: (CustomWallpaperCrop) -> Unit,
+    onTransformChange: (MediaTransform) -> Unit,
+    onUndo: () -> Unit,
+    onReset: () -> Unit,
+    onGenerateResponsiveCrops: ((ResponsiveCropSet) -> Unit)?,
+) {
+    val zoom = (1f / maxOf(crop.width, crop.height).coerceAtLeast(0.05f)).coerceIn(1f, 8f)
+    var zoomEditing by remember(imageBitmap, cropAspectRatio) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CenterFocusStrong,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_wallpaper_smart_subject_detection),
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Switch(
+                checked = smartSubjectEnabled,
+                onCheckedChange = onSmartSubjectEnabledChange,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            CropToolButton(
+                icon = Icons.Rounded.CenterFocusStrong,
+                label = stringResource(R.string.settings_wallpaper_smart_subject),
+                enabled = smartSubjectEnabled,
+                onClick = {
+                    onCommitBeforeChange()
+                    val focus = salientFocus(imageBitmap)
+                    val targetAspect = cropAspectRatio ?: 1f
+                    onCropChange(
+                        centeredCropForAspect(
+                            imageWidth = imageBitmap.width,
+                            imageHeight = imageBitmap.height,
+                            targetAspectRatio = targetAspect,
+                            focusX = focus.x,
+                            focusY = focus.y,
+                        )
+                    )
+                    onGenerateResponsiveCrops?.invoke(
+                        generateResponsiveCrops(
+                            imageWidth = imageBitmap.width,
+                            imageHeight = imageBitmap.height,
+                            focusX = focus.x,
+                            focusY = focus.y,
+                        )
+                    )
+                },
+            )
+            CropToolButton(
+                icon = Icons.AutoMirrored.Rounded.RotateRight,
+                label = stringResource(R.string.settings_wallpaper_rotate),
+                onClick = {
+                    onCommitBeforeChange()
+                    onTransformChange(transform.copy(quarterTurns = transform.quarterTurns + 1))
+                },
+            )
+            CropToolButton(
+                icon = Icons.Rounded.Flip,
+                label = stringResource(R.string.settings_wallpaper_flip),
+                onClick = {
+                    onCommitBeforeChange()
+                    onTransformChange(transform.copy(flipHorizontal = !transform.flipHorizontal))
+                },
+            )
+            CropToolButton(
+                icon = Icons.AutoMirrored.Rounded.Undo,
+                label = stringResource(R.string.settings_wallpaper_undo),
+                enabled = canUndo,
+                onClick = onUndo,
+            )
+            CropToolButton(
+                icon = Icons.Rounded.RestartAlt,
+                label = stringResource(R.string.settings_wallpaper_reset_edit),
+                onClick = onReset,
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_wallpaper_zoom, zoom),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Slider(
+            value = zoom,
+            onValueChange = { next ->
+                if (!zoomEditing) {
+                    onCommitBeforeChange()
+                    zoomEditing = true
+                }
+                onCropChange(scaleCropForZoom(crop, next, cropAspectRatio, imageBitmap))
+            },
+            onValueChangeFinished = { zoomEditing = false },
+            valueRange = 1f..8f,
+        )
+    }
+}
+
+@Composable
+private fun CropToolButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(enabled = enabled, onClick = onClick) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
+        }
+        Text(
+            text = label,
+            color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
+    }
+}
+
+private data class CropEditSnapshot(
+    val crop: CustomWallpaperCrop,
+    val transform: MediaTransform,
+    val responsiveCrops: ResponsiveCropSet?,
+)
+
+private fun scaleCropForZoom(
+    crop: CustomWallpaperCrop,
+    zoom: Float,
+    cropAspectRatio: Float?,
+    imageBitmap: ImageBitmap,
+): CustomWallpaperCrop {
+    val normalizedAspect = normalizedCropAspectRatio(imageBitmap, cropAspectRatio)
+    val base = fitCropToAspect(DEFAULT_CUSTOM_WALLPAPER_CROP, normalizedAspect, 0.12f)
+    val width = (base.width / zoom.coerceIn(1f, 8f)).coerceAtLeast(0.12f)
+    val height = if (normalizedAspect != null) width / normalizedAspect else base.height / zoom.coerceIn(1f, 8f)
+    val centerX = (crop.left + crop.right) / 2f
+    val centerY = (crop.top + crop.bottom) / 2f
+    val safeWidth = width.coerceAtMost(1f)
+    val safeHeight = height.coerceIn(0.12f, 1f)
+    val left = (centerX - safeWidth / 2f).coerceIn(0f, 1f - safeWidth)
+    val top = (centerY - safeHeight / 2f).coerceIn(0f, 1f - safeHeight)
+    return sanitizeCustomWallpaperCrop(CustomWallpaperCrop(left, top, left + safeWidth, top + safeHeight))
+}
+
+private fun salientFocus(imageBitmap: ImageBitmap): Offset {
+    val pixels = imageBitmap.toPixelMap()
+    val stepX = (imageBitmap.width / 40).coerceAtLeast(1)
+    val stepY = (imageBitmap.height / 40).coerceAtLeast(1)
+    var total = 0.0
+    var weightedX = 0.0
+    var weightedY = 0.0
+    var y = stepY
+    while (y < imageBitmap.height - stepY) {
+        var x = stepX
+        while (x < imageBitmap.width - stepX) {
+            val center = pixels[x, y]
+            val right = pixels[x + stepX, y]
+            val down = pixels[x, y + stepY]
+            val luminance = center.red * 0.2126f + center.green * 0.7152f + center.blue * 0.0722f
+            val rightLuminance = right.red * 0.2126f + right.green * 0.7152f + right.blue * 0.0722f
+            val downLuminance = down.red * 0.2126f + down.green * 0.7152f + down.blue * 0.0722f
+            val chroma = maxOf(center.red, center.green, center.blue) - minOf(center.red, center.green, center.blue)
+            val edge = abs(luminance - rightLuminance) + abs(luminance - downLuminance)
+            val weight = (0.03f + edge * 2.2f + chroma * 0.55f).toDouble()
+            total += weight
+            weightedX += weight * x
+            weightedY += weight * y
+            x += stepX
+        }
+        y += stepY
+    }
+    if (total <= 0.0) return Offset(0.5f, 0.5f)
+    return Offset(
+        (weightedX / total / imageBitmap.width).toFloat().coerceIn(0.12f, 0.88f),
+        (weightedY / total / imageBitmap.height).toFloat().coerceIn(0.12f, 0.88f),
+    )
 }
 
 private enum class CropDragMode {

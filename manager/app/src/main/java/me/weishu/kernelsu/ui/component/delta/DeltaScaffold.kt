@@ -1,10 +1,17 @@
 package me.weishu.kernelsu.ui.component.delta
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -224,6 +231,7 @@ fun DeltaScreen(
     secondaryTopActionIcon: ImageVector? = null,
     onSecondaryTopActionClick: () -> Unit = {},
     secondaryTopActionContentDescription: String? = null,
+    topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val background = if (LocalNightBackgroundEffectActive.current) {
@@ -236,16 +244,28 @@ fun DeltaScreen(
             .fillMaxSize()
             .background(background),
     ) {
-        DeltaTopBar(
-            title = title,
-            icon = icon,
-            actionIcon = topActionIcon,
-            onActionClick = onTopActionClick,
-            actionContentDescription = topActionContentDescription,
-            secondaryActionIcon = secondaryTopActionIcon,
-            onSecondaryActionClick = onSecondaryTopActionClick,
-            secondaryActionContentDescription = secondaryTopActionContentDescription,
-        )
+        AnimatedVisibility(
+            visible = topBarVisible,
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = tween(180),
+            ) + fadeIn(animationSpec = tween(150)),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = tween(160),
+            ) + fadeOut(animationSpec = tween(120)),
+        ) {
+            DeltaTopBar(
+                title = title,
+                icon = icon,
+                actionIcon = topActionIcon,
+                onActionClick = onTopActionClick,
+                actionContentDescription = topActionContentDescription,
+                secondaryActionIcon = secondaryTopActionIcon,
+                onSecondaryActionClick = onSecondaryTopActionClick,
+                secondaryActionContentDescription = secondaryTopActionContentDescription,
+            )
+        }
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 8.dp))
         }
@@ -355,6 +375,7 @@ private fun DeltaRule() {
 fun DeltaCard(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    backgroundContent: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -364,6 +385,7 @@ fun DeltaCard(
             .background(DeltaColors.Surface)
             .padding(contentPadding),
     ) {
+        backgroundContent?.invoke(this)
         content()
     }
 }

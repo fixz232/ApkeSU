@@ -213,4 +213,61 @@ class UiDecorationModelsTest {
         assertEquals(source.card, preview.card)
         assertEquals(source.background, preview.background)
     }
+
+    @Test
+    fun renderTuningUsesOpacityAndIntensityIndependently() {
+        val transparent = UiDecorationConfig(opacity = 0f, intensity = 1f).renderTuning()
+        val noDetails = UiDecorationConfig(opacity = 1f, intensity = 0f).renderTuning()
+        val medium = UiDecorationConfig(opacity = 0.8f, intensity = 0.5f).renderTuning()
+        val full = UiDecorationConfig(opacity = 1f, intensity = 1f).renderTuning()
+
+        assertEquals(0f, transparent.alpha)
+        assertEquals(0f, noDetails.alpha)
+        assertEquals(0.4f, medium.alpha)
+        assertEquals(1f, full.alpha)
+        assertFalse(transparent.visible)
+        assertFalse(noDetails.visible)
+        assertTrue(medium.visible)
+        assertEquals(0, noDetails.detailCount(total = 12))
+        assertEquals(7, medium.detailCount(total = 12, minimumVisible = 2))
+        assertEquals(12, full.detailCount(total = 12))
+        assertEquals(0.825f, medium.detailScale())
+    }
+
+    @Test
+    fun renderTuningSanitizesInvalidValuesBeforeDrawing() {
+        val tuning = UiDecorationConfig(
+            opacity = Float.NaN,
+            intensity = Float.POSITIVE_INFINITY,
+        ).renderTuning()
+
+        assertEquals(DEFAULT_UI_DECORATION_OPACITY, tuning.opacity)
+        assertEquals(DEFAULT_UI_DECORATION_INTENSITY, tuning.intensity)
+        assertTrue(tuning.visible)
+    }
+
+    @Test
+    fun seasonalCardsKeepCustomChromeWithoutRenderingCustomInterior() {
+        assertFalse(
+            shouldRenderCustomCardInterior(
+                style = UiCardDecoration.Custom,
+                customStyleAvailable = true,
+                nativeSeasonalInterior = true,
+            )
+        )
+        assertTrue(
+            shouldRenderCustomCardInterior(
+                style = UiCardDecoration.Custom,
+                customStyleAvailable = true,
+                nativeSeasonalInterior = false,
+            )
+        )
+        assertFalse(
+            shouldRenderCustomCardInterior(
+                style = UiCardDecoration.Highlight,
+                customStyleAvailable = true,
+                nativeSeasonalInterior = false,
+            )
+        )
+    }
 }

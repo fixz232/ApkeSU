@@ -90,11 +90,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
@@ -155,8 +155,8 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                 saved.copy(
                     authorName = saved.authorName.ifBlank { localProfile.displayName },
                     authorBio = saved.authorBio.ifBlank { localProfile.bio },
-                    minManagerVersionCodeText = saved.minManagerVersionCodeText
-                        .ifBlank { BuildConfig.VERSION_CODE.toString() },
+                    minManagerVersionCodeText = "1",
+                    maxManagerVersionCodeText = "",
                 )
             }
         )
@@ -189,6 +189,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
     }
 
     fun showError(error: Throwable) {
+        if (error is CancellationException) throw error
         errorMessage = error.safeCloudThemeMessage()
     }
 
@@ -239,6 +240,7 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                     val loaded = runCatching {
                         creatorRepository.loadCreatorActivity(requestedLogin)
                     }.onFailure {
+                        if (it is CancellationException) throw it
                         if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
                             activityErrorMessage = it.safeCloudThemeMessage()
                         }
@@ -262,12 +264,18 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
         val requestedLogin = draft.githubLogin.trim()
         try {
             registrySnapshot = creatorRepository.loadRegistry()
-            knownCategories = runCatching { cloudRepository.loadCatalog().catalog.categories }
-                .getOrDefault(emptyList())
+            knownCategories = try {
+                cloudRepository.loadCatalog().catalog.categories
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                emptyList()
+            }
             if (isValidCloudThemeGithubLogin(requestedLogin)) {
                 val loaded = runCatching {
                     creatorRepository.loadCreatorActivity(requestedLogin)
                 }.onFailure {
+                    if (it is CancellationException) throw it
                     if (draft.githubLogin.trim().equals(requestedLogin, ignoreCase = true)) {
                         activityErrorMessage = it.safeCloudThemeMessage()
                     }
@@ -607,7 +615,8 @@ fun CloudThemeCreatorScreen(initialPageIndex: Int = 0) {
                             authorBio = draft.authorBio,
                             authorProfileUrl = draft.authorProfileUrl,
                             authorAvatarUrl = draft.authorAvatarUrl,
-                            minManagerVersionCodeText = BuildConfig.VERSION_CODE.toString(),
+                            minManagerVersionCodeText = "1",
+                            maxManagerVersionCodeText = "",
                         )
                     },
                 ) {
@@ -1200,39 +1209,11 @@ private fun CreatorVersionCard(
                     label = { Text(stringResource(R.string.cloud_theme_creator_version_code)) },
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                OutlinedTextField(
-                    value = draft.minManagerVersionCodeText,
-                    onValueChange = {
-                        onDraftChange(
-                            draft.copy(
-                                minManagerVersionCodeText = it.filter(Char::isDigit).take(18)
-                            )
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text(stringResource(R.string.cloud_theme_creator_min_manager)) },
-                )
-                OutlinedTextField(
-                    value = draft.maxManagerVersionCodeText,
-                    onValueChange = {
-                        onDraftChange(
-                            draft.copy(
-                                maxManagerVersionCodeText = it.filter(Char::isDigit).take(18)
-                            )
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text(stringResource(R.string.cloud_theme_creator_max_manager)) },
-                )
-            }
+            Text(
+                text = stringResource(R.string.cloud_theme_creator_manager_unrestricted),
+                style = MaterialTheme.typography.bodySmall,
+                color = creatorMutedColor(),
+            )
             OutlinedTextField(
                 value = draft.license,
                 onValueChange = { onDraftChange(draft.copy(license = it.take(48))) },

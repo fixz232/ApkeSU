@@ -49,13 +49,6 @@ internal fun DrawScope.drawSeasonCardFramePolish(season: SeasonStyle, dark: Bool
     if (!seasonCardFramePolishEnabled(size.width, size.height, minimumWidth, minimumHeight)) return
     val unit = 2.dp.toPx().coerceAtMost(size.minDimension / 18f)
     val palette = seasonFramePalette(season, dark)
-    val inset = unit * 0.9f
-    drawRect(
-        color = palette.edge,
-        topLeft = Offset(inset, inset),
-        size = Size(size.width - inset * 2f, size.height - inset * 2f),
-        style = Stroke(width = unit * 0.34f),
-    )
     drawSeasonCardDepthFrame(unit, palette)
     when (season) {
         SeasonStyle.Spring -> drawSpringFramePolish(unit, palette)
@@ -279,13 +272,6 @@ private fun DrawScope.drawAutumnFramePolish(unit: Float, palette: SeasonFramePal
 }
 
 private fun DrawScope.drawWinterFramePolish(unit: Float, palette: SeasonFramePalette) {
-    val inset = unit * 1.7f
-    drawRect(
-        color = palette.primary.copy(alpha = palette.primary.alpha * 0.58f),
-        topLeft = Offset(inset, inset),
-        size = Size(size.width - inset * 2f, size.height - inset * 2f),
-        style = Stroke(width = unit * 0.30f),
-    )
     listOf(
         Offset(unit * 3f, size.height * 0.58f),
         Offset(size.width - unit * 3.5f, size.height * 0.38f),

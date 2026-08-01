@@ -22,6 +22,7 @@ class RainStyleTest {
         assertEquals(RainStyle.MediumRain, RainStyle.fromIndex(1))
         assertEquals(RainStyle.HeavyRain, RainStyle.fromIndex(2))
         assertEquals(RainStyle.Thunderstorm, RainStyle.fromIndex(3))
+        assertEquals(RainStyle.AfterRain, RainStyle.fromIndex(4))
         assertEquals(RainStyle.LightRain, RainStyle.fromIndex(-1))
         assertEquals(RainStyle.LightRain, RainStyle.fromIndex(99))
     }
@@ -36,7 +37,7 @@ class RainStyleTest {
 
     @Test
     fun modesHaveUniqueValuesAndKeyColors() {
-        assertEquals(4, RainStyle.entries.size)
+        assertEquals(5, RainStyle.entries.size)
         assertEquals(RainStyle.entries.size, RainStyle.entries.map { it.value }.toSet().size)
         assertEquals(RainStyle.entries.size, RainStyle.entries.map { it.keyColor }.toSet().size)
         RainStyle.entries.forEach { style ->
@@ -47,7 +48,12 @@ class RainStyleTest {
 
     @Test
     fun rainDensityAndSpeedIncreaseWithIntensity() {
-        val specs = RainStyle.entries.map(RainSceneSpec::forStyle)
+        val specs = listOf(
+            RainStyle.LightRain,
+            RainStyle.MediumRain,
+            RainStyle.HeavyRain,
+            RainStyle.Thunderstorm,
+        ).map(RainSceneSpec::forStyle)
         specs.zipWithNext().forEach { (lighter, stronger) ->
             assertTrue(stronger.dropCount > lighter.dropCount)
             assertTrue(stronger.rippleCount > lighter.rippleCount)
@@ -74,6 +80,7 @@ class RainStyleTest {
         assertFalse(forceRainDarkTheme(RainStyle.MediumRain))
         assertTrue(forceRainDarkTheme(RainStyle.HeavyRain))
         assertTrue(forceRainDarkTheme(RainStyle.Thunderstorm))
+        assertFalse(forceRainDarkTheme(RainStyle.AfterRain))
         assertEquals(
             rainPalette(RainStyle.HeavyRain, dark = false),
             rainPalette(RainStyle.HeavyRain, dark = true),
@@ -103,6 +110,14 @@ class RainStyleTest {
         assertEquals(9.5f, rainCardDecorationHeight(13f, 320f, 50f), 0.001f)
         assertEquals(0f, rainCardDecorationHeight(13f, 71f, 180f), 0.001f)
         assertEquals(0f, rainCardDecorationHeight(13f, 320f, 47f), 0.001f)
-        assertEquals(0f, rainCardContentLayerColor(Color.Blue).alpha, 0f)
+        assertEquals(0.14f, rainCardContentLayerColor(Color.Blue).alpha, 0.002f)
+    }
+
+    @Test
+    fun afterRainFadesRainWithoutHidingWetReflections() {
+        assertEquals(1f, afterRainRainAlpha(RainStyle.AfterRain, 0f), 0.001f)
+        assertEquals(0.59f, afterRainRainAlpha(RainStyle.AfterRain, 0.5f), 0.001f)
+        assertEquals(0.18f, afterRainRainAlpha(RainStyle.AfterRain, 1f), 0.001f)
+        assertEquals(1f, afterRainRainAlpha(RainStyle.LightRain, 1f), 0.001f)
     }
 }

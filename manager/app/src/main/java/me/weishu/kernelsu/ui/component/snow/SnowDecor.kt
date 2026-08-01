@@ -52,6 +52,9 @@ import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
 import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
 import me.weishu.kernelsu.ui.component.rain.rainMiuixCardColors
 import me.weishu.kernelsu.ui.component.rain.rainMiuixCardSurface
+import me.weishu.kernelsu.ui.component.ink.inkMiuixCardColors
+import me.weishu.kernelsu.ui.component.ink.inkMiuixCardSurface
+import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -266,7 +269,14 @@ fun Modifier.snowMiuixCardSurface(
     }
     if (isRainInterfaceStyle()) {
         return rainMiuixCardSurface(
-            shape = shape,
+            enabled = true,
+            capHeight = capHeight,
+            customTarget = customTarget,
+        )
+    }
+    if (isInkInterfaceStyle()) {
+        return inkMiuixCardSurface(
+            shape = RoundedCornerShape(13.dp),
             enabled = true,
             capHeight = capHeight,
             customTarget = customTarget,
@@ -331,6 +341,8 @@ fun snowMiuixCardColors(
     pixelMiuixCardColors(color = color, enabled = true)
 } else if (enabled && isRainInterfaceStyle()) {
     rainMiuixCardColors(color = color)
+} else if (enabled && isInkInterfaceStyle()) {
+    inkMiuixCardColors(color = color, enabled = true)
 } else if (enabled && isSnowInterfaceStyle()) {
     CardDefaults.defaultColors(
         // snowMiuixCardSurface paints the seasonal glass and artwork. A second

@@ -20,17 +20,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,7 +62,6 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaScreen
 import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
 import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
-import me.weishu.kernelsu.ui.component.alpha.isStudioStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 
 @Composable
@@ -121,11 +123,13 @@ fun ModulePagerAlpha(
 
     val searchText = uiState.searchStatus.searchText
     val modules = if (searchText.isBlank()) uiState.moduleList else uiState.searchResults
-    val studioStyle = isStudioStyle()
+    val moduleListState = rememberLazyListState()
+    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
 
     AlphaScreen(
         title = stringResource(R.string.module),
         bottomInnerPadding = bottomInnerPadding,
+        topBarVisible = topBarVisible,
         topActionIcon = if (uiState.installButtonVisible) Icons.Rounded.Add else null,
         onTopActionClick = {
             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -134,11 +138,12 @@ fun ModulePagerAlpha(
             }
             selectZipLauncher.launch(intent)
         },
-        secondaryTopActionIcon = Icons.Rounded.Backup,
-        onSecondaryTopActionClick = actions.onOpenWallpaperBackup,
-        secondaryTopActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
+        secondaryTopActionIcon = Icons.Rounded.Build,
+        onSecondaryTopActionClick = actions.onOpenTools,
+        secondaryTopActionContentDescription = stringResource(R.string.module_tools_title),
     ) { contentPadding ->
         LazyColumn(
+            state = moduleListState,
             contentPadding = PaddingValues(
                 start = 16.dp,
                 top = 18.dp,
@@ -147,14 +152,6 @@ fun ModulePagerAlpha(
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (studioStyle) {
-                item {
-                    StudioModuleOverview(
-                        modules = uiState.moduleList,
-                        updateCount = uiState.updateInfo.size,
-                    )
-                }
-            }
             item {
                 AlphaModuleSearch(
                     searchText = searchText,
@@ -202,6 +199,7 @@ fun ModulePagerAlpha(
                         module = module,
                         updateInfo = uiState.updateInfo[module.id],
                         actions = actions,
+                        wallpaperPaused = moduleListState.isScrollInProgress,
                     )
                 }
             }
@@ -229,75 +227,6 @@ private fun AlphaModuleLoadError(onRetry: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-    }
-}
-
-@Composable
-fun ModulePagerStudio(
-    uiState: ModuleUiState,
-    confirmDialogState: ModuleConfirmDialogState?,
-    moduleEvent: Flow<ModuleEffect>,
-    actions: ModuleActions,
-    bottomInnerPadding: Dp,
-) {
-    ModulePagerAlpha(
-        uiState = uiState,
-        confirmDialogState = confirmDialogState,
-        moduleEvent = moduleEvent,
-        actions = actions,
-        bottomInnerPadding = bottomInnerPadding,
-    )
-}
-
-@Composable
-private fun StudioModuleOverview(
-    modules: List<Module>,
-    updateCount: Int,
-) {
-    AlphaCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StudioModuleMetric(
-                value = modules.size,
-                label = stringResource(R.string.module),
-                modifier = Modifier.weight(1f),
-            )
-            StudioModuleMetric(
-                value = modules.count { it.enabled && !it.remove },
-                label = stringResource(R.string.skrootpro_running),
-                modifier = Modifier.weight(1f),
-            )
-            StudioModuleMetric(
-                value = updateCount,
-                label = stringResource(R.string.module_update),
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StudioModuleMetric(
-    value: Int,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = value.toString(),
-            color = AlphaColors.Accent,
-            fontSize = alphaSp(18f, maxScale = 1.0f),
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = label,
-            color = AlphaColors.Muted,
-            fontSize = alphaSp(11f, maxScale = 1.0f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -375,11 +304,20 @@ private fun AlphaModuleCard(
     module: Module,
     updateInfo: ModuleUpdateInfo?,
     actions: ModuleActions,
+    wallpaperPaused: Boolean,
 ) {
     val pending = module.update || module.remove
     val textDecoration = if (module.remove) TextDecoration.LineThrough else TextDecoration.None
+    val wallpaperState = rememberModuleCardWallpaperState(module.id)
+    val wallpaperEntry = rememberModuleCardWallpaperFrame(wallpaperState, paused = wallpaperPaused)
+    val wallpaperBitmap = rememberModuleCardWallpaperLoadState(wallpaperEntry).bitmap
 
-    AlphaCard(contentPadding = PaddingValues(0.dp)) {
+    AlphaCard(
+        contentPadding = PaddingValues(0.dp),
+        backgroundContent = {
+            ModuleCardWallpaperBackground(bitmap = wallpaperBitmap, entry = wallpaperEntry)
+        },
+    ) {
         Column {
             Row(
                 modifier = Modifier
@@ -442,13 +380,22 @@ private fun AlphaModuleCard(
                         )
                     }
                 }
-                AlphaSwitch(
-                    checked = module.enabled && !module.remove,
-                    enabled = !pending,
-                    onCheckedChange = {
-                        if (it != module.enabled) actions.onToggleModule(module)
-                    },
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = { actions.onOpenWallpaperEditor(module) }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Image,
+                            contentDescription = stringResource(R.string.module_wallpaper_editor_open),
+                            tint = AlphaColors.Muted,
+                        )
+                    }
+                    AlphaSwitch(
+                        checked = module.enabled && !module.remove,
+                        enabled = !pending,
+                        onCheckedChange = {
+                            if (it != module.enabled) actions.onToggleModule(module)
+                        },
+                    )
+                }
             }
 
             Box(

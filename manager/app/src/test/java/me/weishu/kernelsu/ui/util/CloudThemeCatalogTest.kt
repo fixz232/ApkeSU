@@ -9,7 +9,7 @@ import org.junit.Test
 
 class CloudThemeCatalogTest {
     @Test
-    fun parseCatalog_readsPublishedThemeAndCompatibilityRange() {
+    fun parseCatalog_doesNotRestrictDownloadsByManagerVersion() {
         val catalog = parseCloudThemeCatalog(validCatalogJson())
 
         assertEquals(1, catalog.themes.size)
@@ -17,8 +17,8 @@ class CloudThemeCatalogTest {
         assertEquals("aurora-night", theme.id)
         assertEquals("Appearance", catalog.categoryName(theme.categoryId))
         assertTrue(theme.isCompatible(32700L))
-        assertFalse(theme.isCompatible(32699L))
-        assertFalse(theme.isCompatible(33001L))
+        assertTrue(theme.isCompatible(1L))
+        assertTrue(theme.isCompatible(Long.MAX_VALUE))
     }
 
     @Test
@@ -34,7 +34,7 @@ class CloudThemeCatalogTest {
     @Test
     fun parseCatalog_rejectsNonGithubDownloadHost() {
         val unsafe = validCatalogJson().replace(
-            "https://github.com/fixz232/ApkeSU/releases/download/theme-1/aurora.kstheme",
+            "https://github.com/fixz232/ApkeSU-ThemeStore/releases/download/theme-1/aurora.kstheme",
             "https://example.com/aurora.kstheme",
         )
 
@@ -58,7 +58,7 @@ class CloudThemeCatalogTest {
     @Test
     fun parseCatalog_rejectsDuplicateScreenshots() {
         val screenshot =
-            "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora-1.png"
+            "https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora-1.png"
         val duplicateScreenshots = validCatalogJson().replace(
             "\"screenshots\":[\"$screenshot\"]",
             "\"screenshots\":[\"$screenshot\",\"$screenshot\"]",
@@ -67,6 +67,89 @@ class CloudThemeCatalogTest {
         assertThrows(IllegalArgumentException::class.java) {
             parseCloudThemeCatalog(duplicateScreenshots)
         }
+    }
+
+    @Test
+    fun parseCatalog_clampsInvalidUsageCounts() {
+        val negative = parseCloudThemeCatalog(
+            validCatalogJson().replace("\"downloadCount\":42", "\"downloadCount\":-8")
+        )
+        val overflow = parseCloudThemeCatalog(
+            validCatalogJson().replace(
+                "\"downloadCount\":42",
+                "\"downloadCount\":9223372036854775808",
+            )
+        )
+
+        assertEquals(0L, negative.themes.single().downloadCount)
+        assertEquals(Long.MAX_VALUE, overflow.themes.single().downloadCount)
+    }
+
+    @Test
+    fun calculateUsageStatistics_sortsDeterministically() {
+        val baseCatalog = parseCloudThemeCatalog(validCatalogJson())
+        val base = baseCatalog.themes.single()
+        val themes = listOf(
+            base.copy(id = "older", name = "Older", downloadCount = 20L, publishedAt = 100L),
+            base.copy(id = "zeta", name = "Zeta", downloadCount = 20L, publishedAt = 200L),
+            base.copy(id = "alpha-b", name = "Alpha", downloadCount = 20L, publishedAt = 200L),
+            base.copy(id = "alpha-a", name = "Alpha", downloadCount = 20L, publishedAt = 200L),
+            base.copy(id = "popular", name = "Popular", downloadCount = 21L, publishedAt = 50L),
+        )
+
+        val statistics = baseCatalog.copy(themes = themes).calculateUsageStatistics()
+
+        assertEquals(
+            listOf("popular", "alpha-a", "alpha-b", "zeta", "older"),
+            statistics.rankedThemes.map(CloudTheme::id),
+        )
+    }
+
+    @Test
+    fun calculateUsageStatistics_countsPublishedDataAndSaturatesTotal() {
+        val baseCatalog = parseCloudThemeCatalog(validCatalogJson())
+        val base = baseCatalog.themes.single()
+        val secondCategory = CloudThemeCategory("utility", "Utility")
+        val themes = listOf(
+            base.copy(downloadCount = Long.MAX_VALUE),
+            base.copy(
+                id = "second-theme",
+                author = base.author.copy(id = "second-author", name = "Second Author"),
+                categoryId = secondCategory.id,
+                downloadCount = 50L,
+            ),
+            base.copy(id = "negative-theme", downloadCount = -10L),
+            base.copy(
+                id = "deprecated-theme",
+                status = CloudThemePublicationStatus.Deprecated,
+                downloadCount = 999L,
+            ),
+        )
+
+        val statistics = baseCatalog.copy(
+            categories = baseCatalog.categories + secondCategory,
+            themes = themes,
+        ).calculateUsageStatistics()
+
+        assertEquals(Long.MAX_VALUE, statistics.totalUsageCount)
+        assertEquals(3, statistics.publishedThemeCount)
+        assertEquals(2, statistics.creatorCount)
+        assertEquals(2, statistics.categoryCount)
+        assertFalse(statistics.rankedThemes.any { it.id == "deprecated-theme" })
+        assertEquals("negative-theme", statistics.rankedThemes.last().id)
+    }
+
+    @Test
+    fun calculateUsageStatistics_handlesEmptyCatalog() {
+        val catalog = parseCloudThemeCatalog(validCatalogJson()).copy(themes = emptyList())
+
+        val statistics = catalog.calculateUsageStatistics()
+
+        assertEquals(0L, statistics.totalUsageCount)
+        assertEquals(0, statistics.publishedThemeCount)
+        assertEquals(0, statistics.creatorCount)
+        assertEquals(0, statistics.categoryCount)
+        assertTrue(statistics.rankedThemes.isEmpty())
     }
 
     @Test
@@ -166,9 +249,9 @@ class CloudThemeCatalogTest {
           "packageVersion":4,
           "minManagerVersionCode":32700,
           "maxManagerVersionCode":33000,
-          "coverUrl":"https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora.png",
-          "screenshots":["https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/media/aurora-1.png"],
-          "downloadUrl":"https://github.com/fixz232/ApkeSU/releases/download/theme-1/aurora.kstheme",
+          "coverUrl":"https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora.png",
+          "screenshots":["https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/media/aurora-1.png"],
+          "downloadUrl":"https://github.com/fixz232/ApkeSU-ThemeStore/releases/download/theme-1/aurora.kstheme",
           "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "sizeBytes":1024,
           "license":"CC-BY-4.0",

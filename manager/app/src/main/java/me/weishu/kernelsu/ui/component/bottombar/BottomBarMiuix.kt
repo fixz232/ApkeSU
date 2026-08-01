@@ -51,6 +51,10 @@ import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
 import me.weishu.kernelsu.ui.component.rain.rainNavigationContainerColor
 import me.weishu.kernelsu.ui.component.rain.rainNavigationIndicator
 import me.weishu.kernelsu.ui.component.rain.rainNavigationSurface
+import me.weishu.kernelsu.ui.component.ink.inkNavigationContainerColor
+import me.weishu.kernelsu.ui.component.ink.inkNavigationIndicator
+import me.weishu.kernelsu.ui.component.ink.inkNavigationSurface
+import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
@@ -86,6 +90,7 @@ fun BottomBarMiuix(
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
     val isRainStyle = isRainInterfaceStyle()
+    val isInkStyle = isInkInterfaceStyle()
     val isPixelStyle = isPixelInterfaceStyle()
 
     val destinations = BottomBarDestination.entries.toList()
@@ -94,6 +99,8 @@ fun BottomBarMiuix(
         pixelNavigationContainerColor()
     } else if (isRainStyle) {
         rainNavigationContainerColor()
+    } else if (isInkStyle) {
+        inkNavigationContainerColor()
     } else if (blurBackdrop != null) {
         Color.Transparent
     } else if (isLiquidGlass) {
@@ -109,12 +116,13 @@ fun BottomBarMiuix(
             when {
                 isPixelStyle -> Modifier.pixelNavigationSurface(navigationShape)
                 isRainStyle -> Modifier.rainNavigationSurface(navigationShape, paintBackground = false)
+                isInkStyle -> Modifier.inkNavigationSurface(navigationShape, paintBackground = false)
                 isSnowStyle -> Modifier.seasonNavigationSurface(navigationShape, paintBackground = false)
                 else -> Modifier
             },
         )
-        BlurredBar(blurBackdrop, blurActive = !isPixelStyle) {
-            if (customIcons.hasSelected) {
+        BlurredBar(blurBackdrop, blurActive = !isPixelStyle && !isInkStyle) {
+            if (customIcons.hasCustomization) {
                 MiuixCustomNavigationBar(
                     modifier = navigationModifier,
                     color = barColor,
@@ -127,7 +135,7 @@ fun BottomBarMiuix(
             } else {
                 val items = destinations.map { destination ->
                     NavigationItem(
-                        label = stringResource(destination.label),
+                        label = customIcons[destination.slot].displayLabel(stringResource(destination.label)),
                         icon = destination.icon,
                     )
                 }
@@ -167,7 +175,7 @@ fun BottomBarMiuix(
             isBlurEnabled = enableFloatingBottomBarBlur && backdrop != null,
         ) {
             destinations.forEachIndexed { index, destination ->
-                val label = stringResource(destination.label)
+                val label = customIcons[destination.slot].displayLabel(stringResource(destination.label))
                 val badge = navigationBadgeFor(index, navigationBadge, floating = true)
                 FloatingBottomBarItem(
                     onClick = {
@@ -253,10 +261,11 @@ private fun RowScope.MiuixCustomNavigationBarItem(
     badge: (@Composable () -> Unit)?,
     onClick: () -> Unit,
 ) {
-    val label = stringResource(destination.label)
+    val label = state.displayLabel(stringResource(destination.label))
     val isSnowStyle = isSnowInterfaceStyle()
     val isRainStyle = isRainInterfaceStyle()
-    val itemShape = if (isSnowStyle || isRainStyle) RoundedCornerShape(10.dp) else CircleShape
+    val isInkStyle = isInkInterfaceStyle()
+    val itemShape = if (isSnowStyle || isRainStyle || isInkStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -282,7 +291,15 @@ private fun RowScope.MiuixCustomNavigationBarItem(
                     if (selected && isSnowStyle) {
                         Modifier.seasonNavigationIndicator(itemShape)
                     } else if (selected && isRainStyle) {
-                        Modifier.rainNavigationIndicator(itemShape)
+                        Modifier.rainNavigationIndicator(
+                            shape = itemShape,
+                            interactionKey = destination,
+                        )
+                    } else if (selected && isInkStyle) {
+                        Modifier.inkNavigationIndicator(
+                            shape = itemShape,
+                            interactionKey = destination,
+                        )
                     } else {
                         Modifier.background(
                             if (selected) {

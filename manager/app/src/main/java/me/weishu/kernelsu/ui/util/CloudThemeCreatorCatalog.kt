@@ -13,11 +13,11 @@ internal const val CLOUD_THEME_SUBMISSION_SCHEMA =
     "io.github.fixz.apkesu.theme-submission"
 internal const val CLOUD_THEME_SUBMISSION_VERSION = 1
 internal const val CLOUD_THEME_DEFAULT_CREATOR_REGISTRY_URL =
-    "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/creators/v1/creators.json"
+    "https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/creators/v1/creators.json"
 internal const val CLOUD_THEME_GITHUB_REPOSITORY_URL =
-    "https://github.com/fixz232/ApkeSU"
+    "https://github.com/fixz232/ApkeSU-ThemeStore"
 internal const val CLOUD_THEME_DEFAULT_COVER_URL =
-    "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/manager/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+    "https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/assets/default-cover.png"
 internal const val CLOUD_THEME_CREATOR_REVIEWER = "fixz232"
 internal const val CLOUD_THEME_MAX_CREATOR_REGISTRY_BYTES = 512L * 1024L
 internal const val CLOUD_THEME_MAX_GITHUB_ISSUES_BYTES = 2L * 1024L * 1024L
@@ -286,19 +286,7 @@ internal fun buildCloudThemeSubmissionManifest(draft: CloudThemeSubmissionDraft)
         ?.takeIf { it >= 1L }
         ?: error("Invalid theme version code")
     val versionName = draft.versionName.requiredDraftText("Version name", 40)
-    val minimumManagerVersion = draft.minManagerVersionCodeText.trim().toLongOrNull()
-        ?.takeIf { it >= 1L }
-        ?: error("Invalid minimum Manager version")
-    val maximumManagerVersion = draft.maxManagerVersionCodeText.trim()
-        .takeIf(String::isNotBlank)
-        ?.toLongOrNull()
-        ?.takeIf { it >= minimumManagerVersion }
-        ?: run {
-            require(draft.maxManagerVersionCodeText.isBlank()) {
-                "Invalid maximum Manager version"
-            }
-            null
-        }
+    val minimumManagerVersion = 1L
     require(draft.hasInspectedPackage) { "Select and verify a .kstheme package first" }
     val packageUrl = validateCloudThemeCreatorPackageUrl(draft.packageUrl, github)
     require(draft.isRemoteVerified) { "Verify that the remote package matches the local package" }
@@ -372,7 +360,7 @@ internal fun buildCloudThemeSubmissionManifest(draft: CloudThemeSubmissionDraft)
         .put("packageSchema", CLOUD_THEME_PACKAGE_SCHEMA)
         .put("packageVersion", draft.packageVersion)
         .put("minManagerVersionCode", minimumManagerVersion)
-        .put("maxManagerVersionCode", maximumManagerVersion ?: JSONObject.NULL)
+        .put("maxManagerVersionCode", JSONObject.NULL)
         .put("coverUrl", coverUrl)
         .put("screenshots", JSONArray(validatedScreenshots))
         .put("packageUrl", packageUrl)

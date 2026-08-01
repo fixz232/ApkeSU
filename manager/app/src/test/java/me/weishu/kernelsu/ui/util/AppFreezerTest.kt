@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.util
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppFreezerTest {
@@ -92,5 +93,54 @@ class AppFreezerTest {
                 launcherPackages = emptySet(),
             )
         )
+    }
+
+    @Test
+    fun persistedFreezeKeysAreValidatedSortedAndUpdatedByTarget() {
+        val persisted = parsePersistedAppFreezeKeys(
+            listOf(
+                "10|com.example.work",
+                "0|com.example.game",
+                "invalid-line",
+                "10|com.example.work",
+                "-1|com.example.invalid",
+                "0|com.example.app;reboot",
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                AppFreezeKey("com.example.game", 0),
+                AppFreezeKey("com.example.work", 10),
+            ),
+            persisted,
+        )
+        assertEquals(
+            listOf(
+                AppFreezeKey("com.example.work", 10),
+            ),
+            updatePersistedFreezeKeys(
+                persisted,
+                AppFreezeKey("com.example.game", 0),
+                frozen = false,
+            ),
+        )
+        assertEquals(
+            "0|com.example.game\n10|com.example.work\n",
+            serializePersistedAppFreezeKeys(persisted),
+        )
+    }
+
+    @Test
+    fun freezeRecoveryServiceRetriesPackageManagerAndUsesValidatedRecords() {
+        val service = buildAppFreezeServiceScript()
+        val installer = buildAppFreezePersistenceScript("0|com.example.game\n")
+
+        assertTrue(service.contains("while [ \"\$attempt\" -lt 30 ]; do"))
+        assertTrue(service.contains("cmd package suspend --user \"\$user_id\" \"\$package_name\""))
+        assertTrue(service.contains("am force-stop --user \"\$user_id\" \"\$package_name\""))
+        assertTrue(service.contains("is_valid_package"))
+        assertTrue(installer.contains("mv -f '/data/adb/apkesu/app_freeze/frozen_apps.tsv.tmp'"))
+        assertTrue(installer.contains("mv -f '/data/adb/service.d/95-apkesu-app-freeze.sh.tmp'"))
     }
 }

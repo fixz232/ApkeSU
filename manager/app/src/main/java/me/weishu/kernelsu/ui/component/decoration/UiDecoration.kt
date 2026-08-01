@@ -60,18 +60,18 @@ fun isUiDecorationActive(): Boolean {
 fun UiDecorationBackdrop(modifier: Modifier = Modifier) {
     val config = LocalUiDecorationConfig.current
     val active = config.isActiveFor(LocalUiDecorationScope.current) && config.background != UiBackgroundDecoration.None
-    if (!active) return
+    val tuning = config.renderTuning()
+    if (!active || !tuning.visible) return
     val palette = uiDecorationPalette()
     val progress = decorationProgress(config.motionEnabled, "uiDecorationBackdrop")
     Canvas(modifier = modifier.fillMaxSize()) {
-        val alpha = config.opacity * config.intensity
         when (config.background) {
             UiBackgroundDecoration.None -> Unit
-            UiBackgroundDecoration.SoftRays -> drawSoftRays(palette, alpha, progress)
-            UiBackgroundDecoration.StarMap -> drawStarMap(palette, alpha, progress)
-            UiBackgroundDecoration.Botanical -> drawBotanicalBackdrop(palette, alpha, progress)
-            UiBackgroundDecoration.Frost -> drawFrostBackdrop(palette, alpha, progress)
-            UiBackgroundDecoration.PixelGrid -> drawPixelGridBackdrop(palette, alpha)
+            UiBackgroundDecoration.SoftRays -> drawSoftRays(palette, tuning, progress)
+            UiBackgroundDecoration.StarMap -> drawStarMap(palette, tuning, progress)
+            UiBackgroundDecoration.Botanical -> drawBotanicalBackdrop(palette, tuning, progress)
+            UiBackgroundDecoration.Frost -> drawFrostBackdrop(palette, tuning, progress)
+            UiBackgroundDecoration.PixelGrid -> drawPixelGridBackdrop(palette, tuning)
         }
     }
 }
@@ -80,7 +80,12 @@ fun UiDecorationBackdrop(modifier: Modifier = Modifier) {
 fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
     val config = LocalUiDecorationConfig.current
     val active = config.isActiveFor(LocalUiDecorationScope.current)
-    if (!active || (config.topBar == UiTopBarDecoration.None && config.navigation == UiNavigationDecoration.None)) return
+    val tuning = config.renderTuning()
+    if (
+        !active ||
+        !tuning.visible ||
+        (config.topBar == UiTopBarDecoration.None && config.navigation == UiNavigationDecoration.None)
+    ) return
     val palette = uiDecorationPalette()
     val progress = decorationProgress(config.motionEnabled, "uiDecorationChrome")
     val customStyle = LocalCustomCardStyle.current
@@ -93,11 +98,10 @@ fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
     val topEdge = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
     val navigationHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 82.dp
     Canvas(modifier = modifier.fillMaxSize()) {
-        val alpha = config.opacity * config.intensity
         drawTopBarDecoration(
             style = config.topBar,
             palette = palette,
-            alpha = alpha,
+            alpha = tuning.alpha,
             edgeY = topEdge.toPx().coerceAtMost(size.height * 0.24f),
             progress = progress,
         )
@@ -107,14 +111,14 @@ fun UiDecorationChromeOverlay(modifier: Modifier = Modifier) {
                 style = customStyle,
                 floating = floatingBottomBar,
                 areaHeight = resolvedNavigationHeight,
-                alpha = alpha,
+                alpha = tuning.alpha,
                 motionProgress = customProgress,
             )
         } else {
             drawNavigationDecoration(
                 style = config.navigation,
                 palette = palette,
-                alpha = alpha,
+                alpha = tuning.alpha,
                 areaHeight = resolvedNavigationHeight,
                 progress = progress,
             )
@@ -128,10 +132,17 @@ fun Modifier.uiDecoratedCard(
     enabled: Boolean = true,
     nativeDecorations: Set<UiCardDecoration> = emptySet(),
     customTarget: CustomCardTarget = CustomCardTarget.Default,
+    nativeInterior: Boolean = false,
 ): Modifier {
     val config = LocalUiDecorationConfig.current
     val configuredStyle = config.card.withoutNativeDuplicate(nativeDecorations)
-    if (!enabled || !config.isActiveFor(LocalUiDecorationScope.current) || configuredStyle == UiCardDecoration.None) {
+    val tuning = config.renderTuning()
+    if (
+        !enabled ||
+        !config.isActiveFor(LocalUiDecorationScope.current) ||
+        configuredStyle == UiCardDecoration.None ||
+        !tuning.visible
+    ) {
         return this
     }
     val palette = uiDecorationPalette()
@@ -149,28 +160,41 @@ fun Modifier.uiDecoratedCard(
     } else {
         configuredStyle
     }
-    val alpha = config.opacity * config.intensity
+    val customDecoration = style == UiCardDecoration.Custom && customStyle != null
+    val renderCustomInterior = shouldRenderCustomCardInterior(
+        style = style,
+        customStyleAvailable = customStyle != null,
+        nativeSeasonalInterior = seasonalInterface || nativeInterior,
+    )
     return drawWithContent {
-        if (style == UiCardDecoration.Custom && customStyle != null) {
+        if (renderCustomInterior) {
             drawCustomCardInterior(
-                style = customStyle,
+                style = checkNotNull(customStyle),
                 target = customTarget,
-                alpha = alpha,
+                alpha = tuning.alpha,
                 motionProgress = customProgress,
             )
         }
         drawContent()
-        if (style == UiCardDecoration.Custom && customStyle != null) {
+        if (customDecoration) {
             drawCustomCardChrome(
-                style = customStyle,
+                style = checkNotNull(customStyle),
                 target = customTarget,
-                alpha = alpha,
+                alpha = tuning.alpha,
                 motionProgress = customProgress,
             )
         } else {
-            drawCardDecoration(style, shape, palette, alpha)
+            drawCardDecoration(style, shape, palette, tuning.alpha)
         }
     }
+}
+
+internal fun shouldRenderCustomCardInterior(
+    style: UiCardDecoration,
+    customStyleAvailable: Boolean,
+    nativeSeasonalInterior: Boolean,
+): Boolean {
+    return style == UiCardDecoration.Custom && customStyleAvailable && !nativeSeasonalInterior
 }
 
 @Composable
@@ -214,9 +238,13 @@ private data class UiDecorationPalette(
     val dark: Boolean,
 )
 
-private fun DrawScope.drawSoftRays(palette: UiDecorationPalette, alpha: Float, progress: Float) {
+private fun DrawScope.drawSoftRays(
+    palette: UiDecorationPalette,
+    tuning: UiDecorationRenderTuning,
+    progress: Float,
+) {
     val shift = sin(progress * PI * 2.0).toFloat() * size.width * 0.04f
-    repeat(3) { index ->
+    repeat(tuning.detailCount(total = 4)) { index ->
         val startX = size.width * (-0.18f + index * 0.34f) + shift
         val band = Path().apply {
             moveTo(startX, 0f)
@@ -230,7 +258,7 @@ private fun DrawScope.drawSoftRays(palette: UiDecorationPalette, alpha: Float, p
             brush = Brush.horizontalGradient(
                 colors = listOf(
                     Color.Transparent,
-                    palette.primary.copy(alpha = alpha * (0.055f + index * 0.012f)),
+                    palette.primary.copy(alpha = tuning.alpha * (0.055f + index * 0.012f)),
                     Color.Transparent,
                 ),
             ),
@@ -238,14 +266,20 @@ private fun DrawScope.drawSoftRays(palette: UiDecorationPalette, alpha: Float, p
     }
 }
 
-private fun DrawScope.drawStarMap(palette: UiDecorationPalette, alpha: Float, progress: Float) {
-    val points = STAR_POINTS.mapIndexed { index, point ->
+private fun DrawScope.drawStarMap(
+    palette: UiDecorationPalette,
+    tuning: UiDecorationRenderTuning,
+    progress: Float,
+) {
+    val pointCount = tuning.detailCount(STAR_POINTS.size, minimumVisible = 3)
+    val pointScale = tuning.detailScale(minimum = 0.7f, maximum = 1.1f)
+    val points = STAR_POINTS.take(pointCount).mapIndexed { index, point ->
         val drift = sin((progress * PI * 2.0 + index * 0.7)).toFloat() * 3.dp.toPx()
         Offset(size.width * point.first, size.height * point.second + drift)
     }
-    STAR_CONNECTIONS.forEach { (from, to) ->
+    STAR_CONNECTIONS.filter { (from, to) -> from < pointCount && to < pointCount }.forEach { (from, to) ->
         drawLine(
-            color = palette.primary.copy(alpha = alpha * 0.10f),
+            color = palette.primary.copy(alpha = tuning.alpha * 0.10f),
             start = points[from],
             end = points[to],
             strokeWidth = 0.7.dp.toPx(),
@@ -255,34 +289,49 @@ private fun DrawScope.drawStarMap(palette: UiDecorationPalette, alpha: Float, pr
         val twinkle = 0.45f + 0.55f * ((sin((progress * PI * 4.0 + index).toFloat()) + 1f) / 2f)
         drawCircle(
             color = if (index % 4 == 0) palette.secondary else palette.highlight,
-            radius = (if (index % 5 == 0) 1.3.dp else 0.8.dp).toPx(),
+            radius = (if (index % 5 == 0) 1.3.dp else 0.8.dp).toPx() * pointScale,
             center = point,
-            alpha = alpha * 0.28f * twinkle,
+            alpha = tuning.alpha * 0.28f * twinkle,
         )
     }
 }
 
-private fun DrawScope.drawBotanicalBackdrop(palette: UiDecorationPalette, alpha: Float, progress: Float) {
+private fun DrawScope.drawBotanicalBackdrop(
+    palette: UiDecorationPalette,
+    tuning: UiDecorationRenderTuning,
+    progress: Float,
+) {
     val sway = sin(progress * PI * 2.0).toFloat() * 4f
+    val stemCount = tuning.detailCount(total = 2)
+    val leafCount = tuning.detailCount(total = 4)
     drawStemWithLeaves(
         origin = Offset(-4.dp.toPx(), size.height * 0.23f),
         direction = Offset(size.width * 0.20f, -size.height * 0.12f),
-        color = palette.secondary.copy(alpha = alpha * 0.16f),
+        color = palette.secondary.copy(alpha = tuning.alpha * 0.16f),
         rotationDegrees = sway,
+        leafCount = leafCount,
     )
-    drawStemWithLeaves(
-        origin = Offset(size.width + 4.dp.toPx(), size.height * 0.74f),
-        direction = Offset(-size.width * 0.22f, size.height * 0.10f),
-        color = palette.primary.copy(alpha = alpha * 0.14f),
-        rotationDegrees = -sway,
-    )
+    if (stemCount > 1) {
+        drawStemWithLeaves(
+            origin = Offset(size.width + 4.dp.toPx(), size.height * 0.74f),
+            direction = Offset(-size.width * 0.22f, size.height * 0.10f),
+            color = palette.primary.copy(alpha = tuning.alpha * 0.14f),
+            rotationDegrees = -sway,
+            leafCount = leafCount,
+        )
+    }
 }
 
-private fun DrawScope.drawFrostBackdrop(palette: UiDecorationPalette, alpha: Float, progress: Float) {
+private fun DrawScope.drawFrostBackdrop(
+    palette: UiDecorationPalette,
+    tuning: UiDecorationRenderTuning,
+    progress: Float,
+) {
     val shimmer = 0.72f + sin(progress * PI * 2.0).toFloat() * 0.18f
-    FROST_POINTS.forEachIndexed { index, point ->
+    val detailScale = tuning.detailScale(minimum = 0.72f, maximum = 1.08f)
+    FROST_POINTS.take(tuning.detailCount(FROST_POINTS.size)).forEachIndexed { index, point ->
         val center = Offset(size.width * point.first, size.height * point.second)
-        val radius = (4 + (index % 3) * 2).dp.toPx()
+        val radius = (4 + (index % 3) * 2).dp.toPx() * detailScale
         repeat(3) { branch ->
             val angle = (branch * 60f + index * 17f) * (PI / 180f)
             val end = Offset(
@@ -290,7 +339,7 @@ private fun DrawScope.drawFrostBackdrop(palette: UiDecorationPalette, alpha: Flo
                 center.y + sin(angle).toFloat() * radius,
             )
             drawLine(
-                color = palette.highlight.copy(alpha = alpha * 0.14f * shimmer),
+                color = palette.highlight.copy(alpha = tuning.alpha * 0.14f * shimmer),
                 start = center,
                 end = end,
                 strokeWidth = 0.65.dp.toPx(),
@@ -300,12 +349,15 @@ private fun DrawScope.drawFrostBackdrop(palette: UiDecorationPalette, alpha: Flo
     }
 }
 
-private fun DrawScope.drawPixelGridBackdrop(palette: UiDecorationPalette, alpha: Float) {
-    val cell = 26.dp.toPx()
+private fun DrawScope.drawPixelGridBackdrop(
+    palette: UiDecorationPalette,
+    tuning: UiDecorationRenderTuning,
+) {
+    val cell = (42f - 20f * tuning.intensity).dp.toPx()
     var x = cell
     while (x < size.width) {
         drawLine(
-            color = palette.primary.copy(alpha = alpha * 0.09f),
+            color = palette.primary.copy(alpha = tuning.alpha * 0.09f),
             start = Offset(x, 0f),
             end = Offset(x, size.height),
             strokeWidth = 0.55.dp.toPx(),
@@ -315,22 +367,25 @@ private fun DrawScope.drawPixelGridBackdrop(palette: UiDecorationPalette, alpha:
     var y = cell
     while (y < size.height) {
         drawLine(
-            color = palette.primary.copy(alpha = alpha * 0.075f),
+            color = palette.primary.copy(alpha = tuning.alpha * 0.075f),
             start = Offset(0f, y),
             end = Offset(size.width, y),
             strokeWidth = 0.55.dp.toPx(),
         )
         y += cell
     }
-    PIXEL_DECORATION_POINTS.forEachIndexed { index, point ->
-        val side = (if (index % 4 == 0) 3.dp else 2.dp).toPx()
-        drawRect(
-            color = (if (index % 3 == 0) palette.secondary else palette.highlight)
-                .copy(alpha = alpha * 0.26f),
-            topLeft = Offset(size.width * point.first, size.height * point.second),
-            size = Size(side, side),
-        )
-    }
+    PIXEL_DECORATION_POINTS
+        .take(tuning.detailCount(PIXEL_DECORATION_POINTS.size))
+        .forEachIndexed { index, point ->
+            val side = (if (index % 4 == 0) 3.dp else 2.dp).toPx() *
+                tuning.detailScale(minimum = 0.72f, maximum = 1.08f)
+            drawRect(
+                color = (if (index % 3 == 0) palette.secondary else palette.highlight)
+                    .copy(alpha = tuning.alpha * 0.26f),
+                topLeft = Offset(size.width * point.first, size.height * point.second),
+                size = Size(side, side),
+            )
+        }
 }
 
 private fun DrawScope.drawTopBarDecoration(
@@ -769,11 +824,12 @@ private fun DrawScope.drawStemWithLeaves(
     direction: Offset,
     color: Color,
     rotationDegrees: Float,
+    leafCount: Int,
 ) {
     rotate(rotationDegrees, origin) {
         val end = Offset(origin.x + direction.x, origin.y + direction.y)
         drawLine(color, origin, end, 1.dp.toPx(), StrokeCap.Round)
-        repeat(4) { index ->
+        repeat(leafCount.coerceIn(0, 4)) { index ->
             val fraction = 0.22f + index * 0.19f
             val center = Offset(
                 origin.x + direction.x * fraction,

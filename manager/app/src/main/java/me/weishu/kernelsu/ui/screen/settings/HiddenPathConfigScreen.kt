@@ -109,6 +109,9 @@ import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_FILE_NAME
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_MIME_TYPE
 import me.weishu.kernelsu.ui.util.HiddenPathConfigState
@@ -591,7 +594,7 @@ private fun HiddenPathUnavailableScreen() {
     val navigator = LocalNavigator.current
     val onBack = dropUnlessResumed { navigator.pop() }
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
@@ -605,7 +608,10 @@ private fun HiddenPathUnavailableScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surface,
+                    ),
                 ),
             )
         },

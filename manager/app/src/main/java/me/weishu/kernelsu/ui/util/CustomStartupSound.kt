@@ -11,6 +11,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.security.MessageDigest
+import java.util.UUID
 
 const val CUSTOM_STARTUP_SOUND_URI_KEY = "custom_startup_sound_uri"
 const val CUSTOM_STARTUP_SOUND_DURATION_SECONDS_KEY = "custom_startup_sound_duration_seconds"
@@ -26,6 +31,10 @@ const val DEFAULT_CUSTOM_AUDIO_VOLUME = 1.0f
 const val DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME = 0.35f
 const val MIN_CUSTOM_AUDIO_VOLUME = 0.0f
 const val MAX_CUSTOM_AUDIO_VOLUME = 1.0f
+const val MAX_PERSISTED_CUSTOM_AUDIO_BYTES = 500L * 1024L * 1024L
+private const val CUSTOM_AUDIO_DIR_NAME = "custom-audio"
+private const val CUSTOM_AUDIO_EXTENSION = ".audio"
+private val CUSTOM_AUDIO_HEX_CHARS = "0123456789abcdef".toCharArray()
 
 fun sanitizeCustomStartupSoundDurationSeconds(value: Int): Int {
     return value.coerceIn(
@@ -69,13 +78,101 @@ fun releasePersistableAudioReadPermission(context: Context, uriString: String?) 
     }
 }
 
+fun persistCustomAudioReference(
+    context: Context,
+    sourceUri: Uri,
+    storageKey: String,
+    maxBytes: Long = MAX_PERSISTED_CUSTOM_AUDIO_BYTES,
+): String? {
+    return runCatching {
+        require(maxBytes > 0L) { "maxBytes must be positive" }
+        val appContext = context.applicationContext
+        val targetFile = customAudioFile(appContext, storageKey)
+        val parentDir = targetFile.parentFile ?: return@runCatching null
+        val tempFile = File(parentDir, "${targetFile.name}.tmp")
+        parentDir.mkdirs()
+        try {
+            appContext.contentResolver.openInputStream(sourceUri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var totalBytes = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        totalBytes += count
+                        if (totalBytes > maxBytes) {
+                            throw IOException("The selected audio file is too large")
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    if (totalBytes == 0L) throw IOException("The selected audio file is empty")
+                    output.fd.sync()
+                }
+            } ?: return@runCatching null
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+            Uri.fromFile(targetFile).toString()
+        } finally {
+            tempFile.delete()
+        }
+    }.getOrNull()
+}
+
+fun releaseCustomAudioReference(context: Context, uriString: String?) {
+    releasePersistableAudioReadPermission(context, uriString)
+    if (uriString.isNullOrBlank()) return
+    runCatching {
+        val uri = Uri.parse(uriString)
+        if (uri.scheme != "file") return@runCatching
+        val path = uri.path ?: return@runCatching
+        val file = File(path).canonicalFile
+        val audioDir = customAudioDir(context.applicationContext).canonicalFile
+        if (file.path != audioDir.path && !file.path.startsWith(audioDir.path + File.separator)) {
+            return@runCatching
+        }
+        file.delete()
+    }
+}
+
+private fun customAudioFile(context: Context, storageKey: String): File {
+    return File(
+        customAudioDir(context),
+        "${hashCustomAudioStorageKey(storageKey)}_${UUID.randomUUID()}$CUSTOM_AUDIO_EXTENSION",
+    )
+}
+
+private fun customAudioDir(context: Context): File {
+    return File(context.filesDir, CUSTOM_AUDIO_DIR_NAME)
+}
+
+private fun hashCustomAudioStorageKey(storageKey: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(storageKey.toByteArray(Charsets.UTF_8))
+    val chars = CharArray(digest.size * 2)
+    digest.forEachIndexed { index, byte ->
+        val value = byte.toInt() and 0xff
+        chars[index * 2] = CUSTOM_AUDIO_HEX_CHARS[value ushr 4]
+        chars[index * 2 + 1] = CUSTOM_AUDIO_HEX_CHARS[value and 0x0f]
+    }
+    return String(chars)
+}
+
 object StartupSoundPlayer {
 
     private var player: MediaPlayer? = null
     private var source: AssetFileDescriptor? = null
     private var suppressNextAutoPlay = false
+    @Volatile
+    private var active = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopRunnable: Runnable? = null
+    private val audioCoordinator = RuntimeAudioCoordinator(
+        onPause = { pauseForSystem() },
+        onResume = { resumeForSystem() },
+    )
 
     fun playConfigured(context: Context) {
         if (suppressNextAutoPlay) {
@@ -127,10 +224,16 @@ object StartupSoundPlayer {
         onError: ((Throwable?) -> Unit)? = null,
     ) {
         if (uriString.isNullOrBlank()) return
+        val track = readAppAudioSettings(context).startup
+        if (!isAudioPlaybackAllowed(context, track)) {
+            stop()
+            return
+        }
         stop()
         val safeDurationSeconds = sanitizeCustomStartupSoundDurationSeconds(durationSeconds)
         val safeVolume = sanitizeCustomAudioVolume(volume)
 
+        active = true
         runCatching {
             val appContext = context.applicationContext
             val uri = Uri.parse(uriString)
@@ -138,9 +241,20 @@ object StartupSoundPlayer {
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
+            if (!audioCoordinator.request(
+                    appContext,
+                    audioAttributes,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+                    track,
+                )
+            ) {
+                active = false
+                return
+            }
             player = MediaPlayer().apply {
                 setAudioAttributes(audioAttributes)
-                setVolume(safeVolume, safeVolume)
+                val initialVolume = if (track.fadeInMs > 0) 0f else safeVolume
+                setVolume(initialVolume, initialVolume)
                 source = runCatching {
                     appContext.contentResolver.openAssetFileDescriptor(uri, "r")
                 }.getOrNull()
@@ -156,8 +270,21 @@ object StartupSoundPlayer {
                 }
                 setOnPreparedListener {
                     runCatching {
+                        val mediaDuration = it.duration.toLong().coerceAtLeast(0L)
+                        val startMs = track.trimStartMs.coerceAtMost(mediaDuration)
+                        val endMs = track.trimEndMs
+                            .takeIf { end -> end > startMs }
+                            ?.coerceAtMost(mediaDuration)
+                            ?: mediaDuration
+                        if (startMs > 0L) it.seekTo(startMs.toInt())
                         it.start()
-                        scheduleStop(it, safeDurationSeconds)
+                        scheduleFadeIn(it, safeVolume, track.fadeInMs)
+                        scheduleStop(
+                            it,
+                            minOf(safeDurationSeconds * 1_000L, (endMs - startMs).coerceAtLeast(1L)),
+                            safeVolume,
+                            track.fadeOutMs,
+                        )
                     }.onFailure { throwable ->
                         Log.e("StartupSound", "failed to start startup sound", throwable)
                         cleanup(it)
@@ -183,7 +310,9 @@ object StartupSoundPlayer {
     }
 
     fun stop() {
+        active = false
         clearScheduledStop()
+        audioCoordinator.release()
         player?.let { mediaPlayer ->
             runCatching {
                 if (mediaPlayer.isPlaying) {
@@ -199,15 +328,32 @@ object StartupSoundPlayer {
 
     private fun cleanup(mediaPlayer: MediaPlayer) {
         if (player === mediaPlayer) {
+            active = false
             player = null
             clearScheduledStop()
+            audioCoordinator.release()
             runCatching { source?.close() }
             source = null
         }
         mediaPlayer.release()
     }
 
-    private fun scheduleStop(mediaPlayer: MediaPlayer, durationSeconds: Int) {
+    fun isActive(): Boolean = active
+
+    private fun pauseForSystem() {
+        player?.let { active -> runCatching { if (active.isPlaying) active.pause() } }
+    }
+
+    private fun resumeForSystem() {
+        player?.let { active -> runCatching { if (!active.isPlaying) active.start() } }
+    }
+
+    private fun scheduleStop(
+        mediaPlayer: MediaPlayer,
+        durationMs: Long,
+        volume: Float,
+        fadeOutMs: Int,
+    ) {
         clearScheduledStop()
         val runnable = Runnable {
             if (player === mediaPlayer) {
@@ -215,7 +361,35 @@ object StartupSoundPlayer {
             }
         }
         stopRunnable = runnable
-        mainHandler.postDelayed(runnable, durationSeconds * 1000L)
+        if (fadeOutMs > 0 && durationMs > fadeOutMs) {
+            mainHandler.postDelayed({ scheduleFadeOut(mediaPlayer, volume, fadeOutMs) }, durationMs - fadeOutMs)
+        }
+        mainHandler.postDelayed(runnable, durationMs)
+    }
+
+    private fun scheduleFadeIn(mediaPlayer: MediaPlayer, volume: Float, durationMs: Int) {
+        if (durationMs <= 0) return
+        val started = SystemClock.uptimeMillis()
+        fun step() {
+            if (player !== mediaPlayer) return
+            val progress = ((SystemClock.uptimeMillis() - started).toFloat() / durationMs).coerceIn(0f, 1f)
+            runCatching { mediaPlayer.setVolume(volume * progress, volume * progress) }
+            if (progress < 1f) mainHandler.postDelayed(::step, 40L)
+        }
+        mainHandler.post(::step)
+    }
+
+    private fun scheduleFadeOut(mediaPlayer: MediaPlayer, volume: Float, durationMs: Int) {
+        if (durationMs <= 0) return
+        val started = SystemClock.uptimeMillis()
+        fun step() {
+            if (player !== mediaPlayer) return
+            val progress = ((SystemClock.uptimeMillis() - started).toFloat() / durationMs).coerceIn(0f, 1f)
+            val next = volume * (1f - progress)
+            runCatching { mediaPlayer.setVolume(next, next) }
+            if (progress < 1f) mainHandler.postDelayed(::step, 40L)
+        }
+        mainHandler.post(::step)
     }
 
     private fun clearScheduledStop() {
@@ -282,6 +456,8 @@ object ClickSoundPlayer {
             release()
             return
         }
+        val track = readAppAudioSettings(context).click
+        if (!isAudioPlaybackAllowed(context, track)) return
 
         this.volume = sanitizeCustomAudioVolume(volume)
         val now = SystemClock.uptimeMillis()
@@ -402,11 +578,19 @@ object ClickSoundPlayer {
 
 object BackgroundMusicPlayer {
 
+    private const val STARTUP_SOUND_RETRY_DELAY_MS = 120L
+
     private var player: MediaPlayer? = null
     private var source: AssetFileDescriptor? = null
     private var loadedUriString: String? = null
     private var volume = DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var trimBoundaryRunnable: Runnable? = null
+    private var deferredPlayRunnable: Runnable? = null
+    private val audioCoordinator = RuntimeAudioCoordinator(
+        onPause = { pauseForSystem() },
+        onResume = { resumeForSystem() },
+    )
 
     fun playConfigured(context: Context) {
         val appContext = context.applicationContext
@@ -426,6 +610,16 @@ object BackgroundMusicPlayer {
         onError: ((Throwable?) -> Unit)? = null,
     ) {
         if (uriString.isNullOrBlank()) {
+            stop()
+            return
+        }
+        if (StartupSoundPlayer.isActive()) {
+            deferUntilStartupSoundFinishes(context, uriString, volume, loop, onError)
+            return
+        }
+        clearDeferredPlay()
+        val track = readAppAudioSettings(context).background
+        if (!isAudioPlaybackAllowed(context, track)) {
             stop()
             return
         }
@@ -457,10 +651,18 @@ object BackgroundMusicPlayer {
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
+            if (!audioCoordinator.request(
+                    appContext,
+                    audioAttributes,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN,
+                    track,
+                )
+            ) return
             player = MediaPlayer().apply {
                 setAudioAttributes(audioAttributes)
-                isLooping = loop
-                setVolume(safeVolume, safeVolume)
+                isLooping = loop && track.trimStartMs == 0L && track.trimEndMs == 0L
+                val initialVolume = if (track.fadeInMs > 0) 0f else safeVolume
+                setVolume(initialVolume, initialVolume)
                 source = runCatching {
                     appContext.contentResolver.openAssetFileDescriptor(uri, "r")
                 }.getOrNull()
@@ -475,7 +677,27 @@ object BackgroundMusicPlayer {
                     setDataSource(appContext, uri)
                 }
                 setOnPreparedListener {
-                    runCatching { it.start() }
+                    runCatching {
+                        val duration = it.duration.toLong().coerceAtLeast(0L)
+                        val start = track.trimStartMs.coerceAtMost(duration)
+                        val end = track.trimEndMs.takeIf { value -> value > start }
+                            ?.coerceAtMost(duration)
+                            ?: duration
+                        if (start > 0L) it.seekTo(start.toInt())
+                        it.start()
+                        scheduleBackgroundFadeIn(it, safeVolume, track.fadeInMs)
+                        if (end > start && (start > 0L || end < duration)) {
+                            scheduleTrimBoundary(
+                                it,
+                                start,
+                                end,
+                                track.loop || loop,
+                                safeVolume,
+                                track.fadeInMs,
+                                track.fadeOutMs,
+                            )
+                        }
+                    }
                         .onFailure { throwable ->
                             Log.e("BackgroundMusic", "failed to start background music", throwable)
                             cleanup(it)
@@ -507,6 +729,10 @@ object BackgroundMusicPlayer {
     }
 
     fun stop() {
+        clearDeferredPlay()
+        trimBoundaryRunnable?.let { mainHandler.removeCallbacks(it) }
+        trimBoundaryRunnable = null
+        audioCoordinator.release()
         player?.let { mediaPlayer ->
             runCatching {
                 if (mediaPlayer.isPlaying) {
@@ -527,8 +753,19 @@ object BackgroundMusicPlayer {
             loadedUriString = null
             runCatching { source?.close() }
             source = null
+            trimBoundaryRunnable?.let { mainHandler.removeCallbacks(it) }
+            trimBoundaryRunnable = null
+            audioCoordinator.release()
         }
         mediaPlayer.release()
+    }
+
+    private fun pauseForSystem() {
+        player?.let { active -> runCatching { if (active.isPlaying) active.pause() } }
+    }
+
+    private fun resumeForSystem() {
+        player?.let { active -> runCatching { if (!active.isPlaying) active.start() } }
     }
 
     private fun readConfiguredVolume(context: Context): Float {
@@ -542,5 +779,85 @@ object BackgroundMusicPlayer {
     private fun notifyError(onError: ((Throwable?) -> Unit)?, throwable: Throwable?) {
         onError ?: return
         mainHandler.post { onError(throwable) }
+    }
+
+    private fun deferUntilStartupSoundFinishes(
+        context: Context,
+        uriString: String,
+        volume: Float,
+        loop: Boolean,
+        onError: ((Throwable?) -> Unit)?,
+    ) {
+        clearDeferredPlay()
+        val appContext = context.applicationContext
+        val runnable = object : Runnable {
+            override fun run() {
+                if (deferredPlayRunnable !== this) return
+                if (StartupSoundPlayer.isActive()) {
+                    mainHandler.postDelayed(this, STARTUP_SOUND_RETRY_DELAY_MS)
+                    return
+                }
+                deferredPlayRunnable = null
+                play(appContext, uriString, volume, loop, onError)
+            }
+        }
+        deferredPlayRunnable = runnable
+        mainHandler.postDelayed(runnable, STARTUP_SOUND_RETRY_DELAY_MS)
+    }
+
+    private fun clearDeferredPlay() {
+        deferredPlayRunnable?.let(mainHandler::removeCallbacks)
+        deferredPlayRunnable = null
+    }
+
+    private fun scheduleTrimBoundary(
+        mediaPlayer: MediaPlayer,
+        startMs: Long,
+        endMs: Long,
+        loop: Boolean,
+        volume: Float,
+        fadeInMs: Int,
+        fadeOutMs: Int,
+    ) {
+        trimBoundaryRunnable?.let { mainHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                if (player !== mediaPlayer) return
+                val position = runCatching { mediaPlayer.currentPosition.toLong() }.getOrDefault(0L)
+                if (fadeOutMs > 0 && endMs - position <= fadeOutMs) {
+                    val factor = ((endMs - position).toFloat() / fadeOutMs).coerceIn(0f, 1f)
+                    runCatching { mediaPlayer.setVolume(volume * factor, volume * factor) }
+                }
+                if (position >= endMs) {
+                    if (loop) {
+                        runCatching {
+                            mediaPlayer.seekTo(startMs.toInt())
+                            mediaPlayer.setVolume(if (fadeInMs > 0) 0f else volume,
+                                if (fadeInMs > 0) 0f else volume)
+                            mediaPlayer.start()
+                            scheduleBackgroundFadeIn(mediaPlayer, volume, fadeInMs)
+                        }
+                    } else {
+                        stop()
+                        return
+                    }
+                }
+                mainHandler.postDelayed(this, 60L)
+            }
+        }
+        trimBoundaryRunnable = runnable
+        mainHandler.post(runnable)
+    }
+
+    private fun scheduleBackgroundFadeIn(mediaPlayer: MediaPlayer, volume: Float, durationMs: Int) {
+        if (durationMs <= 0) return
+        val started = SystemClock.uptimeMillis()
+        fun step() {
+            if (player !== mediaPlayer) return
+            val progress = ((SystemClock.uptimeMillis() - started).toFloat() / durationMs).coerceIn(0f, 1f)
+            runCatching { mediaPlayer.setVolume(volume * progress, volume * progress) }
+            if (progress < 1f) mainHandler.postDelayed(::step, 40L)
+        }
+        mainHandler.post(::step)
     }
 }

@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -16,12 +19,18 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -29,6 +38,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomNavigationIconImage
 import me.weishu.kernelsu.ui.util.CustomNavigationIconState
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSlot
+import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
@@ -37,13 +47,13 @@ import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
 fun SettingsNavigationIconPreviewDialog(
     show: Boolean,
     slot: CustomNavigationIconSlot,
-    state: CustomNavigationIconState,
+    icons: CustomNavigationIconSet,
     onDismissRequest: () -> Unit,
 ) {
     if (!show) return
 
     val title = stringResource(slot.previewTitleRes)
-    val fallbackIcon = slot.fallbackIcon
+    var style by remember { mutableStateOf(NavigationPreviewStyle.Standard) }
 
     OverlayDialog(
         show = true,
@@ -52,10 +62,23 @@ fun SettingsNavigationIconPreviewDialog(
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 NavigationIconPreviewFrame(
-                    title = title,
-                    state = state,
-                    fallbackIcon = fallbackIcon,
+                    selectedSlot = slot,
+                    icons = icons,
+                    style = style,
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    NavigationPreviewStyle.entries.forEach { option ->
+                        FilterChip(
+                            modifier = Modifier.weight(1f),
+                            selected = style == option,
+                            onClick = { style = option },
+                            label = { Text(stringResource(option.labelRes)) },
+                        )
+                    }
+                }
                 MiuixTextButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = stringResource(android.R.string.ok),
@@ -77,37 +100,63 @@ private val CustomNavigationIconSlot.fallbackIcon: ImageVector
 
 @Composable
 private fun NavigationIconPreviewFrame(
-    title: String,
-    state: CustomNavigationIconState,
-    fallbackIcon: ImageVector,
+    selectedSlot: CustomNavigationIconSlot,
+    icons: CustomNavigationIconSet,
+    style: NavigationPreviewStyle,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(112.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(26.dp)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .background(style.backgroundColor(), style.shape)
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                CustomNavigationIconImage(
-                    state = state,
-                    contentDescription = title,
-                    modifier = Modifier.size(42.dp),
+            CustomNavigationIconSlot.entries.forEach { itemSlot ->
+                val state = icons[itemSlot]
+                val selected = itemSlot == selectedSlot
+                val label = state.displayLabel(stringResource(itemSlot.labelRes))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(
-                        imageVector = fallbackIcon,
-                        contentDescription = title,
-                        modifier = Modifier.size(42.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                else Color.Transparent,
+                                if (style == NavigationPreviewStyle.Pixel) RoundedCornerShape(4.dp) else CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CustomNavigationIconImage(
+                            state = state,
+                            contentDescription = label,
+                            modifier = Modifier.size(24.dp),
+                            alpha = if (selected) 1f else 0.74f,
+                        ) {
+                            Icon(
+                                imageVector = itemSlot.fallbackIcon,
+                                contentDescription = label,
+                                modifier = Modifier.size(24.dp),
+                                tint = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Text(
+                        text = label,
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
                     )
                 }
             }
@@ -118,4 +167,22 @@ private fun NavigationIconPreviewFrame(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+private enum class NavigationPreviewStyle(val labelRes: Int) {
+    Standard(R.string.settings_navigation_preview_standard),
+    Frosted(R.string.settings_navigation_preview_frosted),
+    Liquid(R.string.settings_navigation_preview_liquid),
+    Pixel(R.string.settings_navigation_preview_pixel),
+}
+
+private val NavigationPreviewStyle.shape
+    get() = if (this == NavigationPreviewStyle.Pixel) RoundedCornerShape(6.dp) else RoundedCornerShape(18.dp)
+
+@Composable
+private fun NavigationPreviewStyle.backgroundColor(): Color = when (this) {
+    NavigationPreviewStyle.Standard -> MaterialTheme.colorScheme.surfaceVariant
+    NavigationPreviewStyle.Frosted -> MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+    NavigationPreviewStyle.Liquid -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+    NavigationPreviewStyle.Pixel -> Color(0xFF15131B)
 }

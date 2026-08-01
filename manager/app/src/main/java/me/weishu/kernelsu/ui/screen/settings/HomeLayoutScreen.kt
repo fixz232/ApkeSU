@@ -1,6 +1,9 @@
 package me.weishu.kernelsu.ui.screen.settings
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
@@ -32,9 +36,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Redo
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.DashboardCustomize
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
@@ -42,7 +51,12 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FormatAlignCenter
 import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.Landscape
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Portrait
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Tune
@@ -56,6 +70,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -65,17 +80,26 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -110,28 +134,52 @@ import me.weishu.kernelsu.ui.screen.home.HomeUiState
 import me.weishu.kernelsu.ui.util.HomeLayoutCard
 import me.weishu.kernelsu.ui.util.HomeLayoutItem
 import me.weishu.kernelsu.ui.util.HomeLayoutPreset
+import me.weishu.kernelsu.ui.util.HomeLayoutSticker
 import me.weishu.kernelsu.ui.util.HomeLayoutState
+import me.weishu.kernelsu.ui.util.HomeLayoutWallpaperFit
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
+import me.weishu.kernelsu.ui.util.autoArrangeHomeLayoutItems
+import me.weishu.kernelsu.ui.util.decodeHomeLayoutState
+import me.weishu.kernelsu.ui.util.encodeHomeLayoutState
 import me.weishu.kernelsu.ui.util.homeLayoutItemsForPreset
+import me.weishu.kernelsu.ui.util.itemsForOrientation
+import me.weishu.kernelsu.ui.util.loadCustomImageBitmap
 import me.weishu.kernelsu.ui.util.minimumHomeLayoutHeight
+import me.weishu.kernelsu.ui.util.moveHomeLayoutItem
 import me.weishu.kernelsu.ui.util.moveHomeLayoutCardLayer
 import me.weishu.kernelsu.ui.util.readHomeLayoutState
+import me.weishu.kernelsu.ui.util.releaseCustomImageReference
+import me.weishu.kernelsu.ui.util.resolveHomeLayoutCollisions
 import me.weishu.kernelsu.ui.util.resizeHomeLayoutItem
 import me.weishu.kernelsu.ui.util.sanitizeHomeLayoutItem
 import me.weishu.kernelsu.ui.util.saveHomeLayoutState
 import me.weishu.kernelsu.ui.util.snapHomeLayoutItem
 import me.weishu.kernelsu.ui.util.suggestedHomeLayoutHeight
+import me.weishu.kernelsu.ui.util.persistCustomImageReference
+import me.weishu.kernelsu.ui.util.withItemsForOrientation
 import me.weishu.kernelsu.ui.viewmodel.HomeViewModel
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
 import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import kotlin.math.roundToInt
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.util.UUID
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+private const val HOME_LAYOUT_STICKER_MAX_BYTES = 32L * 1024L * 1024L
+private const val HOME_LAYOUT_STICKER_VALIDATION_SIDE = 512
+private const val HOME_LAYOUT_TRANSFER_MAX_BYTES = 256 * 1024
+
+private val HomeLayoutMutableStateSaver = Saver<MutableState<HomeLayoutState>, String>(
+    save = { state -> encodeHomeLayoutState(state.value) },
+    restore = { encoded -> mutableStateOf(decodeHomeLayoutState(encoded) ?: HomeLayoutState()) },
+)
 
 @Composable
 fun HomeLayoutScreen() {
@@ -142,11 +190,20 @@ fun HomeLayoutScreen() {
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     val popBack = dropUnlessResumed { navigator.pop() }
     val initialState = remember(context) { readHomeLayoutState(context) }
-    var state by remember { mutableStateOf(initialState) }
-    var savedState by remember { mutableStateOf(initialState) }
-    var selectedCard by remember { mutableStateOf(HomeLayoutCard.Lkm) }
+    var state by rememberSaveable(saver = HomeLayoutMutableStateSaver) {
+        mutableStateOf(initialState)
+    }
+    var savedState by rememberSaveable(saver = HomeLayoutMutableStateSaver) {
+        mutableStateOf(initialState)
+    }
+    var selectedCard by rememberSaveable { mutableStateOf(HomeLayoutCard.Lkm) }
+    var editingLandscape by rememberSaveable { mutableStateOf(false) }
+    var selectedStickerId by remember { mutableStateOf<String?>(null) }
+    var pendingStickerUris by remember { mutableStateOf(emptySet<String>()) }
     var saving by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var fullscreenEditor by remember { mutableStateOf(false) }
@@ -157,9 +214,14 @@ fun HomeLayoutScreen() {
     var undoStack by remember { mutableStateOf(emptyList<HomeLayoutState>()) }
     var redoStack by remember { mutableStateOf(emptyList<HomeLayoutState>()) }
     var interactionStartState by remember { mutableStateOf<HomeLayoutState?>(null) }
+    var fullscreenControlsHeightPx by remember { mutableStateOf(112) }
     val saveSuccess = stringResource(R.string.home_layout_save_success)
     val saveFailed = stringResource(R.string.home_layout_save_failed)
     val resetSuccess = stringResource(R.string.home_layout_reset_success)
+    val importSuccess = stringResource(R.string.home_layout_import_success)
+    val importFailed = stringResource(R.string.home_layout_import_failed)
+    val exportSuccess = stringResource(R.string.home_layout_export_success)
+    val exportFailed = stringResource(R.string.home_layout_export_failed)
     val dirty = state != savedState
 
     fun pushUndo(previous: HomeLayoutState) {
@@ -174,9 +236,20 @@ fun HomeLayoutScreen() {
         message = null
     }
 
+    fun activeItems(source: HomeLayoutState = state): List<HomeLayoutItem> {
+        return source.itemsForOrientation(editingLandscape)
+    }
+
+    fun replaceActiveItems(
+        source: HomeLayoutState = state,
+        items: List<HomeLayoutItem>,
+    ): HomeLayoutState {
+        return source.withItemsForOrientation(editingLandscape, items)
+    }
+
     fun updateItem(card: HomeLayoutCard, transform: (HomeLayoutItem) -> HomeLayoutItem) {
-        state = state.copy(
-            items = state.items.map { item ->
+        state = replaceActiveItems(
+            items = activeItems().map { item ->
                 if (item.card == card) sanitizeHomeLayoutItem(transform(item)) else item
             },
         )
@@ -187,10 +260,24 @@ fun HomeLayoutScreen() {
     }
 
     fun finishInteraction(card: HomeLayoutCard) {
-        val currentItem = state.items.firstOrNull { it.card == card }
+        val currentItems = activeItems()
+        val currentItem = currentItems.firstOrNull { it.card == card }
         if (currentItem != null) {
-            val snapped = snapHomeLayoutItem(currentItem, state.items)
-            updateItem(card) { snapped }
+            val snapped = if (state.autoSnap) {
+                snapHomeLayoutItem(currentItem, currentItems)
+            } else {
+                currentItem
+            }
+            var nextItems = currentItems.map { item ->
+                if (item.card == card) snapped else item
+            }
+            if (state.autoAvoidOverlap) {
+                nextItems = resolveHomeLayoutCollisions(nextItems)
+            }
+            state = replaceActiveItems(items = nextItems)
+            if (snapped.x != currentItem.x || snapped.y != currentItem.y) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
         }
         interactionStartState?.let { start ->
             if (start != state) pushUndo(start)
@@ -220,6 +307,18 @@ fun HomeLayoutScreen() {
         if (dirty) showDiscardDialog = true else popBack()
     }
 
+    fun stickerUris(source: HomeLayoutState): Set<String> {
+        return (source.items + source.landscapeItems)
+            .flatMap { it.stickers }
+            .map { it.uriString }
+            .filter(String::isNotBlank)
+            .toSet()
+    }
+
+    fun releaseUris(uris: Set<String>) {
+        uris.forEach { uriString -> releaseCustomImageReference(context, uriString) }
+    }
+
     fun save(
         next: HomeLayoutState = state,
         successText: String = saveSuccess,
@@ -227,10 +326,17 @@ fun HomeLayoutScreen() {
     ) {
         if (saving) return
         saving = true
+        val previouslySavedStickerUris = stickerUris(savedState)
         scope.launch {
             val ok = withContext(Dispatchers.IO) { saveHomeLayoutState(context, next) }
             if (ok) {
                 val persisted = readHomeLayoutState(context)
+                val persistedStickerUris = stickerUris(persisted)
+                withContext(Dispatchers.IO) {
+                    releaseUris(previouslySavedStickerUris - persistedStickerUris)
+                    releaseUris(pendingStickerUris - persistedStickerUris)
+                }
+                pendingStickerUris = emptySet()
                 state = persisted
                 savedState = persisted
                 undoStack = emptyList()
@@ -242,6 +348,109 @@ fun HomeLayoutScreen() {
                 message = saveFailed
             }
             saving = false
+        }
+    }
+
+    val layoutExportPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val exportedState = state
+        scope.launch {
+            val exported = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(encodeHomeLayoutState(exportedState).toByteArray(Charsets.UTF_8))
+                    } != null
+                }.getOrDefault(false)
+            }
+            message = if (exported) exportSuccess else exportFailed
+        }
+    }
+
+    val layoutImportPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use(::readHomeLayoutTransfer)
+                        ?.let(::decodeHomeLayoutState)
+                }.getOrNull()
+            }
+            if (imported == null) {
+                message = importFailed
+            } else {
+                applyState(imported)
+                selectedCard = HomeLayoutCard.Lkm
+                selectedStickerId = null
+                overlappingCards = emptySet()
+                message = importSuccess
+            }
+        }
+    }
+
+    val stickerPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val targetCard = selectedCard
+        scope.launch {
+            val storageKey = "home_layout_sticker_${targetCard.value}_${UUID.randomUUID()}"
+            val persistedUri = withContext(Dispatchers.IO) {
+                persistCustomImageReference(
+                    context = context,
+                    sourceUri = uri,
+                    storageKey = storageKey,
+                    maxBytes = HOME_LAYOUT_STICKER_MAX_BYTES,
+                )
+            }
+            if (persistedUri == null) {
+                Toast.makeText(context, R.string.home_layout_sticker_import_failed, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val validImage = withContext(Dispatchers.IO) {
+                loadCustomImageBitmap(
+                    context = context,
+                    uriString = persistedUri,
+                    maxSide = HOME_LAYOUT_STICKER_VALIDATION_SIDE,
+                )?.let { bitmap ->
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                    true
+                } ?: false
+            }
+            if (!validImage) {
+                withContext(Dispatchers.IO) {
+                    releaseCustomImageReference(context, persistedUri)
+                }
+                Toast.makeText(context, R.string.home_layout_sticker_invalid, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val sticker = HomeLayoutSticker(
+                id = UUID.randomUUID().toString(),
+                uriString = persistedUri,
+            )
+            pendingStickerUris = pendingStickerUris + persistedUri
+            selectedStickerId = sticker.id
+            applyState(
+                replaceActiveItems(
+                    items = activeItems().map { item ->
+                        if (item.card == targetCard) {
+                            sanitizeHomeLayoutItem(item.copy(stickers = item.stickers + sticker))
+                        } else {
+                            item
+                        }
+                    },
+                ),
+            )
+        }
+    }
+
+    val currentPendingStickerUris by rememberUpdatedState(pendingStickerUris)
+    DisposableEffect(Unit) {
+        onDispose {
+            releaseUris(currentPendingStickerUris)
         }
     }
 
@@ -308,53 +517,133 @@ fun HomeLayoutScreen() {
                 }
             }
 
-            message?.let {
-                TonalCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = it,
-                        modifier = Modifier.padding(14.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+            TonalCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = message ?: stringResource(
+                        when {
+                            saving -> R.string.home_layout_saving
+                            dirty -> R.string.home_layout_unsaved
+                            else -> R.string.home_layout_saved
+                        },
+                    ),
+                    modifier = Modifier.padding(14.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (dirty && message == null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !saving,
+                    onClick = { layoutImportPicker.launch(arrayOf("application/json", "text/json")) },
+                ) {
+                    Text(stringResource(R.string.home_layout_import))
+                }
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !saving,
+                    onClick = {
+                        layoutExportPicker.launch("apkesu-home-layout.json")
+                    },
+                ) {
+                    Text(stringResource(R.string.home_layout_export))
                 }
             }
 
+            HomeLayoutOrientationControls(
+                editingLandscape = editingLandscape,
+                onEditingLandscapeChange = { landscape ->
+                    if (editingLandscape != landscape) {
+                        editingLandscape = landscape
+                        selectedStickerId = null
+                        overlappingCards = emptySet()
+                        interactionStartState = null
+                    }
+                },
+            )
+
             HomeLayoutPresetControls(
                 state = state,
+                isLandscape = editingLandscape,
                 onPresetSelected = { preset ->
-                    applyState(state.copy(items = homeLayoutItemsForPreset(preset)))
+                    applyState(
+                        replaceActiveItems(
+                            items = homeLayoutItemsForPreset(
+                                preset = preset,
+                                isLandscape = editingLandscape,
+                            ),
+                        ),
+                    )
+                },
+                onAutoSnapChange = { enabled ->
+                    applyState(state.copy(autoSnap = enabled))
                 },
                 onAutoAvoidChange = { enabled ->
                     applyState(state.copy(autoAvoidOverlap = enabled))
+                },
+                onAutoArrange = {
+                    applyState(replaceActiveItems(items = autoArrangeHomeLayoutItems(activeItems())))
                 },
             )
 
             HomeLayoutPreview(
                 state = state,
                 homeUiState = homeUiState,
+                isLandscape = editingLandscape,
                 onOpenFullscreen = { fullscreenEditor = true },
             )
 
-            FilledTonalButton(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { showPreciseControls = !showPreciseControls },
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = if (showPreciseControls) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_layout_precise_controls))
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { showPreciseControls = !showPreciseControls },
+                ) {
+                    Icon(
+                        imageVector = if (showPreciseControls) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_layout_precise_controls))
+                }
+                IconButton(onClick = ::undo, enabled = undoStack.isNotEmpty()) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.Undo,
+                        contentDescription = stringResource(R.string.home_layout_undo),
+                    )
+                }
+                IconButton(onClick = ::redo, enabled = redoStack.isNotEmpty()) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.Redo,
+                        contentDescription = stringResource(R.string.home_layout_redo),
+                    )
+                }
             }
 
             AnimatedVisibility(visible = showPreciseControls) {
                 HomeLayoutInspector(
-                    item = state.items.first { it.card == selectedCard },
-                    onCardSelected = { selectedCard = it },
+                    item = activeItems().first { it.card == selectedCard },
+                    selectedStickerId = selectedStickerId,
+                    onCardSelected = {
+                        selectedCard = it
+                        selectedStickerId = null
+                    },
                     onItemChange = { item -> updateItem(item.card) { item } },
                     onCommittedItemChange = { item ->
                         applyState(
-                            state.copy(
-                                items = state.items.map { current ->
+                            replaceActiveItems(
+                                items = activeItems().map { current ->
                                     if (current.card == item.card) sanitizeHomeLayoutItem(item) else current
                                 },
                             ),
@@ -364,12 +653,55 @@ fun HomeLayoutScreen() {
                     onInteractionEnd = { finishInteraction(selectedCard) },
                     onAlign = { x ->
                         applyState(
-                            state.copy(
-                                items = state.items.map { item ->
+                            replaceActiveItems(
+                                items = activeItems().map { item ->
                                     if (item.card == selectedCard) item.copy(x = x) else item
                                 },
                             ),
                         )
+                    },
+                    onNudge = { horizontal, vertical ->
+                        applyState(
+                            replaceActiveItems(
+                                items = activeItems().map { item ->
+                                    if (item.card == selectedCard) {
+                                        sanitizeHomeLayoutItem(
+                                            item.copy(
+                                                x = if (item.width >= 0.999f) 0f else item.x + horizontal,
+                                                y = item.y + vertical,
+                                            ),
+                                        )
+                                    } else {
+                                        item
+                                    }
+                                },
+                            ),
+                        )
+                    },
+                    onAddSticker = { stickerPicker.launch(arrayOf("image/*")) },
+                    onStickerSelected = { selectedStickerId = it },
+                    onStickerChange = { sticker ->
+                        updateItem(selectedCard) { item ->
+                            item.copy(
+                                stickers = item.stickers.map { current ->
+                                    if (current.id == sticker.id) sticker else current
+                                },
+                            )
+                        }
+                    },
+                    onStickerDelete = { sticker ->
+                        applyState(
+                            replaceActiveItems(
+                                items = activeItems().map { item ->
+                                    if (item.card == selectedCard) {
+                                        item.copy(stickers = item.stickers.filterNot { it.id == sticker.id })
+                                    } else {
+                                        item
+                                    }
+                                },
+                            ),
+                        )
+                        selectedStickerId = null
                     },
                 )
             }
@@ -412,22 +744,25 @@ fun HomeLayoutScreen() {
             ),
         ) {
             HomeLayoutFullscreenBackground(settingsUiState) {
-                CompositionLocalProvider(LocalInterfaceStyle provides InterfaceStyle.Miuix.value) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        HomePagerMiuix(
+                Box(modifier = Modifier.fillMaxSize()) {
+                    HomePagerMiuix(
                             state = homeUiState,
                             actions = rememberHomeLayoutPreviewActions(),
-                            bottomInnerPadding = if (showLayerPanel) 420.dp else 112.dp,
+                            bottomInnerPadding = with(density) {
+                                fullscreenControlsHeightPx.toDp()
+                            } + 12.dp,
                             installFeedbackActive = false,
                             homeLayoutOverride = state.copy(enabled = true),
+                            homeLayoutLandscapeOverride = editingLandscape,
                             homeLayoutEditor = HomeLayoutEditor(
                                 selectedCard = selectedCard,
                                 onSelectedCardChange = { selectedCard = it },
                                 onDragCard = { card, delta ->
                                     updateItem(card) { item ->
-                                        item.copy(
-                                            x = item.x + delta.x,
-                                            y = item.y + delta.y,
+                                        moveHomeLayoutItem(
+                                            item = item,
+                                            horizontalDelta = delta.x,
+                                            verticalDeltaRows = delta.y,
                                         )
                                     }
                                 },
@@ -447,11 +782,15 @@ fun HomeLayoutScreen() {
                                 onOverlapChange = { overlappingCards = it },
                             ),
                         )
-                        HomeLayoutFullscreenControls(
+                    HomeLayoutFullscreenControls(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coordinates ->
+                                    fullscreenControlsHeightPx = coordinates.size.height
+                                },
                             state = state,
+                            isLandscape = editingLandscape,
                             selectedCard = selectedCard,
                             showLayers = showLayerPanel,
                             canUndo = undoStack.isNotEmpty(),
@@ -459,15 +798,23 @@ fun HomeLayoutScreen() {
                             overlappingCards = overlappingCards,
                             saving = saving,
                             dirty = dirty,
-                            onSelectedCardChange = { selectedCard = it },
+                            onSelectedCardChange = {
+                                selectedCard = it
+                                selectedStickerId = null
+                            },
+                            onOrientationChange = { landscape ->
+                                editingLandscape = landscape
+                                selectedStickerId = null
+                                overlappingCards = emptySet()
+                            },
                             onToggleLayers = { showLayerPanel = !showLayerPanel },
                             onUndo = ::undo,
                             onRedo = ::redo,
                             onVisibilityChange = { card, visible ->
-                                val item = state.items.first { it.card == card }
+                                val item = activeItems().first { it.card == card }
                                 applyState(
-                                    state.copy(
-                                        items = state.items.map { current ->
+                                    replaceActiveItems(
+                                        items = activeItems().map { current ->
                                             if (current.card == card) item.copy(visible = visible) else current
                                         },
                                     ),
@@ -475,16 +822,34 @@ fun HomeLayoutScreen() {
                             },
                             onMoveLayer = { card, direction ->
                                 applyState(
-                                    state.copy(
-                                        items = moveHomeLayoutCardLayer(state.items, card, direction),
+                                    replaceActiveItems(
+                                        items = moveHomeLayoutCardLayer(activeItems(), card, direction),
                                     ),
                                 )
                             },
                             onAlign = { x ->
                                 applyState(
-                                    state.copy(
-                                        items = state.items.map { item ->
+                                    replaceActiveItems(
+                                        items = activeItems().map { item ->
                                             if (item.card == selectedCard) item.copy(x = x) else item
+                                        },
+                                    ),
+                                )
+                            },
+                            onNudge = { horizontal, vertical ->
+                                applyState(
+                                    replaceActiveItems(
+                                        items = activeItems().map { item ->
+                                            if (item.card == selectedCard) {
+                                                sanitizeHomeLayoutItem(
+                                                    item.copy(
+                                                        x = if (item.width >= 0.999f) 0f else item.x + horizontal,
+                                                        y = item.y + vertical,
+                                                    ),
+                                                )
+                                            } else {
+                                                item
+                                            }
                                         },
                                     ),
                                 )
@@ -492,10 +857,12 @@ fun HomeLayoutScreen() {
                             onAutoAvoidChange = { enabled ->
                                 applyState(state.copy(autoAvoidOverlap = enabled))
                             },
+                            onAutoSnapChange = { enabled ->
+                                applyState(state.copy(autoSnap = enabled))
+                            },
                             onClose = { fullscreenEditor = false },
                             onSave = { save(onSuccess = { fullscreenEditor = false }) },
                         )
-                    }
                 }
             }
         }
@@ -515,6 +882,8 @@ fun HomeLayoutScreen() {
                 TextButton(
                     onClick = {
                         showDiscardDialog = false
+                        releaseUris(pendingStickerUris)
+                        pendingStickerUris = emptySet()
                         popBack()
                     },
                 ) {
@@ -538,6 +907,7 @@ private fun HomeLayoutFullscreenBackground(
             opacity = settings.customWallpaperOpacity,
             crop = settings.customWallpaperCrop,
             videoDurationSeconds = settings.customVideoBackgroundDurationSeconds,
+            visualSettings = settings.customWallpaperVisualSettings,
         )
     val interfaceStyle = LocalInterfaceStyle.current
     val seasonalStyle = interfaceStyle == InterfaceStyle.Snow.value
@@ -553,6 +923,7 @@ private fun HomeLayoutFullscreenBackground(
         videoDurationSeconds = homeBackground.videoDurationSeconds,
         opacity = homeBackground.opacity,
         crop = homeBackground.crop,
+        visualSettings = homeBackground.visualSettings,
         passthroughEnabled = settings.customWallpaperPassthroughEnabled,
         passthroughOpacity = settings.customWallpaperPassthroughOpacity,
     ) {
@@ -582,10 +953,41 @@ private fun HomeLayoutFullscreenBackground(
 }
 
 @Composable
+private fun HomeLayoutOrientationControls(
+    editingLandscape: Boolean,
+    onEditingLandscapeChange: (Boolean) -> Unit,
+) {
+    TonalCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                modifier = Modifier.weight(1f),
+                selected = !editingLandscape,
+                onClick = { onEditingLandscapeChange(false) },
+                leadingIcon = { Icon(Icons.Rounded.Portrait, contentDescription = null) },
+                label = { Text(stringResource(R.string.home_layout_portrait)) },
+            )
+            FilterChip(
+                modifier = Modifier.weight(1f),
+                selected = editingLandscape,
+                onClick = { onEditingLandscapeChange(true) },
+                leadingIcon = { Icon(Icons.Rounded.Landscape, contentDescription = null) },
+                label = { Text(stringResource(R.string.home_layout_landscape)) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun HomeLayoutPresetControls(
     state: HomeLayoutState,
+    isLandscape: Boolean,
     onPresetSelected: (HomeLayoutPreset) -> Unit,
+    onAutoSnapChange: (Boolean) -> Unit,
     onAutoAvoidChange: (Boolean) -> Unit,
+    onAutoArrange: () -> Unit,
 ) {
     TonalCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -605,11 +1007,36 @@ private fun HomeLayoutPresetControls(
             ) {
                 HomeLayoutPreset.entries.forEach { preset ->
                     FilterChip(
-                        selected = state.items.matchesPreset(preset),
+                        selected = state.itemsForOrientation(isLandscape).matchesPreset(
+                            preset = preset,
+                            isLandscape = isLandscape,
+                        ),
                         onClick = { onPresetSelected(preset) },
                         label = { Text(stringResource(preset.labelRes())) },
                     )
                 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.home_layout_auto_snap),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = stringResource(R.string.home_layout_auto_snap_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.autoSnap,
+                    onCheckedChange = onAutoSnapChange,
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -633,6 +1060,12 @@ private fun HomeLayoutPresetControls(
                     onCheckedChange = onAutoAvoidChange,
                 )
             }
+            FilledTonalButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onAutoArrange,
+            ) {
+                Text(stringResource(R.string.home_layout_auto_arrange))
+            }
         }
     }
 }
@@ -640,6 +1073,7 @@ private fun HomeLayoutPresetControls(
 @Composable
 private fun HomeLayoutFullscreenControls(
     state: HomeLayoutState,
+    isLandscape: Boolean,
     selectedCard: HomeLayoutCard,
     showLayers: Boolean,
     canUndo: Boolean,
@@ -648,17 +1082,21 @@ private fun HomeLayoutFullscreenControls(
     saving: Boolean,
     dirty: Boolean,
     onSelectedCardChange: (HomeLayoutCard) -> Unit,
+    onOrientationChange: (Boolean) -> Unit,
     onToggleLayers: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onVisibilityChange: (HomeLayoutCard, Boolean) -> Unit,
     onMoveLayer: (HomeLayoutCard, Int) -> Unit,
     onAlign: (Float) -> Unit,
+    onNudge: (Float, Float) -> Unit,
     onAutoAvoidChange: (Boolean) -> Unit,
+    onAutoSnapChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val activeItems = state.itemsForOrientation(isLandscape)
     Surface(
         modifier = modifier.windowInsetsPadding(
             WindowInsets.navigationBars.only(WindowInsetsSides.Bottom),
@@ -667,9 +1105,68 @@ private fun HomeLayoutFullscreenControls(
         tonalElevation = 3.dp,
     ) {
         Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(onClick = onClose, enabled = !saving) {
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.close))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(
+                            R.string.home_layout_selected_card,
+                            stringResource(selectedCard.labelRes()),
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = stringResource(
+                            when {
+                                saving -> R.string.home_layout_saving
+                                dirty -> R.string.home_layout_unsaved
+                                else -> R.string.home_layout_saved
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (dirty) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                IconButton(onClick = { onOrientationChange(false) }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Portrait,
+                        contentDescription = stringResource(R.string.home_layout_portrait),
+                        tint = if (!isLandscape) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = { onOrientationChange(true) }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Landscape,
+                        contentDescription = stringResource(R.string.home_layout_landscape),
+                        tint = if (isLandscape) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(onClick = onSave, enabled = !saving && dirty) {
+                    Icon(Icons.Rounded.Save, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.home_layout_save))
+                }
+            }
             AnimatedVisibility(visible = showLayers) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .heightIn(max = 260.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
@@ -692,7 +1189,22 @@ private fun HomeLayoutFullscreenControls(
                             onCheckedChange = onAutoAvoidChange,
                         )
                     }
-                    state.items.sortedByDescending { it.zIndex }.forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_layout_auto_snap),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = state.autoSnap,
+                            onCheckedChange = onAutoSnapChange,
+                        )
+                    }
+                    activeItems.sortedByDescending { it.zIndex }.forEach { item ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -808,21 +1320,23 @@ private fun HomeLayoutFullscreenControls(
                         contentDescription = stringResource(R.string.home_layout_align_right),
                     )
                 }
-                Text(
-                    text = stringResource(
-                        R.string.home_layout_selected_card,
-                        stringResource(selectedCard.labelRes()),
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                )
-                IconButton(onClick = onClose, enabled = !saving) {
-                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.close))
+                IconButton(
+                    enabled = activeItems.first { it.card == selectedCard }.width < 0.999f,
+                    onClick = { onNudge(-0.025f, 0f) },
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.home_layout_nudge_left))
                 }
-                Button(onClick = onSave, enabled = !saving && dirty) {
-                    Icon(Icons.Rounded.Save, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.home_layout_save))
+                IconButton(onClick = { onNudge(0f, -0.05f) }) {
+                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = stringResource(R.string.home_layout_nudge_up))
+                }
+                IconButton(onClick = { onNudge(0f, 0.05f) }) {
+                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.home_layout_nudge_down))
+                }
+                IconButton(
+                    enabled = activeItems.first { it.card == selectedCard }.width < 0.999f,
+                    onClick = { onNudge(0.025f, 0f) },
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = stringResource(R.string.home_layout_nudge_right))
                 }
             }
         }
@@ -833,6 +1347,7 @@ private fun HomeLayoutFullscreenControls(
 private fun HomeLayoutPreview(
     state: HomeLayoutState,
     homeUiState: HomeUiState,
+    isLandscape: Boolean,
     onOpenFullscreen: () -> Unit,
     modifier: Modifier = Modifier,
     canvasHeight: Dp = 340.dp,
@@ -903,18 +1418,18 @@ private fun HomeLayoutPreview(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    CompositionLocalProvider(LocalInterfaceStyle provides InterfaceStyle.Miuix.value) {
-                        HomeLayoutCanvas(
-                            state = state,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { item ->
-                            HomeLayoutCardContent(
-                                item = item,
-                                state = homeUiState,
-                                actions = actions,
-                                installFeedbackActive = false,
-                            )
-                        }
+                    HomeLayoutCanvas(
+                        state = state,
+                        modifier = Modifier.fillMaxWidth(),
+                        isLandscapeOverride = isLandscape,
+                    ) { item ->
+                        HomeLayoutCardContent(
+                            item = item,
+                            state = homeUiState,
+                            actions = actions,
+                            installFeedbackActive = false,
+                            forceLkmPreview = true,
+                        )
                     }
                 }
             }
@@ -937,12 +1452,18 @@ private fun rememberHomeLayoutPreviewActions(): HomeActions {
 @Composable
 private fun HomeLayoutInspector(
     item: HomeLayoutItem,
+    selectedStickerId: String?,
     onCardSelected: (HomeLayoutCard) -> Unit,
     onItemChange: (HomeLayoutItem) -> Unit,
     onCommittedItemChange: (HomeLayoutItem) -> Unit,
     onInteractionStart: () -> Unit,
     onInteractionEnd: () -> Unit,
     onAlign: (Float) -> Unit,
+    onNudge: (Float, Float) -> Unit,
+    onAddSticker: () -> Unit,
+    onStickerSelected: (String?) -> Unit,
+    onStickerChange: (HomeLayoutSticker) -> Unit,
+    onStickerDelete: (HomeLayoutSticker) -> Unit,
 ) {
     TonalCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -982,10 +1503,100 @@ private fun HomeLayoutInspector(
                     onCheckedChange = { onCommittedItemChange(item.copy(visible = it)) },
                 )
             }
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = item.customTitle,
+                onValueChange = { value ->
+                    onCommittedItemChange(item.copy(customTitle = value.take(80)))
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            if (item.card == HomeLayoutCard.Lkm) {
+                                R.string.home_layout_lkm_status_text
+                            } else {
+                                R.string.home_layout_custom_title
+                            },
+                        ),
+                    )
+                },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (item.card == HomeLayoutCard.Lkm) {
+                                R.string.home_layout_lkm_status_text_hint
+                            } else {
+                                R.string.home_layout_custom_text_hint
+                            },
+                        ),
+                    )
+                },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = item.customSubtitle,
+                onValueChange = { value ->
+                    onCommittedItemChange(item.copy(customSubtitle = value.take(160)))
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            if (item.card == HomeLayoutCard.Lkm) {
+                                R.string.home_layout_manager_version_text
+                            } else {
+                                R.string.home_layout_custom_subtitle
+                            },
+                        ),
+                    )
+                },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (item.card == HomeLayoutCard.Lkm) {
+                                R.string.home_layout_manager_version_text_hint
+                            } else {
+                                R.string.home_layout_custom_text_hint
+                            },
+                        ),
+                    )
+                },
+                maxLines = 2,
+            )
+            HomeLayoutSlider(
+                title = stringResource(R.string.home_layout_text_scale),
+                value = item.textScale,
+                valueRange = 0.72f..1.25f,
+                label = "${(item.textScale * 100).roundToInt()}%",
+                onValueChange = {
+                    onInteractionStart()
+                    onItemChange(item.copy(textScale = it))
+                },
+                onValueChangeFinished = onInteractionEnd,
+            )
+            Text(
+                text = stringResource(R.string.home_layout_wallpaper_fit),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HomeLayoutWallpaperFit.entries.forEach { fit ->
+                    FilterChip(
+                        selected = item.wallpaperFit == fit,
+                        onClick = { onCommittedItemChange(item.copy(wallpaperFit = fit)) },
+                        label = { Text(stringResource(fit.labelRes())) },
+                    )
+                }
+            }
             HomeLayoutSlider(
                 title = stringResource(R.string.home_layout_width),
                 value = item.width,
-                valueRange = 0.36f..1f,
+                valueRange = 0.28f..1f,
                 label = "${(item.width * 100).roundToInt()}%",
                 onValueChange = {
                     onInteractionStart()
@@ -1021,17 +1632,77 @@ private fun HomeLayoutInspector(
             ) {
                 Text(stringResource(R.string.home_layout_restore_xiaomi_height))
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.home_layout_width), style = MaterialTheme.typography.labelLarge)
+                IconButton(onClick = {
+                    onCommittedItemChange(item.copy(width = item.width - 0.04f))
+                }) {
+                    Icon(Icons.Rounded.Remove, contentDescription = stringResource(R.string.home_layout_shrink_width))
+                }
+                IconButton(onClick = {
+                    onCommittedItemChange(item.copy(width = item.width + 0.04f))
+                }) {
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.home_layout_expand_width))
+                }
+                Text(stringResource(R.string.home_layout_height), style = MaterialTheme.typography.labelLarge)
+                IconButton(onClick = {
+                    val current = item.height.takeIf { it > 0f } ?: suggestedHomeLayoutHeight(item.card)
+                    onCommittedItemChange(item.copy(height = current - 0.08f))
+                }) {
+                    Icon(Icons.Rounded.Remove, contentDescription = stringResource(R.string.home_layout_shrink_height))
+                }
+                IconButton(onClick = {
+                    val current = item.height.takeIf { it > 0f } ?: suggestedHomeLayoutHeight(item.card)
+                    onCommittedItemChange(item.copy(height = current + 0.08f))
+                }) {
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.home_layout_expand_height))
+                }
+            }
             HomeLayoutSlider(
                 title = stringResource(R.string.home_layout_horizontal),
                 value = item.x,
                 valueRange = 0f..1f,
                 label = "${(item.x * 100).roundToInt()}%",
+                enabled = item.width < 0.999f,
                 onValueChange = {
                     onInteractionStart()
                     onItemChange(item.copy(x = it))
                 },
                 onValueChangeFinished = onInteractionEnd,
             )
+            Text(
+                text = stringResource(R.string.home_layout_nudge),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    enabled = item.width < 0.999f,
+                    onClick = { onNudge(-0.025f, 0f) },
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.home_layout_nudge_left))
+                }
+                IconButton(onClick = { onNudge(0f, -0.05f) }) {
+                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = stringResource(R.string.home_layout_nudge_up))
+                }
+                IconButton(onClick = { onNudge(0f, 0.05f) }) {
+                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.home_layout_nudge_down))
+                }
+                IconButton(
+                    enabled = item.width < 0.999f,
+                    onClick = { onNudge(0.025f, 0f) },
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = stringResource(R.string.home_layout_nudge_right))
+                }
+            }
             HomeLayoutSlider(
                 title = stringResource(R.string.home_layout_vertical),
                 value = item.y,
@@ -1071,7 +1742,7 @@ private fun HomeLayoutInspector(
                     Text(stringResource(R.string.home_layout_align_right))
                 }
             }
-            if (item.card == HomeLayoutCard.Lkm) {
+            if (item.card == HomeLayoutCard.Lkm && item.height <= 0f) {
                 HomeLayoutSlider(
                     title = stringResource(R.string.home_layout_lkm_aspect_ratio),
                     value = item.aspectRatio,
@@ -1090,6 +1761,111 @@ private fun HomeLayoutInspector(
                     Text(stringResource(R.string.home_layout_set_square))
                 }
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.home_layout_stickers),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.home_layout_stickers_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                FilledTonalButton(
+                    enabled = item.stickers.size < 12,
+                    onClick = onAddSticker,
+                ) {
+                    Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.home_layout_add_sticker))
+                }
+            }
+            if (item.stickers.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.home_layout_no_stickers),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item.stickers.forEachIndexed { index, sticker ->
+                        FilterChip(
+                            selected = selectedStickerId == sticker.id ||
+                                (selectedStickerId == null && index == 0),
+                            onClick = { onStickerSelected(sticker.id) },
+                            label = {
+                                Text(stringResource(R.string.home_layout_sticker_number, index + 1))
+                            },
+                        )
+                    }
+                }
+                val selectedSticker = item.stickers.firstOrNull { it.id == selectedStickerId }
+                    ?: item.stickers.first()
+                HomeLayoutSlider(
+                    title = stringResource(R.string.home_layout_sticker_horizontal),
+                    value = selectedSticker.x,
+                    valueRange = 0f..1f,
+                    label = "${(selectedSticker.x * 100).roundToInt()}%",
+                    onValueChange = {
+                        onInteractionStart()
+                        onStickerChange(selectedSticker.copy(x = it))
+                    },
+                    onValueChangeFinished = onInteractionEnd,
+                )
+                HomeLayoutSlider(
+                    title = stringResource(R.string.home_layout_sticker_vertical),
+                    value = selectedSticker.y,
+                    valueRange = 0f..1f,
+                    label = "${(selectedSticker.y * 100).roundToInt()}%",
+                    onValueChange = {
+                        onInteractionStart()
+                        onStickerChange(selectedSticker.copy(y = it))
+                    },
+                    onValueChangeFinished = onInteractionEnd,
+                )
+                HomeLayoutSlider(
+                    title = stringResource(R.string.home_layout_sticker_size),
+                    value = selectedSticker.width,
+                    valueRange = 0.08f..1f,
+                    label = "${(selectedSticker.width * 100).roundToInt()}%",
+                    onValueChange = {
+                        onInteractionStart()
+                        onStickerChange(selectedSticker.copy(width = it))
+                    },
+                    onValueChangeFinished = onInteractionEnd,
+                )
+                HomeLayoutSlider(
+                    title = stringResource(R.string.home_layout_sticker_opacity),
+                    value = selectedSticker.opacity,
+                    valueRange = 0.1f..1f,
+                    label = "${(selectedSticker.opacity * 100).roundToInt()}%",
+                    onValueChange = {
+                        onInteractionStart()
+                        onStickerChange(selectedSticker.copy(opacity = it))
+                    },
+                    onValueChangeFinished = onInteractionEnd,
+                )
+                FilledTonalButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onStickerDelete(selectedSticker) },
+                ) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_layout_delete_sticker))
+                }
+            }
         }
     }
 }
@@ -1100,6 +1876,7 @@ private fun HomeLayoutSlider(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     label: String,
+    enabled: Boolean = true,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
 ) {
@@ -1121,6 +1898,7 @@ private fun HomeLayoutSlider(
         Slider(
             value = value,
             valueRange = valueRange,
+            enabled = enabled,
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,
         )
@@ -1148,16 +1926,41 @@ private fun HomeLayoutPreset.labelRes(): Int = when (this) {
     HomeLayoutPreset.Compact -> R.string.home_layout_preset_compact
 }
 
-private fun List<HomeLayoutItem>.matchesPreset(preset: HomeLayoutPreset): Boolean {
-    val expected = homeLayoutItemsForPreset(preset).associateBy { it.card }
+private fun List<HomeLayoutItem>.matchesPreset(
+    preset: HomeLayoutPreset,
+    isLandscape: Boolean,
+): Boolean {
+    val expected = homeLayoutItemsForPreset(preset, isLandscape).associateBy { it.card }
     return all { item ->
         val target = expected[item.card] ?: return@all false
         item.visible == target.visible &&
             kotlin.math.abs(item.x - target.x) < 0.001f &&
             kotlin.math.abs(item.y - target.y) < 0.001f &&
             kotlin.math.abs(item.width - target.width) < 0.001f &&
-            kotlin.math.abs(item.aspectRatio - target.aspectRatio) < 0.001f
+            kotlin.math.abs(item.aspectRatio - target.aspectRatio) < 0.001f &&
+            kotlin.math.abs(item.height - target.height) < 0.001f &&
+            item.zIndex == target.zIndex
     }
 }
 
+private fun HomeLayoutWallpaperFit.labelRes(): Int = when (this) {
+    HomeLayoutWallpaperFit.Crop -> R.string.home_layout_wallpaper_crop
+    HomeLayoutWallpaperFit.Fit -> R.string.home_layout_wallpaper_fit_inside
+    HomeLayoutWallpaperFit.Stretch -> R.string.home_layout_wallpaper_stretch
+}
+
 private const val HOME_LAYOUT_HISTORY_LIMIT = 30
+
+private fun readHomeLayoutTransfer(input: InputStream): String {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var total = 0
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) break
+        total += read
+        require(total <= HOME_LAYOUT_TRANSFER_MAX_BYTES) { "Home layout file is too large" }
+        output.write(buffer, 0, read)
+    }
+    return output.toString(Charsets.UTF_8.name())
+}

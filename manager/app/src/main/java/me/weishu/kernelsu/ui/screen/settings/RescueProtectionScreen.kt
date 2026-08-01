@@ -2,6 +2,7 @@ package me.weishu.kernelsu.ui.screen.settings
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -53,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,12 +68,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.RescueConfigState
 import me.weishu.kernelsu.ui.util.RescueImageState
 import me.weishu.kernelsu.ui.util.RescueStatus
@@ -82,9 +88,13 @@ import me.weishu.kernelsu.ui.util.runRescueCommand
 import me.weishu.kernelsu.ui.util.saveRescueConfig
 import me.weishu.kernelsu.ui.util.testRescueEnvironment
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 
 private fun rescueText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
+
+private const val RESCUE_IMPORT_TAG = "RescueProtection"
+private const val RESCUE_IMPORT_CACHE_MAX_AGE_MILLIS = 24L * 60L * 60L * 1000L
 
 private val rescueTabs: List<String>
     get() = listOf(
@@ -107,6 +117,7 @@ fun RescueProtectionScreen() {
     var showBackupConfirm by remember { mutableStateOf(false) }
     var showImportConfirmFor by remember { mutableStateOf<RescueImageState?>(null) }
     var pendingImportPartition by remember { mutableStateOf<String?>(null) }
+    var pendingImportExpectedSize by remember { mutableLongStateOf(0L) }
     var pendingImportForce by remember { mutableStateOf(false) }
     var testReport by remember { mutableStateOf("") }
     var includeDtbo by remember { mutableStateOf(false) }
@@ -122,17 +133,31 @@ fun RescueProtectionScreen() {
     val imageImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val partition = pendingImportPartition ?: return@rememberLauncherForActivityResult
+        val partition = pendingImportPartition
+        val expectedSize = pendingImportExpectedSize
         val force = pendingImportForce
+        pendingImportPartition = null
+        pendingImportExpectedSize = 0L
+        pendingImportForce = false
+        if (uri == null || partition == null) {
+            return@rememberLauncherForActivityResult
+        }
         scope.launch {
             busy = true
-            val file = runCatching { copyRescueImageToCache(context, uri, partition) }.getOrNull()
-            val ok = file?.let { importRescueImage(partition, it.absolutePath, force) } == true
-            file?.delete()
-            status = getRescueStatus()
-            logs = getRescueLogs()
-            busy = false
+            var file: File? = null
+            val ok = try {
+                file = copyRescueImageToCache(context, uri, partition, expectedSize)
+                importRescueImage(partition, file.absolutePath, force)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                Log.w(RESCUE_IMPORT_TAG, "Failed to stage rescue image", error)
+                false
+            } finally {
+                file?.delete()
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
+            }
             Toast.makeText(
                 context,
                 if (ok) rescueText(R.string.rescue_image_imported) else rescueText(R.string.rescue_image_import_failed),
@@ -156,23 +181,29 @@ fun RescueProtectionScreen() {
     fun refresh(syncConfig: Boolean = false) {
         scope.launch {
             loading = true
-            val current = getRescueStatus()
-            status = current
-            logs = getRescueLogs()
-            if (syncConfig) {
-                loadConfig(current)
+            try {
+                val current = getRescueStatus()
+                status = current
+                logs = getRescueLogs()
+                if (syncConfig && current.available) {
+                    loadConfig(current)
+                }
+            } finally {
+                loading = false
             }
-            loading = false
         }
     }
 
     fun runAction(command: String, success: String, fail: String, timeoutMultiplier: Long = 6) {
         scope.launch {
             busy = true
-            val ok = runRescueCommand(command, timeoutMultiplier)
-            status = getRescueStatus()
-            logs = getRescueLogs()
-            busy = false
+            val ok = try {
+                runRescueCommand(command, timeoutMultiplier)
+            } finally {
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
+            }
             Toast.makeText(context, if (ok) success else fail, Toast.LENGTH_LONG).show()
         }
     }
@@ -180,25 +211,28 @@ fun RescueProtectionScreen() {
     fun saveConfig() {
         scope.launch {
             busy = true
-            val custom = mapOf(
-                "boot" to bootPath,
-                "vendor_boot" to vendorBootPath,
-                "init_boot" to initBootPath,
-                "dtbo" to dtboPath,
-                "vbmeta" to vbmetaPath,
-            ).filterValues(String::isNotBlank)
-            val ok = saveRescueConfig(
-                RescueConfigState(
-                    includeDtbo = includeDtbo,
-                    includeVbmeta = includeVbmeta,
-                    backupOtherSlot = backupOtherSlot,
-                    allowDangerousAutoRestore = allowDangerousAutoRestore,
-                    customPartitions = custom,
+            val ok = try {
+                val custom = mapOf(
+                    "boot" to bootPath,
+                    "vendor_boot" to vendorBootPath,
+                    "init_boot" to initBootPath,
+                    "dtbo" to dtboPath,
+                    "vbmeta" to vbmetaPath,
+                ).filterValues(String::isNotBlank)
+                saveRescueConfig(
+                    RescueConfigState(
+                        includeDtbo = includeDtbo,
+                        includeVbmeta = includeVbmeta,
+                        backupOtherSlot = backupOtherSlot,
+                        allowDangerousAutoRestore = allowDangerousAutoRestore,
+                        customPartitions = custom,
+                    )
                 )
-            )
-            status = getRescueStatus()
-            logs = getRescueLogs()
-            busy = false
+            } finally {
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
+            }
             Toast.makeText(
                 context,
                 if (ok) rescueText(R.string.rescue_config_saved) else rescueText(R.string.rescue_config_save_failed),
@@ -210,17 +244,21 @@ fun RescueProtectionScreen() {
     fun testEnvironment() {
         scope.launch {
             busy = true
-            val report = testRescueEnvironment()
-            testReport = report.text.ifBlank {
-                if (report.ok) {
-                    rescueText(R.string.rescue_test_passed)
-                } else {
-                    rescueText(R.string.rescue_test_failed_reason, report.reason)
+            val report = try {
+                testRescueEnvironment().also { result ->
+                    testReport = result.text.ifBlank {
+                        if (result.ok) {
+                            rescueText(R.string.rescue_test_passed)
+                        } else {
+                            rescueText(R.string.rescue_test_failed_reason, result.reason)
+                        }
+                    }
                 }
+            } finally {
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
             }
-            status = getRescueStatus()
-            logs = getRescueLogs()
-            busy = false
             Toast.makeText(
                 context,
                 if (report.ok) rescueText(R.string.rescue_test_passed) else rescueText(R.string.rescue_test_failed),
@@ -229,8 +267,9 @@ fun RescueProtectionScreen() {
         }
     }
 
-    fun launchImageImport(partition: String, force: Boolean) {
+    fun launchImageImport(partition: String, expectedSize: Long, force: Boolean) {
         pendingImportPartition = partition
+        pendingImportExpectedSize = expectedSize
         pendingImportForce = force
         imageImportLauncher.launch(arrayOf("*/*"))
     }
@@ -239,8 +278,12 @@ fun RescueProtectionScreen() {
         refresh(syncConfig = true)
     }
 
-    val pageContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
-    val barContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+    val pageContainerColor = immersivePageColor(
+        MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+    )
+    val barContainerColor = immersiveSurfaceColor(
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+    )
     val tabs = rescueTabs
     val activeTab = selectedTab.coerceIn(tabs.indices)
     Scaffold(
@@ -255,7 +298,7 @@ fun RescueProtectionScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = barContainerColor,
+                    containerColor = immersiveTopBarColor(barContainerColor),
                     scrolledContainerColor = barContainerColor,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                     navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
@@ -303,11 +346,13 @@ fun RescueProtectionScreen() {
                             if (image.exists) {
                                 showImportConfirmFor = image
                             } else {
-                                launchImageImport(image.name, force = false)
+                                launchImageImport(image.name, image.partitionSize, force = false)
                             }
                         },
                         onBackup = {
-                            if (status.manifestCreatedAt.isBlank()) {
+                            val backupExists = status.manifestCreatedAt.isNotBlank() ||
+                                status.images.any(RescueImageState::exists)
+                            if (!backupExists) {
                                 runAction(
                                     "backup",
                                     rescueText(R.string.rescue_backup_completed),
@@ -442,7 +487,7 @@ fun RescueProtectionScreen() {
                 Button(
                     onClick = {
                         showImportConfirmFor = null
-                        launchImageImport(image.name, force = true)
+                        launchImageImport(image.name, image.partitionSize, force = true)
                     },
                 ) {
                     Text(rescueText(R.string.rescue_image_overwrite_action))
@@ -497,14 +542,23 @@ private fun RescueStatusCard(status: RescueStatus) {
     RescueCard(title = rescueText(R.string.rescue_current_status)) {
         StatusLine(
             rescueText(R.string.rescue_status_protection),
-            if (status.enabled) rescueText(R.string.rescue_value_enabled) else rescueText(R.string.rescue_value_disabled),
+            when {
+                !status.available -> rescueText(R.string.rescue_value_unknown)
+                status.enabled -> rescueText(R.string.rescue_value_enabled)
+                else -> rescueText(R.string.rescue_value_disabled)
+            },
         )
         StatusLine(
             rescueText(R.string.rescue_status_backup_complete),
-            if (status.requiredReady) rescueText(R.string.rescue_value_available) else rescueText(R.string.rescue_value_incomplete),
+            when {
+                !status.available -> rescueText(R.string.rescue_value_unknown)
+                status.requiredReady -> rescueText(R.string.rescue_value_available)
+                else -> rescueText(R.string.rescue_value_incomplete)
+            },
         )
-        if (!status.requiredReady && status.readyReason.isNotBlank()) {
-            StatusLine(rescueText(R.string.rescue_status_reason), status.readyReason)
+        val statusReason = if (status.available) status.readyReason else status.statusError
+        if ((!status.requiredReady || !status.available) && statusReason.isNotBlank()) {
+            StatusLine(rescueText(R.string.rescue_status_reason), statusReason)
         }
         StatusLine(
             rescueText(R.string.rescue_status_current_slot),
@@ -537,6 +591,14 @@ private fun RescueImagesCard(
     onImport: (RescueImageState) -> Unit,
 ) {
     RescueCard(title = rescueText(R.string.rescue_image_backups)) {
+        if (!status.available) {
+            Text(
+                text = status.statusError.ifBlank { rescueText(R.string.rescue_value_unknown) },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            return@RescueCard
+        }
         status.images.ifEmpty {
             listOf(RescueImageState(name = "boot", required = true))
         }.forEachIndexed { index, image ->
@@ -610,6 +672,7 @@ private fun RescueImageRow(
         if (image.restore && !image.otherSlot) {
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
+                enabled = image.partition.isNotBlank() && image.partitionSize > 0,
                 onClick = { onImport(image) },
             ) {
                 Text(
@@ -722,7 +785,7 @@ private fun RescueActionCard(
             }
             ExpressiveSwitch(
                 checked = status.enabled,
-                enabled = !busy && (status.requiredReady || status.enabled),
+                enabled = status.available && !busy && (status.requiredReady || status.enabled),
                 onCheckedChange = onToggle,
                 showThumbIcon = false,
             )
@@ -732,14 +795,18 @@ private fun RescueActionCard(
             Spacer(Modifier.size(8.dp))
             Text(rescueText(R.string.rescue_check_environment))
         }
-        FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onBackup) {
+        FilledTonalButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = status.available && !busy,
+            onClick = onBackup,
+        ) {
             Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
             Text(rescueText(R.string.rescue_backup_current_images))
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
-            enabled = !busy && status.requiredReady,
+            enabled = status.available && !busy && status.requiredReady,
             onClick = onRestore,
         ) {
             Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -964,13 +1031,53 @@ private fun formatSize(size: Long): String {
     return String.format(Locale.getDefault(), "%.1f MiB", mib)
 }
 
-private suspend fun copyRescueImageToCache(context: Context, uri: Uri, partition: String): File = withContext(Dispatchers.IO) {
-    val dir = File(context.cacheDir, "rescue-import").apply { mkdirs() }
-    val file = File(dir, "${partition}_${System.currentTimeMillis()}.img")
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        file.outputStream().use { output ->
-            input.copyTo(output)
+private suspend fun copyRescueImageToCache(
+    context: Context,
+    uri: Uri,
+    partition: String,
+    expectedSize: Long,
+): File = withContext(Dispatchers.IO) {
+    require(expectedSize > 0) { "Cannot determine target partition size" }
+    val dir = File(context.cacheDir, "rescue-import")
+    check(dir.isDirectory || dir.mkdirs()) { "Cannot create rescue import cache" }
+    val now = System.currentTimeMillis()
+    dir.listFiles()?.forEach { cached ->
+        if (now - cached.lastModified() > RESCUE_IMPORT_CACHE_MAX_AGE_MILLIS) {
+            cached.delete()
         }
-    } ?: error("Cannot open selected image")
-    file
+    }
+
+    val safePartition = partition.replace(Regex("[^A-Za-z0-9_]"), "_")
+    val file = File(dir, "${safePartition}_${System.nanoTime()}.img")
+    val temporary = File(dir, ".${file.name}.part")
+    try {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            temporary.outputStream().use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var copied = 0L
+                while (true) {
+                    val remaining = expectedSize + 1L - copied
+                    if (remaining <= 0L) {
+                        throw IOException("Selected image is larger than the target partition")
+                    }
+                    val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    copied += read
+                }
+                output.fd.sync()
+                if (copied != expectedSize) {
+                    throw IOException(
+                        "Image size mismatch: selected=$copied, partition=$expectedSize"
+                    )
+                }
+            }
+        } ?: throw IOException("Cannot open selected image")
+        check(temporary.renameTo(file)) { "Cannot finalize rescue import cache" }
+        file
+    } catch (error: Exception) {
+        temporary.delete()
+        file.delete()
+        throw error
+    }
 }

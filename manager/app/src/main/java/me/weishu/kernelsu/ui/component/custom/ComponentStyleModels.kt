@@ -82,6 +82,91 @@ enum class SwitchImageScale(val value: String) {
     }
 }
 
+enum class SwitchImageBlend(val value: String) {
+    Normal("normal"),
+    Multiply("multiply"),
+    Screen("screen"),
+    Add("add");
+
+    companion object {
+        fun fromValue(value: String?): SwitchImageBlend = entries.firstOrNull { it.value == value } ?: Normal
+    }
+}
+
+enum class SwitchTransitionEasing(val value: String) {
+    Standard("standard"),
+    Linear("linear"),
+    Accelerate("accelerate"),
+    Decelerate("decelerate");
+
+    companion object {
+        fun fromValue(value: String?): SwitchTransitionEasing =
+            entries.firstOrNull { it.value == value } ?: Standard
+    }
+}
+
+@Immutable
+data class SwitchImageAppearance(
+    val scale: SwitchImageScale = SwitchImageScale.Crop,
+    val opacity: Float = 1f,
+    val zoom: Float = 1f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val rotationDegrees: Float = 0f,
+    val flipHorizontal: Boolean = false,
+    val flipVertical: Boolean = false,
+    val tint: Long? = null,
+    val saturation: Float = 1f,
+    val brightness: Float = 0f,
+    val blend: SwitchImageBlend = SwitchImageBlend.Normal,
+) {
+    fun normalized(): SwitchImageAppearance = copy(
+        opacity = opacity.takeIf(Float::isFinite)?.coerceIn(0.1f, 1f) ?: 1f,
+        zoom = zoom.takeIf(Float::isFinite)?.coerceIn(0.5f, 3f) ?: 1f,
+        offsetX = offsetX.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+        offsetY = offsetY.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+        rotationDegrees = rotationDegrees.takeIf(Float::isFinite)?.coerceIn(-180f, 180f) ?: 0f,
+        tint = tint?.takeIf(::isValidArgb),
+        saturation = saturation.takeIf(Float::isFinite)?.coerceIn(0f, 2f) ?: 1f,
+        brightness = brightness.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+    )
+
+    internal fun toJson(): JSONObject = normalized().let { value ->
+        JSONObject()
+            .put("scale", value.scale.value)
+            .put("opacity", value.opacity.toDouble())
+            .put("zoom", value.zoom.toDouble())
+            .put("offset_x", value.offsetX.toDouble())
+            .put("offset_y", value.offsetY.toDouble())
+            .put("rotation", value.rotationDegrees.toDouble())
+            .put("flip_horizontal", value.flipHorizontal)
+            .put("flip_vertical", value.flipVertical)
+            .put("tint", value.tint)
+            .put("saturation", value.saturation.toDouble())
+            .put("brightness", value.brightness.toDouble())
+            .put("blend", value.blend.value)
+    }
+
+    companion object {
+        internal fun fromJson(json: JSONObject?): SwitchImageAppearance? = json?.let {
+            SwitchImageAppearance(
+                scale = SwitchImageScale.fromValue(it.optString("scale")),
+                opacity = it.optDouble("opacity", 1.0).toFloat(),
+                zoom = it.optDouble("zoom", 1.0).toFloat(),
+                offsetX = it.optDouble("offset_x", 0.0).toFloat(),
+                offsetY = it.optDouble("offset_y", 0.0).toFloat(),
+                rotationDegrees = it.optDouble("rotation", 0.0).toFloat(),
+                flipHorizontal = it.optBoolean("flip_horizontal", false),
+                flipVertical = it.optBoolean("flip_vertical", false),
+                tint = it.optLongOrNull("tint"),
+                saturation = it.optDouble("saturation", 1.0).toFloat(),
+                brightness = it.optDouble("brightness", 0.0).toFloat(),
+                blend = SwitchImageBlend.fromValue(it.optString("blend")),
+            ).normalized()
+        }
+    }
+}
+
 @Immutable
 data class PixelGrid(
     val width: Int,
@@ -385,8 +470,50 @@ data class CustomSwitchStyle(
     val imageUri: String? = null,
     val imageSha256: String? = null,
     val imageMimeType: String? = null,
+    val imageOnUri: String? = null,
+    val imageOnSha256: String? = null,
+    val imageOnMimeType: String? = null,
     val imageScale: SwitchImageScale = SwitchImageScale.Crop,
     val imageOpacity: Float = 1f,
+    val imageZoom: Float = 1f,
+    val imageOffsetX: Float = 0f,
+    val imageOffsetY: Float = 0f,
+    val imageRotationDegrees: Float = 0f,
+    val imageFlipHorizontal: Boolean = false,
+    val imageFlipVertical: Boolean = false,
+    val imageTint: Long? = null,
+    val imageSaturation: Float = 1f,
+    val imageBrightness: Float = 0f,
+    val imageBlend: SwitchImageBlend = SwitchImageBlend.Normal,
+    // Optional state-specific image settings keep older styles compatible while
+    // allowing the disabled and enabled images to be authored independently.
+    val imageOffAppearance: SwitchImageAppearance? = null,
+    val imageOnAppearance: SwitchImageAppearance? = null,
+    val trackScaleX: Float = 1f,
+    val trackScaleY: Float = 1f,
+    val trackBaseColor: Long = 0xFF3D4450L,
+    // Optional state-specific colors keep legacy styles compatible while allowing
+    // the off and on appearances to be authored independently.
+    val trackOffColorOverride: Long? = null,
+    val trackOnColorOverride: Long? = null,
+    val cornerRadiusFraction: Float = 0.5f,
+    val borderColor: Long = 0x52FFFFFFL,
+    val borderOffColorOverride: Long? = null,
+    val borderOnColorOverride: Long? = null,
+    val borderWidthDp: Float = 1f,
+    val thumbScale: Float = 1f,
+    val thumbPaddingDp: Float = 3f,
+    val thumbTravel: Float = 1f,
+    val thumbBaseColor: Long = 0xFFFFFFFFL,
+    val thumbOffColorOverride: Long? = null,
+    val thumbOnColorOverride: Long? = null,
+    val shadowColor: Long = 0x66000000L,
+    val shadowRadiusDp: Float = 0f,
+    val glowColor: Long = 0x668A7DFFL,
+    val glowRadiusDp: Float = 0f,
+    val disabledAlpha: Float = 0.45f,
+    val transitionDurationMillis: Int = 220,
+    val transitionEasing: SwitchTransitionEasing = SwitchTransitionEasing.Standard,
     val palette: List<Long> = DEFAULT_PIXEL_PALETTE,
     val motion: PixelMotionRule = PixelMotionRule(),
 ) {
@@ -412,7 +539,56 @@ data class CustomSwitchStyle(
                 ?.lowercase()
                 ?.take(MAX_COMPONENT_MIME_LENGTH)
                 ?.takeIf(String::isNotBlank),
+            imageOnUri = imageOnUri
+                ?.takeIf { usesImage }
+                ?.trim()
+                ?.take(MAX_COMPONENT_IMAGE_URI_LENGTH)
+                ?.takeIf(String::isNotBlank),
+            imageOnSha256 = imageOnSha256
+                ?.takeIf { usesImage }
+                ?.lowercase()
+                ?.takeIf { COMPONENT_SHA256_PATTERN.matches(it) },
+            imageOnMimeType = imageOnMimeType
+                ?.takeIf { usesImage }
+                ?.trim()
+                ?.lowercase()
+                ?.take(MAX_COMPONENT_MIME_LENGTH)
+                ?.takeIf(String::isNotBlank),
             imageOpacity = imageOpacity.takeIf(Float::isFinite)?.coerceIn(0.1f, 1f) ?: 1f,
+            imageZoom = imageZoom.takeIf(Float::isFinite)?.coerceIn(0.5f, 3f) ?: 1f,
+            imageOffsetX = imageOffsetX.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+            imageOffsetY = imageOffsetY.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+            imageRotationDegrees = imageRotationDegrees.takeIf(Float::isFinite)?.coerceIn(-180f, 180f) ?: 0f,
+            imageTint = imageTint?.takeIf(::isValidArgb),
+            imageSaturation = imageSaturation.takeIf(Float::isFinite)?.coerceIn(0f, 2f) ?: 1f,
+            imageBrightness = imageBrightness.takeIf(Float::isFinite)?.coerceIn(-1f, 1f) ?: 0f,
+            imageOffAppearance = imageOffAppearance?.normalized(),
+            imageOnAppearance = imageOnAppearance?.normalized(),
+            trackScaleX = trackScaleX.takeIf(Float::isFinite)?.coerceIn(0.65f, 1f) ?: 1f,
+            trackScaleY = trackScaleY.takeIf(Float::isFinite)?.coerceIn(0.55f, 1f) ?: 1f,
+            trackBaseColor = trackBaseColor.takeIf(::isValidArgb) ?: 0xFF3D4450L,
+            trackOffColorOverride = trackOffColorOverride?.takeIf(::isValidArgb),
+            trackOnColorOverride = trackOnColorOverride?.takeIf(::isValidArgb),
+            cornerRadiusFraction = cornerRadiusFraction.takeIf(Float::isFinite)?.coerceIn(0f, 0.5f) ?: 0.5f,
+            borderColor = borderColor.takeIf(::isValidArgb) ?: 0x52FFFFFFL,
+            borderOffColorOverride = borderOffColorOverride?.takeIf(::isValidArgb),
+            borderOnColorOverride = borderOnColorOverride?.takeIf(::isValidArgb),
+            borderWidthDp = borderWidthDp.takeIf(Float::isFinite)?.coerceIn(0f, 4f) ?: 1f,
+            thumbScale = thumbScale.takeIf(Float::isFinite)?.coerceIn(0.55f, 1.1f) ?: 1f,
+            thumbPaddingDp = thumbPaddingDp.takeIf(Float::isFinite)?.coerceIn(0f, 8f) ?: 3f,
+            thumbTravel = thumbTravel.takeIf(Float::isFinite)?.coerceIn(0.5f, 1f) ?: 1f,
+            thumbBaseColor = thumbBaseColor.takeIf(::isValidArgb) ?: 0xFFFFFFFFL,
+            thumbOffColorOverride = thumbOffColorOverride?.takeIf(::isValidArgb),
+            thumbOnColorOverride = thumbOnColorOverride?.takeIf(::isValidArgb),
+            shadowColor = shadowColor.takeIf(::isValidArgb) ?: 0x66000000L,
+            shadowRadiusDp = shadowRadiusDp.takeIf(Float::isFinite)?.coerceIn(0f, 8f) ?: 0f,
+            glowColor = glowColor.takeIf(::isValidArgb) ?: 0x668A7DFFL,
+            glowRadiusDp = glowRadiusDp.takeIf(Float::isFinite)?.coerceIn(0f, 8f) ?: 0f,
+            disabledAlpha = disabledAlpha.takeIf(Float::isFinite)?.coerceIn(0.2f, 1f) ?: 0.45f,
+            transitionDurationMillis = transitionDurationMillis.coerceIn(
+                MIN_SWITCH_TRANSITION_DURATION_MS,
+                MAX_SWITCH_TRANSITION_DURATION_MS,
+            ),
             palette = sanitizePixelPalette(palette),
             motion = motion.normalized(),
         )
@@ -438,8 +614,46 @@ data class CustomSwitchStyle(
             .put("image_uri", if (includeLocalImageUri) value.imageUri else null)
             .put("image_sha256", value.imageSha256)
             .put("image_mime", value.imageMimeType)
+            .put("image_on_uri", if (includeLocalImageUri) value.imageOnUri else null)
+            .put("image_on_sha256", value.imageOnSha256)
+            .put("image_on_mime", value.imageOnMimeType)
             .put("image_scale", value.imageScale.value)
             .put("image_opacity", value.imageOpacity.toDouble())
+            .put("image_zoom", value.imageZoom.toDouble())
+            .put("image_offset_x", value.imageOffsetX.toDouble())
+            .put("image_offset_y", value.imageOffsetY.toDouble())
+            .put("image_rotation", value.imageRotationDegrees.toDouble())
+            .put("image_flip_horizontal", value.imageFlipHorizontal)
+            .put("image_flip_vertical", value.imageFlipVertical)
+            .put("image_tint", value.imageTint)
+            .put("image_saturation", value.imageSaturation.toDouble())
+            .put("image_brightness", value.imageBrightness.toDouble())
+            .put("image_blend", value.imageBlend.value)
+            .put("image_off_appearance", value.imageOffAppearance?.toJson())
+            .put("image_on_appearance", value.imageOnAppearance?.toJson())
+            .put("track_scale_x", value.trackScaleX.toDouble())
+            .put("track_scale_y", value.trackScaleY.toDouble())
+            .put("track_base_color", value.trackBaseColor)
+            .put("track_off_color", value.trackOffColorOverride)
+            .put("track_on_color", value.trackOnColorOverride)
+            .put("corner_radius_fraction", value.cornerRadiusFraction.toDouble())
+            .put("border_color", value.borderColor)
+            .put("border_off_color", value.borderOffColorOverride)
+            .put("border_on_color", value.borderOnColorOverride)
+            .put("border_width_dp", value.borderWidthDp.toDouble())
+            .put("thumb_scale", value.thumbScale.toDouble())
+            .put("thumb_padding_dp", value.thumbPaddingDp.toDouble())
+            .put("thumb_travel", value.thumbTravel.toDouble())
+            .put("thumb_base_color", value.thumbBaseColor)
+            .put("thumb_off_color", value.thumbOffColorOverride)
+            .put("thumb_on_color", value.thumbOnColorOverride)
+            .put("shadow_color", value.shadowColor)
+            .put("shadow_radius_dp", value.shadowRadiusDp.toDouble())
+            .put("glow_color", value.glowColor)
+            .put("glow_radius_dp", value.glowRadiusDp.toDouble())
+            .put("disabled_alpha", value.disabledAlpha.toDouble())
+            .put("transition_duration_ms", value.transitionDurationMillis)
+            .put("transition_easing", value.transitionEasing.value)
             .put("palette", value.palette.toJsonArray())
             .put("motion", value.motion.toJson())
     }
@@ -481,13 +695,73 @@ data class CustomSwitchStyle(
                 imageUri = json.optString("image_uri").takeIf { allowLocalImageUri && it.isNotBlank() },
                 imageSha256 = json.optString("image_sha256"),
                 imageMimeType = json.optString("image_mime"),
+                imageOnUri = json.optString("image_on_uri").takeIf { allowLocalImageUri && it.isNotBlank() },
+                imageOnSha256 = json.optString("image_on_sha256"),
+                imageOnMimeType = json.optString("image_on_mime"),
                 imageScale = SwitchImageScale.fromValue(json.optString("image_scale")),
                 imageOpacity = json.optDouble("image_opacity", 1.0).toFloat(),
+                imageZoom = json.optDouble("image_zoom", 1.0).toFloat(),
+                imageOffsetX = json.optDouble("image_offset_x", 0.0).toFloat(),
+                imageOffsetY = json.optDouble("image_offset_y", 0.0).toFloat(),
+                imageRotationDegrees = json.optDouble("image_rotation", 0.0).toFloat(),
+                imageFlipHorizontal = json.optBoolean("image_flip_horizontal", false),
+                imageFlipVertical = json.optBoolean("image_flip_vertical", false),
+                imageTint = json.optLongOrNull("image_tint"),
+                imageSaturation = json.optDouble("image_saturation", 1.0).toFloat(),
+                imageBrightness = json.optDouble("image_brightness", 0.0).toFloat(),
+                imageBlend = SwitchImageBlend.fromValue(json.optString("image_blend")),
+                imageOffAppearance = SwitchImageAppearance.fromJson(
+                    json.optJSONObject("image_off_appearance"),
+                ),
+                imageOnAppearance = SwitchImageAppearance.fromJson(
+                    json.optJSONObject("image_on_appearance"),
+                ),
+                trackScaleX = json.optDouble("track_scale_x", 1.0).toFloat(),
+                trackScaleY = json.optDouble("track_scale_y", 1.0).toFloat(),
+                trackBaseColor = json.optLong("track_base_color", 0xFF3D4450L),
+                trackOffColorOverride = json.optLongOrNull("track_off_color"),
+                trackOnColorOverride = json.optLongOrNull("track_on_color"),
+                cornerRadiusFraction = json.optDouble("corner_radius_fraction", 0.5).toFloat(),
+                borderColor = json.optLong("border_color", 0x52FFFFFFL),
+                borderOffColorOverride = json.optLongOrNull("border_off_color"),
+                borderOnColorOverride = json.optLongOrNull("border_on_color"),
+                borderWidthDp = json.optDouble("border_width_dp", 1.0).toFloat(),
+                thumbScale = json.optDouble("thumb_scale", 1.0).toFloat(),
+                thumbPaddingDp = json.optDouble("thumb_padding_dp", 3.0).toFloat(),
+                thumbTravel = json.optDouble("thumb_travel", 1.0).toFloat(),
+                thumbBaseColor = json.optLong("thumb_base_color", 0xFFFFFFFFL),
+                thumbOffColorOverride = json.optLongOrNull("thumb_off_color"),
+                thumbOnColorOverride = json.optLongOrNull("thumb_on_color"),
+                shadowColor = json.optLong("shadow_color", 0x66000000L),
+                shadowRadiusDp = json.optDouble("shadow_radius_dp", 0.0).toFloat(),
+                glowColor = json.optLong("glow_color", 0x668A7DFFL),
+                glowRadiusDp = json.optDouble("glow_radius_dp", 0.0).toFloat(),
+                disabledAlpha = json.optDouble("disabled_alpha", 0.45).toFloat(),
+                transitionDurationMillis = json.optInt("transition_duration_ms", 220),
+                transitionEasing = SwitchTransitionEasing.fromValue(json.optString("transition_easing")),
                 palette = parsePixelPalette(json.optJSONArray("palette")),
                 motion = PixelMotionRule.fromJson(json.optJSONObject("motion")),
             ).normalized()
         }
     }
+}
+
+fun CustomSwitchStyle.imageAppearanceFor(on: Boolean): SwitchImageAppearance {
+    val legacy = SwitchImageAppearance(
+        scale = imageScale,
+        opacity = imageOpacity,
+        zoom = imageZoom,
+        offsetX = imageOffsetX,
+        offsetY = imageOffsetY,
+        rotationDegrees = imageRotationDegrees,
+        flipHorizontal = imageFlipHorizontal,
+        flipVertical = imageFlipVertical,
+        tint = imageTint,
+        saturation = imageSaturation,
+        brightness = imageBrightness,
+        blend = imageBlend,
+    ).normalized()
+    return (if (on) imageOnAppearance else imageOffAppearance)?.normalized() ?: legacy
 }
 
 internal fun encodeCardStyleLibrary(styles: List<CustomCardStyle>): String = JSONObject()
@@ -600,6 +874,12 @@ private fun parsePixelPalette(source: JSONArray?): List<Long> {
 
 private fun List<Long>.toJsonArray(): JSONArray = JSONArray().apply { this@toJsonArray.forEach(::put) }
 
+private fun JSONObject.optLongOrNull(key: String): Long? {
+    val raw = opt(key)
+    if (raw == null || raw === JSONObject.NULL) return null
+    return (raw as? Number)?.toLong() ?: raw.toString().toLongOrNull()
+}
+
 private fun isValidArgb(value: Long): Boolean = value in TRANSPARENT_PIXEL..MAX_ARGB
 
 private fun requireComponentJsonSize(raw: String, maxBytes: Int = MAX_COMPONENT_STYLE_JSON_BYTES) {
@@ -642,7 +922,7 @@ val DEFAULT_PIXEL_PALETTE = listOf(
 )
 
 private const val COMPONENT_STYLE_SCHEMA = "io.github.fixz.apkesu.component-style"
-private const val COMPONENT_STYLE_VERSION = 1
+private const val COMPONENT_STYLE_VERSION = 2
 private const val COMPONENT_LIBRARY_SCHEMA = "io.github.fixz.apkesu.component-style-library"
 private const val COMPONENT_LIBRARY_VERSION = 1
 private const val MAX_PIXEL_GRID_SIDE = 48
@@ -653,6 +933,8 @@ private const val MAX_COMPONENT_STYLE_AUTHOR_LENGTH = 64
 private const val MAX_COMPONENT_STYLE_ID_LENGTH = 80
 private const val MAX_COMPONENT_IMAGE_URI_LENGTH = 1_024
 private const val MAX_COMPONENT_MIME_LENGTH = 80
+const val MIN_SWITCH_TRANSITION_DURATION_MS = 150
+const val MAX_SWITCH_TRANSITION_DURATION_MS = 250
 private const val MAX_COMPONENT_STYLE_JSON_BYTES = 192 * 1024
 private const val MAX_COMPONENT_LIBRARY_JSON_BYTES = 2 * 1024 * 1024
 private const val MAX_ARGB = 0xFFFFFFFFL

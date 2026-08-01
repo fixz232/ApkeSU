@@ -118,6 +118,10 @@ import kotlinx.coroutines.flow.collectLatest
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.markdown.GithubMarkdown
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.navigation3.Route
 import java.text.DateFormat
 import java.util.Date
@@ -165,7 +169,9 @@ fun AiChatScreen() {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+        containerColor = immersivePageColor(
+            MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+        ),
         contentWindowInsets = WindowInsets.safeDrawing.only(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         ),
@@ -301,8 +307,12 @@ fun AiChatScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = immersiveTopBarColor(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    ),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surface,
+                    ),
                 ),
             )
         },
@@ -450,7 +460,7 @@ private fun AiApiConfigCard(
             .padding(horizontal = 14.dp, vertical = 8.dp),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
         ),
     ) {
         Row(
@@ -1126,7 +1136,11 @@ private fun AiChatInputBar(
     }
     Surface(
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+        color = immersiveSurfaceColor(
+            defaultColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+            darkAlpha = 0.70f,
+            lightAlpha = 0.76f,
+        ),
     ) {
         Column(
             modifier = Modifier

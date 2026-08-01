@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -24,17 +25,39 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.edit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
+import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
-import me.weishu.kernelsu.ui.util.loadCustomImageBitmap
+import me.weishu.kernelsu.ui.util.HomeLayoutWallpaperFit
+import me.weishu.kernelsu.ui.util.MediaVariantSettings
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
+import me.weishu.kernelsu.ui.util.ResponsiveCropSet
+import me.weishu.kernelsu.ui.util.ThemeStoreImageSlot
+import me.weishu.kernelsu.ui.util.generateResponsiveCrops
+import me.weishu.kernelsu.ui.util.inspectMediaFile
 import me.weishu.kernelsu.ui.util.persistCustomImageReference
+import me.weishu.kernelsu.ui.component.preloadCustomImageBitmap
+import me.weishu.kernelsu.ui.component.rememberCustomImageAndroidBitmap
+import me.weishu.kernelsu.ui.util.readThemeStoreImageState
 import me.weishu.kernelsu.ui.util.releasePersistableVideoBackgroundReadPermission
 import me.weishu.kernelsu.ui.util.releaseCustomImageReference
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlot
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotCrop
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotNightCrop
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotNightMedia
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotResponsiveCrops
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotVariantSettings
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotVideo
+import me.weishu.kernelsu.ui.util.setThemeStoreImageSlotVisualSettings
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.takePersistableImageReadPermission
 import me.weishu.kernelsu.ui.util.takePersistableVideoBackgroundReadPermission
@@ -42,6 +65,8 @@ import me.weishu.kernelsu.ui.util.takePersistableVideoBackgroundReadPermission
 internal const val HOME_METRIC_CARD_WALLPAPER_ASPECT_RATIO = 1.72f
 
 private const val HOME_LKM_CARD_WALLPAPER_ASPECT_RATIO = 1.08f
+private const val HOME_CLASSIC_MIUIX_LKM_CARD_WALLPAPER_ASPECT_RATIO = 0.84f
+private const val HOME_MATERIAL_LKM_CARD_WALLPAPER_ASPECT_RATIO = 3.4f
 private const val HOME_METRIC_CARD_WALLPAPER_MAX_SIDE = 1200
 private const val HOME_REBOOT_MENU_WALLPAPER_ASPECT_RATIO = 0.72f
 
@@ -58,6 +83,24 @@ internal enum class HomeMetricCardWallpaperTarget(
         keyPrefix = "home_lkm_card_wallpaper",
         titleRes = R.string.home_card_main,
         aspectRatio = HOME_LKM_CARD_WALLPAPER_ASPECT_RATIO,
+        pickLabelRes = R.string.home_lkm_wallpaper_pick,
+        cropLabelRes = R.string.home_lkm_wallpaper_crop,
+        previewLabelRes = R.string.home_lkm_wallpaper_preview,
+        clearLabelRes = R.string.home_lkm_wallpaper_clear,
+    ),
+    ClassicMiuixLkm(
+        keyPrefix = "home_classic_miuix_lkm_card_wallpaper",
+        titleRes = R.string.home_card_classic_miuix_lkm,
+        aspectRatio = HOME_CLASSIC_MIUIX_LKM_CARD_WALLPAPER_ASPECT_RATIO,
+        pickLabelRes = R.string.home_lkm_wallpaper_pick,
+        cropLabelRes = R.string.home_lkm_wallpaper_crop,
+        previewLabelRes = R.string.home_lkm_wallpaper_preview,
+        clearLabelRes = R.string.home_lkm_wallpaper_clear,
+    ),
+    MaterialLkm(
+        keyPrefix = "home_material_lkm_card_wallpaper",
+        titleRes = R.string.home_card_material_lkm,
+        aspectRatio = HOME_MATERIAL_LKM_CARD_WALLPAPER_ASPECT_RATIO,
         pickLabelRes = R.string.home_lkm_wallpaper_pick,
         cropLabelRes = R.string.home_lkm_wallpaper_crop,
         previewLabelRes = R.string.home_lkm_wallpaper_preview,
@@ -118,15 +161,38 @@ internal enum class HomeMetricCardWallpaperTarget(
 
     val preferenceKeys: Set<String>
         get() = setOf(uriKey, videoUriKey, cropLeftKey, cropTopKey, cropRightKey, cropBottomKey)
+
+    val themeSlot: ThemeStoreImageSlot
+        get() = when (this) {
+            Lkm -> ThemeStoreImageSlot.Lkm
+            ClassicMiuixLkm -> ThemeStoreImageSlot.ClassicMiuixLkm
+            MaterialLkm -> ThemeStoreImageSlot.MaterialLkm
+            Superuser -> ThemeStoreImageSlot.Superuser
+            Module -> ThemeStoreImageSlot.Module
+            StatusMonitor -> ThemeStoreImageSlot.StatusMonitor
+            SystemInfo -> ThemeStoreImageSlot.SystemInfo
+            RebootMenu -> ThemeStoreImageSlot.RebootMenu
+        }
 }
 
 internal data class HomeMetricCardWallpaperState(
     val uriString: String?,
     val videoUriString: String?,
     val crop: CustomWallpaperCrop,
+    val visualSettings: MediaVisualSettings,
+    val responsiveCrops: ResponsiveCropSet,
+    val dayUriString: String?,
+    val dayVideoUriString: String?,
+    val nightUriString: String?,
+    val nightVideoUriString: String?,
+    val nightSelected: Boolean,
+    val variantSettings: MediaVariantSettings,
     val onPickWallpaper: () -> Unit,
     val onPickVideoWallpaper: () -> Unit,
     val onCropChange: (CustomWallpaperCrop) -> Unit,
+    val onVisualSettingsChange: (MediaVisualSettings) -> Unit,
+    val onResponsiveCropsChange: (ResponsiveCropSet) -> Unit,
+    val onVariantSettingsChange: (MediaVariantSettings) -> Unit,
     val onClearWallpaper: () -> Unit,
 ) {
     val hasSelectedWallpaper: Boolean
@@ -137,57 +203,121 @@ internal data class HomeMetricCardWallpaperState(
         get() = hasSelectedWallpaper || hasSelectedVideoWallpaper
 }
 
+internal fun hasHomeMetricCardWallpaperImage(
+    context: Context,
+    target: HomeMetricCardWallpaperTarget,
+): Boolean {
+    val storedState = readThemeStoreImageState(context, target.themeSlot)
+    return !storedState.uriString.isNullOrBlank() || !storedState.nightUriString.isNullOrBlank()
+}
+
+internal suspend fun preloadHomeMetricCardWallpaperImages(
+    context: Context,
+    target: HomeMetricCardWallpaperTarget,
+) {
+    val storedState = readThemeStoreImageState(context, target.themeSlot)
+    val requests = buildList {
+        storedState.uriString?.takeIf(String::isNotBlank)?.let { uriString ->
+            add(uriString to storedState.responsiveCrops.forAspectRatio(target.aspectRatio))
+        }
+        storedState.nightUriString?.takeIf(String::isNotBlank)?.let { uriString ->
+            add(uriString to storedState.nightResponsiveCrops.forAspectRatio(target.aspectRatio))
+        }
+    }.distinct()
+    coroutineScope {
+        requests.map { (uriString, crop) ->
+            async {
+                preloadCustomImageBitmap(
+                    context = context,
+                    uriString = uriString,
+                    maxSide = HOME_METRIC_CARD_WALLPAPER_MAX_SIDE,
+                    crop = crop,
+                )
+            }
+        }.awaitAll()
+    }
+}
+
 @Composable
 internal fun rememberHomeMetricCardWallpaperState(
     target: HomeMetricCardWallpaperTarget,
     onWallpaperSelected: () -> Unit,
+    forceNight: Boolean? = null,
 ): HomeMetricCardWallpaperState {
     val context = LocalContext.current
     val currentOnWallpaperSelected by rememberUpdatedState(onWallpaperSelected)
+    val scope = rememberCoroutineScope()
+    val darkTheme = isInDarkTheme()
     val prefs = remember(context) {
         context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     }
-    var uriString by remember(target) {
-        mutableStateOf(prefs.getString(target.uriKey, null))
-    }
-    var videoUriString by remember(target) {
-        mutableStateOf(prefs.getString(target.videoUriKey, null))
-    }
-    var crop by remember(target) {
-        mutableStateOf(readHomeMetricCardWallpaperCrop(prefs, target))
+    val slot = target.themeSlot
+    var storedState by remember(target) { mutableStateOf(readThemeStoreImageState(context, slot)) }
+    val nowMillis by produceState(System.currentTimeMillis(), storedState.variantSettings) {
+        while (isActive) {
+            value = System.currentTimeMillis()
+            delay(30_000L)
+        }
     }
     DisposableEffect(prefs, target) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { preferences, key ->
-            if (key == null || key !in target.preferenceKeys) return@OnSharedPreferenceChangeListener
-            uriString = preferences.getString(target.uriKey, null)
-            videoUriString = preferences.getString(target.videoUriKey, null)
-            crop = readHomeMetricCardWallpaperCrop(preferences, target)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key !in slot.preferenceKeys) return@OnSharedPreferenceChangeListener
+            storedState = readThemeStoreImageState(context, slot)
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose {
             prefs.unregisterOnSharedPreferenceChangeListener(listener)
         }
     }
+    val scheduled = storedState.activeVariant(darkTheme, nowMillis, slot.id.hashCode())
+    val selectedNight = forceNight ?: (
+        storedState.hasNightSelected && scheduled.uriString == storedState.nightUriString &&
+            scheduled.videoUriString == storedState.nightVideoUriString
+        )
+    val active = if (selectedNight) {
+        me.weishu.kernelsu.ui.util.ActiveMediaVariant(
+            uriString = storedState.nightUriString,
+            videoUriString = storedState.nightVideoUriString,
+            crop = storedState.nightCrop,
+            responsiveCrops = storedState.nightResponsiveCrops,
+            visualSettings = storedState.nightVisualSettings,
+        )
+    } else {
+        me.weishu.kernelsu.ui.util.ActiveMediaVariant(
+            uriString = storedState.uriString,
+            videoUriString = storedState.videoUriString,
+            crop = storedState.crop,
+            responsiveCrops = storedState.responsiveCrops,
+            visualSettings = storedState.visualSettings,
+        )
+    }
+
+    fun updateResponsiveCrops(uriString: String, night: Boolean) {
+        scope.launch {
+            val info = inspectMediaFile(context, uriString)
+            val width = info?.width ?: return@launch
+            val height = info.height ?: return@launch
+            setThemeStoreImageSlotResponsiveCrops(
+                context,
+                slot,
+                generateResponsiveCrops(width, height),
+                night = night,
+            )
+        }
+    }
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        val nextUriString = persistCustomImageReference(context, uri, target.uriKey)
+        val storageKey = if (selectedNight) slot.nightUriKey else slot.uriKey
+        val nextUriString = persistCustomImageReference(context, uri, storageKey)
             ?: uri.toString().also { takePersistableImageReadPermission(context, uri) }
-        val previousUriString = uriString
-        val defaultCrop = DEFAULT_CUSTOM_WALLPAPER_CROP
-        if (previousUriString != nextUriString) {
-            releaseCustomImageReference(context, previousUriString)
+        if (selectedNight) {
+            setThemeStoreImageSlotNightMedia(context, slot, nextUriString, video = false)
+        } else {
+            setThemeStoreImageSlot(context, slot, nextUriString)
         }
-        releasePersistableVideoBackgroundReadPermission(context, videoUriString)
-        uriString = nextUriString
-        videoUriString = null
-        crop = defaultCrop
-        prefs.edit(commit = true) {
-            putString(target.uriKey, nextUriString)
-            remove(target.videoUriKey)
-            putHomeMetricCardWallpaperCrop(target, defaultCrop)
-        }
+        updateResponsiveCrops(nextUriString, selectedNight)
         currentOnWallpaperSelected()
     }
     val videoLauncher = rememberLauncherForActivityResult(
@@ -195,29 +325,29 @@ internal fun rememberHomeMetricCardWallpaperState(
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         val nextUriString = uri.toString()
-        val previousUriString = uriString
-        val previousVideoUriString = videoUriString
         takePersistableVideoBackgroundReadPermission(context, uri)
-        releaseCustomImageReference(context, previousUriString)
-        if (previousVideoUriString != nextUriString) {
-            releasePersistableVideoBackgroundReadPermission(context, previousVideoUriString)
+        if (selectedNight) {
+            setThemeStoreImageSlotNightMedia(context, slot, nextUriString, video = true)
+        } else {
+            setThemeStoreImageSlotVideo(context, slot, nextUriString)
         }
-        uriString = null
-        videoUriString = nextUriString
-        crop = DEFAULT_CUSTOM_WALLPAPER_CROP
-        prefs.edit(commit = true) {
-            remove(target.uriKey)
-            putHomeMetricCardWallpaperCrop(target, DEFAULT_CUSTOM_WALLPAPER_CROP)
-            putString(target.videoUriKey, nextUriString)
-        }
+        updateResponsiveCrops(nextUriString, selectedNight)
         currentOnWallpaperSelected()
     }
 
-    return remember(target, uriString, videoUriString, crop, launcher, videoLauncher, prefs, context) {
+    return remember(target, storedState, active, selectedNight, launcher, videoLauncher, context, forceNight) {
         HomeMetricCardWallpaperState(
-            uriString = uriString,
-            videoUriString = videoUriString,
-            crop = crop,
+            uriString = active.uriString,
+            videoUriString = active.videoUriString,
+            crop = active.responsiveCrops.forAspectRatio(target.aspectRatio),
+            visualSettings = active.visualSettings,
+            responsiveCrops = active.responsiveCrops,
+            dayUriString = storedState.uriString,
+            dayVideoUriString = storedState.videoUriString,
+            nightUriString = storedState.nightUriString,
+            nightVideoUriString = storedState.nightVideoUriString,
+            nightSelected = selectedNight,
+            variantSettings = storedState.variantSettings,
             onPickWallpaper = {
                 launcher.launch(arrayOf("image/*"))
             },
@@ -226,21 +356,32 @@ internal fun rememberHomeMetricCardWallpaperState(
             },
             onCropChange = { nextCrop ->
                 val safeCrop = sanitizeCustomWallpaperCrop(nextCrop)
-                crop = safeCrop
-                prefs.edit(commit = true) {
-                    putHomeMetricCardWallpaperCrop(target, safeCrop)
+                if (selectedNight) {
+                    setThemeStoreImageSlotNightCrop(context, slot, safeCrop)
+                } else {
+                    setThemeStoreImageSlotCrop(context, slot, safeCrop)
                 }
+                setThemeStoreImageSlotResponsiveCrops(
+                    context = context,
+                    slot = slot,
+                    crops = active.responsiveCrops.withCropForAspectRatio(target.aspectRatio, safeCrop),
+                    night = selectedNight,
+                )
+            },
+            onVisualSettingsChange = { settings ->
+                setThemeStoreImageSlotVisualSettings(context, slot, settings, night = selectedNight)
+            },
+            onResponsiveCropsChange = { crops ->
+                setThemeStoreImageSlotResponsiveCrops(context, slot, crops, night = selectedNight)
+            },
+            onVariantSettingsChange = { settings ->
+                setThemeStoreImageSlotVariantSettings(context, slot, settings)
             },
             onClearWallpaper = {
-                releaseCustomImageReference(context, uriString)
-                releasePersistableVideoBackgroundReadPermission(context, videoUriString)
-                uriString = null
-                videoUriString = null
-                crop = DEFAULT_CUSTOM_WALLPAPER_CROP
-                prefs.edit(commit = true) {
-                    remove(target.uriKey)
-                    remove(target.videoUriKey)
-                    removeHomeMetricCardWallpaperCrop(target)
+                if (selectedNight) {
+                    setThemeStoreImageSlotNightMedia(context, slot, null, video = false)
+                } else {
+                    setThemeStoreImageSlot(context, slot, null)
                 }
             },
         )
@@ -252,22 +393,11 @@ internal fun rememberHomeMetricCardWallpaperBitmap(
     uriString: String?,
     crop: CustomWallpaperCrop,
 ): Bitmap? {
-    val context = LocalContext.current
-    val bitmapState = produceState<Bitmap?>(initialValue = null, uriString, crop, context) {
-        value = if (uriString.isNullOrBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                loadCustomImageBitmap(
-                    context = context,
-                    uriString = uriString,
-                    maxSide = HOME_METRIC_CARD_WALLPAPER_MAX_SIDE,
-                    crop = crop,
-                )
-            }
-        }
-    }
-    return bitmapState.value
+    return rememberCustomImageAndroidBitmap(
+        uriString = uriString,
+        maxSide = HOME_METRIC_CARD_WALLPAPER_MAX_SIDE,
+        crop = crop,
+    )
 }
 
 @Composable
@@ -275,31 +405,40 @@ internal fun BoxScope.HomeMetricCardWallpaperBackground(
     bitmap: Bitmap?,
     videoUriString: String? = null,
     videoCrop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
+    visualSettings: MediaVisualSettings,
 ) {
     if (bitmap == null && videoUriString.isNullOrBlank()) return
 
-    if (!videoUriString.isNullOrBlank()) {
-        CustomVideoBackground(
-            uriString = videoUriString,
-            drawOverlay = false,
-            crop = videoCrop,
-            touchPassthrough = true,
-            modifier = Modifier.matchParentSize(),
-        )
-    } else if (bitmap != null) {
-        val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
-        Image(
-            modifier = Modifier.matchParentSize(),
-            bitmap = imageBitmap,
-            contentDescription = null,
-            contentScale = ContentScale.Crop
-        )
-    }
-    Box(
-        modifier = Modifier
-            .matchParentSize()
-            .background(Color.Black.copy(alpha = if (isInDarkTheme()) 0.52f else 0.44f))
+    val adjusted = visualSettings.copy(
+        overlayAlpha = (visualSettings.overlayAlpha + if (isInDarkTheme()) 0.08f else 0f).coerceAtMost(0.82f)
     )
+    MediaVisualLayer(settings = adjusted, modifier = Modifier.matchParentSize()) { colorFilter ->
+        if (!videoUriString.isNullOrBlank()) {
+            CustomVideoBackground(
+                uriString = videoUriString,
+                drawOverlay = false,
+                crop = videoCrop,
+                touchPassthrough = true,
+                modifier = Modifier.matchParentSize(),
+            )
+        } else if (bitmap != null) {
+            val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
+            Image(
+                modifier = Modifier.matchParentSize(),
+                bitmap = imageBitmap,
+                contentDescription = null,
+                contentScale = wallpaperFit.toContentScale(),
+                colorFilter = colorFilter,
+            )
+        }
+    }
+}
+
+internal fun HomeLayoutWallpaperFit.toContentScale(): ContentScale = when (this) {
+    HomeLayoutWallpaperFit.Crop -> ContentScale.Crop
+    HomeLayoutWallpaperFit.Fit -> ContentScale.Fit
+    HomeLayoutWallpaperFit.Stretch -> ContentScale.FillBounds
 }
 
 private fun readHomeMetricCardWallpaperCrop(

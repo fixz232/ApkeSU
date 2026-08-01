@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ksuApp
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -352,9 +351,6 @@ class CloudThemeInstaller(
     }
 
     private fun ensureCompatible(theme: CloudTheme) {
-        require(theme.isCompatible(BuildConfig.VERSION_CODE.toLong())) {
-            "This cloud theme is not compatible with the current Manager version"
-        }
         require(theme.status == CloudThemePublicationStatus.Published) {
             "This cloud theme is no longer available for installation"
         }

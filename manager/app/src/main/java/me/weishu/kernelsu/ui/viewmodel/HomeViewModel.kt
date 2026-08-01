@@ -23,6 +23,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.data.repository.CUSTOM_HOME_TITLE_KEY
+import me.weishu.kernelsu.data.repository.MIUIX_CLASSIC_HOME_LAYOUT_KEY
 import me.weishu.kernelsu.data.repository.SHOW_GKI_WARNING_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_LEARN_CARD_KEY
 import me.weishu.kernelsu.data.repository.SHOW_HOME_SUPPORT_CARD_KEY
@@ -62,6 +63,7 @@ class HomeViewModel(
             key == SHOW_GKI_WARNING_KEY ||
             key == SHOW_HOME_SUPPORT_CARD_KEY ||
             key == SHOW_HOME_LEARN_CARD_KEY ||
+            key == MIUIX_CLASSIC_HOME_LAYOUT_KEY ||
             key == CUSTOM_HOME_TITLE_KEY
         ) {
             _uiState.update {
@@ -70,6 +72,7 @@ class HomeViewModel(
                     showGkiWarningSetting = repo.showGkiWarning,
                     showHomeSupportCard = repo.showHomeSupportCard,
                     showHomeLearnCard = repo.showHomeLearnCard,
+                    miuixClassicHomeLayoutEnabled = repo.miuixClassicHomeLayoutEnabled,
                     customHomeTitle = repo.customHomeTitle,
                 )
             }
@@ -228,6 +231,7 @@ class HomeViewModel(
             showGkiWarningSetting = repo.showGkiWarning,
             showHomeSupportCard = repo.showHomeSupportCard,
             showHomeLearnCard = repo.showHomeLearnCard,
+            miuixClassicHomeLayoutEnabled = repo.miuixClassicHomeLayoutEnabled,
             customHomeTitle = repo.customHomeTitle,
             superuserCount = runCatching { getSuperuserCount() }.getOrDefault(0),
             moduleCount = runCatching { getModuleCount() }.getOrDefault(0),
@@ -281,6 +285,9 @@ class HomeViewModel(
             showGkiWarningSetting = runCatching { repo.showGkiWarning }.getOrDefault(true),
             showHomeSupportCard = runCatching { repo.showHomeSupportCard }.getOrDefault(true),
             showHomeLearnCard = runCatching { repo.showHomeLearnCard }.getOrDefault(true),
+            miuixClassicHomeLayoutEnabled = runCatching {
+                repo.miuixClassicHomeLayoutEnabled
+            }.getOrDefault(false),
             customHomeTitle = runCatching { repo.customHomeTitle }.getOrDefault(""),
             superuserCount = 0,
             moduleCount = 0,

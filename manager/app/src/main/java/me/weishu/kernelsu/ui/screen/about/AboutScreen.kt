@@ -22,12 +22,24 @@ fun AboutScreen() {
             LinkInfo(
                 fullText = stringResource(R.string.about_join_qq_group),
                 url = QQ_GROUP_URL,
-            )
+            ),
+            LinkInfo(
+                fullText = stringResource(R.string.about_official_telegram),
+                url = OFFICIAL_TELEGRAM_URL,
+            ),
+            LinkInfo(
+                fullText = stringResource(R.string.about_official_upstream),
+                url = OFFICIAL_UPSTREAM_URL,
+            ),
         ),
     )
     val actions = AboutScreenActions(
         onBack = dropUnlessResumed { navigator.pop() },
-        onOpenLink = uriHandler::openUri,
+        onOpenLink = { url ->
+            // A device may not have a handler for every external scheme. Keep the
+            // About page usable instead of letting the URI handler exception crash it.
+            runCatching { uriHandler.openUri(url) }
+        },
     )
 
     when (LocalUiMode.current) {
@@ -36,4 +48,6 @@ fun AboutScreen() {
     }
 }
 
-private const val QQ_GROUP_URL = "https://qm.qq.com/q/8O7qvLM3zq"
+private const val QQ_GROUP_URL = "https://qm.qq.com/q/Q8PmBoq9iK"
+private const val OFFICIAL_TELEGRAM_URL = "https://t.me/ApkeSu"
+private const val OFFICIAL_UPSTREAM_URL = "https://github.com/tiann/KernelSU"

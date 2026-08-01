@@ -4,6 +4,9 @@ import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -19,6 +22,9 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
@@ -26,7 +32,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +47,14 @@ import kotlin.math.sin
 
 val LocalCustomCardStyle = staticCompositionLocalOf<CustomCardStyle?> { null }
 val LocalCustomSwitchStyle = staticCompositionLocalOf<CustomSwitchStyle?> { null }
+val LocalComponentMotionProgressOverride = staticCompositionLocalOf<Float?> { null }
+
+fun SwitchTransitionEasing.composeEasing() = when (this) {
+    SwitchTransitionEasing.Standard -> FastOutSlowInEasing
+    SwitchTransitionEasing.Linear -> LinearEasing
+    SwitchTransitionEasing.Accelerate -> FastOutLinearInEasing
+    SwitchTransitionEasing.Decelerate -> LinearOutSlowInEasing
+}
 
 @Composable
 fun rememberComponentMotionProgress(
@@ -46,6 +62,7 @@ fun rememberComponentMotionProgress(
     enabled: Boolean,
     label: String,
 ): Float {
+    LocalComponentMotionProgressOverride.current?.let { return it.coerceIn(0f, 1f) }
     val normalized = rule.normalized()
     val systemAnimationsEnabled = ValueAnimator.areAnimatorsEnabled()
     if (!enabled || !normalized.enabled || !systemAnimationsEnabled) return INACTIVE_MOTION_PROGRESS
@@ -65,17 +82,32 @@ fun rememberComponentMotionProgress(
     return progress
 }
 
+data class CustomSwitchImages(
+    val off: ImageBitmap? = null,
+    val on: ImageBitmap? = null,
+)
+
 @Composable
-fun rememberCustomSwitchImage(style: CustomSwitchStyle?): ImageBitmap? {
+fun rememberCustomSwitchImages(style: CustomSwitchStyle?): CustomSwitchImages {
     val context = LocalContext.current
-    val uri = style?.takeIf { it.source == CustomSwitchSource.Image }?.imageUri
-    val image by produceState<ImageBitmap?>(initialValue = null, uri) {
+    val imageStyle = style?.takeIf { it.source == CustomSwitchSource.Image }
+    val offUri = imageStyle?.imageUri
+    val onUri = imageStyle?.imageOnUri
+    val images by produceState(initialValue = CustomSwitchImages(), offUri, onUri) {
         value = withContext(Dispatchers.IO) {
-            val file = ComponentStyleStore(context).resolveImageFile(uri) ?: return@withContext null
-            runCatching { decodeCustomSwitchImage(file) }.getOrNull()
+            val store = ComponentStyleStore(context)
+            fun decode(uri: String?): ImageBitmap? {
+                val file = store.resolveImageFile(uri) ?: return null
+                return runCatching { decodeCustomSwitchImage(file) }.getOrNull()
+            }
+            val off = decode(offUri)
+            CustomSwitchImages(
+                off = off,
+                on = if (onUri == offUri) off else decode(onUri),
+            )
         }
     }
-    return image
+    return images
 }
 
 fun DrawScope.drawCustomCardInterior(
@@ -187,43 +219,120 @@ fun DrawScope.drawCustomSwitchStyle(
     checkedProgress: Float,
     enabledAlpha: Float,
     motionProgress: Float,
-    image: ImageBitmap?,
+    images: CustomSwitchImages,
 ) {
     val normalized = style.normalized()
-    val corner = size.height / 2f
+    val trackSize = Size(
+        width = size.width * normalized.trackScaleX,
+        height = size.height * normalized.trackScaleY,
+    )
+    val trackTopLeft = Offset(
+        x = (size.width - trackSize.width) / 2f,
+        y = (size.height - trackSize.height) / 2f,
+    )
+    val corner = trackSize.height * normalized.cornerRadiusFraction
     val path = Path().apply {
-        addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(corner, corner)))
+        addRoundRect(RoundRect(Rect(trackTopLeft, trackSize), CornerRadius(corner, corner)))
     }
     val dynamicAlpha = enabledAlpha * motionAlpha(normalized.motion, motionProgress)
+    val stateProgress = checkedProgress.coerceIn(0f, 1f)
+    val trackColor = stateColor(
+        off = normalized.trackOffColorOverride,
+        on = normalized.trackOnColorOverride,
+        fallback = normalized.trackBaseColor,
+        progress = stateProgress,
+    )
+    val borderColor = stateColor(
+        off = normalized.borderOffColorOverride,
+        on = normalized.borderOnColorOverride,
+        fallback = normalized.borderColor,
+        progress = stateProgress,
+    )
+    val thumbColor = stateColor(
+        off = normalized.thumbOffColorOverride,
+        on = normalized.thumbOnColorOverride,
+        fallback = normalized.thumbBaseColor,
+        progress = stateProgress,
+    )
+    val offImageAppearance = normalized.imageAppearanceFor(on = false)
+    val onImageAppearance = normalized.imageAppearanceFor(on = true)
+    if (normalized.shadowRadiusDp > 0f) {
+        drawRoundRect(
+            color = Color(normalized.shadowColor.toInt()).copy(
+                alpha = Color(normalized.shadowColor.toInt()).alpha * enabledAlpha * 0.55f
+            ),
+            topLeft = trackTopLeft + Offset(0f, normalized.shadowRadiusDp.dp.toPx() * 0.45f),
+            size = trackSize,
+            cornerRadius = CornerRadius(corner, corner),
+            style = Stroke(width = (normalized.shadowRadiusDp * 1.8f).dp.toPx()),
+        )
+    }
+    if (normalized.glowRadiusDp > 0f) {
+        drawRoundRect(
+            color = Color(normalized.glowColor.toInt()).copy(
+                alpha = Color(normalized.glowColor.toInt()).alpha * enabledAlpha * 0.60f
+            ),
+            topLeft = trackTopLeft,
+            size = trackSize,
+            cornerRadius = CornerRadius(corner, corner),
+            style = Stroke(width = (normalized.glowRadiusDp * 1.6f).dp.toPx()),
+        )
+    }
     clipPath(path) {
         drawRoundRect(
-            color = Color(0xFF3D4450).copy(alpha = enabledAlpha),
-            size = size,
+            color = trackColor.copy(alpha = trackColor.alpha * enabledAlpha),
+            topLeft = trackTopLeft,
+            size = trackSize,
             cornerRadius = CornerRadius(corner, corner),
         )
-        if (normalized.source == CustomSwitchSource.Image && image != null) {
-            drawSwitchImage(
-                image = image,
-                scale = normalized.imageScale,
-                alpha = dynamicAlpha * normalized.imageOpacity,
-            )
+        if (normalized.source == CustomSwitchSource.Image) {
+            // A missing state image may intentionally fall back to the other state;
+            // a configured-but-undecodable image must remain visible as an error.
+            val offImage = images.off ?: images.on.takeIf { normalized.imageUri == null }
+            val onImage = images.on ?: images.off.takeIf { normalized.imageOnUri == null }
+            if (offImage == null) {
+                drawMissingSwitchImage(trackTopLeft, trackSize, dynamicAlpha * (1f - checkedProgress))
+            } else {
+                offImage.let { image ->
+                    drawSwitchImage(
+                        image = image,
+                        appearance = offImageAppearance,
+                        topLeft = trackTopLeft,
+                        destinationSize = trackSize,
+                        alpha = dynamicAlpha * offImageAppearance.opacity * (1f - checkedProgress),
+                    )
+                }
+            }
+            if (onImage == null) {
+                drawMissingSwitchImage(trackTopLeft, trackSize, dynamicAlpha * checkedProgress)
+            } else {
+                onImage.let { image ->
+                    drawSwitchImage(
+                        image = image,
+                        appearance = onImageAppearance,
+                        topLeft = trackTopLeft,
+                        destinationSize = trackSize,
+                        alpha = dynamicAlpha * onImageAppearance.opacity * checkedProgress,
+                    )
+                }
+            }
         } else {
             val offsetX = motionOffset(
                 normalized.motion,
                 motionProgress,
-                size.width / normalized.trackOff.width,
+                trackSize.width / normalized.trackOff.width,
             )
             drawPixelLayer(
                 grid = normalized.trackOff,
-                topLeft = Offset.Zero,
-                destinationSize = size,
+                topLeft = trackTopLeft,
+                destinationSize = trackSize,
                 alpha = dynamicAlpha * (1f - checkedProgress),
                 offsetX = offsetX,
             )
             drawPixelLayer(
                 grid = normalized.trackOn,
-                topLeft = Offset.Zero,
-                destinationSize = size,
+                topLeft = trackTopLeft,
+                destinationSize = trackSize,
                 alpha = dynamicAlpha * checkedProgress,
                 offsetX = offsetX,
             )
@@ -233,37 +342,46 @@ fun DrawScope.drawCustomSwitchStyle(
             normalized.motion.mode == PixelMotionMode.Scan &&
             motionProgress.isActiveMotionProgress()
         ) {
-            val scanX = size.width * motionProgress.coerceIn(0f, 1f)
+            val scanX = trackTopLeft.x + trackSize.width * motionProgress.coerceIn(0f, 1f)
             drawRect(
                 color = Color.White.copy(alpha = enabledAlpha * 0.24f),
-                topLeft = Offset(scanX, 0f),
-                size = Size(1.dp.toPx(), size.height),
+                topLeft = Offset(scanX, trackTopLeft.y),
+                size = Size(1.dp.toPx(), trackSize.height),
             )
         }
     }
 
-    drawRoundRect(
-        color = Color.White.copy(alpha = enabledAlpha * 0.32f),
-        size = size,
-        cornerRadius = CornerRadius(corner, corner),
-        style = Stroke(width = 1.dp.toPx()),
-    )
+    if (normalized.borderWidthDp > 0f) {
+        drawRoundRect(
+            color = borderColor.copy(alpha = borderColor.alpha * enabledAlpha),
+            topLeft = trackTopLeft,
+            size = trackSize,
+            cornerRadius = CornerRadius(corner, corner),
+            style = Stroke(width = normalized.borderWidthDp.dp.toPx()),
+        )
+    }
 
-    val inset = 3.dp.toPx()
-    val radius = size.height / 2f - inset
-    val startX = inset + radius
-    val endX = size.width - inset - radius
+    val inset = normalized.thumbPaddingDp.dp.toPx().coerceAtMost(trackSize.height * 0.45f)
+    val radius = ((trackSize.height / 2f - inset) * normalized.thumbScale)
+        .coerceIn(1.dp.toPx(), trackSize.height / 2f)
+    val fullStartX = trackTopLeft.x + inset + radius
+    val fullEndX = trackTopLeft.x + trackSize.width - inset - radius
+    val travelCenter = (fullStartX + fullEndX) / 2f
+    val travelRadius = ((fullEndX - fullStartX) / 2f * normalized.thumbTravel).coerceAtLeast(0f)
+    val startX = travelCenter - travelRadius
+    val endX = travelCenter + travelRadius
     val center = Offset(startX + (endX - startX) * checkedProgress, size.height / 2f)
     val thumbSize = Size(radius * 2f, radius * 2f)
     val thumbTopLeft = center - Offset(radius, radius)
     val offBlank = normalized.thumbOff.pixels.all { it == TRANSPARENT_PIXEL }
     val onBlank = normalized.thumbOn.pixels.all { it == TRANSPARENT_PIXEL }
+    drawCircle(
+        color = thumbColor.copy(alpha = thumbColor.alpha * enabledAlpha),
+        radius = radius,
+        center = center,
+    )
     if (offBlank && onBlank) {
-        drawCircle(
-            color = Color.White.copy(alpha = enabledAlpha),
-            radius = radius,
-            center = center,
-        )
+        return
     } else {
         drawPixelLayer(
             grid = normalized.thumbOff,
@@ -278,6 +396,17 @@ fun DrawScope.drawCustomSwitchStyle(
             alpha = dynamicAlpha * checkedProgress,
         )
     }
+}
+
+private fun stateColor(
+    off: Long?,
+    on: Long?,
+    fallback: Long,
+    progress: Float,
+): Color {
+    val offColor = Color((off ?: fallback).toInt())
+    val onColor = Color((on ?: fallback).toInt())
+    return lerp(offColor, onColor, progress)
 }
 
 fun DrawScope.drawPixelLayer(
@@ -367,47 +496,117 @@ private fun DrawScope.drawMotionScan(rule: PixelMotionRule, progress: Float, alp
 
 private fun DrawScope.drawSwitchImage(
     image: ImageBitmap,
-    scale: SwitchImageScale,
+    appearance: SwitchImageAppearance,
+    topLeft: Offset,
+    destinationSize: Size,
     alpha: Float,
 ) {
     val sourceWidth = image.width
     val sourceHeight = image.height
     if (sourceWidth <= 0 || sourceHeight <= 0 || alpha <= 0f) return
     val sourceAspect = sourceWidth.toFloat() / sourceHeight
-    val destinationAspect = size.width / size.height
-    val sourceSize = when (scale) {
+    val destinationAspect = destinationSize.width / destinationSize.height
+    val sourceSize = when (appearance.scale) {
         SwitchImageScale.Fit -> androidx.compose.ui.unit.IntSize(sourceWidth, sourceHeight)
         SwitchImageScale.Crop -> if (sourceAspect > destinationAspect) {
-            androidx.compose.ui.unit.IntSize((sourceHeight * destinationAspect).toInt(), sourceHeight)
+            androidx.compose.ui.unit.IntSize(
+                (sourceHeight * destinationAspect).toInt().coerceIn(1, sourceWidth),
+                sourceHeight,
+            )
         } else {
-            androidx.compose.ui.unit.IntSize(sourceWidth, (sourceWidth / destinationAspect).toInt())
+            androidx.compose.ui.unit.IntSize(
+                sourceWidth,
+                (sourceWidth / destinationAspect).toInt().coerceIn(1, sourceHeight),
+            )
         }
     }
     val sourceOffset = androidx.compose.ui.unit.IntOffset(
         x = ((sourceWidth - sourceSize.width) / 2).coerceAtLeast(0),
         y = ((sourceHeight - sourceSize.height) / 2).coerceAtLeast(0),
     )
-    val destination = if (scale == SwitchImageScale.Fit) {
+    val baseDestination = if (appearance.scale == SwitchImageScale.Fit) {
         val fitted = if (sourceAspect > destinationAspect) {
-            androidx.compose.ui.unit.IntSize(size.width.toInt(), (size.width / sourceAspect).toInt())
+            androidx.compose.ui.unit.IntSize(
+                destinationSize.width.toInt().coerceAtLeast(1),
+                (destinationSize.width / sourceAspect).toInt().coerceAtLeast(1),
+            )
         } else {
-            androidx.compose.ui.unit.IntSize((size.height * sourceAspect).toInt(), size.height.toInt())
+            androidx.compose.ui.unit.IntSize(
+                (destinationSize.height * sourceAspect).toInt().coerceAtLeast(1),
+                destinationSize.height.toInt().coerceAtLeast(1),
+            )
         }
         fitted
     } else {
-        androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+        androidx.compose.ui.unit.IntSize(destinationSize.width.toInt(), destinationSize.height.toInt())
     }
-    val destinationOffset = androidx.compose.ui.unit.IntOffset(
-        x = ((size.width.toInt() - destination.width) / 2).coerceAtLeast(0),
-        y = ((size.height.toInt() - destination.height) / 2).coerceAtLeast(0),
+    val destination = androidx.compose.ui.unit.IntSize(
+        width = (baseDestination.width * appearance.zoom).toInt().coerceAtLeast(1),
+        height = (baseDestination.height * appearance.zoom).toInt().coerceAtLeast(1),
     )
-    drawImage(
-        image = image,
-        srcOffset = sourceOffset,
-        srcSize = sourceSize,
-        dstOffset = destinationOffset,
-        dstSize = destination,
-        alpha = alpha.coerceIn(0f, 1f),
+    val center = Offset(
+        x = topLeft.x + destinationSize.width / 2f + appearance.offsetX * destinationSize.width / 2f,
+        y = topLeft.y + destinationSize.height / 2f + appearance.offsetY * destinationSize.height / 2f,
+    )
+    val destinationOffset = androidx.compose.ui.unit.IntOffset(
+        x = (center.x - destination.width / 2f).toInt(),
+        y = (center.y - destination.height / 2f).toInt(),
+    )
+    val colorMatrix = ColorMatrix().apply {
+        setToSaturation(appearance.saturation)
+        val brightnessShift = appearance.brightness * 255f
+        this[0, 4] = brightnessShift
+        this[1, 4] = brightnessShift
+        this[2, 4] = brightnessShift
+        appearance.tint?.let { argb ->
+            val tint = Color(argb.toInt())
+            for (column in 0..4) {
+                this[0, column] *= tint.red
+                this[1, column] *= tint.green
+                this[2, column] *= tint.blue
+                this[3, column] *= tint.alpha
+            }
+        }
+    }
+    withTransform({
+        rotate(appearance.rotationDegrees, pivot = center)
+        scale(
+            scaleX = if (appearance.flipHorizontal) -1f else 1f,
+            scaleY = if (appearance.flipVertical) -1f else 1f,
+            pivot = center,
+        )
+    }) {
+        drawImage(
+            image = image,
+            srcOffset = sourceOffset,
+            srcSize = sourceSize,
+            dstOffset = destinationOffset,
+            dstSize = destination,
+            alpha = alpha.coerceIn(0f, 1f),
+            colorFilter = ColorFilter.colorMatrix(colorMatrix),
+            blendMode = when (appearance.blend) {
+                SwitchImageBlend.Normal -> BlendMode.SrcOver
+                SwitchImageBlend.Multiply -> BlendMode.Multiply
+                SwitchImageBlend.Screen -> BlendMode.Screen
+                SwitchImageBlend.Add -> BlendMode.Plus
+            },
+        )
+    }
+}
+
+private fun DrawScope.drawMissingSwitchImage(topLeft: Offset, destinationSize: Size, alpha: Float) {
+    val color = Color(0xFFFF5B6E).copy(alpha = alpha.coerceIn(0f, 1f) * 0.88f)
+    drawLine(
+        color = color,
+        start = topLeft + Offset(destinationSize.width * 0.24f, destinationSize.height * 0.26f),
+        end = topLeft + Offset(destinationSize.width * 0.76f, destinationSize.height * 0.74f),
+        strokeWidth = 2.dp.toPx(),
+    )
+    drawLine(
+        color = color,
+        start = topLeft + Offset(destinationSize.width * 0.76f, destinationSize.height * 0.26f),
+        end = topLeft + Offset(destinationSize.width * 0.24f, destinationSize.height * 0.74f),
+        strokeWidth = 2.dp.toPx(),
     )
 }
 

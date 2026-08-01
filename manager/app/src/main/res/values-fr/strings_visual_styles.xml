@@ -12,10 +12,13 @@
     <string name="rain_style_heavy_summary">Palette sombre et orageuse, vent plus fort, verre détrempé et ondulations fréquentes au sol.</string>
     <string name="rain_style_thunderstorm">Orage</string>
     <string name="rain_style_thunderstorm_summary">Éclairs nocturnes toutes les 3 à 8 secondes, avec pluie dense et nuages orageux violets.</string>
+    <string name="rain_style_after_rain">Après la pluie</string>
+    <string name="rain_style_after_rain_summary">La pluie faiblit, les nuages s’ouvrent et les reflets reviennent sur le verre humide.</string>
     <string name="rain_motto_light">Écoutez la pluie se poser sur le verre</string>
     <string name="rain_motto_medium">Quand la pluie s’intensifie, le monde s’apaise</string>
     <string name="rain_motto_heavy">Rester lucide au cœur de la tempête</string>
     <string name="rain_motto_thunderstorm">L’éclair traverse la nuit, le cœur résiste</string>
+    <string name="rain_motto_after_rain">Après la pluie, la lumière revient sur l’eau</string>
     <string name="theme_preset_rain">Pluie sur verre</string>
     <string name="theme_preset_rain_summary">Verre gris-bleu froid, bords de cartes humides, auvents pluvieux et barre de navigation flottante assortie.</string>
     <string name="settings_pixel_card_motion">Animation des cartes pixel</string>

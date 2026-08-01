@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.component
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -37,6 +39,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
@@ -47,6 +50,9 @@ import me.weishu.kernelsu.ui.util.HomeLayoutCard
 import me.weishu.kernelsu.ui.util.HomeLayoutItem
 import me.weishu.kernelsu.ui.util.HomeLayoutResizeEdge
 import me.weishu.kernelsu.ui.util.HomeLayoutState
+import me.weishu.kernelsu.ui.util.itemsForOrientation
+import me.weishu.kernelsu.ui.util.resolveHomeLayoutCollisions
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 data class HomeLayoutResizeGesture(
@@ -72,11 +78,21 @@ fun HomeLayoutCanvas(
     editor: HomeLayoutEditor? = null,
     selectedCard: HomeLayoutCard? = null,
     onCardSelected: ((HomeLayoutCard) -> Unit)? = null,
+    isLandscapeOverride: Boolean? = null,
     rowHeight: Dp = 150.dp,
     cardContent: @Composable (HomeLayoutItem) -> Unit,
 ) {
     val currentEditor by rememberUpdatedState(editor)
-    val visibleItems = state.items.filter { it.visible }.sortedBy { it.zIndex }
+    val configuration = LocalConfiguration.current
+    val isLandscape = isLandscapeOverride
+        ?: (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+    val sourceItems = state.itemsForOrientation(isLandscape)
+    val layoutItems = if (state.autoAvoidOverlap && editor == null) {
+        resolveHomeLayoutCollisions(sourceItems)
+    } else {
+        sourceItems
+    }
+    val visibleItems = layoutItems.filter { it.visible }.sortedBy { it.zIndex }
     val visibleCards = visibleItems.map { it.card }.toSet()
     val cardBounds = remember { mutableStateMapOf<HomeLayoutCard, Rect>() }
     val overlappingCards by remember {
@@ -93,8 +109,40 @@ fun HomeLayoutCanvas(
     BoxWithConstraints(modifier = modifier) {
         val canvasWidthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val rowHeightPx = with(LocalDensity.current) { rowHeight.toPx() }
+        val guideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
+        val selectedItem = visibleItems.firstOrNull {
+            it.card == (editor?.selectedCard ?: selectedCard)
+        }
         Layout(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    if (editor == null || selectedItem == null || !state.autoSnap) return@drawBehind
+                    val horizontalAnchor = listOf(0f, 0.5f, 1f)
+                        .minByOrNull { abs(selectedItem.x - it) }
+                        ?.takeIf { abs(selectedItem.x - it) <= 0.045f }
+                    if (horizontalAnchor != null) {
+                        val cardLeft = (size.width - size.width * selectedItem.width) * horizontalAnchor
+                        val guideX = when (horizontalAnchor) {
+                            0f -> cardLeft
+                            0.5f -> size.width / 2f
+                            else -> cardLeft + size.width * selectedItem.width
+                        }
+                        drawLine(
+                            color = guideColor,
+                            start = Offset(guideX, 0f),
+                            end = Offset(guideX, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                    val guideY = selectedItem.y * rowHeightPx
+                    drawLine(
+                        color = guideColor.copy(alpha = 0.44f),
+                        start = Offset(0f, guideY),
+                        end = Offset(size.width, guideY),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                },
             content = {
                 visibleItems.forEach { item ->
                     key(item.card) {
@@ -121,14 +169,11 @@ fun HomeLayoutCanvas(
                                 )
                                 .then(
                                     if (editor != null) {
-                                        val renderedWidthPx = canvasWidthPx * item.width
-                                        val availableWidthPx = (canvasWidthPx - renderedWidthPx)
-                                            .coerceAtLeast(1f)
                                         Modifier
                                             .clickable {
                                                 currentEditor?.onSelectedCardChange?.invoke(item.card)
                                             }
-                                            .pointerInput(item.card, canvasWidthPx, rowHeightPx) {
+                                            .pointerInput(item.card, item.width, canvasWidthPx, rowHeightPx) {
                                                 detectDragGestures(
                                                     onDragStart = {
                                                         currentEditor?.onSelectedCardChange?.invoke(item.card)
@@ -145,7 +190,7 @@ fun HomeLayoutCanvas(
                                                         currentEditor?.onDragCard?.invoke(
                                                             item.card,
                                                             Offset(
-                                                                x = dragAmount.x / availableWidthPx,
+                                                                x = dragAmount.x / canvasWidthPx,
                                                                 y = dragAmount.y / rowHeightPx.coerceAtLeast(1f),
                                                             ),
                                                         )
@@ -214,20 +259,14 @@ fun HomeLayoutCanvas(
         ) { measurables, constraints ->
             val canvasWidth = constraints.maxWidth.takeIf { it != Constraints.Infinity }
                 ?: constraints.minWidth
-            val gapPx = 12.dp.roundToPx()
             val bottomPaddingPx = 24.dp.roundToPx()
             val measured = visibleItems.zip(measurables).map { (item, measurable) ->
                 val widthPx = (canvasWidth * item.width)
                     .roundToInt()
                     .coerceIn(1, canvasWidth.coerceAtLeast(1))
                 val cardConstraints = if (item.height > 0f) {
-                    val minHeightPx = (rowHeightPx * item.height).roundToInt().coerceAtLeast(1)
-                    Constraints(
-                        minWidth = widthPx,
-                        maxWidth = widthPx,
-                        minHeight = minHeightPx,
-                        maxHeight = Constraints.Infinity,
-                    )
+                    val heightPx = (rowHeightPx * item.height).roundToInt().coerceAtLeast(1)
+                    Constraints.fixed(widthPx, heightPx)
                 } else {
                     Constraints.fixedWidth(widthPx)
                 }
@@ -241,24 +280,13 @@ fun HomeLayoutCanvas(
             ).forEach { card ->
                 val maxX = (canvasWidth - card.placeable.width).coerceAtLeast(0)
                 val x = (maxX * card.item.x).roundToInt().coerceIn(0, maxX)
-                var y = (rowHeightPx * card.item.y).roundToInt().coerceAtLeast(0)
-                var rect = PixelRect(
+                val y = (rowHeightPx * card.item.y).roundToInt().coerceAtLeast(0)
+                val rect = PixelRect(
                     left = x,
                     top = y,
                     right = x + card.placeable.width,
                     bottom = y + card.placeable.height,
                 )
-                if (state.autoAvoidOverlap) {
-                    while (true) {
-                        val conflicts = occupied.filter(rect::overlaps)
-                        if (conflicts.isEmpty()) break
-                        y = conflicts.maxOf { it.bottom } + gapPx
-                        rect = rect.copy(
-                            top = y,
-                            bottom = y + card.placeable.height,
-                        )
-                    }
-                }
                 occupied += rect
                 placements[card.item.card] = PixelPlacement(x = x, y = y)
             }
@@ -303,7 +331,7 @@ private fun ResizeEdgeHandle(
     val horizontal = edge == HomeLayoutResizeEdge.Top || edge == HomeLayoutResizeEdge.Bottom
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(40.dp)
             .pointerInput(edge) {
                 awaitEachGesture {
                     val down = awaitFirstDown(
@@ -341,9 +369,9 @@ private fun ResizeEdgeHandle(
             modifier = Modifier
                 .then(
                     if (horizontal) {
-                        Modifier.width(30.dp).height(14.dp)
+                        Modifier.width(24.dp).height(12.dp)
                     } else {
-                        Modifier.width(14.dp).height(30.dp)
+                        Modifier.width(12.dp).height(24.dp)
                     },
                 )
                 .clip(shape)
@@ -356,9 +384,9 @@ private fun ResizeEdgeHandle(
                 contentDescription = stringResource(edge.descriptionRes()),
                 tint = Color.White,
                 modifier = if (horizontal) {
-                    Modifier.width(20.dp).height(12.dp)
+                    Modifier.width(16.dp).height(10.dp)
                 } else {
-                    Modifier.width(12.dp).height(20.dp)
+                    Modifier.width(10.dp).height(16.dp)
                 },
             )
         }
@@ -391,11 +419,7 @@ private data class PixelRect(
     val top: Int,
     val right: Int,
     val bottom: Int,
-) {
-    fun overlaps(other: PixelRect): Boolean {
-        return left < other.right && right > other.left && top < other.bottom && bottom > other.top
-    }
-}
+)
 
 private fun findOverlappingCards(bounds: Map<HomeLayoutCard, Rect>): Set<HomeLayoutCard> {
     val entries = bounds.entries.toList()

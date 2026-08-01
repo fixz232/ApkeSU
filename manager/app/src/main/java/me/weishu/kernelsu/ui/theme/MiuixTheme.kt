@@ -1,6 +1,5 @@
 package me.weishu.kernelsu.ui.theme
 
-import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
@@ -11,23 +10,28 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
+import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
-import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
-import me.weishu.kernelsu.ui.component.rain.forceRainDarkTheme
+import me.weishu.kernelsu.ui.component.rain.rainPalette
+import me.weishu.kernelsu.ui.component.ink.LocalInkFontEnabled
+import me.weishu.kernelsu.ui.component.ink.LocalInkStyle
+import me.weishu.kernelsu.ui.component.ink.InkPalette
+import me.weishu.kernelsu.ui.component.ink.inkPalette
 import me.weishu.kernelsu.ui.util.AppFontState
 import me.weishu.kernelsu.ui.util.resolveAppFontFamily
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec
@@ -44,24 +48,57 @@ fun MiuixKernelSUTheme(
     val context = LocalContext.current
     val systemDarkTheme = isSystemInDarkTheme()
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
-    val forcePixelCyberDark =
-        LocalInterfaceStyle.current == InterfaceStyle.Pixel.value &&
-            LocalPixelStyle.current == PixelStyle.CyberHacker
-    val forceRainDark =
-        LocalInterfaceStyle.current == InterfaceStyle.Rain.value &&
-            forceRainDarkTheme(LocalRainStyle.current)
-    val forceInterfaceDark = forcePixelCyberDark || forceRainDark
-    val darkTheme = forceInterfaceDark ||
-        appSettings.colorMode.isDark ||
-        (appSettings.colorMode.isSystem && systemDarkTheme)
+    val isRainStyle = LocalInterfaceStyle.current == InterfaceStyle.Rain.value
+    val isInkStyle = LocalInterfaceStyle.current == InterfaceStyle.Ink.value
+    val rainStyle = LocalRainStyle.current
+    val inkStyle = LocalInkStyle.current
+    val inkFontEnabled = LocalInkFontEnabled.current
+    val forceInterfaceDark = isInterfaceForcedDark(
+        interfaceStyle = LocalInterfaceStyle.current,
+        rainStyle = LocalRainStyle.current,
+        pixelStyle = LocalPixelStyle.current,
+    )
+    val darkTheme = resolveEffectiveDarkMode(
+        colorMode = appSettings.colorMode,
+        systemDark = systemDarkTheme,
+        interfaceStyle = LocalInterfaceStyle.current,
+        rainStyle = LocalRainStyle.current,
+        pixelStyle = LocalPixelStyle.current,
+    )
     val colorStyle = appSettings.paletteStyle
     val colorSpec = appSettings.colorSpec
     val materialColorScheme = rememberAppColorScheme(
         appSettings = appSettings,
         forceDark = forceInterfaceDark,
     )
-    val appFontFamily = remember(appFontState) {
-        resolveAppFontFamily(context, appFontState)
+    val rainColors = remember(isRainStyle, rainStyle, darkTheme) {
+        if (isRainStyle) rainPalette(rainStyle, darkTheme) else null
+    }
+    val inkColors = remember(isInkStyle, inkStyle, darkTheme) {
+        if (isInkStyle) inkPalette(inkStyle, darkTheme) else null
+    }
+    val effectiveMaterialColorScheme = remember(materialColorScheme, rainColors, inkColors, darkTheme) {
+        when {
+            rainColors != null -> {
+                val secondaryText = if (darkTheme) Color(0xFFB8C6CE) else Color(0xFF435D68)
+                materialColorScheme.copy(
+                    onBackground = rainColors.content,
+                    onSurface = rainColors.content,
+                    onSurfaceVariant = secondaryText,
+                    outline = rainColors.outline,
+                )
+            }
+
+            inkColors != null -> materialColorScheme.withInkColors(inkColors)
+            else -> materialColorScheme
+        }
+    }
+    val appFontFamily = remember(appFontState, isInkStyle, inkFontEnabled) {
+        if (isInkStyle && inkFontEnabled) {
+            FontFamily(Font(R.font.ink_wenkai))
+        } else {
+            resolveAppFontFamily(context, appFontState)
+        }
     }
     val materialTypography = remember(appFontFamily) {
         Typography(fontFamily = appFontFamily)
@@ -125,32 +162,112 @@ fun MiuixKernelSUTheme(
         controller = controller,
         textStyles = miuixTextStyles,
         content = {
-            LaunchedEffect(darkTheme) {
-                val window = (context as? Activity)?.window ?: return@LaunchedEffect
-                WindowInsetsControllerCompat(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !darkTheme
-                    isAppearanceLightNavigationBars = !darkTheme
+            val baseMiuixColors = MiuixTheme.colorScheme
+            val effectiveMiuixColors = remember(
+                baseMiuixColors,
+                appSettings.colorMode,
+                appSettings.monetSurfaceOpacity,
+                rainColors,
+                inkColors,
+                darkTheme,
+            ) {
+                val base = if (appSettings.colorMode.isMonet) {
+                    baseMiuixColors.withMonetSurfaceOpacity(appSettings.monetSurfaceOpacity)
+                } else {
+                    baseMiuixColors
+                }
+                when {
+                    rainColors != null -> base.withRainTextColors(
+                        content = rainColors.content,
+                        secondary = if (darkTheme) Color(0xFFB8C6CE) else Color(0xFF435D68),
+                        outline = rainColors.outline,
+                    )
+
+                    inkColors != null -> base.withInkColors(inkColors)
+                    else -> base
                 }
             }
-            MonetColorsProvider.UpdateCss()
-            MaterialExpressiveTheme(
-                colorScheme = materialColorScheme,
-                typography = materialTypography,
-                motionScheme = MotionScheme.expressive(),
+            MiuixTheme(
+                colors = effectiveMiuixColors,
+                textStyles = miuixTextStyles,
             ) {
-                val fontContentColor = MiuixTheme.colorScheme.onBackground.copy(
-                    alpha = appFontState.opacity,
-                )
-                CompositionLocalProvider(
-                    LocalContentColor provides fontContentColor,
-                    MaterialLocalContentColor provides fontContentColor,
+                MaterialExpressiveTheme(
+                    colorScheme = effectiveMaterialColorScheme,
+                    typography = materialTypography,
+                    motionScheme = MotionScheme.expressive(),
                 ) {
-                    content()
+                    val fontContentColor = MiuixTheme.colorScheme.onBackground.copy(
+                        alpha = appFontState.opacity,
+                    )
+                    CompositionLocalProvider(
+                        LocalContentColor provides fontContentColor,
+                        MaterialLocalContentColor provides fontContentColor,
+                    ) {
+                        MonetColorsProvider.UpdateCss()
+                        content()
+                    }
                 }
             }
         }
     )
 }
+
+private fun Colors.withRainTextColors(
+    content: Color,
+    secondary: Color,
+    outline: Color,
+): Colors = copy(
+    onBackground = content,
+    onBackgroundVariant = secondary,
+    onSurface = content,
+    onSurfaceSecondary = secondary,
+    onSurfaceVariantSummary = secondary,
+    onSurfaceVariantActions = content,
+    onSurfaceContainer = content,
+    onSurfaceContainerVariant = secondary,
+    onSurfaceContainerHigh = content,
+    onSurfaceContainerHighest = content,
+    outline = outline,
+)
+
+private fun ColorScheme.withInkColors(palette: InkPalette): ColorScheme = copy(
+    primary = palette.primary,
+    secondary = palette.secondary,
+    tertiary = palette.seal,
+    background = palette.backgroundBottom,
+    onBackground = palette.content,
+    surface = palette.surfaceBottom,
+    surfaceVariant = palette.surfaceTop,
+    surfaceContainerLowest = palette.surfaceBottom,
+    surfaceContainerLow = palette.surfaceBottom,
+    surfaceContainer = palette.surfaceTop,
+    surfaceContainerHigh = palette.surfaceTop,
+    surfaceContainerHighest = palette.surfaceTop,
+    onSurface = palette.content,
+    onSurfaceVariant = palette.secondaryContent,
+    outline = palette.outline,
+)
+
+private fun Colors.withInkColors(palette: InkPalette): Colors = copy(
+    primary = palette.primary,
+    secondary = palette.secondary,
+    surface = palette.surfaceBottom,
+    surfaceVariant = palette.surfaceTop,
+    surfaceContainer = palette.surfaceTop,
+    surfaceContainerHigh = palette.surfaceTop,
+    surfaceContainerHighest = palette.surfaceTop,
+    onBackground = palette.content,
+    onBackgroundVariant = palette.secondaryContent,
+    onSurface = palette.content,
+    onSurfaceSecondary = palette.secondaryContent,
+    onSurfaceVariantSummary = palette.secondaryContent,
+    onSurfaceVariantActions = palette.content,
+    onSurfaceContainer = palette.content,
+    onSurfaceContainerVariant = palette.secondaryContent,
+    onSurfaceContainerHigh = palette.content,
+    onSurfaceContainerHighest = palette.content,
+    outline = palette.outline,
+)
 
 @Composable
 private fun rememberAppColorScheme(
@@ -162,7 +279,7 @@ private fun rememberAppColorScheme(
     val darkTheme = forceDark || appSettings.colorMode.isDark ||
         (appSettings.colorMode.isSystem && systemDarkTheme)
 
-    return if (appSettings.keyColor == 0) {
+    val baseScheme = if (appSettings.keyColor == 0) {
         val baseScheme = if (darkTheme) {
             dynamicDarkColorScheme(context)
         } else {
@@ -190,4 +307,41 @@ private fun rememberAppColorScheme(
             specVersion = appSettings.colorSpec,
         )
     }
+    return remember(baseScheme, appSettings.colorMode, appSettings.monetSurfaceOpacity) {
+        if (appSettings.colorMode.isMonet) {
+            baseScheme.withMonetSurfaceOpacity(appSettings.monetSurfaceOpacity)
+        } else {
+            baseScheme
+        }
+    }
+}
+
+private fun ColorScheme.withMonetSurfaceOpacity(opacity: Float): ColorScheme {
+    val safeOpacity = sanitizeMonetSurfaceOpacity(opacity)
+    if (safeOpacity >= 1f) return this
+    fun Color.withOpacity() = copy(alpha = safeOpacity)
+    return copy(
+        surface = surface.withOpacity(),
+        surfaceDim = surfaceDim.withOpacity(),
+        surfaceBright = surfaceBright.withOpacity(),
+        surfaceContainerLowest = surfaceContainerLowest.withOpacity(),
+        surfaceContainerLow = surfaceContainerLow.withOpacity(),
+        surfaceContainer = surfaceContainer.withOpacity(),
+        surfaceContainerHigh = surfaceContainerHigh.withOpacity(),
+        surfaceContainerHighest = surfaceContainerHighest.withOpacity(),
+        surfaceVariant = surfaceVariant.withOpacity(),
+    )
+}
+
+private fun Colors.withMonetSurfaceOpacity(opacity: Float): Colors {
+    val safeOpacity = sanitizeMonetSurfaceOpacity(opacity)
+    if (safeOpacity >= 1f) return this
+    fun Color.withOpacity() = copy(alpha = safeOpacity)
+    return copy(
+        surface = surface.withOpacity(),
+        surfaceVariant = surfaceVariant.withOpacity(),
+        surfaceContainer = surfaceContainer.withOpacity(),
+        surfaceContainerHigh = surfaceContainerHigh.withOpacity(),
+        surfaceContainerHighest = surfaceContainerHighest.withOpacity(),
+    )
 }

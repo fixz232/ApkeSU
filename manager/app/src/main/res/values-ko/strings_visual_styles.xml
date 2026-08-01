@@ -12,10 +12,13 @@
     <string name="rain_style_heavy_summary">어두운 폭풍 색상, 강한 바람, 짙게 젖은 유리와 자주 퍼지는 바닥 물결을 표현합니다.</string>
     <string name="rain_style_thunderstorm">뇌우</string>
     <string name="rain_style_thunderstorm_summary">야간에만 3~8초마다 번개가 번쩍이며 거센 비와 보라색 먹구름을 표시합니다.</string>
+    <string name="rain_style_after_rain">비 갠 뒤</string>
+    <string name="rain_style_after_rain_summary">빗줄기가 차츰 잦아들고 구름이 열리며 젖은 유리와 바닥에 빛이 돌아옵니다.</string>
     <string name="rain_motto_light">유리 위에 내려앉는 빗소리를 듣다</string>
     <string name="rain_motto_medium">비가 짙어질수록 세상은 고요해진다</string>
     <string name="rain_motto_heavy">폭풍 속에서도 맑음을 지키다</string>
     <string name="rain_motto_thunderstorm">번개가 밤을 가르고, 중심은 흔들리지 않는다</string>
+    <string name="rain_motto_after_rain">비가 그치면 물 위로 빛이 돌아온다</string>
     <string name="theme_preset_rain">빗속 유리</string>
     <string name="theme_preset_rain_summary">차가운 회청색 유리, 젖은 카드 가장자리, 빗물 차양과 어울리는 플로팅 내비게이션 바입니다.</string>
     <string name="settings_pixel_card_motion">픽셀 카드 애니메이션</string>

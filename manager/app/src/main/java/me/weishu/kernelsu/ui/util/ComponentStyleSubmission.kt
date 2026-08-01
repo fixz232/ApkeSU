@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ui.component.custom.ComponentStyleKind
 import me.weishu.kernelsu.ui.component.custom.CustomCardStyle
 import me.weishu.kernelsu.ui.component.custom.CustomSwitchStyle
@@ -125,7 +124,7 @@ internal fun buildComponentStyleSubmissionDraft(
     tagsText = tags,
     versionCodeText = "1",
     versionName = "1.0.0",
-    minManagerVersionCodeText = BuildConfig.VERSION_CODE.toString(),
+    minManagerVersionCodeText = "1",
     maxManagerVersionCodeText = "",
     packageUrl = "",
     coverUrl = "",

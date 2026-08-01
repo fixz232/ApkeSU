@@ -47,6 +47,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +69,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.AppFreezeFailure
 import me.weishu.kernelsu.ui.util.AppFreezeProtection
 import me.weishu.kernelsu.ui.util.FreezableApp
@@ -101,7 +106,7 @@ fun AppFreezeScreen() {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -132,6 +137,12 @@ fun AppFreezeScreen() {
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                ),
             )
         },
     ) { paddingValues ->
@@ -313,7 +324,7 @@ private fun AppFreezeMetric(
 ) {
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(8.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
@@ -385,7 +396,7 @@ private fun AppFreezeRow(
         color = if (app.frozen) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer)
         },
         shape = RoundedCornerShape(8.dp),
     ) {
@@ -555,6 +566,7 @@ private fun appFreezeFailureMessage(failure: AppFreezeFailure, detail: String): 
             AppFreezeFailure.RootUnavailable -> R.string.app_freeze_error_root
             AppFreezeFailure.CommandFailed -> R.string.app_freeze_error_command
             AppFreezeFailure.VerificationFailed -> R.string.app_freeze_error_verify
+            AppFreezeFailure.PersistenceFailed -> R.string.app_freeze_error_persistence
         }
     )
     return if (detail.isBlank() || detail == failure.name) base else "$base: $detail"

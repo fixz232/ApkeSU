@@ -257,7 +257,7 @@ class CloudThemeCreatorRepository(
             val github = normalizeCloudThemeGithubLogin(githubLogin)
             val request = Request.Builder()
                 .url(
-                    "https://$CLOUD_THEME_GITHUB_API_HOST/repos/fixz232/ApkeSU/issues" +
+                    "https://$CLOUD_THEME_GITHUB_API_HOST/repos/fixz232/ApkeSU-ThemeStore/issues" +
                         "?state=all&creator=$github&per_page=100&sort=updated&direction=desc"
                 )
                 .header("Accept", "application/vnd.github+json")

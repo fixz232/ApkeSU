@@ -37,8 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AcUnit
-import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -154,18 +153,11 @@ fun SuperUserPagerMiuix(
                             }
                         },
                         actions = {
-                            IconButton(onClick = actions.onOpenAppFreeze) {
+                            IconButton(onClick = actions.onOpenAppTools) {
                                 Icon(
-                                    imageVector = Icons.Rounded.AcUnit,
+                                    imageVector = Icons.Rounded.Apps,
                                     tint = topBarColors.content,
-                                    contentDescription = stringResource(R.string.app_freeze_open),
-                                )
-                            }
-                            IconButton(onClick = actions.onOpenAppIdManager) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Fingerprint,
-                                    tint = topBarColors.content,
-                                    contentDescription = stringResource(R.string.app_id_manager_open),
+                                    contentDescription = stringResource(R.string.superuser_app_tools_title),
                                 )
                             }
                             Box {

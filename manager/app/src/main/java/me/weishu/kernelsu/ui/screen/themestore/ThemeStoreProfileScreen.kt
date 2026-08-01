@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -207,6 +208,14 @@ fun ThemeStoreMyScreen(
                                 ?.take(240)
                                 ?: resources.getString(R.string.theme_store_profile_save_failed)
                         }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Throwable) {
+                        errorMessage = error.localizedMessage
+                            ?.lineSequence()
+                            ?.firstOrNull()
+                            ?.take(240)
+                            ?: resources.getString(R.string.theme_store_profile_save_failed)
                     } finally {
                         busy = false
                     }

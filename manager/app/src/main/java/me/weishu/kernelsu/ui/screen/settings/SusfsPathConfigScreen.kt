@@ -60,6 +60,10 @@ import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.SusfsPathConfigState
 import me.weishu.kernelsu.ui.util.getSusfsPathConfig
 import me.weishu.kernelsu.ui.util.normalizeSusfsPath
@@ -138,7 +142,7 @@ fun SusfsPathConfigScreen() {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(
@@ -156,11 +160,23 @@ fun SusfsPathConfigScreen() {
                         Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.susfs_path_refresh))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surface,
+                    ),
+                ),
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 3.dp) {
+            Surface(
+                color = immersiveSurfaceColor(
+                    defaultColor = MaterialTheme.colorScheme.surface,
+                    darkAlpha = 0.70f,
+                    lightAlpha = 0.76f,
+                ),
+                tonalElevation = 3.dp,
+            ) {
                 Button(
                     onClick = ::apply,
                     enabled = state.available && !loading && !applying,
@@ -190,7 +206,7 @@ fun SusfsPathConfigScreen() {
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -265,7 +281,7 @@ fun SusfsPathConfigScreen() {
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),

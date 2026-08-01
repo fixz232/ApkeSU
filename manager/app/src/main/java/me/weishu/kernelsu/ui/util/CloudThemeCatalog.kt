@@ -2,7 +2,9 @@ package me.weishu.kernelsu.ui.util
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.math.BigInteger
 import java.net.URI
+import java.util.Locale
 
 internal const val CLOUD_THEME_CATALOG_SCHEMA = "io.github.fixz.apkesu.theme-catalog"
 internal const val CLOUD_THEME_CATALOG_VERSION = 1
@@ -10,7 +12,7 @@ internal const val CLOUD_THEME_PACKAGE_SCHEMA = "io.github.fixz.apkesu.theme"
 internal const val CLOUD_THEME_MAX_PACKAGE_BYTES = 500L * 1024L * 1024L
 internal const val CLOUD_THEME_MAX_CATALOG_BYTES = 2L * 1024L * 1024L
 internal const val CLOUD_THEME_DEFAULT_CATALOG_URL =
-    "https://raw.githubusercontent.com/fixz232/ApkeSU/ApkeSU/theme-store/catalog/v1/catalog.json"
+    "https://raw.githubusercontent.com/fixz232/ApkeSU-ThemeStore/main/theme-store/catalog/v1/catalog.json"
 
 private const val CLOUD_THEME_STATE_SCHEMA = "io.github.fixz.apkesu.cloud-theme-state"
 private const val CLOUD_THEME_STATE_VERSION = 1
@@ -64,10 +66,8 @@ data class CloudTheme(
     val featured: Boolean,
     val downloadCount: Long,
 ) {
-    fun isCompatible(managerVersionCode: Long): Boolean {
-        return managerVersionCode >= minManagerVersionCode &&
-            (maxManagerVersionCode == null || managerVersionCode <= maxManagerVersionCode)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun isCompatible(managerVersionCode: Long): Boolean = true
 }
 
 data class CloudThemeCatalog(
@@ -79,6 +79,38 @@ data class CloudThemeCatalog(
 
     fun categoryName(categoryId: String): String =
         categories.firstOrNull { it.id == categoryId }?.name ?: categoryId
+}
+
+data class CloudThemeUsageStatistics(
+    val totalUsageCount: Long,
+    val publishedThemeCount: Int,
+    val creatorCount: Int,
+    val categoryCount: Int,
+    val rankedThemes: List<CloudTheme>,
+)
+
+internal fun CloudThemeCatalog.calculateUsageStatistics(): CloudThemeUsageStatistics {
+    val publishedThemes = themes.filter { it.status == CloudThemePublicationStatus.Published }
+    val rankedThemes = publishedThemes.sortedWith(
+        compareByDescending<CloudTheme> { it.downloadCount.coerceAtLeast(0L) }
+            .thenByDescending(CloudTheme::publishedAt)
+            .thenBy { it.name.lowercase(Locale.ROOT) }
+            .thenBy(CloudTheme::id)
+    )
+    val totalUsageCount = publishedThemes.fold(0L) { total, theme ->
+        total.saturatingAdd(theme.downloadCount.coerceAtLeast(0L))
+    }
+    return CloudThemeUsageStatistics(
+        totalUsageCount = totalUsageCount,
+        publishedThemeCount = publishedThemes.size,
+        creatorCount = publishedThemes.distinctBy { it.author.id }.size,
+        categoryCount = publishedThemes.distinctBy(CloudTheme::categoryId).size,
+        rankedThemes = rankedThemes,
+    )
+}
+
+private fun Long.saturatingAdd(value: Long): Long {
+    return if (value > Long.MAX_VALUE - this) Long.MAX_VALUE else this + value
 }
 
 enum class CloudThemeCatalogSource {
@@ -276,7 +308,7 @@ private fun parseCloudTheme(item: JSONObject, categoryIds: Set<String>): CloudTh
         publishedAt = item.requiredLong("publishedAt", minimum = 0L),
         status = status,
         featured = item.optionalBoolean("featured", false),
-        downloadCount = item.optionalLong("downloadCount", minimum = 0L) ?: 0L,
+        downloadCount = item.optionalUsageCount("downloadCount"),
     )
 }
 
@@ -471,6 +503,16 @@ private fun JSONObject.requiredLong(key: String, minimum: Long): Long {
 private fun JSONObject.optionalLong(key: String, minimum: Long): Long? {
     if (!has(key) || isNull(key)) return null
     return requiredLong(key, minimum)
+}
+
+private fun JSONObject.optionalUsageCount(key: String): Long {
+    if (!has(key) || isNull(key)) return 0L
+    return when (val value = opt(key)) {
+        null -> 0L
+        is Byte, is Short, is Int, is Long -> (value as Number).toLong().coerceAtLeast(0L)
+        is BigInteger -> value.coerceIn(BigInteger.ZERO, BigInteger.valueOf(Long.MAX_VALUE)).toLong()
+        else -> 0L
+    }
 }
 
 private fun JSONObject.optionalBoolean(key: String, fallback: Boolean): Boolean {

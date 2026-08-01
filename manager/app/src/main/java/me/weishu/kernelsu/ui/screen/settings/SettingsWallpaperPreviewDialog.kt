@@ -19,14 +19,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.rememberCustomWallpaperPreviewBitmap
+import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -39,6 +40,7 @@ fun SettingsWallpaperPreviewDialog(
     uriString: String?,
     opacity: Float,
     crop: CustomWallpaperCrop,
+    visualSettings: MediaVisualSettings = MediaVisualSettings(),
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
     onDismissRequest: () -> Unit,
@@ -50,6 +52,7 @@ fun SettingsWallpaperPreviewDialog(
         imageBitmap = imageBitmap,
         uriString = uriString,
         opacity = opacity,
+        visualSettings = visualSettings,
         passthroughEnabled = passthroughEnabled,
         passthroughOpacity = passthroughOpacity,
         onDismissRequest = onDismissRequest,
@@ -61,6 +64,7 @@ private fun MiuixWallpaperPreviewDialog(
     imageBitmap: ImageBitmap?,
     uriString: String?,
     opacity: Float,
+    visualSettings: MediaVisualSettings,
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
     onDismissRequest: () -> Unit,
@@ -75,6 +79,7 @@ private fun MiuixWallpaperPreviewDialog(
                     imageBitmap = imageBitmap,
                     uriString = uriString,
                     opacity = opacity,
+                    visualSettings = visualSettings,
                     passthroughEnabled = passthroughEnabled,
                     passthroughOpacity = passthroughOpacity,
                 )
@@ -94,6 +99,7 @@ private fun WallpaperPreviewFrame(
     imageBitmap: ImageBitmap?,
     uriString: String?,
     opacity: Float,
+    visualSettings: MediaVisualSettings,
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
 ) {
@@ -108,12 +114,18 @@ private fun WallpaperPreviewFrame(
         contentAlignment = Alignment.Center,
     ) {
         when {
-            imageBitmap != null -> Image(
+            imageBitmap != null -> MediaVisualLayer(
+                settings = visualSettings,
                 modifier = Modifier.fillMaxSize(),
-                bitmap = imageBitmap,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-            )
+            ) { colorFilter ->
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    bitmap = imageBitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = colorFilter,
+                )
+            }
 
             uriString.isNullOrBlank() -> Text(
                 modifier = Modifier.padding(24.dp),
@@ -158,18 +170,17 @@ private fun WallpaperPreviewFrame(
                 }
             }
             if (passthroughEnabled && passthroughAlpha > 0f) {
-                Image(
+                MediaVisualLayer(
+                    settings = visualSettings.copy(opacity = visualSettings.opacity * passthroughAlpha),
                     modifier = Modifier.fillMaxSize(),
-                    bitmap = imageBitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alpha = passthroughAlpha,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Transparent)
-                )
+                ) {
+                    Image(
+                        modifier = Modifier.fillMaxSize(),
+                        bitmap = imageBitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             }
         }
     }

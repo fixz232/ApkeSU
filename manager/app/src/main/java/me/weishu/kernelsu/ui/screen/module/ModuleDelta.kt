@@ -22,16 +22,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,17 +129,21 @@ fun ModulePagerDelta(
 
     val searchText = uiState.searchStatus.searchText
     val modules = if (searchText.isBlank()) uiState.moduleList else uiState.searchResults
+    val moduleListState = rememberLazyListState()
+    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
 
     DeltaScreen(
         title = stringResource(R.string.module),
         icon = Icons.Rounded.Extension,
         bottomInnerPadding = bottomInnerPadding,
-        topActionIcon = Icons.Rounded.Backup,
-        onTopActionClick = actions.onOpenWallpaperBackup,
-        topActionContentDescription = stringResource(R.string.module_wallpaper_backup_open),
+        topBarVisible = topBarVisible,
+        topActionIcon = Icons.Rounded.Build,
+        onTopActionClick = actions.onOpenTools,
+        topActionContentDescription = stringResource(R.string.module_tools_title),
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
+                state = moduleListState,
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = 18.dp,
@@ -173,6 +180,7 @@ fun ModulePagerDelta(
                             module = module,
                             updateInfo = uiState.updateInfo[module.id],
                             actions = actions,
+                            wallpaperPaused = moduleListState.isScrollInProgress,
                         )
                     }
                 }
@@ -220,11 +228,20 @@ private fun DeltaModuleCard(
     module: Module,
     updateInfo: ModuleUpdateInfo?,
     actions: ModuleActions,
+    wallpaperPaused: Boolean,
 ) {
     val pending = module.update || module.remove
     val textDecoration = if (module.remove) TextDecoration.LineThrough else TextDecoration.None
+    val wallpaperState = rememberModuleCardWallpaperState(module.id)
+    val wallpaperEntry = rememberModuleCardWallpaperFrame(wallpaperState, paused = wallpaperPaused)
+    val wallpaperBitmap = rememberModuleCardWallpaperLoadState(wallpaperEntry).bitmap
 
-    DeltaCard(contentPadding = PaddingValues(0.dp)) {
+    DeltaCard(
+        contentPadding = PaddingValues(0.dp),
+        backgroundContent = {
+            ModuleCardWallpaperBackground(bitmap = wallpaperBitmap, entry = wallpaperEntry)
+        },
+    ) {
         Column {
             Row(
                 modifier = Modifier
@@ -299,13 +316,22 @@ private fun DeltaModuleCard(
                         )
                     }
                 }
-                DeltaSwitch(
-                    checked = module.enabled && !module.remove,
-                    enabled = !pending,
-                    onCheckedChange = {
-                        if (it != module.enabled) actions.onToggleModule(module)
-                    },
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = { actions.onOpenWallpaperEditor(module) }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Image,
+                            contentDescription = stringResource(R.string.module_wallpaper_editor_open),
+                            tint = DeltaColors.Muted,
+                        )
+                    }
+                    DeltaSwitch(
+                        checked = module.enabled && !module.remove,
+                        enabled = !pending,
+                        onCheckedChange = {
+                            if (it != module.enabled) actions.onToggleModule(module)
+                        },
+                    )
+                }
             }
 
             DeltaModuleActions(

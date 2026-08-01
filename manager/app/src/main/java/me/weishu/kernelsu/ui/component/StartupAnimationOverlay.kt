@@ -13,6 +13,8 @@ import android.view.TextureView
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -20,6 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
@@ -37,14 +41,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ui.util.isCustomStartupAnimationGif
 import me.weishu.kernelsu.ui.util.isCustomStartupAnimationVideo
-
-private const val MAX_STARTUP_ANIMATION_DURATION_MS = 5_000L
-private const val STATIC_STARTUP_IMAGE_DURATION_MS = 1_500L
+import me.weishu.kernelsu.ui.util.MAX_STARTUP_ANIMATION_DURATION_MS
+import me.weishu.kernelsu.ui.util.StartupAnimationScaleMode
+import me.weishu.kernelsu.ui.util.StartupAnimationSettings
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun StartupAnimationOverlay(
     uriString: String?,
     modifier: Modifier = Modifier,
+    settings: StartupAnimationSettings = StartupAnimationSettings(),
     onFinished: () -> Unit,
     onError: () -> Unit = {},
 ) {
@@ -57,26 +65,50 @@ fun StartupAnimationOverlay(
 
     val context = LocalContext.current
     val uri = remember(uriString) { uriString.toUri() }
+    val normalizedSettings = remember(settings) { settings.normalized() }
     val isGif = remember(uriString) { isCustomStartupAnimationGif(context, uri) }
     val isVideo = remember(uriString, isGif) { !isGif && isCustomStartupAnimationVideo(context, uri) }
     var isVideoRendering by remember(uriString) { mutableStateOf(false) }
     val currentOnFinished by rememberUpdatedState(onFinished)
+    var verticalDrag by remember(uriString) { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(uriString) {
-        delay(MAX_STARTUP_ANIMATION_DURATION_MS)
+    LaunchedEffect(uriString, normalizedSettings.durationMillis) {
+        delay(normalizedSettings.durationMillis.coerceAtMost(MAX_STARTUP_ANIMATION_DURATION_MS))
         currentOnFinished()
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color(normalizedSettings.backgroundArgb))
+            .clickable(
+                enabled = normalizedSettings.allowTapSkip,
+                indication = null,
+                interactionSource = null,
+                onClick = currentOnFinished,
+            )
+            .pointerInput(normalizedSettings.allowSwipeSkip) {
+                if (!normalizedSettings.allowSwipeSkip) return@pointerInput
+                detectVerticalDragGestures(
+                    onDragStart = { verticalDrag = 0f },
+                    onVerticalDrag = { change, amount ->
+                        verticalDrag += amount
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (abs(verticalDrag) >= 72f) currentOnFinished()
+                        verticalDrag = 0f
+                    },
+                    onDragCancel = { verticalDrag = 0f },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (isVideo) {
             StartupAnimationVideo(
                 uri = uri,
                 visible = isVideoRendering,
+                settings = normalizedSettings,
                 onFirstFrame = { isVideoRendering = true },
                 onFinished = onFinished,
                 onError = onError,
@@ -84,9 +116,20 @@ fun StartupAnimationOverlay(
         } else {
             StartupAnimationImage(
                 uri = uri,
+                settings = normalizedSettings,
                 onFinished = onFinished,
                 onError = onError,
             )
+        }
+        val brightnessOverlay = when {
+            normalizedSettings.brightness < 1f -> Color.Black.copy(alpha = 1f - normalizedSettings.brightness)
+            normalizedSettings.brightness > 1f -> Color.White.copy(
+                alpha = ((normalizedSettings.brightness - 1f) * 0.45f).coerceAtMost(0.16f)
+            )
+            else -> Color.Transparent
+        }
+        if (brightnessOverlay.alpha > 0f) {
+            Box(Modifier.fillMaxSize().background(brightnessOverlay))
         }
     }
 }
@@ -95,6 +138,7 @@ fun StartupAnimationOverlay(
 private fun StartupAnimationVideo(
     uri: Uri,
     visible: Boolean,
+    settings: StartupAnimationSettings,
     onFirstFrame: () -> Unit,
     onFinished: () -> Unit,
     onError: () -> Unit,
@@ -131,7 +175,15 @@ private fun StartupAnimationVideo(
                                     setDataSource(context.applicationContext, uri)
                                     setOnPreparedListener { player ->
                                         player.isLooping = false
-                                        applyFitCenterTransform(this@textureView, player.videoWidth, player.videoHeight)
+                                        applyStartupVideoTransform(
+                                            this@textureView,
+                                            player.videoWidth,
+                                            player.videoHeight,
+                                            settings,
+                                        )
+                                        runCatching {
+                                            player.playbackParams = player.playbackParams.setSpeed(settings.playbackSpeed)
+                                        }
                                         player.start()
                                         this@textureView.postDelayed({ currentOnFirstFrame() }, 250L)
                                     }
@@ -142,7 +194,7 @@ private fun StartupAnimationVideo(
                                         false
                                     }
                                     setOnVideoSizeChangedListener { _, videoWidth, videoHeight ->
-                                        applyFitCenterTransform(this@textureView, videoWidth, videoHeight)
+                                        applyStartupVideoTransform(this@textureView, videoWidth, videoHeight, settings)
                                     }
                                     setOnCompletionListener {
                                         currentOnFinished()
@@ -168,7 +220,7 @@ private fun StartupAnimationVideo(
                             height: Int,
                         ) {
                             mediaPlayer?.let { player ->
-                                applyFitCenterTransform(this@textureView, player.videoWidth, player.videoHeight)
+                                applyStartupVideoTransform(this@textureView, player.videoWidth, player.videoHeight, settings)
                             }
                         }
 
@@ -197,22 +249,43 @@ private fun StartupAnimationVideo(
     }
 }
 
-private fun applyFitCenterTransform(textureView: TextureView, videoWidth: Int, videoHeight: Int) {
+private fun applyStartupVideoTransform(
+    textureView: TextureView,
+    videoWidth: Int,
+    videoHeight: Int,
+    settings: StartupAnimationSettings,
+) {
     if (videoWidth <= 0 || videoHeight <= 0 || textureView.width <= 0 || textureView.height <= 0) return
 
     val viewWidth = textureView.width.toFloat()
     val viewHeight = textureView.height.toFloat()
     val viewAspect = viewWidth / viewHeight
-    val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
-    val (scaleX, scaleY) = if (videoAspect > viewAspect) {
-        1f to viewAspect / videoAspect
-    } else {
-        videoAspect / viewAspect to 1f
+    val crop = settings.cropForViewport(textureView.width, textureView.height)
+    val videoAspect = (videoWidth * crop.width).coerceAtLeast(1f) /
+        (videoHeight * crop.height).coerceAtLeast(1f)
+    val (scaleX, scaleY) = when (settings.scaleMode) {
+        StartupAnimationScaleMode.Fill -> 1f to 1f
+        StartupAnimationScaleMode.Fit -> if (videoAspect > viewAspect) {
+            1f to viewAspect / videoAspect
+        } else {
+            videoAspect / viewAspect to 1f
+        }
+        StartupAnimationScaleMode.Crop -> if (videoAspect > viewAspect) {
+            videoAspect / viewAspect to 1f
+        } else {
+            1f to viewAspect / videoAspect
+        }
     }
 
     textureView.setTransform(
         Matrix().apply {
             setScale(scaleX, scaleY, viewWidth / 2f, viewHeight / 2f)
+            val focusX = (crop.left + crop.right) / 2f
+            val focusY = (crop.top + crop.bottom) / 2f
+            postTranslate(
+                (0.5f - focusX) * viewWidth * scaleX,
+                (0.5f - focusY) * viewHeight * scaleY,
+            )
         }
     )
 }
@@ -220,6 +293,7 @@ private fun applyFitCenterTransform(textureView: TextureView, videoWidth: Int, v
 @Composable
 private fun StartupAnimationImage(
     uri: Uri,
+    settings: StartupAnimationSettings,
     onFinished: () -> Unit,
     onError: () -> Unit,
 ) {
@@ -249,15 +323,19 @@ private fun StartupAnimationImage(
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
             ImageView(context).apply {
-                setBackgroundColor(android.graphics.Color.BLACK)
-                scaleType = ImageView.ScaleType.FIT_CENTER
+                setBackgroundColor(settings.backgroundArgb.toInt())
+                scaleType = ImageView.ScaleType.MATRIX
                 setImageDrawable(drawable)
+                post { applyStartupImageMatrix(this, drawable, settings) }
             }
         },
         update = { imageView ->
             if (imageView.drawable !== drawable) {
                 imageView.setImageDrawable(drawable)
             }
+            imageView.setBackgroundColor(settings.backgroundArgb.toInt())
+            imageView.scaleType = ImageView.ScaleType.MATRIX
+            imageView.post { applyStartupImageMatrix(imageView, drawable, settings) }
         },
     )
 
@@ -278,8 +356,50 @@ private fun StartupAnimationImage(
         }
     } else {
         LaunchedEffect(drawable) {
-            delay(STATIC_STARTUP_IMAGE_DURATION_MS)
+            delay(settings.durationMillis)
             currentOnFinished()
         }
+    }
+}
+
+private fun applyStartupImageMatrix(
+    imageView: ImageView,
+    drawable: Drawable,
+    settings: StartupAnimationSettings,
+) {
+    val viewWidth = imageView.width.toFloat()
+    val viewHeight = imageView.height.toFloat()
+    val sourceWidth = drawable.intrinsicWidth.toFloat()
+    val sourceHeight = drawable.intrinsicHeight.toFloat()
+    if (viewWidth <= 0f || viewHeight <= 0f || sourceWidth <= 0f || sourceHeight <= 0f) return
+    val crop = settings.cropForViewport(imageView.width, imageView.height)
+    val cropWidth = (sourceWidth * crop.width).coerceAtLeast(1f)
+    val cropHeight = (sourceHeight * crop.height).coerceAtLeast(1f)
+    val scaleX: Float
+    val scaleY: Float
+    when (settings.scaleMode) {
+        StartupAnimationScaleMode.Fill -> {
+            scaleX = viewWidth / cropWidth
+            scaleY = viewHeight / cropHeight
+        }
+        StartupAnimationScaleMode.Fit -> {
+            val scale = min(viewWidth / cropWidth, viewHeight / cropHeight)
+            scaleX = scale
+            scaleY = scale
+        }
+        StartupAnimationScaleMode.Crop -> {
+            val scale = max(viewWidth / cropWidth, viewHeight / cropHeight)
+            scaleX = scale
+            scaleY = scale
+        }
+    }
+    val cropCenterX = sourceWidth * (crop.left + crop.right) / 2f
+    val cropCenterY = sourceHeight * (crop.top + crop.bottom) / 2f
+    imageView.imageMatrix = Matrix().apply {
+        setScale(scaleX, scaleY)
+        postTranslate(
+            viewWidth / 2f - cropCenterX * scaleX,
+            viewHeight / 2f - cropCenterY * scaleY,
+        )
     }
 }

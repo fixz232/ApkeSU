@@ -79,6 +79,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
 import me.weishu.kernelsu.ui.util.DeviceIdentifierKind
 import me.weishu.kernelsu.ui.util.DeviceIdentifierState
 import me.weishu.kernelsu.ui.util.DeviceIdentifierSupport
@@ -321,7 +322,7 @@ private fun DeviceIdentityContent(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
             ) {
                 Column {
                     uiState.snapshot.identifiers.forEachIndexed { index, identifier ->

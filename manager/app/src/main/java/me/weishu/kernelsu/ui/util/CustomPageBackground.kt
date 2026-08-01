@@ -91,7 +91,12 @@ enum class CustomPageBackgroundTarget(
             return entries.firstOrNull { it.mainPageIndex == page }
         }
     }
+
+    val visualKeys: MediaVisualPreferenceKeys
+        get() = MediaVisualPreferenceKeys("custom_page_background_${id}_visual")
 }
+
+val GLOBAL_BACKGROUND_VISUAL_KEYS = MediaVisualPreferenceKeys("custom_global_background_visual")
 
 @Immutable
 data class CustomBackgroundState(
@@ -100,6 +105,7 @@ data class CustomBackgroundState(
     val opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     val crop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
     val videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    val visualSettings: MediaVisualSettings = MediaVisualSettings(),
 ) {
     val hasWallpaper: Boolean
         get() = !wallpaperUriString.isNullOrBlank()
@@ -145,7 +151,9 @@ val CUSTOM_PAGE_BACKGROUND_PREFERENCE_KEYS: Set<String> = buildSet {
         add(target.cropRightKey)
         add(target.cropBottomKey)
         add(target.videoDurationSecondsKey)
+        addAll(target.visualKeys.all)
     }
+    addAll(GLOBAL_BACKGROUND_VISUAL_KEYS.all)
 }
 
 fun readCustomPageBackgroundSet(context: Context): CustomPageBackgroundSet {
@@ -212,6 +220,7 @@ fun clearCustomPageBackground(context: Context, target: CustomPageBackgroundTarg
         remove(target.videoUriKey)
         remove(target.opacityKey)
         remove(target.videoDurationSecondsKey)
+        removeMediaVisualSettings(target.visualKeys)
         removeCustomPageBackgroundCrop(target)
     }
     releaseCustomImageReference(context, previousWallpaper)
@@ -248,6 +257,26 @@ fun setCustomPageBackgroundVideoDurationSeconds(
     }
 }
 
+fun setCustomPageBackgroundVisualSettings(
+    context: Context,
+    target: CustomPageBackgroundTarget,
+    settings: MediaVisualSettings,
+) {
+    customPageBackgroundPrefs(context).edit {
+        putMediaVisualSettings(target.visualKeys, settings)
+    }
+}
+
+fun readGlobalBackgroundVisualSettings(context: Context): MediaVisualSettings {
+    return customPageBackgroundPrefs(context).readMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS)
+}
+
+fun setGlobalBackgroundVisualSettings(context: Context, settings: MediaVisualSettings) {
+    customPageBackgroundPrefs(context).edit {
+        putMediaVisualSettings(GLOBAL_BACKGROUND_VISUAL_KEYS, settings)
+    }
+}
+
 internal fun SharedPreferences.readCustomPageBackgroundSet(): CustomPageBackgroundSet {
     return CustomPageBackgroundSet(
         home = readCustomPageBackgroundState(CustomPageBackgroundTarget.Home),
@@ -278,6 +307,7 @@ private fun SharedPreferences.readCustomPageBackgroundState(
         videoDurationSeconds = sanitizeCustomVideoBackgroundDurationSeconds(
             getInt(target.videoDurationSecondsKey, DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS)
         ),
+        visualSettings = readMediaVisualSettings(target.visualKeys),
     )
 }
 

@@ -17,12 +17,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
 import me.weishu.kernelsu.ui.component.CustomVideoPassthroughBackground
+import me.weishu.kernelsu.ui.component.MediaVisualLayer
+import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
+import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -34,6 +37,8 @@ fun SettingsVideoBackgroundPreviewDialog(
     uriString: String?,
     durationSeconds: Int,
     opacity: Float,
+    crop: CustomWallpaperCrop = CustomWallpaperCrop(),
+    visualSettings: MediaVisualSettings = MediaVisualSettings(),
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
     onDismissRequest: () -> Unit,
@@ -44,6 +49,8 @@ fun SettingsVideoBackgroundPreviewDialog(
         uriString = uriString,
         durationSeconds = durationSeconds,
         opacity = opacity,
+        crop = crop,
+        visualSettings = visualSettings,
         passthroughEnabled = passthroughEnabled,
         passthroughOpacity = passthroughOpacity,
         onDismissRequest = onDismissRequest,
@@ -55,6 +62,8 @@ private fun MiuixVideoBackgroundPreviewDialog(
     uriString: String?,
     durationSeconds: Int,
     opacity: Float,
+    crop: CustomWallpaperCrop,
+    visualSettings: MediaVisualSettings,
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
     onDismissRequest: () -> Unit,
@@ -69,6 +78,8 @@ private fun MiuixVideoBackgroundPreviewDialog(
                     uriString = uriString,
                     durationSeconds = durationSeconds,
                     opacity = opacity,
+                    crop = crop,
+                    visualSettings = visualSettings,
                     passthroughEnabled = passthroughEnabled,
                     passthroughOpacity = passthroughOpacity,
                 )
@@ -88,9 +99,12 @@ private fun VideoPreviewFrame(
     uriString: String?,
     durationSeconds: Int,
     opacity: Float,
+    crop: CustomWallpaperCrop,
+    visualSettings: MediaVisualSettings,
     passthroughEnabled: Boolean,
     passthroughOpacity: Float,
 ) {
+    val overlayAlpha = 1f - sanitizeCustomWallpaperOpacity(opacity)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -108,11 +122,20 @@ private fun VideoPreviewFrame(
             return@Box
         }
 
-        CustomVideoBackground(
-            uriString = uriString,
-            durationSeconds = durationSeconds,
-            opacity = opacity,
-            modifier = Modifier.fillMaxSize(),
+        MediaVisualLayer(settings = visualSettings, modifier = Modifier.fillMaxSize()) {
+            CustomVideoBackground(
+                uriString = uriString,
+                durationSeconds = durationSeconds,
+                crop = crop,
+                drawOverlay = false,
+                touchPassthrough = true,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = overlayAlpha))
         )
         Column(
             modifier = Modifier
@@ -147,13 +170,10 @@ private fun VideoPreviewFrame(
             CustomVideoPassthroughBackground(
                 uriString = uriString,
                 durationSeconds = durationSeconds,
+                crop = crop,
+                visualSettings = visualSettings,
                 imageAlpha = passthroughAlpha,
                 modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent)
             )
         }
     }

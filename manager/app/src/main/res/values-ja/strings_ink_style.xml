@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="interface_style_ink">墨境</string>
+    <string name="settings_ink_style">墨境モード</string>
+    <string name="settings_ink_font">水墨セリフ書体</string>
+    <string name="settings_ink_font_summary">画面全体に落ち着いたセリフ書体を使います。オフにすると選択中またはカスタム書体に戻ります。</string>
+    <string name="settings_ink_card_motion">動く水墨カード</string>
+    <string name="settings_ink_card_motion_summary">カードとナビゲーションに水紋、細雨、葉、花、月光の控えめな動きを加えます。</string>
+    <string name="ink_style_mist_jiangnan">煙雨江南</string>
+    <string name="ink_style_mist_jiangnan_summary">細い雨、淡い水面、遠い灰青の山並みと静かな朱印。</string>
+    <string name="ink_style_verdant_landscape">青緑山水</string>
+    <string name="ink_style_verdant_landscape_summary">翡翠色の山、石青の水、重なる鉱物色を透明な墨面に描きます。</string>
+    <string name="ink_style_cinnabar_scroll">朱砂画巻</string>
+    <string name="ink_style_cinnabar_scroll_summary">中立的な紙灰、濃淡の墨、控えめな朱砂の枝と印章。</string>
+    <string name="ink_style_purple_night_mountain">紫墨夜山</string>
+    <string name="ink_style_purple_night_mountain_summary">岩紫の夜山、冷銀の霧、淡い翡翠色と遠い月。</string>
+    <string name="theme_preset_ink">墨境</string>
+    <string name="theme_preset_ink_summary">4種類の水墨風景がカード、書体、ナビゲーション、ページ遷移と連動します。</string>
+</resources>

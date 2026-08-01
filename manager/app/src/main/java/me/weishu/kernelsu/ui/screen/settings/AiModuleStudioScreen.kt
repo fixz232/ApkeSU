@@ -103,6 +103,10 @@ import kotlinx.coroutines.flow.collectLatest
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.markdown.GithubMarkdown
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.immersivePageColor
+import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
+import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
+import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.navigation3.Route
 
 private enum class StudioFileDialogMode {
@@ -141,7 +145,9 @@ fun AiModuleStudioScreen() {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+        containerColor = immersivePageColor(
+            MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+        ),
         contentWindowInsets = WindowInsets.safeDrawing.only(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         ),
@@ -174,7 +180,12 @@ fun AiModuleStudioScreen() {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
+                    containerColor = immersiveTopBarColor(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+                    ),
+                    scrolledContainerColor = immersiveScrolledTopBarColor(
+                        MaterialTheme.colorScheme.surface,
+                    ),
                 ),
             )
         },
@@ -365,7 +376,7 @@ private fun StudioWorkspaceHeader(
     onSelected: (AiModuleStudioTab) -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column {
@@ -551,7 +562,7 @@ private fun FilePane(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column {
             Row(
@@ -819,7 +830,7 @@ private fun SearchReplaceBar(
     onClose: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -999,7 +1010,7 @@ private fun ProjectOverviewPanel(
     onEditMetadata: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1224,7 +1235,7 @@ private fun ValidationIssueRow(issue: AiModuleValidationIssue, onClick: () -> Un
     }
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
     ) {
         Row(
@@ -1372,7 +1383,7 @@ private fun AssistantContextPanel(
 ) {
     val apiColor = if (state.apiConfigValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1530,7 +1541,7 @@ private fun AssistantResponsePane(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column {
             Row(

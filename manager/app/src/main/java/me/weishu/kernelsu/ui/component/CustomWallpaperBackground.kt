@@ -6,7 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.SystemClock
+import android.util.LruCache
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -35,31 +36,133 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
+import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.FULL_CUSTOM_WALLPAPER_CROP
+import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.loadCustomImageBitmap
 import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundDurationSeconds
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
 import android.graphics.Matrix as AndroidMatrix
+import java.util.concurrent.ConcurrentHashMap
 
 private const val WALLPAPER_BACKGROUND_MAX_SIDE = 1800
 private const val WALLPAPER_PREVIEW_MAX_SIDE = 1400
+private const val WALLPAPER_PRELOAD_BATCH_SIZE = 2
+private const val WALLPAPER_CACHE_MIN_KIB = 16 * 1024
+private const val WALLPAPER_CACHE_MAX_KIB = 48 * 1024
+
+private data class WallpaperBitmapCacheKey(
+    val uriString: String,
+    val maxSide: Int,
+    val crop: CustomWallpaperCrop,
+)
+
+private val wallpaperBitmapCache = object : LruCache<WallpaperBitmapCacheKey, Bitmap>(
+    (Runtime.getRuntime().maxMemory() / 8L / 1024L)
+        .coerceIn(WALLPAPER_CACHE_MIN_KIB.toLong(), WALLPAPER_CACHE_MAX_KIB.toLong())
+        .toInt(),
+) {
+    override fun sizeOf(key: WallpaperBitmapCacheKey, value: Bitmap): Int {
+        return (value.allocationByteCount / 1024).coerceAtLeast(1)
+    }
+}
+
+private val wallpaperBitmapDecodeLocks = ConcurrentHashMap<WallpaperBitmapCacheKey, Any>()
+
+private fun cachedWallpaperBitmap(key: WallpaperBitmapCacheKey): Bitmap? {
+    val bitmap = wallpaperBitmapCache.get(key) ?: return null
+    if (!bitmap.isRecycled) return bitmap
+    wallpaperBitmapCache.remove(key)
+    return null
+}
+
+private fun loadCachedWallpaperBitmap(
+    context: Context,
+    key: WallpaperBitmapCacheKey,
+): Bitmap? {
+    cachedWallpaperBitmap(key)?.let { return it }
+    val decodeLock = wallpaperBitmapDecodeLocks.getOrPut(key) { Any() }
+    return try {
+        synchronized(decodeLock) {
+            cachedWallpaperBitmap(key)?.let { return@synchronized it }
+            loadCustomImageBitmap(
+                context = context.applicationContext,
+                uriString = key.uriString,
+                maxSide = key.maxSide,
+                crop = key.crop,
+            )?.also { wallpaperBitmapCache.put(key, it) }
+        }
+    } finally {
+        wallpaperBitmapDecodeLocks.remove(key, decodeLock)
+    }
+}
+
+internal suspend fun preloadCustomImageBitmap(
+    context: Context,
+    uriString: String?,
+    maxSide: Int,
+    crop: CustomWallpaperCrop = CustomWallpaperCrop(),
+): Bitmap? {
+    val key = uriString?.takeIf(String::isNotBlank)?.let {
+        WallpaperBitmapCacheKey(
+            uriString = it,
+            maxSide = maxSide.coerceAtLeast(1),
+            crop = sanitizeCustomWallpaperCrop(crop),
+        )
+    } ?: return null
+    return withContext(Dispatchers.IO) {
+        loadCachedWallpaperBitmap(context.applicationContext, key)
+    }
+}
+
+suspend fun preloadCustomPageBackgroundImages(
+    context: Context,
+    backgrounds: CustomPageBackgroundSet,
+) {
+    val requests = CustomPageBackgroundTarget.entries
+        .map { backgrounds[it] }
+        .filter { it.hasWallpaper && !it.hasVideo }
+        .mapNotNull { state ->
+            state.wallpaperUriString?.takeIf(String::isNotBlank)?.let { uriString ->
+                WallpaperBitmapCacheKey(
+                    uriString = uriString,
+                    maxSide = WALLPAPER_BACKGROUND_MAX_SIDE,
+                    crop = sanitizeCustomWallpaperCrop(state.crop),
+                )
+            }
+        }
+        .distinct()
+        .filter { cachedWallpaperBitmap(it) == null }
+
+    requests.chunked(WALLPAPER_PRELOAD_BATCH_SIZE).forEach { batch ->
+        coroutineScope {
+            batch.map { key ->
+                async(Dispatchers.IO) {
+                    loadCachedWallpaperBitmap(context, key)
+                }
+            }.awaitAll()
+        }
+    }
+}
 
 @Composable
 fun CustomWallpaperBackground(
@@ -100,6 +203,7 @@ fun CustomWallpaperRoot(
     videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
+    visualSettings: MediaVisualSettings = MediaVisualSettings(),
     passthroughEnabled: Boolean = false,
     passthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
     content: @Composable BoxScope.() -> Unit,
@@ -118,6 +222,7 @@ fun CustomWallpaperRoot(
             videoDurationSeconds = videoDurationSeconds,
             opacity = if (isLiquidGlass) opacity.coerceAtMost(0.42f) else opacity,
             crop = crop,
+            visualSettings = visualSettings,
         )
         content()
         if (passthroughEnabled) {
@@ -126,13 +231,17 @@ fun CustomWallpaperRoot(
                 !videoUriString.isNullOrBlank() -> CustomVideoPassthroughBackground(
                     uriString = videoUriString,
                     durationSeconds = videoDurationSeconds,
+                    crop = crop,
+                    visualSettings = visualSettings,
                     imageAlpha = passthroughAlpha,
                 )
 
-                !uriString.isNullOrBlank() -> CustomWallpaperBackground(
-                    uriString = uriString,
-                    opacity = passthroughAlpha,
+                !uriString.isNullOrBlank() -> CustomBackgroundMedia(
+                    imageUriString = uriString,
+                    videoUriString = null,
+                    opacity = 1f,
                     crop = crop,
+                    visualSettings = visualSettings,
                     imageAlpha = passthroughAlpha,
                     drawOverlay = false,
                 )
@@ -148,29 +257,53 @@ fun CustomBackgroundMedia(
     videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
+    visualSettings: MediaVisualSettings = MediaVisualSettings(),
     imageAlpha: Float = 1f,
     drawOverlay: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    if (!videoUriString.isNullOrBlank()) {
-        CustomVideoBackground(
-            uriString = videoUriString,
-            durationSeconds = videoDurationSeconds,
-            opacity = opacity,
-            crop = FULL_CUSTOM_WALLPAPER_CROP,
-            imageAlpha = imageAlpha,
-            drawOverlay = drawOverlay,
-            modifier = modifier,
-        )
+    if (videoUriString.isNullOrBlank() && imageUriString.isNullOrBlank()) return
+    val imageBitmap = if (videoUriString.isNullOrBlank()) {
+        rememberCustomImageBitmap(imageUriString, WALLPAPER_BACKGROUND_MAX_SIDE, crop)
     } else {
-        CustomWallpaperBackground(
-            uriString = imageUriString,
-            opacity = opacity,
-            crop = crop,
-            imageAlpha = imageAlpha,
-            drawOverlay = drawOverlay,
-            modifier = modifier,
-        )
+        null
+    }
+    Box(modifier = modifier.fillMaxSize()) {
+        MediaVisualLayer(
+            settings = visualSettings.copy(opacity = visualSettings.opacity * imageAlpha),
+            modifier = Modifier.fillMaxSize(),
+        ) { colorFilter ->
+            if (!videoUriString.isNullOrBlank()) {
+                CustomVideoBackground(
+                    uriString = videoUriString,
+                    durationSeconds = videoDurationSeconds,
+                    crop = crop,
+                    imageAlpha = 1f,
+                    drawOverlay = false,
+                    touchPassthrough = true,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (imageBitmap != null) {
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    bitmap = imageBitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = colorFilter,
+                )
+            }
+        }
+        if (drawOverlay) {
+            val overlayAlpha = 1f - sanitizeCustomWallpaperOpacity(opacity)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isInDarkTheme()) Color.Black.copy(alpha = overlayAlpha)
+                        else Color.White.copy(alpha = overlayAlpha)
+                    )
+            )
+        }
     }
 }
 
@@ -239,21 +372,42 @@ fun rememberCustomVideoFrameBitmap(
 }
 
 @Composable
-fun rememberCustomImageBitmap(
+internal fun rememberCustomImageAndroidBitmap(
     uriString: String?,
     maxSide: Int = WALLPAPER_PREVIEW_MAX_SIDE,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
 ) = run {
     val context = LocalContext.current
-    val bitmap by produceState<Bitmap?>(initialValue = null, uriString, maxSide, crop, context) {
-        value = if (uriString.isNullOrBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                loadCustomImageBitmap(context, uriString, maxSide, crop)
-            }
+    val cacheKey = remember(uriString, maxSide, crop) {
+        uriString?.takeIf(String::isNotBlank)?.let {
+            WallpaperBitmapCacheKey(
+                uriString = it,
+                maxSide = maxSide.coerceAtLeast(1),
+                crop = sanitizeCustomWallpaperCrop(crop),
+            )
         }
     }
+    key(cacheKey) {
+        val cachedBitmap = remember(cacheKey) { cacheKey?.let(::cachedWallpaperBitmap) }
+        val bitmap by produceState<Bitmap?>(initialValue = cachedBitmap, cacheKey, context) {
+            value = when {
+                cacheKey == null -> null
+                cachedBitmap != null -> cachedBitmap
+                else -> withContext(Dispatchers.IO) {
+                    loadCachedWallpaperBitmap(context, cacheKey)
+                }
+            }
+        }
+        bitmap
+    }
+}
+
+@Composable
+fun rememberCustomImageBitmap(
+    uriString: String?,
+    maxSide: Int = WALLPAPER_PREVIEW_MAX_SIDE,
+    crop: CustomWallpaperCrop = CustomWallpaperCrop(),
+) = rememberCustomImageAndroidBitmap(uriString, maxSide, crop).let { bitmap ->
     remember(bitmap) { bitmap?.asImageBitmap() }
 }
 
@@ -261,76 +415,25 @@ fun rememberCustomImageBitmap(
 fun CustomVideoPassthroughBackground(
     uriString: String,
     durationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    crop: CustomWallpaperCrop = FULL_CUSTOM_WALLPAPER_CROP,
+    visualSettings: MediaVisualSettings = MediaVisualSettings(),
     imageAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
     if (uriString.isBlank() || imageAlpha <= 0f) return
 
-    val context = LocalContext.current
-    val uri = remember(uriString) { uriString.toUri() }
-    val safeDurationSeconds = sanitizeCustomVideoBackgroundDurationSeconds(durationSeconds)
-    var containerWidth by remember(uriString) { mutableIntStateOf(0) }
-    var containerHeight by remember(uriString) { mutableIntStateOf(0) }
-
-    val frameBitmap by produceState<Bitmap?>(initialValue = null, uri, safeDurationSeconds, containerWidth, containerHeight, context) {
-        if (containerWidth <= 0 || containerHeight <= 0) return@produceState
-
-        val retriever = runCatching { MediaMetadataRetriever() }.getOrNull() ?: return@produceState
-        try {
-            val (dataSourceReady, actualLoopMs) = withContext(Dispatchers.IO) {
-                runCatching {
-                    retriever.setDataSource(context.applicationContext, uri)
-                    true to retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                            ?.toLongOrNull()
-                            ?.coerceAtLeast(1L)
-                }.getOrDefault(false to null)
-            }
-            if (!dataSourceReady) return@produceState
-            val configuredLoopMs = safeDurationSeconds * 1_000L
-            val loopMs = (actualLoopMs ?: configuredLoopMs).coerceAtMost(configuredLoopMs).coerceAtLeast(1L)
-            val frameIntervalMs = 66L
-            val startMs = SystemClock.elapsedRealtime()
-
-            while (isActive) {
-                val elapsedUs = ((SystemClock.elapsedRealtime() - startMs) % loopMs) * 1_000L
-                val bitmap = withContext(Dispatchers.IO) {
-                    runCatching {
-                        retriever.getScaledFrameAtTime(
-                            elapsedUs,
-                            MediaMetadataRetriever.OPTION_CLOSEST,
-                            containerWidth,
-                            containerHeight,
-                        ) ?: retriever.getFrameAtTime(
-                            elapsedUs,
-                            MediaMetadataRetriever.OPTION_CLOSEST,
-                        )
-                    }.getOrNull()
-                }
-                if (bitmap != null) {
-                    value = bitmap
-                }
-                delay(frameIntervalMs)
-            }
-        } finally {
-            runCatching { retriever.release() }
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .onSizeChanged { size ->
-                containerWidth = size.width
-                containerHeight = size.height
-            },
+    MediaVisualLayer(
+        settings = visualSettings.copy(opacity = visualSettings.opacity * imageAlpha),
+        modifier = modifier.fillMaxSize(),
     ) {
-        val bitmap = frameBitmap ?: return@Box
-        Image(
+        CustomVideoBackground(
+            uriString = uriString,
+            durationSeconds = durationSeconds,
+            crop = crop,
+            imageAlpha = 1f,
+            drawOverlay = false,
+            touchPassthrough = true,
             modifier = Modifier.fillMaxSize(),
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alpha = imageAlpha.coerceIn(0f, 1f),
         )
     }
 }

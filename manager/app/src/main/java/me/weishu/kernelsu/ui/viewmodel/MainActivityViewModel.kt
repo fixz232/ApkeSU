@@ -16,10 +16,12 @@ import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.PAGE_TRANSITION_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.NIGHT_BACKGROUND_PASSTHROUGH_KEY
@@ -42,6 +44,12 @@ import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
 import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_CARD_MOTION_ENABLED
+import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_FONT_ENABLED
+import me.weishu.kernelsu.ui.component.ink.INK_CARD_MOTION_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.ink.INK_FONT_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.ink.INK_STYLE_KEY
+import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
@@ -61,6 +69,9 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.APP_FONT_PREFERENCE_KEYS
 import me.weishu.kernelsu.ui.util.AppFontState
+import me.weishu.kernelsu.ui.util.AppAudioSettings
+import me.weishu.kernelsu.ui.util.CUSTOM_AUDIO_SETTINGS_KEY
+import me.weishu.kernelsu.ui.util.readAppAudioSettings
 import me.weishu.kernelsu.ui.util.readAppFontState
 import me.weishu.kernelsu.ui.util.CUSTOM_PAGE_BACKGROUND_PREFERENCE_KEYS
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
@@ -133,6 +144,9 @@ class MainActivityViewModel(
             seasonCardMotionEnabled = settingRepo.seasonCardMotionEnabled,
             rainStyle = settingRepo.rainStyle,
             rainCardMotionEnabled = settingRepo.rainCardMotionEnabled,
+            inkStyle = settingRepo.inkStyle,
+            inkFontEnabled = settingRepo.inkFontEnabled,
+            inkCardMotionEnabled = settingRepo.inkCardMotionEnabled,
             pixelStyle = settingRepo.pixelStyle,
             pixelCardMotionEnabled = settingRepo.pixelCardMotionEnabled,
             uiDecorationConfig = settingRepo.uiDecorationConfig,
@@ -143,10 +157,12 @@ class MainActivityViewModel(
             nightBackgroundPassthroughOpacity = settingRepo.nightBackgroundPassthroughOpacity,
             globalScrollEffectEnabled = settingRepo.globalScrollEffectEnabled,
             globalScrollEffect = settingRepo.globalScrollEffect,
+            pageTransitionEffect = settingRepo.pageTransitionEffect,
             uiMode = UiMode.fromValue(interfaceStyle),
             interfaceStyle = interfaceStyle,
             customWallpaperUri = settingRepo.customWallpaperUri,
             customWallpaperOpacity = settingRepo.customWallpaperOpacity,
+            customWallpaperVisualSettings = settingRepo.customWallpaperVisualSettings,
             customWallpaperCrop = settingRepo.customWallpaperCrop,
             customWallpaperPassthroughEnabled = settingRepo.customWallpaperPassthroughEnabled,
             customWallpaperPassthroughOpacity = settingRepo.customWallpaperPassthroughOpacity,
@@ -154,6 +170,8 @@ class MainActivityViewModel(
             customVideoBackgroundDurationSeconds = settingRepo.customVideoBackgroundDurationSeconds,
             customPageBackgrounds = settingRepo.customPageBackgrounds,
             customStartupAnimationUri = settingRepo.customStartupAnimationUri,
+            startupAnimationSettings = settingRepo.startupAnimationSettings,
+            appAudioSettings = readAppAudioSettings(ksuApp),
             customStartupSoundUri = settingRepo.customStartupSoundUri,
             customClickSoundUri = settingRepo.customClickSoundUri,
             customClickSoundVolume = settingRepo.customClickSoundVolume,
@@ -189,6 +207,9 @@ class MainActivityViewModel(
             seasonCardMotionEnabled = DEFAULT_SEASON_CARD_MOTION_ENABLED,
             rainStyle = RainStyle.DEFAULT_VALUE,
             rainCardMotionEnabled = DEFAULT_RAIN_CARD_MOTION_ENABLED,
+            inkStyle = InkStyle.DEFAULT_VALUE,
+            inkFontEnabled = DEFAULT_INK_FONT_ENABLED,
+            inkCardMotionEnabled = DEFAULT_INK_CARD_MOTION_ENABLED,
             pixelStyle = PixelStyle.DEFAULT_VALUE,
             pixelCardMotionEnabled = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
             uiDecorationConfig = UiDecorationConfig(),
@@ -199,10 +220,12 @@ class MainActivityViewModel(
             nightBackgroundPassthroughOpacity = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
             globalScrollEffectEnabled = false,
             globalScrollEffect = GlobalScrollEffect.DEFAULT_VALUE,
+            pageTransitionEffect = PageTransitionEffect.DEFAULT_VALUE,
             uiMode = UiMode.fromValue(InterfaceStyle.Miuix.value),
             interfaceStyle = InterfaceStyle.Miuix.value,
             customWallpaperUri = null,
             customWallpaperOpacity = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
+            customWallpaperVisualSettings = me.weishu.kernelsu.ui.util.MediaVisualSettings(),
             customWallpaperCrop = CustomWallpaperCrop(),
             customWallpaperPassthroughEnabled = false,
             customWallpaperPassthroughOpacity = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
@@ -210,6 +233,8 @@ class MainActivityViewModel(
             customVideoBackgroundDurationSeconds = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
             customPageBackgrounds = CustomPageBackgroundSet(),
             customStartupAnimationUri = null,
+            startupAnimationSettings = me.weishu.kernelsu.ui.util.StartupAnimationSettings(),
+            appAudioSettings = AppAudioSettings(),
             customStartupSoundUri = null,
             customClickSoundUri = null,
             customClickSoundVolume = DEFAULT_CUSTOM_AUDIO_VOLUME,
@@ -244,6 +269,9 @@ class MainActivityViewModel(
             SEASON_CARD_MOTION_ENABLED_KEY,
             RAIN_STYLE_KEY,
             RAIN_CARD_MOTION_ENABLED_KEY,
+            INK_STYLE_KEY,
+            INK_FONT_ENABLED_KEY,
+            INK_CARD_MOTION_ENABLED_KEY,
             PIXEL_STYLE_KEY,
             PIXEL_CARD_MOTION_ENABLED_KEY,
             UI_DECORATION_CONFIG_KEY,
@@ -254,6 +282,7 @@ class MainActivityViewModel(
             NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY,
             GLOBAL_SCROLL_EFFECT_ENABLED_KEY,
             GLOBAL_SCROLL_EFFECT_KEY,
+            PAGE_TRANSITION_EFFECT_KEY,
             AUTO_HIDE_NAVIGATION_BAR_KEY,
             SCROLL_HIDE_NAVIGATION_BAR_KEY,
             DELTA_COLOR_VARIANT_KEY,
@@ -268,11 +297,13 @@ class MainActivityViewModel(
             "custom_video_background_uri",
             "custom_video_background_duration_seconds",
             "custom_startup_animation_uri",
+            me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY,
             "custom_startup_sound_uri",
             "custom_click_sound_uri",
             CUSTOM_CLICK_SOUND_VOLUME_KEY,
             CUSTOM_BACKGROUND_MUSIC_URI_KEY,
             CUSTOM_BACKGROUND_MUSIC_VOLUME_KEY,
+            CUSTOM_AUDIO_SETTINGS_KEY,
                 )
             )
             CustomNavigationIconSlot.entries.forEach { slot ->

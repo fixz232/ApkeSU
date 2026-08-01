@@ -79,7 +79,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
@@ -121,6 +120,7 @@ fun CloudThemeDetailScreen(themeId: String) {
     var snapshot by remember { mutableStateOf<CloudThemeCatalogSnapshot?>(null) }
     var theme by remember { mutableStateOf<CloudTheme?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var localState by remember { mutableStateOf(repository.readLocalState()) }
     var operationJob by remember { mutableStateOf<Job?>(null) }
     var progress by remember { mutableStateOf<CloudThemeOperationProgress?>(null) }
@@ -131,11 +131,20 @@ fun CloudThemeDetailScreen(themeId: String) {
 
     suspend fun loadTheme(force: Boolean) {
         loading = true
-        val loaded = repository.loadCatalog(forceRefresh = force)
-        snapshot = loaded
-        theme = loaded.catalog.theme(themeId)
-        localState = repository.readLocalState()
-        loading = false
+        loadError = null
+        try {
+            val loaded = repository.loadCatalog(forceRefresh = force)
+            snapshot = loaded
+            theme = loaded.catalog.theme(themeId)
+            localState = repository.readLocalState()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            theme = null
+            loadError = error.safeCloudThemeMessage()
+        } finally {
+            loading = false
+        }
     }
 
     fun startOperation(block: suspend ((CloudThemeOperationProgress) -> Unit) -> CloudThemeOperationResult) {
@@ -162,8 +171,7 @@ fun CloudThemeDetailScreen(themeId: String) {
     val currentTheme = theme
     val record = localState.record(themeId)
     val isActive = localState.isActive(themeId)
-    val compatible = currentTheme?.isCompatible(BuildConfig.VERSION_CODE.toLong()) == true &&
-        currentTheme.status == CloudThemePublicationStatus.Published
+    val compatible = currentTheme?.status == CloudThemePublicationStatus.Published
     val downloading = operationJob != null && progress?.stage == CloudThemeOperationStage.Downloading
 
     val content: @Composable (PaddingValues) -> Unit = { paddingValues ->
@@ -171,7 +179,7 @@ fun CloudThemeDetailScreen(themeId: String) {
             loading -> CloudThemeDetailLoading(Modifier.padding(paddingValues))
             currentTheme == null -> CloudThemeDetailMissing(
                 modifier = Modifier.padding(paddingValues),
-                message = snapshot?.errorMessage,
+                message = loadError ?: snapshot?.errorMessage,
                 onRetry = { scope.launch { loadTheme(force = true) } },
             )
             else -> CloudThemeDetailContent(
@@ -495,8 +503,7 @@ private fun CloudThemeDetailContent(
                 }
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !busy && theme.isCompatible(BuildConfig.VERSION_CODE.toLong()) &&
-                        theme.status == CloudThemePublicationStatus.Published,
+                    enabled = !busy && theme.status == CloudThemePublicationStatus.Published,
                     onClick = onSave,
                 ) {
                     Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -537,8 +544,7 @@ private fun CloudThemeDetailContent(
 
 @Composable
 private fun CloudThemeCompatibilityPanel(theme: CloudTheme) {
-    val compatible = theme.isCompatible(BuildConfig.VERSION_CODE.toLong()) &&
-        theme.status == CloudThemePublicationStatus.Published
+    val compatible = theme.status == CloudThemePublicationStatus.Published
     val tint = if (compatible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     CloudThemeDetailPanel {
         Row(
@@ -562,12 +568,7 @@ private fun CloudThemeCompatibilityPanel(theme: CloudTheme) {
                     color = cloudThemeTextColor(),
                 )
                 Text(
-                    text = stringResource(
-                        R.string.cloud_theme_manager_range,
-                        theme.minManagerVersionCode,
-                        theme.maxManagerVersionCode?.toString()
-                            ?: stringResource(R.string.cloud_theme_no_upper_limit),
-                    ),
+                    text = stringResource(R.string.cloud_theme_manager_unrestricted),
                     style = MaterialTheme.typography.bodySmall,
                     color = cloudThemeMutedColor(),
                 )

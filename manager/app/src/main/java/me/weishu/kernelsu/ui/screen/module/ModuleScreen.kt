@@ -115,7 +115,10 @@ fun ModulePager(
             viewModel.dismissConfirmRequest()
         },
         onOpenRepo = { navigator.push(Route.ModuleRepo) },
-        onOpenWallpaperBackup = { navigator.push(Route.ModuleWallpaperBackup) },
+        onOpenTools = { navigator.push(Route.ModuleTools) },
+        onOpenWallpaperEditor = { module ->
+            navigator.push(Route.ModuleWallpaperEditor(module.id))
+        },
         onToggleSortActionFirst = {
             viewModel.toggleSortActionFirst()
         },
@@ -162,17 +165,6 @@ fun ModulePager(
             return
         }
 
-        InterfaceStyle.Studio.value -> {
-            ModulePagerStudio(
-                uiState = rawUiState,
-                confirmDialogState = rawUiState.confirmDialogState,
-                moduleEvent = viewModel.moduleEvent,
-                actions = actions,
-                bottomInnerPadding = bottomInnerPadding,
-            )
-            return
-        }
-
         InterfaceStyle.Skrootpro.value -> {
             ModulePagerSkrootpro(
                 uiState = rawUiState,
@@ -208,6 +200,7 @@ fun ModulePager(
 
         InterfaceStyle.Snow.value,
         InterfaceStyle.Rain.value,
+        InterfaceStyle.Ink.value,
         InterfaceStyle.Pixel.value -> {
             ModulePagerMiuix(
                 uiState = rawUiState,

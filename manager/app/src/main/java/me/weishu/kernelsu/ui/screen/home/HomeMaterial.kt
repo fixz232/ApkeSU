@@ -6,11 +6,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -131,6 +133,9 @@ fun HomePagerMaterial(
                 state = state,
                 actions = actions,
             )
+            if (state.isKernelActive) {
+                MaterialMetricCards(state = state, actions = actions)
+            }
             InfoCard(systemInfo = state.systemInfo)
             if (state.showHomeSupportCard) {
                 DonateCard(onOpenUrl = actions.onOpenUrl)
@@ -164,13 +169,26 @@ private fun StatusCard(
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         val ksuActive = state.ksuVersion != null
         val notInstalled = !ksuActive && state.kernelVersion.isGKI()
+        val wallpaperState = rememberHomeMetricCardWallpaperState(
+            target = HomeMetricCardWallpaperTarget.MaterialLkm,
+            onWallpaperSelected = {},
+        )
+        val wallpaperBitmap = rememberHomeMetricCardWallpaperBitmap(
+            uriString = wallpaperState.uriString,
+            crop = wallpaperState.crop,
+        )
+        val hasWallpaper = wallpaperBitmap != null || !wallpaperState.videoUriString.isNullOrBlank()
 
         val containerColor = if (ksuActive) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.errorContainer
         }
-        val contentColor = MaterialTheme.colorScheme.contentColorFor(containerColor)
+        val contentColor = if (hasWallpaper) {
+            Color.White
+        } else {
+            MaterialTheme.colorScheme.contentColorFor(containerColor)
+        }
 
         val statusIcon = when {
             ksuActive -> Icons.Outlined.CheckCircle
@@ -228,52 +246,60 @@ private fun StatusCard(
                 }
             }
         ) {
-            ListItem(
-                modifier = Modifier,
-                leadingContent = {
-                    Icon(statusIcon, contentDescription = statusTitle)
-                },
-                trailingContent = statusTrailing,
-                overlineContent = null,
-                supportingContent = {
-                    Text(
-                        text = statusSummary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                },
-                colors = ListItemDefaults.colors(
-                    containerColor = Color.Transparent,
-                    contentColor = contentColor,
-                    leadingContentColor = contentColor,
-                    trailingContentColor = contentColor,
-                    supportingContentColor = contentColor.copy(alpha = 0.7f)
-                ),
-                elevation = ListItemDefaults.elevation(),
-                content = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            Box {
+                HomeMetricCardWallpaperBackground(
+                    bitmap = wallpaperBitmap,
+                    videoUriString = wallpaperState.videoUriString,
+                    videoCrop = wallpaperState.crop,
+                    visualSettings = wallpaperState.visualSettings,
+                )
+                ListItem(
+                    modifier = Modifier,
+                    leadingContent = {
+                        Icon(statusIcon, contentDescription = statusTitle)
+                    },
+                    trailingContent = statusTrailing,
+                    overlineContent = null,
+                    supportingContent = {
                         Text(
-                            text = statusTitle,
-                            style = MaterialTheme.typography.titleMediumEmphasized
+                            text = statusSummary,
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                        if (ksuActive && state.isSafeMode) {
-                            Spacer(Modifier.width(8.dp))
-                            StatusTag(
-                                label = stringResource(id = R.string.safe_mode),
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                backgroundColor = MaterialTheme.colorScheme.errorContainer
+                    },
+                    colors = ListItemDefaults.colors(
+                        containerColor = Color.Transparent,
+                        contentColor = contentColor,
+                        leadingContentColor = contentColor,
+                        trailingContentColor = contentColor,
+                        supportingContentColor = contentColor.copy(alpha = 0.78f)
+                    ),
+                    elevation = ListItemDefaults.elevation(),
+                    content = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = statusTitle,
+                                style = MaterialTheme.typography.titleMediumEmphasized
                             )
+                            if (ksuActive && state.isSafeMode) {
+                                Spacer(Modifier.width(8.dp))
+                                StatusTag(
+                                    label = stringResource(id = R.string.safe_mode),
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    backgroundColor = MaterialTheme.colorScheme.errorContainer
+                                )
+                            }
+                            if (ksuActive && state.isLateLoadMode) {
+                                Spacer(Modifier.width(8.dp))
+                                StatusTag(
+                                    label = stringResource(id = R.string.jailbreak_mode),
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    backgroundColor = MaterialTheme.colorScheme.errorContainer
+                                )
+                            }
                         }
-                        if (ksuActive && state.isLateLoadMode) {
-                            Spacer(Modifier.width(8.dp))
-                            StatusTag(
-                                label = stringResource(id = R.string.jailbreak_mode),
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                backgroundColor = MaterialTheme.colorScheme.errorContainer
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
     }
 }
@@ -305,6 +331,73 @@ private fun WarningCard(
         TonalCard(containerColor = containerColor, onClick = onClick, content = content)
     } else {
         TonalCard(containerColor = containerColor, content = content)
+    }
+}
+
+@Composable
+private fun MaterialMetricCards(
+    state: HomeUiState,
+    actions: HomeActions,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(104.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        MaterialMetricCard(
+            target = HomeMetricCardWallpaperTarget.Superuser,
+            title = stringResource(R.string.superuser),
+            value = state.superuserCount.toString(),
+            onClick = actions.onSuperuserClick,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+        MaterialMetricCard(
+            target = HomeMetricCardWallpaperTarget.Module,
+            title = stringResource(R.string.module),
+            value = state.moduleCount.toString(),
+            onClick = actions.onModuleClick,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+    }
+}
+
+@Composable
+private fun MaterialMetricCard(
+    target: HomeMetricCardWallpaperTarget,
+    title: String,
+    value: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    WallpaperTonalCard(
+        target = target,
+        modifier = modifier,
+        onClick = onClick,
+    ) { primaryColor, secondaryColor ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = secondaryColor,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineMedium,
+                color = primaryColor,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -355,7 +448,53 @@ private fun DonateCard(onOpenUrl: (String) -> Unit) {
 
 @Composable
 private fun InfoCard(systemInfo: SystemInfo) {
-    TonalCard {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        StatusMonitorCard(systemInfo)
+        SystemInfoCard(systemInfo)
+    }
+}
+
+@Composable
+private fun StatusMonitorCard(systemInfo: SystemInfo) {
+    WallpaperTonalCard(
+        target = HomeMetricCardWallpaperTarget.StatusMonitor,
+    ) { primaryColor, secondaryColor ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
+        ) {
+            @Composable
+            fun StatusItem(label: String, content: String) {
+                Text(text = label, style = MaterialTheme.typography.bodyLarge, color = primaryColor)
+                Text(text = content, style = MaterialTheme.typography.bodyMedium, color = secondaryColor)
+            }
+
+            val selinuxDisplay = when (systemInfo.selinuxStatus) {
+                "Enforcing" -> stringResource(R.string.selinux_status_enforcing)
+                "Permissive" -> stringResource(R.string.selinux_status_permissive)
+                "Disabled" -> stringResource(R.string.selinux_status_disabled)
+                else -> stringResource(R.string.selinux_status_unknown)
+            }
+            StatusItem(stringResource(R.string.home_selinux_status), selinuxDisplay)
+            Spacer(Modifier.height(16.dp))
+            val seccompDisplay = when (systemInfo.seccompStatus) {
+                -1 -> stringResource(R.string.seccomp_status_not_supported)
+                0 -> stringResource(R.string.seccomp_status_disabled)
+                1 -> stringResource(R.string.seccomp_status_strict)
+                2 -> stringResource(R.string.seccomp_status_filter)
+                else -> stringResource(R.string.seccomp_status_unknown)
+            }
+            StatusItem(stringResource(R.string.home_seccomp_status), seccompDisplay)
+        }
+    }
+}
+
+@Composable
+private fun SystemInfoCard(systemInfo: SystemInfo) {
+    WallpaperTonalCard(
+        target = HomeMetricCardWallpaperTarget.SystemInfo,
+    ) { primaryColor, secondaryColor ->
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -363,11 +502,11 @@ private fun InfoCard(systemInfo: SystemInfo) {
         ) {
             @Composable
             fun InfoCardItem(label: String, content: String) {
-                Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                Text(text = label, style = MaterialTheme.typography.bodyLarge, color = primaryColor)
                 Text(
                     text = content,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = secondaryColor,
                 )
             }
 
@@ -378,24 +517,47 @@ private fun InfoCard(systemInfo: SystemInfo) {
             InfoCardItem(stringResource(R.string.home_device_model), systemInfo.deviceModel)
             Spacer(Modifier.height(16.dp))
             InfoCardItem(stringResource(R.string.home_fingerprint), systemInfo.fingerprint)
-            Spacer(Modifier.height(16.dp))
-            val selinuxDisplay = when (systemInfo.selinuxStatus) {
-                "Enforcing" -> stringResource(R.string.selinux_status_enforcing)
-                "Permissive" -> stringResource(R.string.selinux_status_permissive)
-                "Disabled" -> stringResource(R.string.selinux_status_disabled)
-                else -> stringResource(R.string.selinux_status_unknown)
-            }
-            InfoCardItem(stringResource(R.string.home_selinux_status), selinuxDisplay)
-            Spacer(Modifier.height(16.dp))
-            val seccompDisplay = when (systemInfo.seccompStatus) {
-                -1 -> stringResource(R.string.seccomp_status_not_supported)
-                0 -> stringResource(R.string.seccomp_status_disabled)
-                1 -> stringResource(R.string.seccomp_status_strict)
-                2 -> stringResource(R.string.seccomp_status_filter)
-                else -> stringResource(R.string.seccomp_status_unknown)
-            }
-            InfoCardItem(stringResource(R.string.home_seccomp_status), seccompDisplay)
         }
+    }
+}
+
+@Composable
+private fun WallpaperTonalCard(
+    target: HomeMetricCardWallpaperTarget,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable (primaryColor: Color, secondaryColor: Color) -> Unit,
+) {
+    val wallpaperState = rememberHomeMetricCardWallpaperState(
+        target = target,
+        onWallpaperSelected = {},
+    )
+    val wallpaperBitmap = rememberHomeMetricCardWallpaperBitmap(
+        uriString = wallpaperState.uriString,
+        crop = wallpaperState.crop,
+    )
+    val hasWallpaper = wallpaperBitmap != null || !wallpaperState.videoUriString.isNullOrBlank()
+    val primaryColor = if (hasWallpaper) Color.White else MaterialTheme.colorScheme.onSurface
+    val secondaryColor = if (hasWallpaper) {
+        Color.White.copy(alpha = 0.78f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val cardContent: @Composable () -> Unit = {
+        Box {
+            HomeMetricCardWallpaperBackground(
+                bitmap = wallpaperBitmap,
+                videoUriString = wallpaperState.videoUriString,
+                videoCrop = wallpaperState.crop,
+                visualSettings = wallpaperState.visualSettings,
+            )
+            content(primaryColor, secondaryColor)
+        }
+    }
+    if (onClick != null) {
+        TonalCard(modifier = modifier, onClick = onClick, content = cardContent)
+    } else {
+        TonalCard(modifier = modifier, content = cardContent)
     }
 }
 

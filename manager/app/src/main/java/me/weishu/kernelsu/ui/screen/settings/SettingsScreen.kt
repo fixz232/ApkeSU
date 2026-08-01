@@ -3,12 +3,22 @@ package me.weishu.kernelsu.ui.screen.settings
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,11 +41,34 @@ import me.weishu.kernelsu.ui.webui.WebUIActivity
 @Composable
 fun SettingPager(
     navigator: Navigator,
-    bottomInnerPadding: Dp
+    bottomInnerPadding: Dp,
 ) {
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel = viewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pageMode = remember { mutableStateOf(readSettingsPageMode(context)) }
+    val onPageModeChange: (SettingsPageMode) -> Unit = { mode ->
+        pageMode.value = mode
+        setSettingsPageMode(context, mode)
+    }
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
+
+    if (pageMode.value == SettingsPageMode.Categories) {
+        SettingsHubScreen(
+            uiState = uiState,
+            bottomInnerPadding = bottomInnerPadding,
+            onOpenCategory = { category ->
+                navigator.push(Route.SettingsCategory(category.routeValue))
+            },
+            onPageModeChange = onPageModeChange,
+        )
+        return
+    }
+
     val showWallpaperPreview = rememberSaveable { mutableStateOf(false) }
     val showVideoBackgroundPreview = rememberSaveable { mutableStateOf(false) }
     val showWallpaperCropEditor = rememberSaveable { mutableStateOf(false) }
@@ -69,17 +102,13 @@ fun SettingPager(
         showVideoBackgroundPreview.value = true
     }
 
-    LifecycleResumeEffect(Unit) {
-        viewModel.refresh()
-        onPauseOrDispose { }
-    }
-
     val actions = SettingsScreenActions(
         onSetCheckModuleUpdate = viewModel::setCheckModuleUpdate,
         onSetShowVersionMismatchWarning = viewModel::setShowVersionMismatchWarning,
         onSetShowGkiWarning = viewModel::setShowGkiWarning,
         onSetShowHomeSupportCard = viewModel::setShowHomeSupportCard,
         onSetShowHomeLearnCard = viewModel::setShowHomeLearnCard,
+        onSetMiuixClassicHomeLayoutEnabled = viewModel::setMiuixClassicHomeLayoutEnabled,
         onSetGraphicsRendererFeatureEnabled = viewModel::setGraphicsRendererFeatureEnabled,
         onOpenTheme = { navigator.push(Route.ColorPalette) },
         onOpenThemeStore = { navigator.push(Route.ThemeStore) },
@@ -90,6 +119,9 @@ fun SettingPager(
         onSetSeasonCardMotionEnabled = viewModel::setSeasonCardMotionEnabled,
         onSetRainStyleIndex = viewModel::setRainStyleIndex,
         onSetRainCardMotionEnabled = viewModel::setRainCardMotionEnabled,
+        onSetInkStyleIndex = viewModel::setInkStyleIndex,
+        onSetInkFontEnabled = viewModel::setInkFontEnabled,
+        onSetInkCardMotionEnabled = viewModel::setInkCardMotionEnabled,
         onSetPixelStyleIndex = viewModel::setPixelStyleIndex,
         onSetPixelCardMotionEnabled = viewModel::setPixelCardMotionEnabled,
         onSetGlobalSnowEnabled = viewModel::setGlobalSnowEnabled,
@@ -117,8 +149,6 @@ fun SettingPager(
         onOpenHomeCardWallpapers = { navigator.push(Route.HomeCardWallpapers) },
         onOpenVisualEffects = { navigator.push(Route.VisualEffects) },
         onOpenUiDecorationLibrary = { navigator.push(Route.UiDecorationLibrary) },
-        onOpenBackgrounds = { navigator.push(Route.Backgrounds) },
-        onOpenSoundEffects = { navigator.push(Route.SoundEffects) },
         onPickWallpaper = { wallpaperLauncher.launch(CUSTOM_BACKGROUND_MIME_TYPES) },
         onPreviewWallpaper = {
             if (uiState.customVideoBackgroundUri.isNullOrBlank()) {
@@ -158,7 +188,6 @@ fun SettingPager(
         onDeleteCustomThemePreset = viewModel::deleteCustomThemePreset,
         onSetThemeSyncStrategy = viewModel::setThemeSyncStrategy,
         onResetThemeToDefault = viewModel::resetThemeToDefault,
-        onOpenStartupAnimation = { navigator.push(Route.StartupAnimation) },
         onOpenProfileTemplate = { navigator.push(Route.AppProfileTemplate) },
         onSetSuCompatMode = viewModel::setSuCompatMode,
         onSetKernelUmountEnabled = viewModel::setKernelUmountEnabled,
@@ -208,16 +237,30 @@ fun SettingPager(
         },
     )
 
-    when (LocalInterfaceStyle.current) {
-        InterfaceStyle.Material.value -> SettingPagerMaterial(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Studio.value -> SettingPagerStudio(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
-        InterfaceStyle.Snow.value,
-        InterfaceStyle.Rain.value,
-        InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
-        else -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (LocalInterfaceStyle.current) {
+            InterfaceStyle.Material.value -> SettingPagerMaterial(uiState, actions, bottomInnerPadding)
+            InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
+            InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
+            InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
+            InterfaceStyle.Snow.value,
+            InterfaceStyle.Rain.value,
+            InterfaceStyle.Ink.value,
+            InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
+            else -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
+        }
+
+        SettingsPageModeButton(
+            currentMode = SettingsPageMode.Collapsed,
+            onModeChange = onPageModeChange,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 4.dp,
+                    end = 8.dp,
+                )
+                .zIndex(4f),
+        )
     }
 
     SettingsWallpaperPreviewDialog(

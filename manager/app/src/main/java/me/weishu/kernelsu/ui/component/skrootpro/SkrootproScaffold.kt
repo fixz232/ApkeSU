@@ -1,6 +1,12 @@
 package me.weishu.kernelsu.ui.component.skrootpro
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -150,6 +156,7 @@ fun SkrootproScreen(
     onTertiaryActionClick: () -> Unit = {},
     tertiaryActionContentDescription: String? = null,
     bottomInnerPadding: Dp,
+    topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val background = if (LocalNightBackgroundEffectActive.current) {
@@ -162,19 +169,31 @@ fun SkrootproScreen(
             .fillMaxSize()
             .background(background)
     ) {
-        SkrootproTopBar(
-            title = title,
-            showAdd = showAdd,
-            onAddClick = onAddClick,
-            actionIcon = actionIcon,
-            actionContentDescription = actionContentDescription,
-            secondaryActionIcon = secondaryActionIcon,
-            onSecondaryActionClick = onSecondaryActionClick,
-            secondaryActionContentDescription = secondaryActionContentDescription,
-            tertiaryActionIcon = tertiaryActionIcon,
-            onTertiaryActionClick = onTertiaryActionClick,
-            tertiaryActionContentDescription = tertiaryActionContentDescription,
-        )
+        AnimatedVisibility(
+            visible = topBarVisible,
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = tween(180),
+            ) + fadeIn(animationSpec = tween(150)),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = tween(160),
+            ) + fadeOut(animationSpec = tween(120)),
+        ) {
+            SkrootproTopBar(
+                title = title,
+                showAdd = showAdd,
+                onAddClick = onAddClick,
+                actionIcon = actionIcon,
+                actionContentDescription = actionContentDescription,
+                secondaryActionIcon = secondaryActionIcon,
+                onSecondaryActionClick = onSecondaryActionClick,
+                secondaryActionContentDescription = secondaryActionContentDescription,
+                tertiaryActionIcon = tertiaryActionIcon,
+                onTertiaryActionClick = onTertiaryActionClick,
+                tertiaryActionContentDescription = tertiaryActionContentDescription,
+            )
+        }
         Box(modifier = Modifier.weight(1f)) {
             content(PaddingValues(bottom = bottomInnerPadding + 10.dp))
         }

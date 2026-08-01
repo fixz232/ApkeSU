@@ -9,12 +9,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.data.repository.SuperUserRepository
 import me.weishu.kernelsu.data.repository.SuperUserRepositoryImpl
 
 private const val ANDROID_UIDS_PER_USER = 100_000
 private const val FIRST_APPLICATION_UID = 10_000
+private const val APP_FREEZE_BASE = "/data/adb/apkesu/app_freeze"
+private const val APP_FREEZE_CONFIG = "$APP_FREEZE_BASE/frozen_apps.tsv"
+private const val APP_FREEZE_SERVICE = "/data/adb/service.d/95-apkesu-app-freeze.sh"
+private const val APP_FREEZE_COMMAND_TIMEOUT_MILLIS = 10_000L
+private const val APP_FREEZE_RESTORE_ATTEMPTS = 30
+private const val APP_FREEZE_MAX_ENTRIES = 4096
 
 private val APP_FREEZE_PACKAGE_PATTERN = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*")
 private val APP_FREEZE_STATE_PATTERN =
@@ -63,6 +70,7 @@ enum class AppFreezeFailure {
     RootUnavailable,
     CommandFailed,
     VerificationFailed,
+    PersistenceFailed,
 }
 
 class AppFreezeException(
@@ -94,7 +102,14 @@ class AppFreezer(
                             before.protection.name,
                         )
                     }
-                    if (before.frozen == frozen) return@runCatching before
+
+                    val persistedBefore = readPersistedFreezeKeys()
+                    if (before.frozen == frozen) {
+                        persistFreezeKeys(
+                            updatePersistedFreezeKeys(persistedBefore, key, frozen),
+                        )
+                        return@runCatching before
+                    }
 
                     val stdout = arrayListOf<String>()
                     val stderr = arrayListOf<String>()
@@ -128,6 +143,26 @@ class AppFreezer(
                     if (verified.frozen != frozen) {
                         throw AppFreezeException(AppFreezeFailure.VerificationFailed)
                     }
+
+                    try {
+                        persistFreezeKeys(
+                            updatePersistedFreezeKeys(persistedBefore, key, frozen),
+                        )
+                    } catch (error: Throwable) {
+                        // Keep the system state and the durable record aligned if the
+                        // filesystem update fails after the package command succeeded.
+                        runCatching {
+                            getRootShell().newJob()
+                                .add(buildAppFreezeCommand(key, !frozen))
+                                .exec()
+                        }
+                        if (error is AppFreezeException) throw error
+                        throw AppFreezeException(
+                            AppFreezeFailure.PersistenceFailed,
+                            error.message.orEmpty(),
+                        )
+                    }
+
                     if (frozen) {
                         runCatching {
                             getRootShell().newJob()
@@ -169,10 +204,180 @@ class AppFreezer(
     }
 }
 
+private suspend fun readPersistedFreezeKeys(): List<AppFreezeKey> {
+    val stdout = arrayListOf<String>()
+    val stderr = arrayListOf<String>()
+    val result = runCatching {
+        withTimeoutOrNull(APP_FREEZE_COMMAND_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("if [ -r ${shellQuote(APP_FREEZE_CONFIG)} ]; then cat ${shellQuote(APP_FREEZE_CONFIG)}; fi")
+                .to(stdout, stderr)
+                .exec()
+        }
+    }.getOrElse { error ->
+        throw AppFreezeException(
+            AppFreezeFailure.PersistenceFailed,
+            error.message.orEmpty().ifBlank { "read configuration failed" },
+        )
+    } ?: throw AppFreezeException(AppFreezeFailure.PersistenceFailed, "read configuration timed out")
+
+    if (!result.isSuccess) {
+        throw AppFreezeException(
+            AppFreezeFailure.PersistenceFailed,
+            (stderr + stdout).joinToString("\n").trim().ifBlank { "read configuration failed" },
+        )
+    }
+    return parsePersistedAppFreezeKeys(stdout)
+}
+
+private suspend fun persistFreezeKeys(keys: List<AppFreezeKey>) {
+    val configText = serializePersistedAppFreezeKeys(keys)
+    val script = buildAppFreezePersistenceScript(configText)
+    val stdout = arrayListOf<String>()
+    val stderr = arrayListOf<String>()
+    val result = runCatching {
+        withTimeoutOrNull(APP_FREEZE_COMMAND_TIMEOUT_MILLIS) {
+            getRootShell().newJob().add(script).to(stdout, stderr).exec()
+        }
+    }.getOrElse { error ->
+        throw AppFreezeException(
+            AppFreezeFailure.PersistenceFailed,
+            error.message.orEmpty().ifBlank { "write configuration failed" },
+        )
+    } ?: throw AppFreezeException(AppFreezeFailure.PersistenceFailed, "write configuration timed out")
+
+    if (!result.isSuccess) {
+        throw AppFreezeException(
+            AppFreezeFailure.PersistenceFailed,
+            (stderr + stdout).joinToString("\n").trim().ifBlank { "write configuration failed" },
+        )
+    }
+}
+
 internal fun validateAppFreezeKey(key: AppFreezeKey) {
     if (!APP_FREEZE_PACKAGE_PATTERN.matches(key.packageName) || key.userId !in 0..99_999) {
         throw AppFreezeException(AppFreezeFailure.InvalidTarget)
     }
+}
+
+internal fun parsePersistedAppFreezeKeys(lines: Iterable<String>): List<AppFreezeKey> {
+    return lines.asSequence()
+        .map(String::trim)
+        .mapNotNull { line ->
+            val separator = line.indexOf('|')
+            if (separator <= 0 || separator == line.lastIndex) return@mapNotNull null
+            val userId = line.substring(0, separator).toIntOrNull() ?: return@mapNotNull null
+            val packageName = line.substring(separator + 1)
+            val key = AppFreezeKey(packageName, userId)
+            if (!APP_FREEZE_PACKAGE_PATTERN.matches(packageName) || userId !in 0..99_999) {
+                null
+            } else {
+                key
+            }
+        }
+        .distinct()
+        .sortedWith(compareBy<AppFreezeKey> { it.userId }.thenBy { it.packageName })
+        .take(APP_FREEZE_MAX_ENTRIES)
+        .toList()
+}
+
+internal fun updatePersistedFreezeKeys(
+    existing: Iterable<AppFreezeKey>,
+    key: AppFreezeKey,
+    frozen: Boolean,
+): List<AppFreezeKey> {
+    validateAppFreezeKey(key)
+    val current = existing.asSequence()
+        .filter { candidate ->
+            APP_FREEZE_PACKAGE_PATTERN.matches(candidate.packageName) && candidate.userId in 0..99_999
+        }
+        .distinct()
+        .filterNot { it == key }
+        .toMutableList()
+    if (frozen) current += key
+    return current
+        .sortedWith(compareBy<AppFreezeKey> { it.userId }.thenBy { it.packageName })
+        .also {
+            if (it.size > APP_FREEZE_MAX_ENTRIES) {
+                throw AppFreezeException(
+                    AppFreezeFailure.PersistenceFailed,
+                    "too many frozen applications",
+                )
+            }
+        }
+}
+
+internal fun serializePersistedAppFreezeKeys(keys: Iterable<AppFreezeKey>): String {
+    val normalized = keys.toList().distinct()
+    normalized.forEach(::validateAppFreezeKey)
+    if (normalized.size > APP_FREEZE_MAX_ENTRIES) {
+        throw AppFreezeException(AppFreezeFailure.PersistenceFailed, "too many frozen applications")
+    }
+    return normalized
+        .sortedWith(compareBy<AppFreezeKey> { it.userId }.thenBy { it.packageName })
+        .joinToString(separator = "\n", postfix = if (normalized.isEmpty()) "" else "\n") {
+            "${it.userId}|${it.packageName}"
+        }
+}
+
+internal fun buildAppFreezeServiceScript(): String = buildString {
+    appendLine("#!/system/bin/sh")
+    appendLine("CONFIG=${shellQuote(APP_FREEZE_CONFIG)}")
+    appendLine("is_valid_package() {")
+    appendLine("    case \"${'$'}1\" in")
+    appendLine("        ''|.*|*.|*..*|*[!A-Za-z0-9_.]*) return 1 ;;")
+    appendLine("    esac")
+    appendLine("    return 0")
+    appendLine("}")
+    appendLine("restore_once() {")
+    appendLine("    [ -r \"${'$'}CONFIG\" ] || return 0")
+    appendLine("    command -v cmd >/dev/null 2>&1 || return 1")
+    appendLine("    command -v am >/dev/null 2>&1 || return 1")
+    appendLine("    failed=0")
+    appendLine("    while IFS='|' read -r user_id package_name; do")
+    appendLine("        case \"${'$'}user_id\" in")
+    appendLine("            ''|*[!0-9]*) continue ;;")
+    appendLine("        esac")
+    appendLine("        [ \"${'$'}user_id\" -le 99999 ] 2>/dev/null || continue")
+    appendLine("        is_valid_package \"${'$'}package_name\" || continue")
+    appendLine("        if ! cmd package suspend --user \"${'$'}user_id\" \"${'$'}package_name\" >/dev/null 2>&1; then")
+    appendLine("            failed=1")
+    appendLine("            continue")
+    appendLine("        fi")
+    appendLine("        am force-stop --user \"${'$'}user_id\" \"${'$'}package_name\" >/dev/null 2>&1 || true")
+    appendLine("    done < \"${'$'}CONFIG\"")
+    appendLine("    [ \"${'$'}failed\" -eq 0 ]")
+    appendLine("}")
+    appendLine("attempt=0")
+    appendLine("while [ \"${'$'}attempt\" -lt $APP_FREEZE_RESTORE_ATTEMPTS ]; do")
+    appendLine("    restore_once && exit 0")
+    appendLine("    attempt=${'$'}((attempt + 1))")
+    appendLine("    sleep 1")
+    appendLine("done")
+    appendLine("exit 0")
+}
+
+internal fun buildAppFreezePersistenceScript(configText: String): String = buildString {
+    val configTemp = "$APP_FREEZE_CONFIG.tmp"
+    val serviceTemp = "$APP_FREEZE_SERVICE.tmp"
+    appendLine("set -e")
+    appendLine("umask 077")
+    appendLine("mkdir -p ${shellQuote(APP_FREEZE_BASE)} /data/adb/service.d")
+    appendLine(
+        "printf '%s' ${shellQuote(configText)} > ${shellQuote(configTemp)} && " +
+            "chmod 0600 ${shellQuote(configTemp)}",
+    )
+    appendLine("cat > ${shellQuote(serviceTemp)} <<'__APKESU_APP_FREEZE_EOF__'")
+    append(buildAppFreezeServiceScript())
+    if (!endsWith("\n")) append('\n')
+    appendLine("__APKESU_APP_FREEZE_EOF__")
+    appendLine("chmod 0700 ${shellQuote(serviceTemp)}")
+    appendLine("chown 0:0 ${shellQuote(configTemp)} ${shellQuote(serviceTemp)} 2>/dev/null || true")
+    appendLine("mv -f ${shellQuote(configTemp)} ${shellQuote(APP_FREEZE_CONFIG)}")
+    appendLine("mv -f ${shellQuote(serviceTemp)} ${shellQuote(APP_FREEZE_SERVICE)}")
+    appendLine("if command -v restorecon >/dev/null 2>&1; then")
+    appendLine("    restorecon ${shellQuote(APP_FREEZE_BASE)} ${shellQuote(APP_FREEZE_CONFIG)} ${shellQuote(APP_FREEZE_SERVICE)} >/dev/null 2>&1 || true")
+    appendLine("fi")
 }
 
 internal fun buildAppFreezeCommand(key: AppFreezeKey, frozen: Boolean): String {
@@ -230,3 +435,5 @@ private fun appFreezeCommandError(stdout: List<String>, stderr: List<String>): S
         ?.take(240)
         .orEmpty()
 }
+
+private fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"

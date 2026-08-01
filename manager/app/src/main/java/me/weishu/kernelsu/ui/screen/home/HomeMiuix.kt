@@ -88,6 +88,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,6 +102,7 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.CustomVideoBackground
 import me.weishu.kernelsu.ui.component.HomeLayoutCanvas
 import me.weishu.kernelsu.ui.component.HomeLayoutEditor
+import me.weishu.kernelsu.ui.component.HomeLayoutStickerLayer
 import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.ListPopupDefaults
@@ -139,6 +141,7 @@ import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
 import me.weishu.kernelsu.ui.util.HomeLayoutCard
 import me.weishu.kernelsu.ui.util.HomeLayoutItem
 import me.weishu.kernelsu.ui.util.HomeLayoutState
+import me.weishu.kernelsu.ui.util.HomeLayoutWallpaperFit
 import me.weishu.kernelsu.ui.util.loadCustomImageBitmap
 import me.weishu.kernelsu.ui.util.persistCustomImageReference
 import me.weishu.kernelsu.ui.util.releasePersistableVideoBackgroundReadPermission
@@ -146,6 +149,7 @@ import me.weishu.kernelsu.ui.util.releaseCustomImageReference
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import me.weishu.kernelsu.ui.util.readHomeLayoutState
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.suggestedHomeLayoutHeight
 import me.weishu.kernelsu.ui.util.takePersistableImageReadPermission
 import me.weishu.kernelsu.ui.util.takePersistableVideoBackgroundReadPermission
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -180,6 +184,8 @@ fun HomePagerMiuix(
     installFeedbackActive: Boolean = false,
     homeLayoutOverride: HomeLayoutState? = null,
     homeLayoutEditor: HomeLayoutEditor? = null,
+    homeLayoutLandscapeOverride: Boolean? = null,
+    classicHomeLayoutEnabled: Boolean = false,
 ) {
     val enableBlur = LocalEnableBlur.current
     val context = LocalContext.current
@@ -294,13 +300,22 @@ fun HomePagerMiuix(
                                 warningMessages = warningMessages,
                                 installFeedbackActive = installFeedbackActive,
                                 editor = homeLayoutEditor,
+                                isLandscapeOverride = homeLayoutLandscapeOverride,
                             )
                         } else {
-                            StatusCard(
-                                state = state,
-                                actions = actions,
-                                installFeedbackActive = installFeedbackActive,
-                            )
+                            if (classicHomeLayoutEnabled) {
+                                ClassicMiuixStatusCard(
+                                    state = state,
+                                    actions = actions,
+                                    installFeedbackActive = installFeedbackActive,
+                                )
+                            } else {
+                                StatusCard(
+                                    state = state,
+                                    actions = actions,
+                                    installFeedbackActive = installFeedbackActive,
+                                )
+                            }
                             WarningSummaryCard(messages = warningMessages)
                             InfoCard(
                                 systemInfo = state.systemInfo,
@@ -328,18 +343,21 @@ private fun HomeCustomLayoutContent(
     warningMessages: List<String>,
     installFeedbackActive: Boolean,
     editor: HomeLayoutEditor? = null,
+    isLandscapeOverride: Boolean? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HomeLayoutCanvas(
             state = layoutState,
             modifier = Modifier.fillMaxWidth(),
             editor = editor,
+            isLandscapeOverride = isLandscapeOverride,
         ) { item ->
             HomeLayoutCardContent(
                 item = item,
                 state = state,
                 actions = actions,
                 installFeedbackActive = installFeedbackActive,
+                forceLkmPreview = editor != null,
             )
         }
         WarningSummaryCard(messages = warningMessages)
@@ -359,42 +377,86 @@ internal fun HomeLayoutCardContent(
     installFeedbackActive: Boolean,
     forceLkmPreview: Boolean = false,
 ) {
-    when (item.card) {
-        HomeLayoutCard.Lkm -> if (state.isKernelActive || forceLkmPreview) {
-            ActivatedLkmCard(
-                state = state,
-                actions = actions,
-                compact = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (item.height <= 0f) {
-                            Modifier.aspectRatio(item.aspectRatio)
-                        } else {
-                            Modifier
-                        },
-                    ),
-            )
-        } else {
-            StatusCard(
-                state = state,
-                actions = actions,
-                installFeedbackActive = installFeedbackActive,
-            )
+    val baseDensity = LocalDensity.current
+    val widthFactor = when {
+        item.width < 0.42f -> 0.78f
+        item.width < 0.55f -> 0.86f
+        item.width < 0.75f -> 0.94f
+        else -> 1f
+    }
+    val heightFactor = if (item.height > 0f) {
+        (item.height / suggestedHomeLayoutHeight(item.card)).coerceIn(0.72f, 1f)
+    } else {
+        1f
+    }
+    val adaptiveTextScale = (item.textScale * widthFactor * heightFactor).coerceIn(0.62f, 1.25f)
+    val adaptiveDensity = Density(
+        density = baseDensity.density,
+        fontScale = baseDensity.fontScale * adaptiveTextScale,
+    )
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        CompositionLocalProvider(LocalDensity provides adaptiveDensity) {
+            when (item.card) {
+                HomeLayoutCard.Lkm -> if (state.isKernelActive || forceLkmPreview) {
+                    ActivatedLkmCard(
+                        state = state,
+                        actions = actions,
+                        compact = true,
+                        customTitle = item.customTitle,
+                        customSubtitle = item.customSubtitle,
+                        wallpaperFit = item.wallpaperFit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (item.height <= 0f) {
+                                    Modifier.aspectRatio(item.aspectRatio)
+                                } else {
+                                    Modifier.fillMaxSize()
+                                },
+                            ),
+                    )
+                } else {
+                    StatusCard(
+                        state = state,
+                        actions = actions,
+                        installFeedbackActive = installFeedbackActive,
+                    )
+                }
+                HomeLayoutCard.Superuser -> SuperuserMetricCard(
+                    state = state,
+                    actions = actions,
+                    titleOverride = item.customTitle,
+                    valueOverride = item.customSubtitle,
+                    wallpaperFit = item.wallpaperFit,
+                    modifier = if (item.height > 0f) Modifier.fillMaxSize() else Modifier,
+                )
+                HomeLayoutCard.Module -> ModuleMetricCard(
+                    state = state,
+                    actions = actions,
+                    titleOverride = item.customTitle,
+                    valueOverride = item.customSubtitle,
+                    wallpaperFit = item.wallpaperFit,
+                    modifier = if (item.height > 0f) Modifier.fillMaxSize() else Modifier,
+                )
+                HomeLayoutCard.StatusMonitor -> StatusMonitorCard(
+                    systemInfo = state.systemInfo,
+                    titleOverride = item.customTitle,
+                    subtitleOverride = item.customSubtitle,
+                    wallpaperFit = item.wallpaperFit,
+                    modifier = if (item.height > 0f) Modifier.fillMaxSize() else Modifier,
+                )
+                HomeLayoutCard.SystemInfo -> SystemInfoCard(
+                    systemInfo = state.systemInfo,
+                    hookTypes = state.kernelHookTypes,
+                    titleOverride = item.customTitle,
+                    subtitleOverride = item.customSubtitle,
+                    wallpaperFit = item.wallpaperFit,
+                    modifier = if (item.height > 0f) Modifier.fillMaxSize() else Modifier,
+                )
+            }
         }
-        HomeLayoutCard.Superuser -> SuperuserMetricCard(
-            state = state,
-            actions = actions,
-        )
-        HomeLayoutCard.Module -> ModuleMetricCard(
-            state = state,
-            actions = actions,
-        )
-        HomeLayoutCard.StatusMonitor -> StatusMonitorCard(systemInfo = state.systemInfo)
-        HomeLayoutCard.SystemInfo -> SystemInfoCard(
-            systemInfo = state.systemInfo,
-            hookTypes = state.kernelHookTypes,
-        )
+        HomeLayoutStickerLayer(item.stickers)
     }
 }
 
@@ -489,10 +551,68 @@ private fun ActivatedStatusCard(
 }
 
 @Composable
+private fun ClassicMiuixStatusCard(
+    state: HomeUiState,
+    actions: HomeActions,
+    installFeedbackActive: Boolean,
+) {
+    if (!state.isKernelActive) {
+        StatusCard(
+            state = state,
+            actions = actions,
+            installFeedbackActive = installFeedbackActive,
+        )
+        return
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(188.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ActivatedLkmCard(
+            state = state,
+            actions = actions,
+            compact = true,
+            wallpaperTarget = HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SuperuserMetricCard(
+                state = state,
+                actions = actions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+            ModuleMetricCard(
+                state = state,
+                actions = actions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun ActivatedLkmCard(
     state: HomeUiState,
     actions: HomeActions,
     compact: Boolean = false,
+    customTitle: String = "",
+    customSubtitle: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
+    wallpaperTarget: HomeMetricCardWallpaperTarget = HomeMetricCardWallpaperTarget.Lkm,
     modifier: Modifier = Modifier,
 ) {
         val rootStateHealthy = state.rootRuntimeState == RootRuntimeState.Running
@@ -523,14 +643,19 @@ private fun ActivatedLkmCard(
             else -> Color(0xFFD83B45)
         }
         val workingMode = state.workingModeLabel
-        val wallpaperState = rememberLkmCardWallpaperState(
-            onWallpaperSelected = {}
+        val wallpaperState = rememberHomeMetricCardWallpaperState(
+            target = wallpaperTarget,
+            onWallpaperSelected = {},
         )
-        val wallpaperBitmap = rememberLkmCardWallpaperBitmap(
-            uriString = if (state.lkmMode == true) wallpaperState.uriString else null,
+        val wallpaperBitmap = rememberHomeMetricCardWallpaperBitmap(
+            uriString = wallpaperState.uriString,
             crop = wallpaperState.crop,
         )
-        val lkmVideoUriString = if (state.lkmMode == true) wallpaperState.videoUriString else null
+        val lkmVideoUriString = wallpaperState.videoUriString
+        val displayTitle = customTitle.ifBlank { stringResource(state.rootRuntimeState.labelRes) }
+        val displaySubtitle = customSubtitle.ifBlank {
+            stringResource(R.string.home_working_version, state.ksuVersionLabel)
+        }
         val hasLkmWallpaper = wallpaperBitmap != null || !lkmVideoUriString.isNullOrBlank()
         val primaryContentColor = if (hasLkmWallpaper) Color.White else colorScheme.onSurface
         val secondaryContentColor = if (hasLkmWallpaper) {
@@ -563,6 +688,7 @@ private fun ActivatedLkmCard(
                 color = containerColor,
                 enabled = !hasLkmWallpaper,
             ),
+            insideMargin = PaddingValues(0.dp),
             onClick = {
                 if (!state.isLateLoadMode) {
                     actions.onInstallClick()
@@ -575,13 +701,13 @@ private fun ActivatedLkmCard(
                 modifier = if (compact) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
             ) {
                 val dense = compact && maxHeight < 132.dp
-                if (state.lkmMode == true) {
-                    LkmCardWallpaperBackground(
-                        bitmap = wallpaperBitmap,
-                        videoUriString = lkmVideoUriString,
-                        videoCrop = wallpaperState.crop,
-                    )
-                }
+                HomeMetricCardWallpaperBackground(
+                    bitmap = wallpaperBitmap,
+                    videoUriString = lkmVideoUriString,
+                    videoCrop = wallpaperState.crop,
+                    wallpaperFit = wallpaperFit,
+                    visualSettings = wallpaperState.visualSettings,
+                )
                 if (dense) {
                     Row(
                         modifier = Modifier
@@ -606,7 +732,7 @@ private fun ActivatedLkmCard(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 modifier = Modifier.fillMaxWidth(),
-                                text = stringResource(state.rootRuntimeState.labelRes),
+                                text = displayTitle,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = primaryContentColor,
@@ -615,7 +741,7 @@ private fun ActivatedLkmCard(
                             )
                             Text(
                                 modifier = Modifier.fillMaxWidth(),
-                                text = stringResource(R.string.home_working_version, state.ksuVersionLabel),
+                                text = displaySubtitle,
                                 fontSize = 11.sp,
                                 lineHeight = 13.sp,
                                 fontWeight = FontWeight.Medium,
@@ -656,7 +782,7 @@ private fun ActivatedLkmCard(
                     }
                     Text(
                         modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(state.rootRuntimeState.labelRes),
+                        text = displayTitle,
                         fontSize = if (compact) 20.sp else 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = primaryContentColor,
@@ -699,10 +825,7 @@ private fun ActivatedLkmCard(
                     }
                     Text(
                         modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(
-                            R.string.home_working_version,
-                            state.ksuVersionLabel
-                        ),
+                        text = displaySubtitle,
                         fontSize = if (compact) 12.sp else 14.sp,
                         lineHeight = if (compact) 15.sp else 18.sp,
                         fontWeight = FontWeight.Medium,
@@ -720,13 +843,17 @@ private fun ActivatedLkmCard(
 internal fun SuperuserMetricCard(
     state: HomeUiState,
     actions: HomeActions,
+    titleOverride: String = "",
+    valueOverride: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     modifier: Modifier = Modifier,
 ) {
     MetricCard(
         modifier = modifier,
         target = HomeMetricCardWallpaperTarget.Superuser,
-        title = stringResource(R.string.superuser),
-        value = state.superuserCount.toString(),
+        title = titleOverride.ifBlank { stringResource(R.string.superuser) },
+        value = valueOverride.ifBlank { state.superuserCount.toString() },
+        wallpaperFit = wallpaperFit,
         onClick = actions.onSuperuserClick,
     )
 }
@@ -735,13 +862,17 @@ internal fun SuperuserMetricCard(
 internal fun ModuleMetricCard(
     state: HomeUiState,
     actions: HomeActions,
+    titleOverride: String = "",
+    valueOverride: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     modifier: Modifier = Modifier,
 ) {
     MetricCard(
         modifier = modifier,
         target = HomeMetricCardWallpaperTarget.Module,
-        title = stringResource(R.string.module),
-        value = state.moduleCount.toString(),
+        title = titleOverride.ifBlank { stringResource(R.string.module) },
+        value = valueOverride.ifBlank { state.moduleCount.toString() },
+        wallpaperFit = wallpaperFit,
         onClick = actions.onModuleClick,
     )
 }
@@ -928,6 +1059,7 @@ private fun BoxScope.LkmCardWallpaperBackground(
     bitmap: Bitmap?,
     videoUriString: String?,
     videoCrop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
 ) {
     if (bitmap == null && videoUriString.isNullOrBlank()) return
 
@@ -945,7 +1077,7 @@ private fun BoxScope.LkmCardWallpaperBackground(
             modifier = Modifier.matchParentSize(),
             bitmap = imageBitmap,
             contentDescription = null,
-            contentScale = ContentScale.Crop
+            contentScale = wallpaperFit.toContentScale(),
         )
     }
     Box(
@@ -1400,6 +1532,7 @@ private fun MetricCard(
     title: String,
     value: String,
     onClick: () -> Unit,
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     modifier: Modifier = Modifier,
 ) {
     val wallpaperState = rememberHomeMetricCardWallpaperState(
@@ -1436,6 +1569,8 @@ private fun MetricCard(
                 bitmap = wallpaperBitmap,
                 videoUriString = videoUriString,
                 videoCrop = wallpaperState.crop,
+                wallpaperFit = wallpaperFit,
+                visualSettings = wallpaperState.visualSettings,
             )
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1789,6 +1924,9 @@ internal fun SecondaryLinksCard(
 @Composable
 internal fun StatusMonitorCard(
     systemInfo: SystemInfo,
+    titleOverride: String = "",
+    subtitleOverride: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     modifier: Modifier = Modifier,
 ) {
     val wallpaperState = rememberHomeMetricCardWallpaperState(
@@ -1821,14 +1959,15 @@ internal fun StatusMonitorCard(
     ) {
         Box(modifier = Modifier.padding(16.dp)) {
             StatusMonitorPanelMiuix(
-                selinuxLabel = stringResource(R.string.home_selinux_status),
+                selinuxLabel = titleOverride.ifBlank { stringResource(R.string.home_selinux_status) },
                 selinuxValue = selinuxDisplay,
                 selinuxDotColor = selinuxDotColorMiuix(systemInfo.selinuxStatus),
-                seccompLabel = stringResource(R.string.home_seccomp_status),
+                seccompLabel = subtitleOverride.ifBlank { stringResource(R.string.home_seccomp_status) },
                 seccompValue = seccompDisplay,
                 seccompDotColor = seccompDotColorMiuix(systemInfo.seccompStatus),
                 wallpaperState = wallpaperState,
                 wallpaperBitmap = wallpaperBitmap,
+                wallpaperFit = wallpaperFit,
             )
         }
     }
@@ -1838,6 +1977,9 @@ internal fun StatusMonitorCard(
 internal fun SystemInfoCard(
     systemInfo: SystemInfo,
     hookTypes: List<KernelHookType> = emptyList(),
+    titleOverride: String = "",
+    subtitleOverride: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboard.current
@@ -1875,6 +2017,9 @@ internal fun SystemInfoCard(
                 onFingerprintExpandedChange = { fingerprintExpanded = it },
                 wallpaperState = wallpaperState,
                 wallpaperBitmap = wallpaperBitmap,
+                headerTitle = titleOverride,
+                headerSubtitle = subtitleOverride,
+                wallpaperFit = wallpaperFit,
                 onCopyValue = ::copyValue,
             )
         }
@@ -1978,14 +2123,18 @@ private fun StatusMonitorPanelMiuix(
     seccompDotColor: Color,
     wallpaperState: HomeMetricCardWallpaperState,
     wallpaperBitmap: Bitmap?,
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
 ) {
     val videoUriString = wallpaperState.videoUriString
     val hasWallpaper = wallpaperBitmap != null || !videoUriString.isNullOrBlank()
+    val seasonalStyle = isSnowInterfaceStyle()
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .then(
                 if (hasWallpaper) {
+                    Modifier.background(Color.Transparent, RoundedCornerShape(14.dp))
+                } else if (seasonalStyle) {
                     Modifier.background(Color.Transparent, RoundedCornerShape(14.dp))
                 } else if (isLiquidGlassTheme()) {
                     Modifier.globalLiquidGlassSurface(
@@ -2006,6 +2155,7 @@ private fun StatusMonitorPanelMiuix(
             .clip(RoundedCornerShape(14.dp))
             .uiDecoratedCard(
                 shape = RoundedCornerShape(14.dp),
+                enabled = !seasonalStyle,
                 customTarget = CustomCardTarget.StatusMonitor,
             ),
     ) {
@@ -2013,6 +2163,8 @@ private fun StatusMonitorPanelMiuix(
             bitmap = wallpaperBitmap,
             videoUriString = videoUriString,
             videoCrop = wallpaperState.crop,
+            wallpaperFit = wallpaperFit,
+            visualSettings = wallpaperState.visualSettings,
         )
         Column(
             modifier = Modifier
@@ -2048,10 +2200,14 @@ private fun SystemInfoPanelMiuix(
     onFingerprintExpandedChange: (Boolean) -> Unit,
     wallpaperState: HomeMetricCardWallpaperState,
     wallpaperBitmap: Bitmap?,
+    headerTitle: String = "",
+    headerSubtitle: String = "",
+    wallpaperFit: HomeLayoutWallpaperFit = HomeLayoutWallpaperFit.Crop,
     onCopyValue: (String, String) -> Unit,
 ) {
     val videoUriString = wallpaperState.videoUriString
     val hasWallpaper = wallpaperBitmap != null || !videoUriString.isNullOrBlank()
+    val seasonalStyle = isSnowInterfaceStyle()
     val hookTypeDisplay = kernelHookTypeLabel(hookTypes)
     val rowColor = if (hasWallpaper) Color.White else colorScheme.onSurface
     val labelColor = if (hasWallpaper) {
@@ -2070,6 +2226,7 @@ private fun SystemInfoPanelMiuix(
             .clip(RoundedCornerShape(14.dp))
             .uiDecoratedCard(
                 shape = RoundedCornerShape(14.dp),
+                enabled = !seasonalStyle,
                 customTarget = CustomCardTarget.SystemInfo,
             ),
     ) {
@@ -2077,6 +2234,8 @@ private fun SystemInfoPanelMiuix(
             bitmap = wallpaperBitmap,
             videoUriString = videoUriString,
             videoCrop = wallpaperState.crop,
+            wallpaperFit = wallpaperFit,
+            visualSettings = wallpaperState.visualSettings,
         )
         Column(
             modifier = Modifier
@@ -2084,6 +2243,29 @@ private fun SystemInfoPanelMiuix(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (headerTitle.isNotBlank() || headerSubtitle.isNotBlank()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (headerTitle.isNotBlank()) {
+                        Text(
+                            text = headerTitle,
+                            color = rowColor,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (headerSubtitle.isNotBlank()) {
+                        Text(
+                            text = headerSubtitle,
+                            color = labelColor,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
             InfoRowMiuix(
                 label = stringResource(R.string.home_manager_version),
                 value = systemInfo.managerVersion,
@@ -2518,8 +2700,14 @@ private fun Modifier.homeLiquidGlassSurface(
     surfaceAlpha: Float = 0.58f,
     customTarget: CustomCardTarget = CustomCardTarget.Default,
 ): Modifier {
+    if (isRainInterfaceStyle()) {
+        return snowMiuixCardSurface(
+            shape = RoundedCornerShape(14.dp),
+            customTarget = customTarget,
+        )
+    }
     if (!enabled) {
-        return if (isSnowInterfaceStyle() || isRainInterfaceStyle()) {
+        return if (isSnowInterfaceStyle()) {
             snowMiuixCardSurface(
                 shape = RoundedCornerShape(18.dp),
                 customTarget = customTarget,
@@ -2547,7 +2735,9 @@ private fun Modifier.homeLiquidGlassSurface(
 }
 
 private fun HomeMetricCardWallpaperTarget.toCustomCardTarget(): CustomCardTarget = when (this) {
-    HomeMetricCardWallpaperTarget.Lkm -> CustomCardTarget.Lkm
+    HomeMetricCardWallpaperTarget.Lkm,
+    HomeMetricCardWallpaperTarget.ClassicMiuixLkm,
+    HomeMetricCardWallpaperTarget.MaterialLkm -> CustomCardTarget.Lkm
     HomeMetricCardWallpaperTarget.Superuser -> CustomCardTarget.Superuser
     HomeMetricCardWallpaperTarget.Module -> CustomCardTarget.Module
     HomeMetricCardWallpaperTarget.StatusMonitor -> CustomCardTarget.StatusMonitor

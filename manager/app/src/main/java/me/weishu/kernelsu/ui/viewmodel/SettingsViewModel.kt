@@ -22,6 +22,7 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
+import me.weishu.kernelsu.ui.component.PageTransitionEffect
 import me.weishu.kernelsu.ui.component.GlobalSnowEffect
 import me.weishu.kernelsu.ui.component.NightBackgroundEffect
 import me.weishu.kernelsu.ui.component.SwitchStyle
@@ -30,6 +31,7 @@ import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
+import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationSaveState
 import me.weishu.kernelsu.ui.theme.ColorMode
@@ -71,6 +73,7 @@ class SettingsViewModel(
             val showGkiWarning = repo.showGkiWarning
             val showHomeSupportCard = repo.showHomeSupportCard
             val showHomeLearnCard = repo.showHomeLearnCard
+            val miuixClassicHomeLayoutEnabled = repo.miuixClassicHomeLayoutEnabled
             val graphicsRendererFeatureEnabled = repo.graphicsRendererFeatureEnabled
             val themeMode = repo.themeMode
             val miuixMonet = repo.miuixMonet
@@ -93,6 +96,9 @@ class SettingsViewModel(
             val seasonCardMotionEnabled = repo.seasonCardMotionEnabled
             val rainStyle = repo.rainStyle
             val rainCardMotionEnabled = repo.rainCardMotionEnabled
+            val inkStyle = repo.inkStyle
+            val inkFontEnabled = repo.inkFontEnabled
+            val inkCardMotionEnabled = repo.inkCardMotionEnabled
             val pixelStyle = repo.pixelStyle
             val pixelCardMotionEnabled = repo.pixelCardMotionEnabled
             val uiDecorationConfig = repo.uiDecorationConfig
@@ -105,6 +111,7 @@ class SettingsViewModel(
             val nightBackgroundPassthroughOpacity = repo.nightBackgroundPassthroughOpacity
             val globalScrollEffectEnabled = repo.globalScrollEffectEnabled
             val globalScrollEffect = repo.globalScrollEffect
+            val pageTransitionEffect = repo.pageTransitionEffect
             val themeSyncStrategy = repo.themeSyncStrategy
             val customThemePresets = repo.getCustomThemePresets()
             val enableWebDebugging = repo.enableWebDebugging
@@ -113,6 +120,7 @@ class SettingsViewModel(
             val customHomeTitle = repo.customHomeTitle
             val customWallpaperUri = repo.customWallpaperUri
             val customWallpaperOpacity = repo.customWallpaperOpacity
+            val customWallpaperVisualSettings = repo.customWallpaperVisualSettings
             val customWallpaperCrop = repo.customWallpaperCrop
             val customWallpaperPassthroughEnabled = repo.customWallpaperPassthroughEnabled
             val customWallpaperPassthroughOpacity = repo.customWallpaperPassthroughOpacity
@@ -120,6 +128,7 @@ class SettingsViewModel(
             val customVideoBackgroundDurationSeconds = repo.customVideoBackgroundDurationSeconds
             val customPageBackgrounds = repo.customPageBackgrounds
             val customStartupAnimationUri = repo.customStartupAnimationUri
+            val startupAnimationSettings = repo.startupAnimationSettings
             val customStartupSoundUri = repo.customStartupSoundUri
             val customStartupSoundDurationSeconds = repo.customStartupSoundDurationSeconds
             val customStartupSoundVolume = repo.customStartupSoundVolume
@@ -131,6 +140,7 @@ class SettingsViewModel(
             val deltaColorVariant = repo.deltaColorVariant
             val colorStyle = repo.colorStyle
             val colorSpec = repo.colorSpec
+            val monetSurfaceOpacity = repo.monetSurfaceOpacity
             val themePreset = resolveThemePreset(
                 repo.themePreset,
                 uiMode = uiMode,
@@ -139,6 +149,7 @@ class SettingsViewModel(
                 keyColor = keyColor,
                 colorStyle = colorStyle,
                 colorSpec = colorSpec,
+                monetSurfaceOpacity = monetSurfaceOpacity,
                 enableBlur = enableBlur,
                 enableFloatingBottomBar = enableFloatingBottomBar,
                 enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
@@ -181,6 +192,7 @@ class SettingsViewModel(
                     showGkiWarning = showGkiWarning,
                     showHomeSupportCard = showHomeSupportCard,
                     showHomeLearnCard = showHomeLearnCard,
+                    miuixClassicHomeLayoutEnabled = miuixClassicHomeLayoutEnabled,
                     graphicsRendererFeatureEnabled = graphicsRendererFeatureEnabled,
                     themeMode = themeMode,
                     miuixMonet = miuixMonet,
@@ -200,6 +212,9 @@ class SettingsViewModel(
                     seasonCardMotionEnabled = seasonCardMotionEnabled,
                     rainStyle = rainStyle,
                     rainCardMotionEnabled = rainCardMotionEnabled,
+                    inkStyle = inkStyle,
+                    inkFontEnabled = inkFontEnabled,
+                    inkCardMotionEnabled = inkCardMotionEnabled,
                     pixelStyle = pixelStyle,
                     pixelCardMotionEnabled = pixelCardMotionEnabled,
                     uiDecorationConfig = uiDecorationConfig,
@@ -212,6 +227,7 @@ class SettingsViewModel(
                     nightBackgroundPassthroughOpacity = nightBackgroundPassthroughOpacity,
                     globalScrollEffectEnabled = globalScrollEffectEnabled,
                     globalScrollEffect = globalScrollEffect,
+                    pageTransitionEffect = pageTransitionEffect,
                     themeSyncStrategy = themeSyncStrategy,
                     customThemePresets = customThemePresets,
                     enableWebDebugging = enableWebDebugging,
@@ -220,6 +236,7 @@ class SettingsViewModel(
                     customHomeTitle = customHomeTitle,
                     customWallpaperUri = customWallpaperUri,
                     customWallpaperOpacity = customWallpaperOpacity,
+                    customWallpaperVisualSettings = customWallpaperVisualSettings,
                     customWallpaperCrop = customWallpaperCrop,
                     customWallpaperPassthroughEnabled = customWallpaperPassthroughEnabled,
                     customWallpaperPassthroughOpacity = customWallpaperPassthroughOpacity,
@@ -227,6 +244,7 @@ class SettingsViewModel(
                     customVideoBackgroundDurationSeconds = customVideoBackgroundDurationSeconds,
                     customPageBackgrounds = customPageBackgrounds,
                     customStartupAnimationUri = customStartupAnimationUri,
+                    startupAnimationSettings = startupAnimationSettings,
                     customStartupSoundUri = customStartupSoundUri,
                     customStartupSoundDurationSeconds = customStartupSoundDurationSeconds,
                     customStartupSoundVolume = customStartupSoundVolume,
@@ -238,6 +256,7 @@ class SettingsViewModel(
                     deltaColorVariant = deltaColorVariant,
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
+                    monetSurfaceOpacity = monetSurfaceOpacity,
                     suCompatStatus = suCompatStatus,
                     suCompatMode = suCompatMode,
                     isSuEnabled = isSuEnabled,
@@ -292,11 +311,6 @@ class SettingsViewModel(
         }
 
         when (normalizedMode) {
-            InterfaceStyle.Studio.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.STUDIO)
-                return
-            }
-
             InterfaceStyle.Skrootpro.value -> {
                 applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.SKROOTPRO)
                 return
@@ -327,6 +341,11 @@ class SettingsViewModel(
                 return
             }
 
+            InterfaceStyle.Ink.value -> {
+                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.INK)
+                return
+            }
+
             InterfaceStyle.Pixel.value -> {
                 applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.PIXEL)
                 return
@@ -335,13 +354,13 @@ class SettingsViewModel(
 
         val oldMode = repo.uiMode
         val currentThemeMode = repo.themeMode
-        val isLeavingSpecialStyle = oldMode == InterfaceStyle.Studio.value ||
-            oldMode == InterfaceStyle.Skrootpro.value ||
+        val isLeavingSpecialStyle = oldMode == InterfaceStyle.Skrootpro.value ||
             oldMode == InterfaceStyle.Alpha.value ||
             oldMode == InterfaceStyle.Delta.value ||
             oldMode == InterfaceStyle.LiquidGlass.value ||
             oldMode == InterfaceStyle.Snow.value ||
             oldMode == InterfaceStyle.Rain.value ||
+            oldMode == InterfaceStyle.Ink.value ||
             oldMode == InterfaceStyle.Pixel.value
 
         if (isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value) {
@@ -372,6 +391,11 @@ class SettingsViewModel(
         } else {
             null
         }
+        val selectedInkStyle = if (mode == InterfaceStyle.Ink.value) {
+            InkStyle.fromValue(repo.inkStyle)
+        } else {
+            null
+        }
         val selectedPixelStyle = if (mode == InterfaceStyle.Pixel.value) {
             PixelStyle.fromValue(repo.pixelStyle)
         } else {
@@ -382,6 +406,7 @@ class SettingsViewModel(
         repo.themeMode = colorMode
         selectedSeason?.let { repo.seasonStyle = it.value }
         selectedRainStyle?.let { repo.rainStyle = it.value }
+        selectedInkStyle?.let { repo.inkStyle = it.value }
         selectedPixelStyle?.let { repo.pixelStyle = it.value }
         refresh()
     }
@@ -409,6 +434,11 @@ class SettingsViewModel(
     fun setShowHomeLearnCard(enabled: Boolean) {
         repo.showHomeLearnCard = enabled
         _uiState.update { it.copy(showHomeLearnCard = enabled) }
+    }
+
+    fun setMiuixClassicHomeLayoutEnabled(enabled: Boolean) {
+        repo.miuixClassicHomeLayoutEnabled = enabled
+        _uiState.update { it.copy(miuixClassicHomeLayoutEnabled = enabled) }
     }
 
     fun setGraphicsRendererFeatureEnabled(enabled: Boolean) {
@@ -519,6 +549,28 @@ class SettingsViewModel(
         _uiState.update { it.copy(rainCardMotionEnabled = enabled) }
     }
 
+    fun setInkStyleIndex(index: Int) {
+        val inkStyle = InkStyle.fromIndex(index)
+        repo.inkStyle = inkStyle.value
+        _uiState.update {
+            it.copy(
+                inkStyle = inkStyle.value,
+                keyColor = inkStyle.keyColor,
+                themePreset = ThemePreset.INK.value,
+            )
+        }
+    }
+
+    fun setInkFontEnabled(enabled: Boolean) {
+        repo.inkFontEnabled = enabled
+        _uiState.update { it.copy(inkFontEnabled = enabled) }
+    }
+
+    fun setInkCardMotionEnabled(enabled: Boolean) {
+        repo.inkCardMotionEnabled = enabled
+        _uiState.update { it.copy(inkCardMotionEnabled = enabled) }
+    }
+
     fun setPixelStyleIndex(index: Int) {
         val pixelStyle = PixelStyle.fromIndex(index)
         repo.pixelStyle = pixelStyle.value
@@ -569,6 +621,12 @@ class SettingsViewModel(
         _uiState.update { it.copy(globalScrollEffect = effect.value) }
     }
 
+    fun setPageTransitionEffectIndex(index: Int) {
+        val effect = PageTransitionEffect.fromIndex(index)
+        repo.pageTransitionEffect = effect.value
+        _uiState.update { it.copy(pageTransitionEffect = effect.value) }
+    }
+
     fun setLauncherIconByIndex(index: Int) {
         val option = LauncherIconOption.entries.getOrElse(index) { LauncherIconOption.Default }
         repo.launcherIcon = option.value
@@ -603,6 +661,11 @@ class SettingsViewModel(
     fun setCustomWallpaperOpacity(opacity: Float) {
         repo.customWallpaperOpacity = opacity
         _uiState.update { it.copy(customWallpaperOpacity = repo.customWallpaperOpacity) }
+    }
+
+    fun setCustomWallpaperVisualSettings(settings: me.weishu.kernelsu.ui.util.MediaVisualSettings) {
+        repo.customWallpaperVisualSettings = settings
+        _uiState.update { it.copy(customWallpaperVisualSettings = repo.customWallpaperVisualSettings) }
     }
 
     fun setCustomWallpaperCrop(crop: CustomWallpaperCrop) {
@@ -663,6 +726,14 @@ class SettingsViewModel(
 
     fun setCustomPageBackgroundVideoDurationSeconds(target: CustomPageBackgroundTarget, seconds: Int) {
         repo.setCustomPageBackgroundVideoDurationSeconds(target, seconds)
+        _uiState.update { it.copy(customPageBackgrounds = repo.customPageBackgrounds) }
+    }
+
+    fun setCustomPageBackgroundVisualSettings(
+        target: CustomPageBackgroundTarget,
+        settings: me.weishu.kernelsu.ui.util.MediaVisualSettings,
+    ) {
+        repo.setCustomPageBackgroundVisualSettings(target, settings)
         _uiState.update { it.copy(customPageBackgrounds = repo.customPageBackgrounds) }
     }
 
@@ -732,6 +803,14 @@ class SettingsViewModel(
         _uiState.update { it.copy(customNavigationIcons = repo.customNavigationIcons) }
     }
 
+    fun setCustomNavigationIconPresentation(
+        slot: CustomNavigationIconSlot,
+        state: me.weishu.kernelsu.ui.util.CustomNavigationIconState,
+    ) {
+        repo.setCustomNavigationIconPresentation(slot, state)
+        _uiState.update { it.copy(customNavigationIcons = repo.customNavigationIcons) }
+    }
+
     fun setDeltaColorVariant(variant: String) {
         val sanitized = DeltaColorVariant.fromValue(variant).value
         repo.deltaColorVariant = sanitized
@@ -741,6 +820,11 @@ class SettingsViewModel(
     fun setCustomStartupAnimationUri(uri: String?) {
         repo.customStartupAnimationUri = uri
         _uiState.update { it.copy(customStartupAnimationUri = repo.customStartupAnimationUri) }
+    }
+
+    fun setStartupAnimationSettings(settings: me.weishu.kernelsu.ui.util.StartupAnimationSettings) {
+        repo.startupAnimationSettings = settings
+        _uiState.update { it.copy(startupAnimationSettings = repo.startupAnimationSettings) }
     }
 
     fun clearCustomStartupAnimation() {
@@ -763,8 +847,17 @@ class SettingsViewModel(
     }
 
     fun setColorMode(mode: ColorMode) {
+        if (mode == ColorMode.DARK_AMOLED) {
+            repo.miuixMonet = false
+        }
         repo.themeMode = mode.value
-        _uiState.update { it.copy(themeMode = mode.value, themePreset = ThemePreset.CUSTOM.value) }
+        _uiState.update {
+            it.copy(
+                themeMode = mode.value,
+                miuixMonet = if (mode == ColorMode.DARK_AMOLED) false else it.miuixMonet,
+                themePreset = ThemePreset.CUSTOM.value,
+            )
+        }
     }
 
     fun setMiuixMonet(enabled: Boolean) {
@@ -801,6 +894,16 @@ class SettingsViewModel(
         _uiState.update { it.copy(colorSpec = spec, themePreset = ThemePreset.CUSTOM.value) }
     }
 
+    fun setMonetSurfaceOpacity(opacity: Float) {
+        repo.monetSurfaceOpacity = opacity
+        _uiState.update {
+            it.copy(
+                monetSurfaceOpacity = repo.monetSurfaceOpacity,
+                themePreset = ThemePreset.CUSTOM.value,
+            )
+        }
+    }
+
     fun applyThemePreset(preset: ThemePreset) {
         repo.applyThemePreset(preset)
         val uiMode = repo.uiMode
@@ -813,6 +916,7 @@ class SettingsViewModel(
                 keyColor = preset.keyColor,
                 colorStyle = preset.paletteStyle.name,
                 colorSpec = preset.colorSpec.name,
+                monetSurfaceOpacity = preset.monetSurfaceOpacity,
                 enableBlur = preset.enableBlur,
                 enableFloatingBottomBar = preset.enableFloatingBottomBar,
                 enableFloatingBottomBarBlur = preset.enableFloatingBottomBarBlur,
@@ -832,6 +936,7 @@ class SettingsViewModel(
         keyColor: Int,
         colorStyle: String,
         colorSpec: String,
+        monetSurfaceOpacity: Float,
         enableBlur: Boolean,
         enableFloatingBottomBar: Boolean,
         enableFloatingBottomBarBlur: Boolean,
@@ -854,6 +959,7 @@ class SettingsViewModel(
                 preset.keyColor == keyColor &&
                 preset.paletteStyle.name == colorStyle &&
                 preset.colorSpec.name == colorSpec &&
+                preset.monetSurfaceOpacity == monetSurfaceOpacity &&
                 preset.enableBlur == enableBlur &&
                 preset.enableFloatingBottomBar == enableFloatingBottomBar &&
                 preset.enableFloatingBottomBarBlur == enableFloatingBottomBarBlur &&
@@ -1111,17 +1217,26 @@ class SettingsViewModel(
             _uiState.update { it.copy(isLateLoadMode = true) }
             return
         }
+        if (_uiState.value.isKPatchNextOperationRunning) return
+
+        _uiState.update { it.copy(isKPatchNextOperationRunning = true) }
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setKPatchNextEnabled(enabled)) {
-                refreshKPatchNextStatus()
+            try {
+                val success = runCatching { repo.setKPatchNextEnabled(enabled) }
+                    .onFailure { Log.e(TAG, "KPatch Next operation failed", it) }
+                    .getOrDefault(false)
+                runCatching { refreshKPatchNextStatus() }
+                    .onFailure { Log.e(TAG, "Failed to refresh KPatch Next status", it) }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(ksuApp, R.string.settings_kpatch_next_reboot_required, Toast.LENGTH_LONG).show()
+                    val message = when {
+                        !success -> R.string.settings_kpatch_next_failed
+                        enabled -> R.string.settings_kpatch_next_install_scheduled
+                        else -> R.string.settings_kpatch_next_uninstall_scheduled
+                    }
+                    Toast.makeText(ksuApp, message, Toast.LENGTH_LONG).show()
                 }
-            } else {
-                refreshKPatchNextStatus()
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(ksuApp, R.string.settings_kpatch_next_failed, Toast.LENGTH_LONG).show()
-                }
+            } finally {
+                _uiState.update { it.copy(isKPatchNextOperationRunning = false) }
             }
         }
     }
