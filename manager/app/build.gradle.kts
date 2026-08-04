@@ -257,7 +257,7 @@ dependencies {
     implementation(libs.appiconloader)
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20250517")
+    testImplementation("org.json:json:20260719")
 }
 
 kotlin {
