@@ -226,7 +226,7 @@ fun HomePagerMiuix(
             ) {
                 item {
                     Column(
-                        modifier = Modifier.padding(vertical = 12.dp),
+                        modifier = Modifier.padding(top = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -327,8 +327,8 @@ fun HomePagerMiuix(
                                 showLearn = state.showHomeLearnCard,
                             )
                         }
+                        Spacer(Modifier.height(bottomInnerPadding))
                     }
-                    Spacer(Modifier.height(bottomInnerPadding))
                 }
             }
         }
