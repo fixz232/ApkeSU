@@ -907,6 +907,7 @@ private fun HomeLayoutFullscreenBackground(
             opacity = settings.customWallpaperOpacity,
             crop = settings.customWallpaperCrop,
             videoDurationSeconds = settings.customVideoBackgroundDurationSeconds,
+            videoFrameRate = settings.customVideoBackgroundFrameRate,
             visualSettings = settings.customWallpaperVisualSettings,
         )
     val interfaceStyle = LocalInterfaceStyle.current
@@ -921,6 +922,7 @@ private fun HomeLayoutFullscreenBackground(
         uriString = homeBackground.wallpaperUriString,
         videoUriString = homeBackground.videoUriString,
         videoDurationSeconds = homeBackground.videoDurationSeconds,
+        videoFrameRate = homeBackground.videoFrameRate,
         opacity = homeBackground.opacity,
         crop = homeBackground.crop,
         visualSettings = homeBackground.visualSettings,

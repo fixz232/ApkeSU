@@ -8,14 +8,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
-private const val MODULE_TOP_BAR_IDLE_TIMEOUT_MILLIS = 3_000L
+const val MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY = "module_top_bar_auto_hide_enabled"
+
+private const val MODULE_TOP_BAR_IDLE_TIMEOUT_MILLIS = 5_000L
 
 @Composable
-internal fun rememberModuleTopBarVisible(isScrollInProgress: Boolean): Boolean {
+internal fun rememberModuleTopBarVisible(
+    enabled: Boolean,
+    isScrollInProgress: Boolean,
+): Boolean {
     var visible by remember { mutableStateOf(true) }
 
-    LaunchedEffect(isScrollInProgress) {
-        if (isScrollInProgress) {
+    LaunchedEffect(enabled, isScrollInProgress) {
+        if (!enabled) {
+            visible = true
+        } else if (isScrollInProgress) {
             visible = false
         } else {
             delay(MODULE_TOP_BAR_IDLE_TIMEOUT_MILLIS)

@@ -36,6 +36,7 @@ import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
+import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
@@ -56,6 +57,8 @@ import me.weishu.kernelsu.ui.component.NightBackgroundEffectOverlay
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
+import me.weishu.kernelsu.ui.component.backgroundScrollFollowController
+import me.weishu.kernelsu.ui.component.rememberBackgroundScrollFollowState
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.component.sanitizeNightBackgroundPassthroughOpacity
 import me.weishu.kernelsu.ui.component.snow.LocalSeasonStyle
@@ -82,15 +85,18 @@ import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY
+import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_URI_KEY
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.GLOBAL_BACKGROUND_VISUAL_KEYS
 import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundDurationSeconds
+import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundFrameRate
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
@@ -174,9 +180,16 @@ class WebUIActivity : ComponentActivity() {
                         enabled = visualEffectsState.globalScrollEnabled,
                         effectValue = visualEffectsState.globalScrollEffect,
                     )
+                    val backgroundScrollFollowState = rememberBackgroundScrollFollowState(
+                        enabled = wallpaperState.scrollFollowEnabled,
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .backgroundScrollFollowController(
+                                state = backgroundScrollFollowState,
+                                pointerFallbackEnabled = true,
+                            )
                             .globalScrollEffectController(
                                 state = globalScrollEffectState,
                                 pointerFallbackEnabled = true,
@@ -186,11 +199,13 @@ class WebUIActivity : ComponentActivity() {
                             uriString = wallpaperState.uriString,
                             videoUriString = wallpaperState.videoUriString,
                             videoDurationSeconds = wallpaperState.videoDurationSeconds,
+                            videoFrameRate = wallpaperState.videoFrameRate,
                             opacity = wallpaperState.opacity,
                             crop = wallpaperState.crop,
                             visualSettings = wallpaperState.visualSettings,
                             passthroughEnabled = wallpaperState.passthroughEnabled,
                             passthroughOpacity = wallpaperState.passthroughOpacity,
+                            backgroundScrollFollowState = backgroundScrollFollowState,
                         ) {
                             if (!visualEffectsState.nightBackgroundPassthrough) {
                                 NightBackgroundEffectOverlay(
@@ -236,6 +251,8 @@ private data class WebUiWallpaperState(
     val uriString: String?,
     val videoUriString: String?,
     val videoDurationSeconds: Int,
+    val videoFrameRate: Int,
+    val scrollFollowEnabled: Boolean,
     val opacity: Float,
     val crop: CustomWallpaperCrop,
     val visualSettings: MediaVisualSettings,
@@ -267,6 +284,13 @@ private fun readWebUiWallpaperState(prefs: SharedPreferences): WebUiWallpaperSta
                 DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
             )
         ),
+        videoFrameRate = sanitizeCustomVideoBackgroundFrameRate(
+            prefs.getInt(
+                CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+            )
+        ),
+        scrollFollowEnabled = prefs.getBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, false),
         opacity = sanitizeCustomWallpaperOpacity(
             prefs.getFloat(CUSTOM_WALLPAPER_OPACITY_KEY, DEFAULT_CUSTOM_WALLPAPER_OPACITY)
         ),
@@ -337,6 +361,8 @@ private val wallpaperPreferenceKeys = buildSet {
     add(CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY)
     add(CUSTOM_VIDEO_BACKGROUND_URI_KEY)
     add(CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY)
+    add(CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY)
+    add(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY)
     addAll(GLOBAL_BACKGROUND_VISUAL_KEYS.all)
 }
 

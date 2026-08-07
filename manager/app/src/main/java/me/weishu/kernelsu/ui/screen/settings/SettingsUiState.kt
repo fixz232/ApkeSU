@@ -33,6 +33,7 @@ import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_OVERLAY
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_LITE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_AUDIO_VOLUME
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_STARTUP_SOUND_DURATION_SECONDS
@@ -72,6 +73,7 @@ data class SettingsUiState(
     val enableFloatingBottomBarBlur: Boolean = false,
     val autoHideNavigationBar: Boolean = false,
     val scrollHideNavigationBar: Boolean = false,
+    val moduleTopBarAutoHideEnabled: Boolean = false,
     val pageScale: Float = 1.0f,
     val fontScale: Float = ThemeAppearanceDefaults.FONT_SCALE,
     val blurIntensity: Float = ThemeAppearanceDefaults.BLUR_INTENSITY,
@@ -96,6 +98,7 @@ data class SettingsUiState(
     val nightBackgroundPassthroughOpacity: Float = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
     val globalScrollEffectEnabled: Boolean = false,
     val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
+    val backgroundScrollFollowEnabled: Boolean = false,
     val pageTransitionEffect: String = PageTransitionEffect.DEFAULT_VALUE,
     val themeSyncStrategy: ThemeSyncStrategy = ThemeSyncStrategy.SHARED,
     val customThemePresets: List<CustomThemePreset> = emptyList(),
@@ -111,6 +114,7 @@ data class SettingsUiState(
     val customWallpaperPassthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
     val customVideoBackgroundUri: String? = null,
     val customVideoBackgroundDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    val customVideoBackgroundFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     val customPageBackgrounds: CustomPageBackgroundSet = CustomPageBackgroundSet(),
     val customStartupAnimationUri: String? = null,
     val startupAnimationSettings: StartupAnimationSettings = StartupAnimationSettings(),
@@ -240,6 +244,7 @@ data class SettingsScreenActions(
     val onPreviewVideoBackground: () -> Unit,
     val onClearVideoBackground: () -> Unit,
     val onSetVideoBackgroundDurationSeconds: (Int) -> Unit,
+    val onSetVideoBackgroundFrameRate: (Int) -> Unit,
     val onSetPageBackgroundWallpaper: (CustomPageBackgroundTarget, String?) -> Unit,
     val onSetPageBackgroundVideo: (CustomPageBackgroundTarget, String?) -> Unit,
     val onSetPageBackgroundOpacity: (CustomPageBackgroundTarget, Float) -> Unit,

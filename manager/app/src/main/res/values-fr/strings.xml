@@ -1117,6 +1117,8 @@
     <string name="settings_wallpaper_crop">Ajuster la zone de papier peint</string>
     <string name="settings_wallpaper_passthrough_summary">Dessinez légèrement le papier peint au-dessus des surfaces de l\&apos;interface utilisateur.</string>
     <string name="settings_wallpaper_passthrough_opacity">Opacité passthrough</string>
+    <string name="settings_background_scroll_follow">Fond suivant le défilement</string>
+    <string name="settings_background_scroll_follow_summary">Déplace doucement l\&apos;arrière-plan actuel avec le défilement de la page.</string>
     <string name="settings_wallpaper_not_selected">Aucun fond d\&apos;écran sélectionné</string>
     <string name="settings_wallpaper_preview_hint">Aperçu en arrière-plan</string>
     <string name="settings_wallpaper_preview_ui_sample">Exemple de couche d\&apos;interface utilisateur</string>
@@ -1127,6 +1129,9 @@
     <string name="settings_video_background_duration">Durée de la boucle vidéo</string>
     <string name="settings_video_background_duration_summary">Redémarrez la vidéo d\&apos;arrière-plan après l\&apos;heure sélectionnée.</string>
     <string name="settings_video_background_duration_value">%1$d s</string>
+    <string name="settings_video_background_frame_rate">Fréquence d\&apos;images de la vidéo</string>
+    <string name="settings_video_background_frame_rate_summary">Demande un taux de rafraîchissement compatible. Les valeurs élevées dépendent de l\&apos;écran et de la vidéo.</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="theme_store">Boutique à thème</string>
     <string name="theme_store_settings_summary">Gérez les icônes, les supports de carte, les arrière-plans, les sons, l\&apos;animation de démarrage et les thèmes enregistrés.</string>
     <string name="theme_store_title">Centre thématique</string>
@@ -1368,6 +1373,8 @@ Mode</string>
     <string name="settings_auto_hide_navigation_bar_summary">Masquer la barre de navigation après 3 secondes sans interaction. Touchez n\&apos;importe où pour l\&apos;afficher à nouveau.</string>
     <string name="settings_scroll_hide_navigation_bar">Masquer la barre de navigation lors du défilement</string>
     <string name="settings_scroll_hide_navigation_bar_summary">Masquer lors de la navigation vers le bas et afficher lors de la navigation vers le haut.</string>
+    <string name="settings_module_top_bar_auto_hide">Masquer automatiquement la barre supérieure des modules</string>
+    <string name="settings_module_top_bar_auto_hide_summary">Masque la barre supérieure des modules pendant le défilement et la réaffiche après 5 secondes d\&apos;inactivité.</string>
     <string name="settings_section_updates">Mises à jour</string>
     <string name="settings_section_updates_summary">Vérifications et rappels de mise à jour du module</string>
     <string name="settings_section_appearance">Apparence</string>

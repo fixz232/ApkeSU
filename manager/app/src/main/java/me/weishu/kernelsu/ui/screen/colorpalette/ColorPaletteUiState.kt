@@ -33,6 +33,7 @@ data class ColorPaletteScreenActions(
     val onSetEnableFloatingBottomBarBlur: (Boolean) -> Unit,
     val onSetAutoHideNavigationBar: (Boolean) -> Unit,
     val onSetScrollHideNavigationBar: (Boolean) -> Unit,
+    val onSetModuleTopBarAutoHideEnabled: (Boolean) -> Unit,
     val onSetEnablePredictiveBack: (Boolean) -> Unit,
     val onSetPageScale: (Float) -> Unit,
     val onSetFontScale: (Float) -> Unit,

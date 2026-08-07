@@ -419,7 +419,6 @@ internal fun BoxScope.HomeMetricCardWallpaperBackground(
                 uriString = videoUriString,
                 drawOverlay = false,
                 crop = videoCrop,
-                touchPassthrough = true,
                 modifier = Modifier.matchParentSize(),
             )
         } else if (bitmap != null) {

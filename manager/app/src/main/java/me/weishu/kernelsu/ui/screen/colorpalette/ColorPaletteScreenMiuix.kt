@@ -435,6 +435,22 @@ fun ColorPaletteScreenMiuix(
                             checked = uiState.scrollHideNavigationBar,
                             onCheckedChange = actions.onSetScrollHideNavigationBar,
                         )
+                        SwitchPreference(
+                            title = stringResource(id = R.string.settings_module_top_bar_auto_hide),
+                            summary = stringResource(id = R.string.settings_module_top_bar_auto_hide_summary),
+                            startAction = {
+                                Icon(
+                                    Icons.Rounded.Timer,
+                                    modifier = Modifier.padding(end = 6.dp),
+                                    contentDescription = stringResource(
+                                        id = R.string.settings_module_top_bar_auto_hide,
+                                    ),
+                                    tint = colorScheme.onBackground,
+                                )
+                            },
+                            checked = uiState.moduleTopBarAutoHideEnabled,
+                            onCheckedChange = actions.onSetModuleTopBarAutoHideEnabled,
+                        )
                         AnimatedVisibility(
                             visible = !isLiquidGlassInterface &&
                                 uiState.enableFloatingBottomBar &&

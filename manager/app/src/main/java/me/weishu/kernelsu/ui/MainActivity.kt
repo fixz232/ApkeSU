@@ -96,6 +96,7 @@ import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ui.component.AutoHidingNavigationBar
+import me.weishu.kernelsu.ui.component.backgroundScrollFollowController
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.preloadCustomPageBackgroundImages
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
@@ -165,6 +166,7 @@ import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyleWallpaper
 import me.weishu.kernelsu.ui.component.snow.rememberSeasonCardMotionProgress
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
+import me.weishu.kernelsu.ui.component.rememberBackgroundScrollFollowState
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
 import me.weishu.kernelsu.ui.navigation3.HandleDeepLink
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -243,6 +245,7 @@ import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBar
 import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
 import me.weishu.kernelsu.ui.theme.LocalImmersiveBackgroundActive
 import me.weishu.kernelsu.ui.theme.LocalScrollHideNavigationBar
+import me.weishu.kernelsu.ui.theme.LocalModuleTopBarAutoHide
 import me.weishu.kernelsu.ui.util.BackgroundMusicPlayer
 import me.weishu.kernelsu.ui.util.ClickSoundPlayer
 import me.weishu.kernelsu.ui.util.readAppAudioSettings
@@ -475,6 +478,7 @@ class MainActivity : ComponentActivity() {
                 LocalEnableFloatingBottomBarBlur provides effectiveEnableFloatingBottomBarBlur,
                 LocalAutoHideNavigationBar provides uiState.autoHideNavigationBar,
                 LocalScrollHideNavigationBar provides uiState.scrollHideNavigationBar,
+                LocalModuleTopBarAutoHide provides uiState.moduleTopBarAutoHideEnabled,
                 LocalUiMode provides uiMode,
                 LocalInterfaceStyle provides uiState.interfaceStyle,
                 LocalSeasonStyle provides SeasonStyle.fromValue(uiState.seasonStyle),
@@ -681,21 +685,28 @@ class MainActivity : ComponentActivity() {
                         enabled = uiState.globalScrollEffectEnabled && !navigationTransitionActive,
                         effectValue = uiState.globalScrollEffect,
                     )
+                    val backgroundScrollFollowState = rememberBackgroundScrollFollowState(
+                        enabled = uiState.backgroundScrollFollowEnabled && !navigationTransitionActive,
+                        resetKey = selectedMainPage to currentRoute,
+                    )
 
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .backgroundScrollFollowController(backgroundScrollFollowState)
                             .globalScrollEffectController(globalScrollEffectState)
                     ) {
                         CustomWallpaperRoot(
                             uriString = effectiveBackground.wallpaperUriString,
                             videoUriString = effectiveBackground.videoUriString,
                             videoDurationSeconds = effectiveBackground.videoDurationSeconds,
+                            videoFrameRate = effectiveBackground.videoFrameRate,
                             opacity = effectiveBackground.opacity,
                             crop = effectiveBackground.crop,
                             visualSettings = effectiveBackground.visualSettings,
                             passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
+                            backgroundScrollFollowState = backgroundScrollFollowState,
                         ) {
                             CompositionLocalProvider(
                                 LocalImmersiveBackgroundActive provides immersiveBackgroundActive,
@@ -849,6 +860,7 @@ private fun MainActivityUiState.effectiveCustomBackground(
         opacity = customWallpaperOpacity,
         crop = customWallpaperCrop,
         videoDurationSeconds = customVideoBackgroundDurationSeconds,
+        videoFrameRate = customVideoBackgroundFrameRate,
         visualSettings = customWallpaperVisualSettings,
     )
 }

@@ -235,6 +235,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">無操作 3 秒後隱藏導航欄，輕觸任意位置即可重新顯示。</string>
     <string name="settings_scroll_hide_navigation_bar">滑動隱藏導航欄</string>
     <string name="settings_scroll_hide_navigation_bar_summary">向下瀏覽時隱藏導航欄，向上瀏覽時重新顯示。</string>
+    <string name="settings_module_top_bar_auto_hide">自動隱藏模組頁頂部欄</string>
+    <string name="settings_module_top_bar_auto_hide_summary">捲動時隱藏模組頁頂部欄，停止操作 5 秒後重新顯示。</string>
     <string name="settings_enable_glass">液態玻璃</string>
     <string name="settings_enable_glass_summary">為懸浮底部欄啟用液態玻璃效果</string>
     <string name="show_only_primary_user_apps">僅顯示主要使用者 App</string>

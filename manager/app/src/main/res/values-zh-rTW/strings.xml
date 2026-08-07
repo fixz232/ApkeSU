@@ -169,6 +169,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">無操作 3 秒後隱藏導覽列，輕觸任意位置即可重新顯示。</string>
     <string name="settings_scroll_hide_navigation_bar">滑動隱藏導覽列</string>
     <string name="settings_scroll_hide_navigation_bar_summary">向下瀏覽時隱藏導覽列，向上瀏覽時重新顯示。</string>
+    <string name="settings_module_top_bar_auto_hide">自動隱藏模組頁頂部列</string>
+    <string name="settings_module_top_bar_auto_hide_summary">捲動時隱藏模組頁頂部列，停止操作 5 秒後重新顯示。</string>
     <string name="settings_enable_glass">液態玻璃</string>
     <string name="settings_enable_glass_summary">啟用懸浮底欄的液態玻璃效果</string>
     <string name="settings_enable_predictive_back">預測性返回手勢</string>

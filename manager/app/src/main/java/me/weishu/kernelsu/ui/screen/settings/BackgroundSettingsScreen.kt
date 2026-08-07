@@ -38,6 +38,9 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -76,6 +79,7 @@ import me.weishu.kernelsu.ui.component.rememberCustomWallpaperPreviewBitmap
 import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
+import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_OPTIONS
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
@@ -186,6 +190,7 @@ fun BackgroundSettingsScreen() {
                     }
                 }
             },
+            onFrameRateChange = viewModel::setCustomVideoBackgroundFrameRate,
             onVisualSettingsChange = { scopeKey, settings ->
                 if (scopeKey == GLOBAL_BACKGROUND_SCOPE_KEY) {
                     viewModel.setCustomWallpaperVisualSettings(settings)
@@ -207,6 +212,7 @@ fun BackgroundSettingsScreen() {
             },
             onPassthroughEnabledChange = viewModel::setCustomWallpaperPassthroughEnabled,
             onPassthroughOpacityChange = viewModel::setCustomWallpaperPassthroughOpacity,
+            onScrollFollowEnabledChange = viewModel::setBackgroundScrollFollowEnabled,
         )
     }
 
@@ -251,6 +257,7 @@ fun BackgroundSettingsScreen() {
         show = previewState?.hasVideo == true,
         uriString = previewState?.videoUriString,
         durationSeconds = previewState?.videoDurationSeconds ?: CustomBackgroundState().videoDurationSeconds,
+        frameRate = previewState?.videoFrameRate ?: CustomBackgroundState().videoFrameRate,
         opacity = previewState?.opacity ?: CustomBackgroundState().opacity,
         crop = previewState?.crop ?: CustomBackgroundState().crop,
         visualSettings = previewState?.visualSettings ?: me.weishu.kernelsu.ui.util.MediaVisualSettings(),
@@ -462,6 +469,12 @@ private fun BackgroundEditorCard(
                         valueLabel = { stringResource(R.string.settings_video_background_duration_value, it.roundToInt()) },
                         onValueChange = { actions.onDurationChange(scopeKey, it.roundToInt()) },
                     )
+                    if (scopeKey == GLOBAL_BACKGROUND_SCOPE_KEY) {
+                        VideoFrameRateSelector(
+                            frameRate = state.videoFrameRate,
+                            onFrameRateChange = actions.onFrameRateChange,
+                        )
+                    }
                 }
 
                 MediaVisualControls(
@@ -644,6 +657,47 @@ private fun BackgroundSlider(
 }
 
 @Composable
+private fun VideoFrameRateSelector(
+    frameRate: Int,
+    onFrameRateChange: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.settings_video_background_frame_rate),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(R.string.settings_video_background_frame_rate_summary),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_OPTIONS.forEachIndexed { index, option ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_OPTIONS.size,
+                    ),
+                    selected = frameRate == option,
+                    onClick = { onFrameRateChange(option) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.settings_video_background_frame_rate_value, option),
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SharedBackgroundOptions(
     uiState: SettingsUiState,
     actions: BackgroundSettingsActions,
@@ -657,6 +711,7 @@ private fun SharedBackgroundOptions(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            val switchStyle = LocalSwitchStyle.current
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -680,7 +735,6 @@ private fun SharedBackgroundOptions(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                val switchStyle = LocalSwitchStyle.current
                 if (switchStyle == SwitchStyle.Original) {
                     Switch(
                         checked = uiState.customWallpaperPassthroughEnabled,
@@ -704,6 +758,38 @@ private fun SharedBackgroundOptions(
                     onValueChange = actions.onPassthroughOpacityChange,
                 )
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_background_scroll_follow),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_background_scroll_follow_summary),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (switchStyle == SwitchStyle.Original) {
+                    Switch(
+                        checked = uiState.backgroundScrollFollowEnabled,
+                        onCheckedChange = actions.onScrollFollowEnabledChange,
+                    )
+                } else {
+                    StyledSwitch(
+                        checked = uiState.backgroundScrollFollowEnabled,
+                        onCheckedChange = actions.onScrollFollowEnabledChange,
+                        style = switchStyle,
+                    )
+                }
+            }
         }
     }
 }
@@ -716,10 +802,12 @@ private data class BackgroundSettingsActions(
     val onClear: (String) -> Unit,
     val onOpacityChange: (String, Float) -> Unit,
     val onDurationChange: (String, Int) -> Unit,
+    val onFrameRateChange: (Int) -> Unit,
     val onVisualSettingsChange: (String, me.weishu.kernelsu.ui.util.MediaVisualSettings) -> Unit,
     val onCropChange: (String, me.weishu.kernelsu.ui.util.CustomWallpaperCrop) -> Unit,
     val onPassthroughEnabledChange: (Boolean) -> Unit,
     val onPassthroughOpacityChange: (Float) -> Unit,
+    val onScrollFollowEnabledChange: (Boolean) -> Unit,
 )
 
 private fun SettingsUiState.backgroundStateForScope(scopeKey: String): CustomBackgroundState {
@@ -730,6 +818,7 @@ private fun SettingsUiState.backgroundStateForScope(scopeKey: String): CustomBac
             opacity = customWallpaperOpacity,
             crop = customWallpaperCrop,
             videoDurationSeconds = customVideoBackgroundDurationSeconds,
+            videoFrameRate = customVideoBackgroundFrameRate,
             visualSettings = customWallpaperVisualSettings,
         )
     }

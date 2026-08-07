@@ -26,6 +26,7 @@ import me.weishu.kernelsu.ui.util.AppAudioSettings
 import me.weishu.kernelsu.ui.util.CustomNavigationIconSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.StartupAnimationSettings
 
@@ -41,6 +42,7 @@ data class MainActivityUiState(
     val enableFloatingBottomBarBlur: Boolean,
     val autoHideNavigationBar: Boolean,
     val scrollHideNavigationBar: Boolean,
+    val moduleTopBarAutoHideEnabled: Boolean,
     val switchStyle: String = SwitchStyle.DEFAULT_VALUE,
     val customCardStyle: CustomCardStyle? = null,
     val customSwitchStyle: CustomSwitchStyle? = null,
@@ -61,6 +63,7 @@ data class MainActivityUiState(
     val nightBackgroundPassthroughOpacity: Float = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
     val globalScrollEffectEnabled: Boolean = false,
     val globalScrollEffect: String = GlobalScrollEffect.DEFAULT_VALUE,
+    val backgroundScrollFollowEnabled: Boolean = false,
     val pageTransitionEffect: String = PageTransitionEffect.DEFAULT_VALUE,
     val uiMode: UiMode,
     val interfaceStyle: String,
@@ -72,6 +75,7 @@ data class MainActivityUiState(
     val customWallpaperPassthroughOpacity: Float,
     val customVideoBackgroundUri: String?,
     val customVideoBackgroundDurationSeconds: Int,
+    val customVideoBackgroundFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     val customPageBackgrounds: CustomPageBackgroundSet,
     val customStartupAnimationUri: String?,
     val startupAnimationSettings: StartupAnimationSettings,

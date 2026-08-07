@@ -64,6 +64,7 @@ fun ColorPaletteScreen() {
         onSetEnableFloatingBottomBarBlur = viewModel::setEnableFloatingBottomBarBlur,
         onSetAutoHideNavigationBar = viewModel::setAutoHideNavigationBar,
         onSetScrollHideNavigationBar = viewModel::setScrollHideNavigationBar,
+        onSetModuleTopBarAutoHideEnabled = viewModel::setModuleTopBarAutoHideEnabled,
         onSetEnablePredictiveBack = predictiveBack@{
             if (predictiveBackUpdatePending || it == uiState.enablePredictiveBack) {
                 return@predictiveBack

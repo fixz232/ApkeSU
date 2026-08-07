@@ -24,6 +24,7 @@ import me.weishu.kernelsu.ui.component.CustomVideoBackground
 import me.weishu.kernelsu.ui.component.CustomVideoPassthroughBackground
 import me.weishu.kernelsu.ui.component.MediaVisualLayer
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
@@ -36,6 +37,7 @@ fun SettingsVideoBackgroundPreviewDialog(
     show: Boolean,
     uriString: String?,
     durationSeconds: Int,
+    frameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     opacity: Float,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
     visualSettings: MediaVisualSettings = MediaVisualSettings(),
@@ -48,6 +50,7 @@ fun SettingsVideoBackgroundPreviewDialog(
     MiuixVideoBackgroundPreviewDialog(
         uriString = uriString,
         durationSeconds = durationSeconds,
+        frameRate = frameRate,
         opacity = opacity,
         crop = crop,
         visualSettings = visualSettings,
@@ -61,6 +64,7 @@ fun SettingsVideoBackgroundPreviewDialog(
 private fun MiuixVideoBackgroundPreviewDialog(
     uriString: String?,
     durationSeconds: Int,
+    frameRate: Int,
     opacity: Float,
     crop: CustomWallpaperCrop,
     visualSettings: MediaVisualSettings,
@@ -77,6 +81,7 @@ private fun MiuixVideoBackgroundPreviewDialog(
                 VideoPreviewFrame(
                     uriString = uriString,
                     durationSeconds = durationSeconds,
+                    frameRate = frameRate,
                     opacity = opacity,
                     crop = crop,
                     visualSettings = visualSettings,
@@ -98,6 +103,7 @@ private fun MiuixVideoBackgroundPreviewDialog(
 private fun VideoPreviewFrame(
     uriString: String?,
     durationSeconds: Int,
+    frameRate: Int,
     opacity: Float,
     crop: CustomWallpaperCrop,
     visualSettings: MediaVisualSettings,
@@ -126,9 +132,9 @@ private fun VideoPreviewFrame(
             CustomVideoBackground(
                 uriString = uriString,
                 durationSeconds = durationSeconds,
+                frameRate = frameRate,
                 crop = crop,
                 drawOverlay = false,
-                touchPassthrough = true,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -170,6 +176,7 @@ private fun VideoPreviewFrame(
             CustomVideoPassthroughBackground(
                 uriString = uriString,
                 durationSeconds = durationSeconds,
+                frameRate = frameRate,
                 crop = crop,
                 visualSettings = visualSettings,
                 imageAlpha = passthroughAlpha,

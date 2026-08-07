@@ -2,16 +2,12 @@ package me.weishu.kernelsu.ui.component
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import android.media.MediaMetadataRetriever
-import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.LruCache
-import android.view.MotionEvent
 import android.view.Surface
-import android.view.TextureView
-import android.view.View
-import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.AndroidEmbeddedExternalSurface
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -37,7 +33,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -52,16 +47,17 @@ import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
 import me.weishu.kernelsu.ui.util.FULL_CUSTOM_WALLPAPER_CROP
 import me.weishu.kernelsu.ui.util.MediaVisualSettings
 import me.weishu.kernelsu.ui.util.loadCustomImageBitmap
 import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundDurationSeconds
+import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundFrameRate
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
-import android.graphics.Matrix as AndroidMatrix
 import java.util.concurrent.ConcurrentHashMap
 
 private const val WALLPAPER_BACKGROUND_MAX_SIDE = 1800
@@ -201,15 +197,18 @@ fun CustomWallpaperRoot(
     uriString: String?,
     videoUriString: String? = null,
     videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    videoFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
     visualSettings: MediaVisualSettings = MediaVisualSettings(),
     passthroughEnabled: Boolean = false,
     passthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
+    backgroundScrollFollowState: BackgroundScrollFollowState? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val isLiquidGlass = isLiquidGlassTheme()
     val surfaceColor = liquidGlassBackdropColor()
+    val backgroundMotionModifier = Modifier.backgroundScrollFollowMotion(backgroundScrollFollowState)
 
     Box(
         modifier = Modifier
@@ -220,9 +219,11 @@ fun CustomWallpaperRoot(
             imageUriString = uriString,
             videoUriString = videoUriString,
             videoDurationSeconds = videoDurationSeconds,
+            videoFrameRate = videoFrameRate,
             opacity = if (isLiquidGlass) opacity.coerceAtMost(0.42f) else opacity,
             crop = crop,
             visualSettings = visualSettings,
+            modifier = backgroundMotionModifier,
         )
         content()
         if (passthroughEnabled) {
@@ -231,9 +232,11 @@ fun CustomWallpaperRoot(
                 !videoUriString.isNullOrBlank() -> CustomVideoPassthroughBackground(
                     uriString = videoUriString,
                     durationSeconds = videoDurationSeconds,
+                    frameRate = videoFrameRate,
                     crop = crop,
                     visualSettings = visualSettings,
                     imageAlpha = passthroughAlpha,
+                    modifier = backgroundMotionModifier,
                 )
 
                 !uriString.isNullOrBlank() -> CustomBackgroundMedia(
@@ -244,6 +247,7 @@ fun CustomWallpaperRoot(
                     visualSettings = visualSettings,
                     imageAlpha = passthroughAlpha,
                     drawOverlay = false,
+                    modifier = backgroundMotionModifier,
                 )
             }
         }
@@ -255,6 +259,7 @@ fun CustomBackgroundMedia(
     imageUriString: String?,
     videoUriString: String?,
     videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    videoFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     crop: CustomWallpaperCrop = CustomWallpaperCrop(),
     visualSettings: MediaVisualSettings = MediaVisualSettings(),
@@ -277,10 +282,10 @@ fun CustomBackgroundMedia(
                 CustomVideoBackground(
                     uriString = videoUriString,
                     durationSeconds = videoDurationSeconds,
+                    frameRate = videoFrameRate,
                     crop = crop,
                     imageAlpha = 1f,
                     drawOverlay = false,
-                    touchPassthrough = true,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else if (imageBitmap != null) {
@@ -311,11 +316,11 @@ fun CustomBackgroundMedia(
 fun CustomVideoBackground(
     uriString: String?,
     durationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    frameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     crop: CustomWallpaperCrop = FULL_CUSTOM_WALLPAPER_CROP,
     imageAlpha: Float = 1f,
     drawOverlay: Boolean = true,
-    touchPassthrough: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (uriString.isNullOrBlank()) return
@@ -326,10 +331,10 @@ fun CustomVideoBackground(
         VideoTextureBackground(
             uri = uri,
             durationSeconds = durationSeconds,
+            frameRate = frameRate,
             crop = crop,
             visible = isRendering,
             imageAlpha = imageAlpha,
-            touchPassthrough = touchPassthrough,
             onFirstFrame = { isRendering = true },
         )
         if (drawOverlay) {
@@ -415,6 +420,7 @@ fun rememberCustomImageBitmap(
 fun CustomVideoPassthroughBackground(
     uriString: String,
     durationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    frameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     crop: CustomWallpaperCrop = FULL_CUSTOM_WALLPAPER_CROP,
     visualSettings: MediaVisualSettings = MediaVisualSettings(),
     imageAlpha: Float,
@@ -429,10 +435,10 @@ fun CustomVideoPassthroughBackground(
         CustomVideoBackground(
             uriString = uriString,
             durationSeconds = durationSeconds,
+            frameRate = frameRate,
             crop = crop,
             imageAlpha = 1f,
             drawOverlay = false,
-            touchPassthrough = true,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -443,28 +449,19 @@ fun CustomVideoPassthroughBackground(
 private fun VideoTextureBackground(
     uri: Uri,
     durationSeconds: Int,
+    frameRate: Int,
     crop: CustomWallpaperCrop,
     visible: Boolean,
     imageAlpha: Float,
-    touchPassthrough: Boolean,
     onFirstFrame: () -> Unit,
 ) {
-    if (touchPassthrough) {
-        TouchPassthroughVideoTextureBackground(
-            uri = uri,
-            durationSeconds = durationSeconds,
-            crop = crop,
-            visible = visible,
-            imageAlpha = imageAlpha,
-            onFirstFrame = onFirstFrame,
-        )
-        return
-    }
-
     val context = LocalContext.current
     val safeDurationSeconds = sanitizeCustomVideoBackgroundDurationSeconds(durationSeconds)
+    val safeFrameRate = sanitizeCustomVideoBackgroundFrameRate(frameRate)
     val currentOnFirstFrame by rememberUpdatedState(onFirstFrame)
     var mediaPlayer by remember(uri) { mutableStateOf<MediaPlayer?>(null) }
+    var surface by remember(uri) { mutableStateOf<Surface?>(null) }
+    var isPrepared by remember(uri) { mutableStateOf(false) }
     var surfaceWidth by remember(uri) { mutableIntStateOf(0) }
     var surfaceHeight by remember(uri) { mutableIntStateOf(0) }
     var videoWidth by remember(uri) { mutableIntStateOf(0) }
@@ -488,222 +485,102 @@ private fun VideoTextureBackground(
         isOpaque = false,
         transform = transform,
     ) {
-        onSurface { surface, width, height ->
+        onSurface { nextSurface, width, height ->
             surfaceWidth = width
             surfaceHeight = height
-            val player = runCatching { MediaPlayer() }.getOrNull() ?: return@onSurface
-            runCatching {
-                player.apply {
-                    setSurface(surface)
-                    setDataSource(context.applicationContext, uri)
-                    setVolume(0f, 0f)
-                    setOnPreparedListener { prepared ->
-                        prepared.isLooping = false
-                        videoWidth = prepared.videoWidth
-                        videoHeight = prepared.videoHeight
-                        prepared.start()
-                        currentOnFirstFrame()
-                    }
-                    setOnInfoListener { _, what, _ ->
-                        if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                            currentOnFirstFrame()
-                        }
-                        false
-                    }
-                    setOnVideoSizeChangedListener { _, newWidth, newHeight ->
-                        videoWidth = newWidth
-                        videoHeight = newHeight
-                    }
-                    setOnCompletionListener { completed ->
-                        completed.seekTo(0)
-                        completed.start()
-                    }
-                    setOnErrorListener { failedPlayer, _, _ ->
-                        runCatching { failedPlayer.release() }
-                        if (mediaPlayer === failedPlayer) {
-                            mediaPlayer = null
-                        }
-                        true
-                    }
-                    prepareAsync()
-                }
-            }.onSuccess {
-                mediaPlayer = it
-            }.onFailure {
-                runCatching { player.release() }
+            if (surface !== nextSurface) {
+                isPrepared = false
+                surface = nextSurface
             }
-
-            surface.onChanged { newWidth, newHeight ->
+            nextSurface.onChanged { newWidth, newHeight ->
                 surfaceWidth = newWidth
                 surfaceHeight = newHeight
             }
-            surface.onDestroyed {
-                runCatching { player.release() }
-                if (mediaPlayer === player) {
-                    mediaPlayer = null
+            nextSurface.onDestroyed {
+                if (surface === nextSurface) {
+                    surface = null
                 }
             }
         }
     }
 
-    LaunchedEffect(mediaPlayer, safeDurationSeconds) {
-        val player = mediaPlayer ?: return@LaunchedEffect
-        while (true) {
-            delay(safeDurationSeconds * 1_000L)
+    LaunchedEffect(surface, safeFrameRate) {
+        val targetSurface = surface ?: return@LaunchedEffect
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             runCatching {
-                player.seekTo(0)
-                player.start()
-            }
-        }
-    }
-
-    DisposableEffect(uri) {
-        onDispose {
-            runCatching { mediaPlayer?.release() }
-            mediaPlayer = null
-        }
-    }
-}
-
-@Composable
-private fun TouchPassthroughVideoTextureBackground(
-    uri: Uri,
-    durationSeconds: Int,
-    crop: CustomWallpaperCrop,
-    visible: Boolean,
-    imageAlpha: Float,
-    onFirstFrame: () -> Unit,
-) {
-    val context = LocalContext.current
-    val safeDurationSeconds = sanitizeCustomVideoBackgroundDurationSeconds(durationSeconds)
-    val currentOnFirstFrame by rememberUpdatedState(onFirstFrame)
-    var mediaPlayer by remember(uri) { mutableStateOf<MediaPlayer?>(null) }
-
-    AndroidView(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                alpha = if (visible) imageAlpha.coerceIn(0f, 1f) else 0f
-            },
-        factory = { viewContext ->
-            TouchPassthroughTextureView(viewContext).apply textureView@{
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
+                targetSurface.setFrameRate(
+                    safeFrameRate.toFloat(),
+                    Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+                    Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS,
                 )
-                isOpaque = false
-                isClickable = false
-                isLongClickable = false
-                isFocusable = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    private var surface: Surface? = null
-                    private var player: MediaPlayer? = null
-
-                    override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-                        releasePlayer()
-                        surface = Surface(surfaceTexture)
-                        val currentSurface = surface ?: return
-                        val nextPlayer = runCatching { MediaPlayer() }.getOrNull() ?: return
-                        runCatching {
-                            nextPlayer.apply {
-                                setSurface(currentSurface)
-                                setDataSource(context.applicationContext, uri)
-                                setVolume(0f, 0f)
-                                setOnPreparedListener { prepared ->
-                                    prepared.isLooping = false
-                                    applyCenterCropTransform(
-                                        textureView = this@textureView,
-                                        videoWidth = prepared.videoWidth,
-                                        videoHeight = prepared.videoHeight,
-                                        crop = crop,
-                                    )
-                                    prepared.start()
-                                    currentOnFirstFrame()
-                                }
-                                setOnInfoListener { _, what, _ ->
-                                    if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                                        currentOnFirstFrame()
-                                    }
-                                    false
-                                }
-                                setOnVideoSizeChangedListener { _, videoWidth, videoHeight ->
-                                    applyCenterCropTransform(this@textureView, videoWidth, videoHeight, crop)
-                                }
-                                setOnCompletionListener { completed ->
-                                    completed.seekTo(0)
-                                    completed.start()
-                                }
-                                setOnErrorListener { failedPlayer, _, _ ->
-                                    runCatching { failedPlayer.release() }
-                                    if (player === failedPlayer) {
-                                        player = null
-                                    }
-                                    if (mediaPlayer === failedPlayer) {
-                                        mediaPlayer = null
-                                    }
-                                    true
-                                }
-                                prepareAsync()
-                            }
-                        }.onSuccess {
-                            player = it
-                            mediaPlayer = it
-                        }.onFailure {
-                            runCatching { nextPlayer.release() }
-                        }
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-                        player?.let {
-                            applyCenterCropTransform(this@textureView, it.videoWidth, it.videoHeight, crop)
-                        }
-                    }
-
-                    override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
-                        releasePlayer()
-                        runCatching { surface?.release() }
-                        surface = null
-                        return true
-                    }
-
-                    override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
-
-                    fun releasePlayer() {
-                        runCatching { player?.release() }
-                        if (mediaPlayer === player) {
-                            mediaPlayer = null
-                        }
-                        player = null
-                    }
-                }
-            }
-        },
-        update = { textureView ->
-            textureView.isClickable = false
-            textureView.isLongClickable = false
-            textureView.isFocusable = false
-            mediaPlayer?.let { player ->
-                applyCenterCropTransform(textureView, player.videoWidth, player.videoHeight, crop)
-            }
-        },
-    )
-
-    LaunchedEffect(mediaPlayer, safeDurationSeconds) {
-        val player = mediaPlayer ?: return@LaunchedEffect
-        while (true) {
-            delay(safeDurationSeconds * 1_000L)
-            runCatching {
-                player.seekTo(0)
-                player.start()
             }
         }
     }
 
-    DisposableEffect(uri) {
-        onDispose {
-            runCatching { mediaPlayer?.release() }
-            mediaPlayer = null
+    DisposableEffect(uri, surface) {
+        val targetSurface = surface ?: return@DisposableEffect onDispose { }
+        var released = false
+        val player = runCatching { MediaPlayer() }.getOrNull()
+            ?: return@DisposableEffect onDispose { }
+
+        fun releasePlayer() {
+            if (released) return
+            released = true
+            if (mediaPlayer === player) {
+                mediaPlayer = null
+            }
+            isPrepared = false
+            runCatching { player.release() }
+        }
+
+        runCatching {
+            mediaPlayer = player
+            player.apply {
+                setSurface(targetSurface)
+                setDataSource(context.applicationContext, uri)
+                setVolume(0f, 0f)
+                setOnPreparedListener { prepared ->
+                    if (released) return@setOnPreparedListener
+                    prepared.isLooping = true
+                    videoWidth = prepared.videoWidth
+                    videoHeight = prepared.videoHeight
+                    isPrepared = true
+                    prepared.start()
+                    currentOnFirstFrame()
+                }
+                setOnInfoListener { _, what, _ ->
+                    if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                        currentOnFirstFrame()
+                    }
+                    false
+                }
+                setOnVideoSizeChangedListener { _, newWidth, newHeight ->
+                    videoWidth = newWidth
+                    videoHeight = newHeight
+                }
+                setOnErrorListener { _, _, _ ->
+                    releasePlayer()
+                    true
+                }
+                prepareAsync()
+            }
+        }.onFailure {
+            releasePlayer()
+        }
+
+        onDispose(::releasePlayer)
+    }
+
+    LaunchedEffect(mediaPlayer, safeDurationSeconds, isPrepared) {
+        val player = mediaPlayer ?: return@LaunchedEffect
+        if (!isPrepared) return@LaunchedEffect
+        while (true) {
+            delay(safeDurationSeconds * 1_000L)
+            if (mediaPlayer !== player || !isPrepared) break
+            runCatching {
+                player.seekTo(0)
+                player.start()
+            }
         }
     }
 }
@@ -742,33 +619,6 @@ private fun buildCropTransform(
     }
 }
 
-private fun applyCenterCropTransform(
-    textureView: TextureView,
-    videoWidth: Int,
-    videoHeight: Int,
-    crop: CustomWallpaperCrop,
-) {
-    val viewWidth = textureView.width.toFloat()
-    val viewHeight = textureView.height.toFloat()
-    if (viewWidth <= 0f || viewHeight <= 0f || videoWidth <= 0 || videoHeight <= 0) return
-
-    val safeCrop = sanitizeCustomWallpaperCrop(crop)
-    val cropWidth = videoWidth * safeCrop.width.coerceAtLeast(0.001f)
-    val cropHeight = videoHeight * safeCrop.height.coerceAtLeast(0.001f)
-    val scale = maxOf(viewWidth / cropWidth, viewHeight / cropHeight)
-    val scaledWidth = videoWidth * scale
-    val scaledHeight = videoHeight * scale
-    val cropCenterX = videoWidth * (safeCrop.left + safeCrop.right) / 2f
-    val cropCenterY = videoHeight * (safeCrop.top + safeCrop.bottom) / 2f
-    val dx = viewWidth / 2f - cropCenterX * scale
-    val dy = viewHeight / 2f - cropCenterY * scale
-    val matrix = AndroidMatrix().apply {
-        setScale(scaledWidth / viewWidth, scaledHeight / viewHeight)
-        postTranslate(dx, dy)
-    }
-    textureView.setTransform(matrix)
-}
-
 private fun loadCustomVideoFrameBitmap(
     context: Context,
     uriString: String,
@@ -798,8 +648,4 @@ private fun loadCustomVideoFrameBitmap(
     } finally {
         runCatching { retriever.release() }
     }
-}
-
-private class TouchPassthroughTextureView(context: Context) : TextureView(context) {
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean = false
 }

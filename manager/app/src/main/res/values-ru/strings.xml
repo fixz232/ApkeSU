@@ -1094,6 +1094,8 @@
     <string name="settings_wallpaper_crop">Настройка области обоев</string>
     <string name="settings_wallpaper_passthrough_summary">Нарисуйте обои слегка над поверхностями пользовательского интерфейса.</string>
     <string name="settings_wallpaper_passthrough_opacity">Сквозная непрозрачность</string>
+    <string name="settings_background_scroll_follow">Фон следует за прокруткой</string>
+    <string name="settings_background_scroll_follow_summary">Плавно перемещает текущий фон вместе с прокруткой страницы.</string>
     <string name="settings_wallpaper_not_selected">Обои не выбраны</string>
     <string name="settings_wallpaper_preview_hint">Предварительный просмотр фона</string>
     <string name="settings_wallpaper_preview_ui_sample">Пример слоя пользовательского интерфейса</string>
@@ -1104,6 +1106,9 @@
     <string name="settings_video_background_duration">Продолжительность цикла видео</string>
     <string name="settings_video_background_duration_summary">Перезапустите фоновое видео через выбранное время.</string>
     <string name="settings_video_background_duration_value">%1$d с</string>
+    <string name="settings_video_background_frame_rate">Частота кадров видео</string>
+    <string name="settings_video_background_frame_rate_summary">Запрашивает совместимую частоту обновления экрана. Высокие значения зависят от экрана и видео.</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Гц</string>
     <string name="theme_store">Магазин тем</string>
     <string name="theme_store_settings_summary">Управление значками, карточками, фоном, звуками, анимацией запуска и сохраненными темами.</string>
     <string name="theme_store_title">Тематический центр</string>
@@ -1352,6 +1357,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">Скрыть панель навигации через 3 секунды без взаимодействия. Нажмите в любом месте, чтобы показать его снова.</string>
     <string name="settings_scroll_hide_navigation_bar">Скрыть панель навигации при прокрутке</string>
     <string name="settings_scroll_hide_navigation_bar_summary">Скрывать при просмотре вниз и показывать при просмотре вверх.</string>
+    <string name="settings_module_top_bar_auto_hide">Автоматически скрывать верхнюю панель модулей</string>
+    <string name="settings_module_top_bar_auto_hide_summary">Скрывает верхнюю панель модулей при прокрутке и снова показывает ее через 5 секунд бездействия.</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果。</string>
     <string name="show_only_primary_user_apps">Показывать только приложения основного пользователя</string>

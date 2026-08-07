@@ -61,6 +61,7 @@ import me.weishu.kernelsu.ui.component.delta.DeltaScreen
 import me.weishu.kernelsu.ui.component.delta.DeltaSwitch
 import me.weishu.kernelsu.ui.component.delta.deltaSp
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
+import me.weishu.kernelsu.ui.theme.LocalModuleTopBarAutoHide
 
 @Composable
 fun ModulePagerDelta(
@@ -130,7 +131,10 @@ fun ModulePagerDelta(
     val searchText = uiState.searchStatus.searchText
     val modules = if (searchText.isBlank()) uiState.moduleList else uiState.searchResults
     val moduleListState = rememberLazyListState()
-    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
+    val topBarVisible = rememberModuleTopBarVisible(
+        enabled = LocalModuleTopBarAutoHide.current,
+        isScrollInProgress = moduleListState.isScrollInProgress,
+    )
 
     DeltaScreen(
         title = stringResource(R.string.module),

@@ -105,6 +105,7 @@ data class CustomBackgroundState(
     val opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     val crop: CustomWallpaperCrop = DEFAULT_CUSTOM_WALLPAPER_CROP,
     val videoDurationSeconds: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+    val videoFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
     val visualSettings: MediaVisualSettings = MediaVisualSettings(),
 ) {
     val hasWallpaper: Boolean
@@ -154,6 +155,7 @@ val CUSTOM_PAGE_BACKGROUND_PREFERENCE_KEYS: Set<String> = buildSet {
         addAll(target.visualKeys.all)
     }
     addAll(GLOBAL_BACKGROUND_VISUAL_KEYS.all)
+    add(CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY)
 }
 
 fun readCustomPageBackgroundSet(context: Context): CustomPageBackgroundSet {
@@ -306,6 +308,12 @@ private fun SharedPreferences.readCustomPageBackgroundState(
         ),
         videoDurationSeconds = sanitizeCustomVideoBackgroundDurationSeconds(
             getInt(target.videoDurationSecondsKey, DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS)
+        ),
+        videoFrameRate = sanitizeCustomVideoBackgroundFrameRate(
+            getInt(
+                CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+            )
         ),
         visualSettings = readMediaVisualSettings(target.visualKeys),
     )

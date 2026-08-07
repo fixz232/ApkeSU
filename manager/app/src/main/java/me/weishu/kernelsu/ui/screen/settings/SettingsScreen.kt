@@ -176,6 +176,7 @@ fun SettingPager(
             showVideoBackgroundPreview.value = false
         },
         onSetVideoBackgroundDurationSeconds = viewModel::setCustomVideoBackgroundDurationSeconds,
+        onSetVideoBackgroundFrameRate = viewModel::setCustomVideoBackgroundFrameRate,
         onSetPageBackgroundWallpaper = viewModel::setCustomPageBackgroundWallpaper,
         onSetPageBackgroundVideo = viewModel::setCustomPageBackgroundVideo,
         onSetPageBackgroundOpacity = viewModel::setCustomPageBackgroundOpacity,
@@ -282,6 +283,7 @@ fun SettingPager(
         show = showVideoBackgroundPreview.value,
         uriString = uiState.customVideoBackgroundUri,
         durationSeconds = uiState.customVideoBackgroundDurationSeconds,
+        frameRate = uiState.customVideoBackgroundFrameRate,
         opacity = uiState.customWallpaperOpacity,
         passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
         passthroughOpacity = uiState.customWallpaperPassthroughOpacity,

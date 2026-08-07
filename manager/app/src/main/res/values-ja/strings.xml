@@ -1089,6 +1089,8 @@
     <string name="settings_wallpaper_crop">壁紙領域を調整する</string>
     <string name="settings_wallpaper_passthrough_summary">UI 表面の上に壁紙を軽く描きます。</string>
     <string name="settings_wallpaper_passthrough_opacity">パススルーの不透明度</string>
+    <string name="settings_background_scroll_follow">背景のスクロール追従</string>
+    <string name="settings_background_scroll_follow_summary">ページのスクロールに合わせて現在の背景を滑らかに動かします。</string>
     <string name="settings_wallpaper_not_selected">壁紙が選択されていません</string>
     <string name="settings_wallpaper_preview_hint">背景プレビュー</string>
     <string name="settings_wallpaper_preview_ui_sample">UI レイヤーのサンプル</string>
@@ -1099,6 +1101,9 @@
     <string name="settings_video_background_duration">ビデオループ時間</string>
     <string name="settings_video_background_duration_summary">選択した時間の経過後に背景ビデオを再開します。</string>
     <string name="settings_video_background_duration_value">%1$d 秒</string>
+    <string name="settings_video_background_frame_rate">動画フレームレート</string>
+    <string name="settings_video_background_frame_rate_summary">画面と動画に対応したリフレッシュレートを要求します。高い値は端末と動画に依存します。</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="theme_store">テーマストア</string>
     <string name="theme_store_settings_summary">アイコン、カード メディア、背景、サウンド、起動アニメーション、保存されたテーマを管理します。</string>
     <string name="theme_store_title">テーマ センター</string>
@@ -1347,6 +1352,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">操作がなければ 3 秒後にナビゲーション バーを非表示にします。どこかをタッチすると再度表示されます。</string>
     <string name="settings_scroll_hide_navigation_bar">スクロール中にナビゲーション バーを非表示にする</string>
     <string name="settings_scroll_hide_navigation_bar_summary">下方向にブラウジングしている間は非表示にし、上方向にブラウジングしている間は表示します。</string>
+    <string name="settings_module_top_bar_auto_hide">モジュール画面の上部バーを自動的に非表示にする</string>
+    <string name="settings_module_top_bar_auto_hide_summary">スクロール中はモジュール画面の上部バーを非表示にし、操作停止から 5 秒後に再表示します。</string>
     <string name="settings_enable_glass">液体态玻ガラス</string>
     <string name="settings_enable_glass_summary">浮遊基板を用いた液体ガラス効果。</string>
     <string name="show_only_primary_user_apps">プライマリ ユーザー アプリのみを表示</string>

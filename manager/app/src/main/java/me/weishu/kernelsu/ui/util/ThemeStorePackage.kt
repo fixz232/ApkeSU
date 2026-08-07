@@ -10,6 +10,7 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_ACTIVE_ID_KEY
@@ -292,6 +293,8 @@ data class ThemeStoreWallpaperState(
     val uriString: String?,
     val videoUriString: String?,
     val videoDurationSeconds: Int,
+    val videoFrameRate: Int = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+    val scrollFollowEnabled: Boolean = false,
     val opacity: Float,
     val crop: CustomWallpaperCrop,
     val visualSettings: MediaVisualSettings = MediaVisualSettings(),
@@ -503,6 +506,13 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
                     DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
                 )
             ),
+            videoFrameRate = sanitizeCustomVideoBackgroundFrameRate(
+                prefs.getInt(
+                    CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                    DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+                )
+            ),
+            scrollFollowEnabled = prefs.getBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, false),
             opacity = sanitizeCustomWallpaperOpacity(
                 prefs.getFloat(CUSTOM_WALLPAPER_OPACITY_KEY, DEFAULT_CUSTOM_WALLPAPER_OPACITY)
             ),
@@ -715,6 +725,7 @@ fun setThemeStoreVideoBackground(
     context: Context,
     uriString: String?,
     durationSeconds: Int? = null,
+    frameRate: Int? = null,
     opacity: Float = DEFAULT_CUSTOM_WALLPAPER_OPACITY,
     passthroughEnabled: Boolean = false,
     passthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
@@ -734,6 +745,12 @@ fun setThemeStoreVideoBackground(
             putInt(
                 CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
                 sanitizeCustomVideoBackgroundDurationSeconds(durationSeconds),
+            )
+        }
+        if (frameRate != null) {
+            putInt(
+                CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                sanitizeCustomVideoBackgroundFrameRate(frameRate),
             )
         }
         putFloat(CUSTOM_WALLPAPER_OPACITY_KEY, sanitizeCustomWallpaperOpacity(opacity))
@@ -756,6 +773,15 @@ fun setThemeStoreVideoBackgroundDurationSeconds(context: Context, seconds: Int) 
         putInt(
             CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
             sanitizeCustomVideoBackgroundDurationSeconds(seconds),
+        )
+    }
+}
+
+fun setThemeStoreVideoBackgroundFrameRate(context: Context, frameRate: Int) {
+    themeStorePrefs(context).edit {
+        putInt(
+            CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+            sanitizeCustomVideoBackgroundFrameRate(frameRate),
         )
     }
 }
@@ -937,6 +963,13 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                             DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
                         )
                     ),
+                    videoFrameRate = sanitizeCustomVideoBackgroundFrameRate(
+                        prefs.getInt(
+                            CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                            DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+                        )
+                    ),
+                    scrollFollowEnabled = prefs.getBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, false),
                     opacity = sanitizeCustomWallpaperOpacity(
                         prefs.getFloat(CUSTOM_WALLPAPER_OPACITY_KEY, DEFAULT_CUSTOM_WALLPAPER_OPACITY)
                     ),
@@ -972,6 +1005,8 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         .put("videoAsset", videoBackgroundAsset?.toJson())
                         .put("videoUri", wallpaperState.videoUriString)
                         .put("videoDurationSeconds", wallpaperState.videoDurationSeconds)
+                        .put("videoFrameRate", wallpaperState.videoFrameRate)
+                        .put("scrollFollowEnabled", wallpaperState.scrollFollowEnabled)
                         .put("opacity", wallpaperState.opacity)
                         .put("crop", wallpaperState.crop.toJson())
                         .put("visualSettings", wallpaperState.visualSettings.toJson())
@@ -1725,6 +1760,13 @@ fun importThemeStorePackage(
                             DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
                         )
                     ),
+                    videoFrameRate = sanitizeCustomVideoBackgroundFrameRate(
+                        wallpaperJson.optInt(
+                            "videoFrameRate",
+                            previousSummary.wallpaper.videoFrameRate,
+                        )
+                    ),
+                    scrollFollowEnabled = wallpaperJson.optBoolean("scrollFollowEnabled", false),
                     opacity = sanitizeCustomWallpaperOpacity(
                         wallpaperJson.optDouble(
                             "opacity",
@@ -2180,6 +2222,11 @@ private fun SharedPreferences.Editor.putImportedWallpaper(state: ThemeStoreWallp
         CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
         sanitizeCustomVideoBackgroundDurationSeconds(state.videoDurationSeconds),
     )
+    putInt(
+        CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+        sanitizeCustomVideoBackgroundFrameRate(state.videoFrameRate),
+    )
+    putBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, state.scrollFollowEnabled)
     putFloat(CUSTOM_WALLPAPER_OPACITY_KEY, sanitizeCustomWallpaperOpacity(state.opacity))
     putBoolean(CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY, state.passthroughEnabled)
     putFloat(

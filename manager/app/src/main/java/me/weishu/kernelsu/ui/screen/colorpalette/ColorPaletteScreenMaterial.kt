@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DesignServices
 import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -257,6 +258,21 @@ fun ColorPaletteScreenMaterial(
                                 onItemSelected = { index ->
                                     actions.onSetColorSpec(specs[index].name)
                                 }
+                            )
+                        }
+                    )
+                )
+
+                SegmentedColumn(
+                    modifier = Modifier.padding(top = 4.dp),
+                    content = listOf(
+                        {
+                            SegmentedSwitchItem(
+                                icon = Icons.Rounded.Timer,
+                                title = stringResource(id = R.string.settings_module_top_bar_auto_hide),
+                                summary = stringResource(id = R.string.settings_module_top_bar_auto_hide_summary),
+                                checked = uiState.moduleTopBarAutoHideEnabled,
+                                onCheckedChange = actions.onSetModuleTopBarAutoHideEnabled,
                             )
                         }
                     )

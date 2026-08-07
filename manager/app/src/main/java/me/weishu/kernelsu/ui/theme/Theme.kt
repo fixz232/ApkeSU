@@ -218,3 +218,5 @@ val LocalEnableFloatingBottomBarBlur = staticCompositionLocalOf { false }
 val LocalAutoHideNavigationBar = staticCompositionLocalOf { false }
 
 val LocalScrollHideNavigationBar = staticCompositionLocalOf { false }
+
+val LocalModuleTopBarAutoHide = staticCompositionLocalOf { false }

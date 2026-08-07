@@ -88,6 +88,7 @@ class SettingsViewModel(
             )
             val autoHideNavigationBar = repo.autoHideNavigationBar
             val scrollHideNavigationBar = repo.scrollHideNavigationBar
+            val moduleTopBarAutoHideEnabled = repo.moduleTopBarAutoHideEnabled
             val pageScale = repo.pageScale
             val fontScale = repo.fontScale
             val blurIntensity = repo.blurIntensity
@@ -111,6 +112,7 @@ class SettingsViewModel(
             val nightBackgroundPassthroughOpacity = repo.nightBackgroundPassthroughOpacity
             val globalScrollEffectEnabled = repo.globalScrollEffectEnabled
             val globalScrollEffect = repo.globalScrollEffect
+            val backgroundScrollFollowEnabled = repo.backgroundScrollFollowEnabled
             val pageTransitionEffect = repo.pageTransitionEffect
             val themeSyncStrategy = repo.themeSyncStrategy
             val customThemePresets = repo.getCustomThemePresets()
@@ -126,6 +128,7 @@ class SettingsViewModel(
             val customWallpaperPassthroughOpacity = repo.customWallpaperPassthroughOpacity
             val customVideoBackgroundUri = repo.customVideoBackgroundUri
             val customVideoBackgroundDurationSeconds = repo.customVideoBackgroundDurationSeconds
+            val customVideoBackgroundFrameRate = repo.customVideoBackgroundFrameRate
             val customPageBackgrounds = repo.customPageBackgrounds
             val customStartupAnimationUri = repo.customStartupAnimationUri
             val startupAnimationSettings = repo.startupAnimationSettings
@@ -204,6 +207,7 @@ class SettingsViewModel(
                     enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
                     autoHideNavigationBar = autoHideNavigationBar,
                     scrollHideNavigationBar = scrollHideNavigationBar,
+                    moduleTopBarAutoHideEnabled = moduleTopBarAutoHideEnabled,
                     pageScale = pageScale,
                     fontScale = fontScale,
                     blurIntensity = blurIntensity,
@@ -227,6 +231,7 @@ class SettingsViewModel(
                     nightBackgroundPassthroughOpacity = nightBackgroundPassthroughOpacity,
                     globalScrollEffectEnabled = globalScrollEffectEnabled,
                     globalScrollEffect = globalScrollEffect,
+                    backgroundScrollFollowEnabled = backgroundScrollFollowEnabled,
                     pageTransitionEffect = pageTransitionEffect,
                     themeSyncStrategy = themeSyncStrategy,
                     customThemePresets = customThemePresets,
@@ -242,6 +247,7 @@ class SettingsViewModel(
                     customWallpaperPassthroughOpacity = customWallpaperPassthroughOpacity,
                     customVideoBackgroundUri = customVideoBackgroundUri,
                     customVideoBackgroundDurationSeconds = customVideoBackgroundDurationSeconds,
+                    customVideoBackgroundFrameRate = customVideoBackgroundFrameRate,
                     customPageBackgrounds = customPageBackgrounds,
                     customStartupAnimationUri = customStartupAnimationUri,
                     startupAnimationSettings = startupAnimationSettings,
@@ -621,6 +627,11 @@ class SettingsViewModel(
         _uiState.update { it.copy(globalScrollEffect = effect.value) }
     }
 
+    fun setBackgroundScrollFollowEnabled(enabled: Boolean) {
+        repo.backgroundScrollFollowEnabled = enabled
+        _uiState.update { it.copy(backgroundScrollFollowEnabled = enabled) }
+    }
+
     fun setPageTransitionEffectIndex(index: Int) {
         val effect = PageTransitionEffect.fromIndex(index)
         repo.pageTransitionEffect = effect.value
@@ -701,6 +712,16 @@ class SettingsViewModel(
         repo.customVideoBackgroundDurationSeconds = seconds
         _uiState.update {
             it.copy(customVideoBackgroundDurationSeconds = repo.customVideoBackgroundDurationSeconds)
+        }
+    }
+
+    fun setCustomVideoBackgroundFrameRate(frameRate: Int) {
+        repo.customVideoBackgroundFrameRate = frameRate
+        _uiState.update {
+            it.copy(
+                customVideoBackgroundFrameRate = repo.customVideoBackgroundFrameRate,
+                customPageBackgrounds = repo.customPageBackgrounds,
+            )
         }
     }
 
@@ -1000,6 +1021,11 @@ class SettingsViewModel(
     fun setScrollHideNavigationBar(enabled: Boolean) {
         repo.scrollHideNavigationBar = enabled
         _uiState.update { it.copy(scrollHideNavigationBar = enabled) }
+    }
+
+    fun setModuleTopBarAutoHideEnabled(enabled: Boolean) {
+        repo.moduleTopBarAutoHideEnabled = enabled
+        _uiState.update { it.copy(moduleTopBarAutoHideEnabled = enabled) }
     }
 
     fun setPageScale(scale: Float) {

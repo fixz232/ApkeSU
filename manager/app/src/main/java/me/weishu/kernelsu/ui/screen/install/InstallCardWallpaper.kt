@@ -62,7 +62,6 @@ internal fun BoxScope.InstallCardWallpaperBackground(state: ThemeStoreImageState
                     uriString = active.videoUriString,
                     crop = active.crop,
                     drawOverlay = false,
-                    touchPassthrough = true,
                     modifier = Modifier.matchParentSize(),
                 )
             } else if (imageBitmap != null) {

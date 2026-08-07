@@ -816,6 +816,17 @@ class ThemeStorePackageTest {
         }
     }
 
+    @Test
+    fun sanitizeThemeStoreConfigForCloud_preservesVideoFrameRate() {
+        val config = currentThemeConfig()
+            .put("wallpaper", JSONObject().put("videoFrameRate", 165))
+
+        sanitizeThemeStoreConfigForCloud(config)
+        validateThemeStoreConfigForCloud(config)
+
+        assertEquals(165, config.getJSONObject("wallpaper").getInt("videoFrameRate"))
+    }
+
     private fun cloudUnsafeConfig(): JSONObject {
         return JSONObject()
             .put("version", 4)

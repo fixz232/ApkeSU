@@ -1106,6 +1106,8 @@
     <string name="settings_wallpaper_crop">Adjust wallpaper area</string>
     <string name="settings_wallpaper_passthrough_summary">Draw the wallpaper lightly above UI surfaces.</string>
     <string name="settings_wallpaper_passthrough_opacity">Passthrough opacity</string>
+    <string name="settings_background_scroll_follow">Background scroll follow</string>
+    <string name="settings_background_scroll_follow_summary">Move the current background smoothly with page scrolling.</string>
     <string name="settings_wallpaper_not_selected">No wallpaper selected</string>
     <string name="settings_wallpaper_preview_hint">Background preview</string>
     <string name="settings_wallpaper_preview_ui_sample">UI layer sample</string>
@@ -1116,6 +1118,9 @@
     <string name="settings_video_background_duration">Video loop duration</string>
     <string name="settings_video_background_duration_summary">Restart the background video after the selected time.</string>
     <string name="settings_video_background_duration_value">%1$d s</string>
+    <string name="settings_video_background_frame_rate">Video frame rate</string>
+    <string name="settings_video_background_frame_rate_summary">Request a compatible display refresh rate. Higher values depend on the screen and video.</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="theme_store">Theme store</string>
     <string name="theme_store_settings_summary">Manage icons, card media, backgrounds, sounds, startup animation, and saved themes.</string>
     <string name="theme_store_title">Theme center</string>
@@ -1426,6 +1431,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">Hide the navigation bar after 3 seconds without interaction. Touch anywhere to show it again.</string>
     <string name="settings_scroll_hide_navigation_bar">Hide navigation bar while scrolling</string>
     <string name="settings_scroll_hide_navigation_bar_summary">Hide while browsing downward and show while browsing upward.</string>
+    <string name="settings_module_top_bar_auto_hide">Auto-hide module top bar</string>
+    <string name="settings_module_top_bar_auto_hide_summary">Hide the module top bar while scrolling and show it again after 5 seconds of inactivity.</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果。</string>
     <string name="show_only_primary_user_apps">Show only primary user apps</string>

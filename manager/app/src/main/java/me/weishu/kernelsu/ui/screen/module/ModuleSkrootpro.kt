@@ -57,6 +57,7 @@ import me.weishu.kernelsu.ui.component.skrootpro.SkrootproEmptyText
 import me.weishu.kernelsu.ui.component.skrootpro.SkrootproScreen
 import me.weishu.kernelsu.ui.component.skrootpro.skrootproSp
 import me.weishu.kernelsu.ui.screen.settings.SettingsWallpaperCropDialog
+import me.weishu.kernelsu.ui.theme.LocalModuleTopBarAutoHide
 
 @Composable
 fun ModulePagerSkrootpro(
@@ -118,7 +119,10 @@ fun ModulePagerSkrootpro(
 
     val modules = if (uiState.searchStatus.isExpand()) uiState.searchResults else uiState.moduleList
     val moduleListState = rememberLazyListState()
-    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
+    val topBarVisible = rememberModuleTopBarVisible(
+        enabled = LocalModuleTopBarAutoHide.current,
+        isScrollInProgress = moduleListState.isScrollInProgress,
+    )
     SkrootproScreen(
         title = stringResource(R.string.skrootpro_title),
         topBarVisible = topBarVisible,

@@ -1055,6 +1055,8 @@
     <string name="settings_wallpaper_crop">Ajustar el área del fondo de pantalla</string>
     <string name="settings_wallpaper_passthrough_summary">Dibuje el fondo de pantalla ligeramente sobre las superficies de la interfaz de usuario.</string>
     <string name="settings_wallpaper_passthrough_opacity">Opacidad de paso</string>
+    <string name="settings_background_scroll_follow">Fondo al seguir el desplazamiento</string>
+    <string name="settings_background_scroll_follow_summary">Mueve suavemente el fondo actual con el desplazamiento de la página.</string>
     <string name="settings_wallpaper_not_selected">No se seleccionó ningún fondo de pantalla</string>
     <string name="settings_wallpaper_preview_hint">Vista previa de fondo</string>
     <string name="settings_wallpaper_preview_ui_sample">Muestra de capa de interfaz de usuario</string>
@@ -1065,6 +1067,9 @@
     <string name="settings_video_background_duration">Duración del bucle de vídeo</string>
     <string name="settings_video_background_duration_summary">Reinicie el vídeo de fondo después del tiempo seleccionado.</string>
     <string name="settings_video_background_duration_value">%1$ds</string>
+    <string name="settings_video_background_frame_rate">Frecuencia de fotogramas del vídeo</string>
+    <string name="settings_video_background_frame_rate_summary">Solicita una frecuencia de actualización compatible. Los valores altos dependen de la pantalla y el vídeo.</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="theme_store">Tienda temática</string>
     <string name="theme_store_settings_summary">Administre íconos, tarjetas, fondos, sonidos, animaciones de inicio y temas guardados.</string>
     <string name="theme_store_title">Centro temático</string>
@@ -1348,6 +1353,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">Ocultar la barra de navegación después de 3 segundos sin interacción. Toca cualquier lugar para mostrarlo nuevamente.</string>
     <string name="settings_scroll_hide_navigation_bar">Ocultar barra de navegación mientras se desplaza</string>
     <string name="settings_scroll_hide_navigation_bar_summary">Ocultar mientras navega hacia abajo y mostrar mientras navega hacia arriba.</string>
+    <string name="settings_module_top_bar_auto_hide">Ocultar automáticamente la barra superior de módulos</string>
+    <string name="settings_module_top_bar_auto_hide_summary">Oculta la barra superior de módulos al desplazarte y la vuelve a mostrar tras 5 segundos sin actividad.</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果.</string>
     <string name="show_only_primary_user_apps">Mostrar solo aplicaciones de usuario principal</string>

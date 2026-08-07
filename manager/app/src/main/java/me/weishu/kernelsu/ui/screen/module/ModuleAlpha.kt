@@ -63,6 +63,7 @@ import me.weishu.kernelsu.ui.component.alpha.AlphaSwitch
 import me.weishu.kernelsu.ui.component.alpha.alphaStrongWeight
 import me.weishu.kernelsu.ui.component.alpha.alphaSp
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
+import me.weishu.kernelsu.ui.theme.LocalModuleTopBarAutoHide
 
 @Composable
 fun ModulePagerAlpha(
@@ -124,7 +125,10 @@ fun ModulePagerAlpha(
     val searchText = uiState.searchStatus.searchText
     val modules = if (searchText.isBlank()) uiState.moduleList else uiState.searchResults
     val moduleListState = rememberLazyListState()
-    val topBarVisible = rememberModuleTopBarVisible(moduleListState.isScrollInProgress)
+    val topBarVisible = rememberModuleTopBarVisible(
+        enabled = LocalModuleTopBarAutoHide.current,
+        isScrollInProgress = moduleListState.isScrollInProgress,
+    )
 
     AlphaScreen(
         title = stringResource(R.string.module),

@@ -14,10 +14,12 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
+import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.PAGE_TRANSITION_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
+import me.weishu.kernelsu.ui.screen.module.MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
@@ -74,7 +76,9 @@ import me.weishu.kernelsu.ui.util.CUSTOM_AUDIO_SETTINGS_KEY
 import me.weishu.kernelsu.ui.util.readAppAudioSettings
 import me.weishu.kernelsu.ui.util.readAppFontState
 import me.weishu.kernelsu.ui.util.CUSTOM_PAGE_BACKGROUND_PREFERENCE_KEYS
+import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_AUDIO_VOLUME
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_BACKGROUND_MUSIC_VOLUME
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
@@ -137,6 +141,7 @@ class MainActivityViewModel(
             ),
             autoHideNavigationBar = settingRepo.autoHideNavigationBar,
             scrollHideNavigationBar = settingRepo.scrollHideNavigationBar,
+            moduleTopBarAutoHideEnabled = settingRepo.moduleTopBarAutoHideEnabled,
             switchStyle = settingRepo.switchStyle,
             customCardStyle = componentStyleStore.readActiveCardStyle(),
             customSwitchStyle = componentStyleStore.readActiveSwitchStyle(),
@@ -157,6 +162,7 @@ class MainActivityViewModel(
             nightBackgroundPassthroughOpacity = settingRepo.nightBackgroundPassthroughOpacity,
             globalScrollEffectEnabled = settingRepo.globalScrollEffectEnabled,
             globalScrollEffect = settingRepo.globalScrollEffect,
+            backgroundScrollFollowEnabled = settingRepo.backgroundScrollFollowEnabled,
             pageTransitionEffect = settingRepo.pageTransitionEffect,
             uiMode = UiMode.fromValue(interfaceStyle),
             interfaceStyle = interfaceStyle,
@@ -168,6 +174,7 @@ class MainActivityViewModel(
             customWallpaperPassthroughOpacity = settingRepo.customWallpaperPassthroughOpacity,
             customVideoBackgroundUri = settingRepo.customVideoBackgroundUri,
             customVideoBackgroundDurationSeconds = settingRepo.customVideoBackgroundDurationSeconds,
+            customVideoBackgroundFrameRate = settingRepo.customVideoBackgroundFrameRate,
             customPageBackgrounds = settingRepo.customPageBackgrounds,
             customStartupAnimationUri = settingRepo.customStartupAnimationUri,
             startupAnimationSettings = settingRepo.startupAnimationSettings,
@@ -200,6 +207,7 @@ class MainActivityViewModel(
             enableFloatingBottomBarBlur = false,
             autoHideNavigationBar = false,
             scrollHideNavigationBar = false,
+            moduleTopBarAutoHideEnabled = false,
             switchStyle = SwitchStyle.DEFAULT_VALUE,
             customCardStyle = null,
             customSwitchStyle = null,
@@ -220,6 +228,7 @@ class MainActivityViewModel(
             nightBackgroundPassthroughOpacity = DEFAULT_NIGHT_BACKGROUND_PASSTHROUGH_OPACITY,
             globalScrollEffectEnabled = false,
             globalScrollEffect = GlobalScrollEffect.DEFAULT_VALUE,
+            backgroundScrollFollowEnabled = false,
             pageTransitionEffect = PageTransitionEffect.DEFAULT_VALUE,
             uiMode = UiMode.fromValue(InterfaceStyle.Miuix.value),
             interfaceStyle = InterfaceStyle.Miuix.value,
@@ -231,6 +240,7 @@ class MainActivityViewModel(
             customWallpaperPassthroughOpacity = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
             customVideoBackgroundUri = null,
             customVideoBackgroundDurationSeconds = DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
+            customVideoBackgroundFrameRate = DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
             customPageBackgrounds = CustomPageBackgroundSet(),
             customStartupAnimationUri = null,
             startupAnimationSettings = me.weishu.kernelsu.ui.util.StartupAnimationSettings(),
@@ -282,9 +292,11 @@ class MainActivityViewModel(
             NIGHT_BACKGROUND_PASSTHROUGH_OPACITY_KEY,
             GLOBAL_SCROLL_EFFECT_ENABLED_KEY,
             GLOBAL_SCROLL_EFFECT_KEY,
+            BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY,
             PAGE_TRANSITION_EFFECT_KEY,
             AUTO_HIDE_NAVIGATION_BAR_KEY,
             SCROLL_HIDE_NAVIGATION_BAR_KEY,
+            MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY,
             DELTA_COLOR_VARIANT_KEY,
             "custom_wallpaper_uri",
             "custom_wallpaper_opacity",
@@ -296,6 +308,7 @@ class MainActivityViewModel(
             "custom_wallpaper_passthrough_opacity",
             "custom_video_background_uri",
             "custom_video_background_duration_seconds",
+            CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
             "custom_startup_animation_uri",
             me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY,
             "custom_startup_sound_uri",

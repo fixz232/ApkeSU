@@ -132,6 +132,7 @@ import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
 import me.weishu.kernelsu.ui.screen.settings.SettingsWallpaperCropDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
+import me.weishu.kernelsu.ui.theme.LocalModuleTopBarAutoHide
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.theme.skrootproTopBarColors
 import me.weishu.kernelsu.ui.util.BlurredBar
@@ -303,7 +304,10 @@ fun ModulePagerMiuix(
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else colorScheme.surface
     val topBarColors = skrootproTopBarColors(barColor, colorScheme.onSurface)
-    val topBarVisible = rememberModuleTopBarVisible(listState.isScrollInProgress)
+    val topBarVisible = rememberModuleTopBarVisible(
+        enabled = LocalModuleTopBarAutoHide.current,
+        isScrollInProgress = listState.isScrollInProgress,
+    )
 
     Scaffold(
         containerColor = Color.Transparent,

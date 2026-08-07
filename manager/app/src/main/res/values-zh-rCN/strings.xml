@@ -967,6 +967,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">无操作 3 秒后隐藏导航栏，触摸任意位置即可重新显示。</string>
     <string name="settings_scroll_hide_navigation_bar">滑动隐藏导航栏</string>
     <string name="settings_scroll_hide_navigation_bar_summary">向下浏览时隐藏导航栏，向上浏览时重新显示。</string>
+    <string name="settings_module_top_bar_auto_hide">自动隐藏模块页顶部栏</string>
+    <string name="settings_module_top_bar_auto_hide_summary">滚动时隐藏模块页顶部栏，停止操作 5 秒后重新显示。</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果</string>
     <string name="show_only_primary_user_apps">只显示主用户应用</string>
@@ -1194,6 +1196,8 @@
     <string name="settings_wallpaper_crop">调整壁纸区域</string>
     <string name="settings_wallpaper_passthrough_summary">让壁纸轻微穿过界面 UI。</string>
     <string name="settings_wallpaper_passthrough_opacity">穿透透明度</string>
+    <string name="settings_background_scroll_follow">背景跟随滑动</string>
+    <string name="settings_background_scroll_follow_summary">让当前背景随页面滚动产生柔和位移。</string>
     <string name="settings_wallpaper_not_selected">未选择壁纸</string>
     <string name="settings_wallpaper_preview_hint">背景预览</string>
     <string name="settings_wallpaper_preview_ui_sample">UI 图层示例</string>
@@ -1204,6 +1208,9 @@
     <string name="settings_video_background_duration">视频循环时长</string>
     <string name="settings_video_background_duration_summary">到达设定时间后从头播放背景视频。</string>
     <string name="settings_video_background_duration_value">%1$d 秒</string>
+    <string name="settings_video_background_frame_rate">视频帧率</string>
+    <string name="settings_video_background_frame_rate_summary">根据屏幕与视频能力请求对应刷新率，高档位不会进行插帧。</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="settings_startup_sound">启动音效</string>
     <string name="settings_startup_sound_summary">选择一个音频文件，在应用启动时播放。</string>
     <string name="settings_startup_sound_selected_summary">已选择启动音效，点击可重新选择。</string>

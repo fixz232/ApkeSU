@@ -47,6 +47,7 @@ interface SettingsRepository {
     var enableFloatingBottomBarBlur: Boolean
     var autoHideNavigationBar: Boolean
     var scrollHideNavigationBar: Boolean
+    var moduleTopBarAutoHideEnabled: Boolean
     var pageScale: Float
     var fontScale: Float
     var blurIntensity: Float
@@ -75,6 +76,7 @@ interface SettingsRepository {
     var nightBackgroundPassthroughOpacity: Float
     var globalScrollEffectEnabled: Boolean
     var globalScrollEffect: String
+    var backgroundScrollFollowEnabled: Boolean
     var pageTransitionEffect: String
     var themeSyncStrategy: ThemeSyncStrategy
     var enableWebDebugging: Boolean
@@ -90,6 +92,7 @@ interface SettingsRepository {
     var customWallpaperPassthroughOpacity: Float
     var customVideoBackgroundUri: String?
     var customVideoBackgroundDurationSeconds: Int
+    var customVideoBackgroundFrameRate: Int
     val customPageBackgrounds: CustomPageBackgroundSet
     var customStartupAnimationUri: String?
     var startupAnimationSettings: StartupAnimationSettings

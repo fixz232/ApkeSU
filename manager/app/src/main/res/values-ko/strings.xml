@@ -1067,6 +1067,8 @@
     <string name="settings_wallpaper_crop">배경 화면 영역 조정</string>
     <string name="settings_wallpaper_passthrough_summary">UI 표면 위에 배경화면을 가볍게 그립니다.</string>
     <string name="settings_wallpaper_passthrough_opacity">통과 불투명도</string>
+    <string name="settings_background_scroll_follow">스크롤에 따른 배경 이동</string>
+    <string name="settings_background_scroll_follow_summary">페이지 스크롤에 맞춰 현재 배경을 부드럽게 이동합니다.</string>
     <string name="settings_wallpaper_not_selected">선택한 배경화면이 없습니다.</string>
     <string name="settings_wallpaper_preview_hint">배경 미리보기</string>
     <string name="settings_wallpaper_preview_ui_sample">UI 레이어 샘플</string>
@@ -1077,6 +1079,9 @@
     <string name="settings_video_background_duration">비디오 루프 지속 시간</string>
     <string name="settings_video_background_duration_summary">선택한 시간 후에 배경 비디오를 다시 시작합니다.</string>
     <string name="settings_video_background_duration_value">%1$d 초</string>
+    <string name="settings_video_background_frame_rate">동영상 프레임 속도</string>
+    <string name="settings_video_background_frame_rate_summary">화면과 동영상에 호환되는 새로 고침 빈도를 요청합니다. 높은 값은 화면과 동영상에 따라 달라집니다.</string>
+    <string name="settings_video_background_frame_rate_value">%1$d Hz</string>
     <string name="theme_store">테마 스토어</string>
     <string name="theme_store_settings_summary">아이콘, 카드 미디어, 배경, 사운드, 시작 애니메이션 및 저장된 테마를 관리합니다.</string>
     <string name="theme_store_title">테마 센터</string>
@@ -1347,6 +1352,8 @@
     <string name="settings_auto_hide_navigation_bar_summary">상호작용 없이 3초 후에 탐색 표시줄을 숨깁니다. 다시 표시하려면 아무 곳이나 터치하세요.</string>
     <string name="settings_scroll_hide_navigation_bar">스크롤하는 동안 탐색 표시줄 숨기기</string>
     <string name="settings_scroll_hide_navigation_bar_summary">아래로 탐색하는 동안 숨기고 위로 탐색하는 동안 표시합니다.</string>
+    <string name="settings_module_top_bar_auto_hide">모듈 화면 상단 표시줄 자동 숨기기</string>
+    <string name="settings_module_top_bar_auto_hide_summary">스크롤 중에는 모듈 화면 상단 표시줄을 숨기고, 5초 동안 조작이 없으면 다시 표시합니다.</string>
     <string name="settings_enable_glass">液态玻璃</string>
     <string name="settings_enable_glass_summary">启用悬浮底栏的液态玻璃效果。</string>
     <string name="show_only_primary_user_apps">기본 사용자 앱만 표시</string>

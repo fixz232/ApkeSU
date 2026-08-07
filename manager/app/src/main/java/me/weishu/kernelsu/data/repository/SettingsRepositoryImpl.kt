@@ -13,8 +13,10 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_KEY
+import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.PAGE_TRANSITION_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.AUTO_HIDE_NAVIGATION_BAR_KEY
+import me.weishu.kernelsu.ui.screen.module.MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_EFFECT_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SNOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GlobalScrollEffect
@@ -77,6 +79,7 @@ import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_PASSTHROUGH_ENABLED_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_WALLPAPER_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY
+import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_VIDEO_BACKGROUND_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_URI_KEY
 import me.weishu.kernelsu.ui.util.CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY
@@ -96,6 +99,7 @@ import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS
+import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_CROP
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_OPACITY
 import me.weishu.kernelsu.ui.util.DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY
@@ -120,6 +124,7 @@ import me.weishu.kernelsu.ui.util.sanitizeCustomAudioVolume
 import me.weishu.kernelsu.ui.util.sanitizeCustomBackgroundMusicVolume
 import me.weishu.kernelsu.ui.util.sanitizeCustomStartupSoundDurationSeconds
 import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundDurationSeconds
+import me.weishu.kernelsu.ui.util.sanitizeCustomVideoBackgroundFrameRate
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
@@ -273,6 +278,10 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var scrollHideNavigationBar: Boolean
         get() = prefs.getBoolean(SCROLL_HIDE_NAVIGATION_BAR_KEY, false)
         set(value) = prefs.edit { putBoolean(SCROLL_HIDE_NAVIGATION_BAR_KEY, value) }
+
+    override var moduleTopBarAutoHideEnabled: Boolean
+        get() = prefs.getBoolean(MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY, false)
+        set(value) = prefs.edit { putBoolean(MODULE_TOP_BAR_AUTO_HIDE_ENABLED_KEY, value) }
 
     override var pageScale: Float
         get() = sanitizeScale(
@@ -520,6 +529,10 @@ class SettingsRepositoryImpl : SettingsRepository {
             putString(GLOBAL_SCROLL_EFFECT_KEY, GlobalScrollEffect.fromValue(value).value)
         }
 
+    override var backgroundScrollFollowEnabled: Boolean
+        get() = prefs.getBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, false)
+        set(value) = prefs.edit { putBoolean(BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY, value) }
+
     override var pageTransitionEffect: String
         get() = PageTransitionEffect.fromValue(
             prefs.getString(PAGE_TRANSITION_EFFECT_KEY, PageTransitionEffect.DEFAULT_VALUE)
@@ -729,6 +742,20 @@ class SettingsRepositoryImpl : SettingsRepository {
             putInt(
                 CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY,
                 sanitizeCustomVideoBackgroundDurationSeconds(value),
+            )
+        }
+
+    override var customVideoBackgroundFrameRate: Int
+        get() = sanitizeCustomVideoBackgroundFrameRate(
+            prefs.getInt(
+                CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE,
+            )
+        )
+        set(value) = prefs.edit {
+            putInt(
+                CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY,
+                sanitizeCustomVideoBackgroundFrameRate(value),
             )
         }
 

@@ -8,9 +8,13 @@ import java.util.Locale
 
 const val CUSTOM_VIDEO_BACKGROUND_URI_KEY = "custom_video_background_uri"
 const val CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS_KEY = "custom_video_background_duration_seconds"
+const val CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_KEY = "custom_video_background_frame_rate"
 const val DEFAULT_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS = 10
+const val DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE = 120
 const val MIN_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS = 3
 const val MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS = 60
+
+val CUSTOM_VIDEO_BACKGROUND_FRAME_RATE_OPTIONS = listOf(60, 90, 120, 165)
 
 val CUSTOM_BACKGROUND_MIME_TYPES = arrayOf(
     "image/*",
@@ -22,6 +26,13 @@ fun sanitizeCustomVideoBackgroundDurationSeconds(value: Int): Int {
         MIN_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
         MAX_CUSTOM_VIDEO_BACKGROUND_DURATION_SECONDS,
     )
+}
+
+fun sanitizeCustomVideoBackgroundFrameRate(value: Int): Int {
+    return when (value) {
+        60, 90, 120, 165 -> value
+        else -> DEFAULT_CUSTOM_VIDEO_BACKGROUND_FRAME_RATE
+    }
 }
 
 fun takePersistableVideoBackgroundReadPermission(context: Context, uri: Uri) {
