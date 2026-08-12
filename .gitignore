@@ -12,3 +12,4 @@ __pycache__
 /repack-config.json
 .codex-*
 /release-local/
+/userspace/ksud/.lkm_image_bootstrap.o
