@@ -117,7 +117,15 @@ fun ModulePager(
         onOpenRepo = { navigator.push(Route.ModuleRepo) },
         onOpenTools = { navigator.push(Route.ModuleTools) },
         onOpenWallpaperEditor = { module ->
-            navigator.push(Route.ModuleWallpaperEditor(module.id))
+            navigator.push(
+                Route.ModuleWallpaperEditor(
+                    moduleId = module.id,
+                    displayName = module.name,
+                    displayAuthor = module.author,
+                    displayVersion = module.version,
+                    displayDescription = module.description,
+                )
+            )
         },
         onToggleSortActionFirst = {
             viewModel.toggleSortActionFirst()

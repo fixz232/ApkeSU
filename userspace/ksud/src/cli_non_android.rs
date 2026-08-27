@@ -21,9 +21,9 @@ enum Commands {
     /// Restore boot or init_boot images patched by KernelSU
     BootRestore(BootRestoreArgs),
 
-    /// Patch KernelSU into a boot image
+    /// Patch the KernelSU LKM directly into a boot image
     ///
-    /// Always operates on a boot image; never selects init_boot or vendor_boot.
+    /// This path always targets boot and never selects init_boot or vendor_boot.
     BootPatchV2(BootPatchV2Args),
 
     /// Get apk size and hash
@@ -54,7 +54,7 @@ pub fn run() -> Result<()> {
 
         Commands::BootRestore(boot_restore) => crate::boot_patch::restore(boot_restore),
 
-        Commands::BootPatchV2(patch) => crate::lkm_image::patch_boot(&patch),
+        Commands::BootPatchV2(boot_patch) => crate::lkm_image::patch_boot(&boot_patch),
 
         Commands::SupportedKmis => {
             let kmi = crate::assets::list_supported_kmi();

@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
@@ -214,6 +215,15 @@ fun SettingPagerMiuix(
                             selectedIndex = InterfaceStyle.selectedIndex(uiState.uiMode),
                             onSelectedIndexChange = actions.onSetUiModeIndex
                         )
+                        if (
+                            uiState.uiMode == InterfaceStyle.Alpha.value ||
+                            uiState.uiMode == InterfaceStyle.Delta.value
+                        ) {
+                            AlphaDeltaMiuixPreference(
+                                deltaSelected = uiState.uiMode == InterfaceStyle.Delta.value,
+                                onModeSelected = actions.onSetAlphaDeltaMode,
+                            )
+                        }
                         if (uiState.uiMode == InterfaceStyle.Miuix.value) {
                             SwitchPreference(
                                 title = stringResource(R.string.settings_miuix_classic_home_layout),
@@ -311,6 +321,18 @@ fun SettingPagerMiuix(
                             icon = Icons.Rounded.Dashboard,
                             onClick = actions.onOpenHomeLayout,
                         )
+                        CategorizedMiuixActionRow(
+                            title = stringResource(id = R.string.pixel_pet_title),
+                            summary = stringResource(
+                                id = if (uiState.pixelPetEnabled) {
+                                    R.string.pixel_pet_enabled_summary
+                                } else {
+                                    R.string.pixel_pet_disabled_summary
+                                },
+                            ),
+                            icon = Icons.Rounded.AutoFixHigh,
+                            onClick = actions.onOpenPixelPet,
+                        )
                         CategorizedMiuixSwitchRow(
                             title = stringResource(id = R.string.settings_show_home_support_card),
                             summary = stringResource(id = R.string.settings_show_home_support_card_summary),
@@ -385,6 +407,20 @@ fun SettingPagerMiuix(
                                 onCheckedChange = actions.onSetKernelUmountEnabled,
                             )
 
+                            val webViewUmountSummary = when (uiState.webViewZygoteUmountStatus) {
+                                "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                else -> stringResource(id = R.string.settings_webview_zygote_umount_summary)
+                            }
+                            CategorizedMiuixSwitchRow(
+                                title = stringResource(id = R.string.settings_webview_zygote_umount),
+                                summary = webViewUmountSummary,
+                                icon = Icons.Rounded.Language,
+                                enabled = uiState.webViewZygoteUmountStatus == "supported",
+                                checked = uiState.isWebViewZygoteUmountEnabled,
+                                onCheckedChange = actions.onSetWebViewZygoteUmountEnabled,
+                            )
+
                             val selinuxHideSummary = when (uiState.selinuxHideStatus) {
                                 "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
                                 "managed" -> stringResource(id = R.string.feature_status_managed_summary)
@@ -439,6 +475,21 @@ fun SettingPagerMiuix(
                                 enabled = uiState.avcSpoofStatus == "supported",
                                 checked = uiState.isAvcSpoofEnabled,
                                 onCheckedChange = actions.onSetAvcSpoofEnabled,
+                            )
+                            SwitchPreference(
+                                title = stringResource(id = R.string.settings_soft_reboot),
+                                summary = stringResource(id = R.string.settings_soft_reboot_summary),
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.RestartAlt,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = stringResource(id = R.string.settings_soft_reboot),
+                                        tint = if (uiState.isLateLoadMode) colorScheme.disabledOnSecondaryVariant else colorScheme.onBackground
+                                    )
+                                },
+                                enabled = !uiState.isLateLoadMode,
+                                checked = uiState.isLateLoadMode || uiState.useSoftReboot,
+                                onCheckedChange = actions.onSetUseSoftReboot
                             )
                         }
 
@@ -858,14 +909,17 @@ private fun CollapsibleMiuixSection(
     }
 }
 
-private const val HOME_MANAGER_ITEM_COUNT = 5
-private const val ROOT_PERMISSIONS_ITEM_COUNT = 7
+private const val HOME_MANAGER_ITEM_COUNT = 6
+private const val ROOT_PERMISSIONS_ITEM_COUNT = 8
 private const val MOUNT_HIDE_ITEM_COUNT = 6
 private const val TOOLBOX_ITEM_COUNT = 6
 
 private fun SettingsUiState.appearanceCategoryItemCount(): Int {
     return 6 + when (uiMode) {
         InterfaceStyle.Miuix.value -> 1
+        InterfaceStyle.Alpha.value,
+        InterfaceStyle.Delta.value,
+        -> 1
         InterfaceStyle.Rain.value,
         InterfaceStyle.Snow.value,
         InterfaceStyle.Ink.value,
@@ -873,6 +927,82 @@ private fun SettingsUiState.appearanceCategoryItemCount(): Int {
         InterfaceStyle.Pixel.value,
         -> 2
         else -> 0
+    }
+}
+
+@Composable
+private fun AlphaDeltaMiuixPreference(
+    deltaSelected: Boolean,
+    onModeSelected: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.Palette,
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .size(24.dp),
+            contentDescription = null,
+            tint = colorScheme.onBackground,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_alpha_delta_mode),
+                color = colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(R.string.settings_alpha_delta_mode_summary),
+                color = colorScheme.onSurfaceVariantSummary,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
+            .selectableGroup()
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        listOf(false, true).forEach { useDelta ->
+            val selected = deltaSelected == useDelta
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) colorScheme.primaryContainer.copy(alpha = 0.92f) else Color.Transparent,
+                    )
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = { onModeSelected(useDelta) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(
+                        if (useDelta) R.string.settings_delta_mode else R.string.settings_alpha_mode,
+                    ),
+                    color = if (selected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariantSummary,
+                    fontSize = 14.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 

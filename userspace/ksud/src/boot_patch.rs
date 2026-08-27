@@ -488,7 +488,7 @@ mod android {
         bail!("{}", errors.join("; "))
     }
 
-    pub(super) fn post_ota() -> Result<()> {
+    pub fn post_ota() -> Result<()> {
         use crate::assets::BOOTCTL_PATH;
         use crate::defs::ADB_DIR;
 
@@ -593,7 +593,7 @@ fn parse_kmi_from_kernel(kernel: &Path) -> Result<String> {
     parse_kmi(&data)
 }
 
-fn parse_kmi_from_boot(image: &Path) -> Result<String> {
+pub fn get_kmi_from_boot(image: &Path) -> Result<String> {
     let data = map_file(image)?;
     let boot = BootImage::parse(&data)?;
     if let Some(kernel) = boot.get_blocks().get_kernel() {
@@ -639,7 +639,7 @@ fn enforce_bootimage_version(boot: &BootImage<'_>) -> Result<()> {
     Ok(())
 }
 
-fn enforce_apkesu_lkm_identity(kernelsu_ko: &[u8], source: &str) -> Result<()> {
+pub fn enforce_apkesu_lkm_identity(kernelsu_ko: &[u8], source: &str) -> Result<()> {
     ensure!(
         kernelsu_ko
             .windows(MANAGER_CERT_HASH.len())
@@ -809,6 +809,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                 "init and module must not be specified."
             );
         }
+
         ensure!(
             !(pathmask_lkm && no_install),
             "pathmask LKM patch cannot be used with no-install"
@@ -825,21 +826,16 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                         "- Trying to auto detect KMI version for {}",
                         image_path.display()
                     );
-                    match parse_kmi_from_boot(image_path) {
-                        Ok(value) => {
-                            return Ok(value);
-                        }
-                        Err(e) => {
-                            println!("- Failed to auto detect KMI from selected image: {e}");
-                        }
-                    }
+                    return get_kmi_from_boot(image_path).with_context(|| {
+                        "Failed to auto detect KMI from selected image; please specify KMI manually"
+                    });
                 }
 
                 #[cfg(target_os = "android")]
                 if ota {
                     let slot_suffix = get_slot_suffix(true)?;
                     println!("- Trying to auto detect KMI version from boot");
-                    return parse_kmi_from_boot(Path::new(&format!(
+                    return get_kmi_from_boot(Path::new(&format!(
                         "/dev/block/by-name/boot{slot_suffix}"
                     )));
                 }
@@ -1002,7 +998,6 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
 
         apply_config("no custom rc", "norc=1", no_custom_rc);
         apply_config("allow shell", "allow_shell=1", allow_shell);
-
         if ksu_config.is_empty() {
             cpio.rm("ksu_config", false);
         } else {

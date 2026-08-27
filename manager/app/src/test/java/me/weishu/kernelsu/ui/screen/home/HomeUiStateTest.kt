@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.screen.home
 
+import me.weishu.kernelsu.KernelVersion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -90,4 +91,54 @@ class HomeUiStateTest {
             )
         )
     }
+
+    @Test
+    fun uapiMismatchDoesNotAlsoClaimKernelVersionIsTooLow() {
+        val mismatch = homeState(
+            requiresNewKernel = true,
+            uapiMismatch = true,
+        )
+
+        assertTrue(mismatch.showUAPIMisMatchWarning)
+        assertFalse(mismatch.showRequireKernelWarning)
+
+        val oldKernel = homeState(
+            requiresNewKernel = true,
+            uapiMismatch = false,
+        )
+
+        assertFalse(oldKernel.showUAPIMisMatchWarning)
+        assertTrue(oldKernel.showRequireKernelWarning)
+    }
+
+    private fun homeState(
+        requiresNewKernel: Boolean,
+        uapiMismatch: Boolean,
+    ) = HomeUiState(
+        kernelVersion = KernelVersion(6, 1, 0),
+        ksuVersion = 32720,
+        managerUAPIVersion = 2,
+        kernelUAPIVersion = if (uapiMismatch) 1 else 2,
+        lkmMode = true,
+        isManager = true,
+        isManagerPrBuild = false,
+        isKernelPrBuild = false,
+        requiresNewKernel = requiresNewKernel,
+        uapiMismatch = uapiMismatch,
+        isRootAvailable = true,
+        isSafeMode = false,
+        isLateLoadMode = false,
+        currentManagerVersionCode = 32720,
+        showVersionMismatchWarningSetting = true,
+        superuserCount = 0,
+        moduleCount = 0,
+        systemInfo = SystemInfo(
+            kernelVersion = "6.1.0",
+            managerVersion = "2.7.1 (32720)",
+            deviceModel = "test",
+            fingerprint = "test",
+            selinuxStatus = "Enforcing",
+            seccompStatus = 2,
+        ),
+    )
 }

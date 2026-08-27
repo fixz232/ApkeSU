@@ -900,27 +900,24 @@ private fun AlphaActionRow(
         horizontalArrangement = Arrangement.spacedBy(if (snow) 11.dp else 10.dp),
     ) {
         if (icon != null) {
-            if (snow) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(AlphaShapes.Control)
-                        .background(AlphaColors.SurfaceStrong),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (enabled) AlphaColors.Accent else AlphaColors.Disabled,
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
-            } else {
+            Box(
+                modifier = Modifier
+                    .size(if (snow) 34.dp else 36.dp)
+                    .clip(AlphaShapes.Control)
+                    .background(
+                        if (enabled) {
+                            if (snow) AlphaColors.SurfaceStrong else AlphaColors.AccentSoft
+                        } else {
+                            AlphaColors.SurfaceStrong
+                        }
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = if (enabled) AlphaColors.Accent else AlphaColors.Disabled,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(if (snow) 19.dp else 20.dp),
                 )
             }
         }
@@ -945,7 +942,15 @@ private fun AlphaActionRow(
                 )
             }
         }
-        if (snow) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(AlphaShapes.Control)
+                .background(
+                    if (enabled) AlphaColors.SurfaceStrong else AlphaColors.SurfaceStrong.copy(alpha = 0.72f)
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                 contentDescription = null,

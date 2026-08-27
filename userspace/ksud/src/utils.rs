@@ -3,8 +3,8 @@ use rustix::fs::{Mode, OFlags, open};
 use rustix::process::setpgid;
 use rustix::stdio::{dup2_stderr, dup2_stdin, dup2_stdout};
 use std::{
-    ffi::{CStr, CString, c_char, c_void},
     collections::BTreeSet,
+    ffi::{CStr, CString, c_char, c_void},
     fs::{File, OpenOptions, create_dir_all, remove_file, symlink_metadata, write},
     io::{
         ErrorKind::{AlreadyExists, NotFound},
@@ -29,6 +29,18 @@ use rustix::{
     process,
     thread::{LinkNameSpaceType, move_into_link_name_space},
 };
+
+const APKESU_GRAPHICS_RENDERER_DIR: &str = "/data/adb/apkesu/graphics_renderer";
+const APKESU_FOREGROUND_TOOLS_DIR: &str = "/data/adb/apkesu/foreground_tools";
+const APKESU_EXTERNAL_SERVICE_FILES: [&str; 7] = [
+    "/data/adb/service.d/97-apkesu-foreground-tools.sh",
+    "/data/adb/service.d/97-apkesu-foreground-tools.sh.pending",
+    "/data/adb/service.d/97-apkesu-foreground-tools.sh.tmp",
+    "/data/adb/service.d/98-apkesu-susfs-paths.sh",
+    "/data/adb/service.d/98-apkesu-susfs-paths.sh.pending",
+    "/data/adb/service.d/99-apkesu-graphics-renderer.sh",
+    "/data/adb/service.d/99-apkesu-graphics-renderer.sh.tmp",
+];
 
 type PropertyReadCallback = unsafe extern "C" fn(*mut c_void, *const c_char, *const c_char, u32);
 
@@ -261,31 +273,28 @@ pub fn has_magisk() -> bool {
     which::which("magisk").is_ok()
 }
 
-pub fn ensure_magisk_module_compat() -> Result<()> {
-    let magisk_dir = Path::new(defs::ADB_DIR).join(".magisk");
-    let module_link = magisk_dir.join("modules");
+pub fn remove_legacy_magisk_module_link() -> Result<bool> {
+    let adb_dir = Path::new(defs::ADB_DIR);
     let module_dir = Path::new(defs::MODULE_DIR.trim_end_matches('/'));
+    remove_legacy_magisk_module_link_at(adb_dir, module_dir)
+}
 
-    ensure_dir_exists(module_dir)?;
-    ensure_dir_exists(&magisk_dir)?;
+fn remove_legacy_magisk_module_link_at(adb_dir: &Path, module_dir: &Path) -> Result<bool> {
+    let magisk_dir = adb_dir.join(".magisk");
+    let module_link = magisk_dir.join("modules");
+    let metadata = match symlink_metadata(&module_link) {
+        std::result::Result::Ok(metadata) => metadata,
+        Err(error) if error.kind() == NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
 
-    match symlink_metadata(&module_link) {
-        std::result::Result::Ok(metadata) if metadata.file_type().is_symlink() => {
-            let target = std::fs::read_link(&module_link).ok();
-            if target.as_deref() == Some(module_dir) {
-                return Ok(());
-            }
-            remove_file(&module_link)?;
-        }
-        std::result::Result::Ok(_) => return Ok(()),
-        Err(e) if e.kind() == NotFound => {}
-        Err(e) => return Err(e.into()),
+    if !metadata.file_type().is_symlink() || std::fs::read_link(&module_link)? != module_dir {
+        return Ok(false);
     }
 
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(module_dir, &module_link)?;
-
-    Ok(())
+    remove_file(&module_link)?;
+    let _ = std::fs::remove_dir(&magisk_dir);
+    Ok(true)
 }
 
 fn link_ksud_to_bin() -> Result<()> {
@@ -299,6 +308,11 @@ fn link_ksud_to_bin() -> Result<()> {
 
 pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Result<()> {
     ensure_dir_exists(defs::ADB_DIR)?;
+    if !has_magisk()
+        && let Err(error) = remove_legacy_magisk_module_link()
+    {
+        log::warn!("failed to remove legacy Magisk module link: {error:#}");
+    }
     let _ = std::fs::remove_file(defs::DAEMON_PATH);
     std::fs::copy("/proc/self/exe", defs::DAEMON_PATH)?;
     restorecon::lsetfilecon(defs::DAEMON_PATH, restorecon::KSU_CON)?;
@@ -339,17 +353,12 @@ pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Resul
 }
 
 pub fn uninstall(package_name: &str) -> Result<()> {
-    if Path::new(defs::MODULE_DIR).exists() {
-        println!("- Uninstall modules..");
-        module::uninstall_all_modules()?;
-        module::prune_modules()?;
+    println!("- Unload hidden path runtime..");
+    if let Err(err) = crate::pathmask::unload() {
+        // Restoring the boot image removes Pathmask on the next boot even when it is busy now.
+        println!("- Warning: unable to unload Pathmask now: {err:#}");
     }
-    println!("- Removing directories..");
-    std::fs::remove_dir_all(defs::WORKING_DIR).ok();
-    std::fs::remove_file(defs::DAEMON_PATH).ok();
-    std::fs::remove_dir_all(defs::MODULE_DIR).ok();
-    std::fs::remove_dir_all(defs::PREINIT_DIR_WATCHDOG).ok();
-    std::fs::remove_dir_all(defs::PREINIT_DIR_DEFAULT).ok();
+
     println!("- Restore boot image..");
     boot_patch::restore(BootRestoreArgs {
         boot: None,
@@ -357,6 +366,23 @@ pub fn uninstall(package_name: &str) -> Result<()> {
         out: None,
         out_name: None,
     })?;
+
+    if Path::new(defs::MODULE_DIR).exists() {
+        println!("- Uninstall modules..");
+        module::uninstall_all_modules()?;
+        module::prune_modules()?;
+    }
+
+    println!("- Removing ApkeSU service extensions..");
+    cleanup_apkesu_uninstall_artifacts()?;
+
+    // The stock-image backup is stored in WORKING_DIR, so remove it only after restore succeeds.
+    println!("- Removing directories..");
+    std::fs::remove_dir_all(defs::WORKING_DIR).ok();
+    std::fs::remove_file(defs::DAEMON_PATH).ok();
+    std::fs::remove_dir_all(defs::MODULE_DIR).ok();
+    std::fs::remove_dir_all(defs::PREINIT_DIR_WATCHDOG).ok();
+    std::fs::remove_dir_all(defs::PREINIT_DIR_DEFAULT).ok();
     println!("- Uninstall KernelSU manager..");
     Command::new("pm")
         .args(["uninstall", package_name])
@@ -365,6 +391,129 @@ pub fn uninstall(package_name: &str) -> Result<()> {
     std::thread::sleep(std::time::Duration::from_secs(5));
     Command::new("reboot").spawn()?;
     Ok(())
+}
+
+fn cleanup_apkesu_uninstall_artifacts() -> Result<()> {
+    let service_files = APKESU_EXTERNAL_SERVICE_FILES.map(Path::new);
+    let state_dirs = [
+        Path::new(APKESU_FOREGROUND_TOOLS_DIR),
+        Path::new(APKESU_GRAPHICS_RENDERER_DIR),
+    ];
+    cleanup_owned_uninstall_paths(&state_dirs, &service_files)
+}
+
+fn cleanup_owned_uninstall_paths(state_dirs: &[&Path], service_files: &[&Path]) -> Result<()> {
+    for path in service_files {
+        remove_owned_uninstall_path(path)?;
+    }
+    for path in state_dirs {
+        remove_owned_uninstall_path(path)?;
+    }
+    Ok(())
+}
+
+fn remove_owned_uninstall_path(path: &Path) -> Result<()> {
+    let metadata = match symlink_metadata(path) {
+        std::result::Result::Ok(metadata) => metadata,
+        Err(error) if error.kind() == NotFound => return Ok(()),
+        Err(error) => {
+            return Err(Error::from(error)).with_context(|| {
+                format!("failed to inspect uninstall artifact {}", path.display())
+            });
+        }
+    };
+
+    let result = if metadata.file_type().is_dir() {
+        std::fs::remove_dir_all(path)
+    } else {
+        std::fs::remove_file(path)
+    };
+    result.with_context(|| format!("failed to remove uninstall artifact {}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cleanup_owned_uninstall_paths, remove_legacy_magisk_module_link_at};
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink as symlink_dir;
+    #[cfg(windows)]
+    use std::os::windows::fs::symlink_dir;
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn removes_only_the_legacy_magisk_modules_link() {
+        let temp = tempfile::tempdir().unwrap();
+        let adb_dir = temp.path().join("adb");
+        let module_dir = adb_dir.join("modules");
+        let magisk_dir = adb_dir.join(".magisk");
+        let module_link = magisk_dir.join("modules");
+
+        fs::create_dir_all(&module_dir).unwrap();
+        fs::create_dir_all(&magisk_dir).unwrap();
+        symlink_dir(&module_dir, &module_link).unwrap();
+
+        assert!(remove_legacy_magisk_module_link_at(&adb_dir, &module_dir).unwrap());
+        assert!(!module_link.exists());
+        assert!(!magisk_dir.exists());
+        assert!(module_dir.is_dir());
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn preserves_a_non_apkesu_magisk_modules_link() {
+        let temp = tempfile::tempdir().unwrap();
+        let adb_dir = temp.path().join("adb");
+        let module_dir = adb_dir.join("modules");
+        let external_modules = temp.path().join("external-modules");
+        let magisk_dir = adb_dir.join(".magisk");
+        let module_link = magisk_dir.join("modules");
+
+        fs::create_dir_all(&module_dir).unwrap();
+        fs::create_dir_all(&external_modules).unwrap();
+        fs::create_dir_all(&magisk_dir).unwrap();
+        symlink_dir(&external_modules, &module_link).unwrap();
+
+        assert!(!remove_legacy_magisk_module_link_at(&adb_dir, &module_dir).unwrap());
+        assert!(module_link.exists());
+    }
+
+    #[test]
+    fn uninstall_cleanup_removes_only_owned_artifacts() {
+        let temp = tempfile::tempdir().unwrap();
+        let state_root = temp.path().join("apkesu");
+        let renderer = state_root.join("graphics_renderer");
+        let foreground = state_root.join("foreground_tools");
+        let unrelated = state_root.join("unrelated");
+        let service_dir = temp.path().join("service.d");
+        let graphics_service = service_dir.join("99-apkesu-graphics-renderer.sh");
+        let susfs_service = service_dir.join("98-apkesu-susfs-paths.sh");
+        let unrelated_service = service_dir.join("other-service.sh");
+
+        fs::create_dir_all(&renderer).unwrap();
+        fs::create_dir_all(&foreground).unwrap();
+        fs::create_dir_all(&unrelated).unwrap();
+        fs::create_dir_all(&service_dir).unwrap();
+        fs::write(renderer.join("mode"), "vulkan").unwrap();
+        fs::write(foreground.join("targets.list"), "com.example.target\n").unwrap();
+        fs::write(unrelated.join("keep"), "keep").unwrap();
+        fs::write(&graphics_service, "graphics").unwrap();
+        fs::write(&susfs_service, "susfs").unwrap();
+        fs::write(&unrelated_service, "keep").unwrap();
+
+        cleanup_owned_uninstall_paths(
+            &[renderer.as_path(), foreground.as_path()],
+            &[graphics_service.as_path(), susfs_service.as_path()],
+        )
+        .unwrap();
+
+        assert!(!renderer.exists());
+        assert!(!foreground.exists());
+        assert!(!graphics_service.exists());
+        assert!(!susfs_service.exists());
+        assert!(unrelated.join("keep").is_file());
+        assert!(unrelated_service.is_file());
+    }
 }
 
 pub fn reset_std() -> Result<()> {

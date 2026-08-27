@@ -29,10 +29,12 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -414,6 +416,7 @@ private fun Modifier.navigationIconLiquidGlassSurface(): Modifier {
 private val CustomNavigationIconSlot.materialFallbackIcon: ImageVector
     get() = when (this) {
         CustomNavigationIconSlot.Home -> Icons.Filled.Home
+        CustomNavigationIconSlot.Kpm -> Icons.Filled.Memory
         CustomNavigationIconSlot.Superuser -> Icons.Filled.Shield
         CustomNavigationIconSlot.Module -> Icons.Filled.Extension
         CustomNavigationIconSlot.Settings -> Icons.Filled.Settings
@@ -422,6 +425,7 @@ private val CustomNavigationIconSlot.materialFallbackIcon: ImageVector
 private val CustomNavigationIconSlot.miuixFallbackIcon: ImageVector
     get() = when (this) {
         CustomNavigationIconSlot.Home -> Icons.Rounded.Cottage
+        CustomNavigationIconSlot.Kpm -> Icons.Rounded.Memory
         CustomNavigationIconSlot.Superuser -> Icons.Rounded.Security
         CustomNavigationIconSlot.Module -> Icons.Rounded.Extension
         CustomNavigationIconSlot.Settings -> Icons.Rounded.Settings

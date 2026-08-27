@@ -87,6 +87,7 @@ data class SettingsUiState(
     val inkCardMotionEnabled: Boolean = DEFAULT_INK_CARD_MOTION_ENABLED,
     val pixelStyle: String = PixelStyle.DEFAULT_VALUE,
     val pixelCardMotionEnabled: Boolean = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
+    val pixelPetEnabled: Boolean = false,
     val uiDecorationConfig: UiDecorationConfig = UiDecorationConfig(),
     val uiDecorationSaveState: UiDecorationSaveState = UiDecorationSaveState.Idle,
     val customUiDecorationPresets: List<CustomUiDecorationPreset> = emptyList(),
@@ -136,6 +137,10 @@ data class SettingsUiState(
     // Kernel Umount
     val kernelUmountStatus: String = "",
     val isKernelUmountEnabled: Boolean = false,
+
+    // WebView Zygote Umount
+    val webViewZygoteUmountStatus: String = "",
+    val isWebViewZygoteUmountEnabled: Boolean = false,
 
     // SELinux Hide
     val selinuxHideStatus: String = "",
@@ -190,7 +195,9 @@ data class SettingsUiState(
     val runtimeModeResolved: Boolean = false,
 
     // Auto Jailbreak
-    val autoJailbreak: Boolean = false
+    val autoJailbreak: Boolean = false,
+    // Soft Reboot
+    val useSoftReboot: Boolean = false,
 )
 
 @Immutable
@@ -230,6 +237,7 @@ data class SettingsScreenActions(
     val onOpenNavigationIcons: () -> Unit,
     val onOpenHomeLayout: () -> Unit,
     val onOpenHomeCardWallpapers: () -> Unit,
+    val onOpenPixelPet: () -> Unit,
     val onOpenVisualEffects: () -> Unit,
     val onOpenUiDecorationLibrary: () -> Unit,
     val onPickWallpaper: () -> Unit,
@@ -260,6 +268,7 @@ data class SettingsScreenActions(
     val onOpenProfileTemplate: () -> Unit,
     val onSetSuCompatMode: (Int) -> Unit,
     val onSetKernelUmountEnabled: (Boolean) -> Unit,
+    val onSetWebViewZygoteUmountEnabled: (Boolean) -> Unit,
     val onSetSelinuxHideEnabled: (Boolean) -> Unit,
     val onSetSulogEnabled: (Boolean) -> Unit,
     val onSetAdbRootEnabled: (Boolean) -> Unit,
@@ -278,6 +287,7 @@ data class SettingsScreenActions(
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,
     val onSetAutoJailbreak: (Boolean) -> Unit,
+    val onSetUseSoftReboot: (Boolean) -> Unit,
     val onSetDeltaColorVariant: (String) -> Unit,
     val onOpenAbout: () -> Unit,
 )

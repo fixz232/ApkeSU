@@ -61,6 +61,7 @@ fun isPixelInterfaceStyle(): Boolean = LocalInterfaceStyle.current == InterfaceS
 @Composable
 fun PixelBackdrop(modifier: Modifier = Modifier) {
     val style = LocalPixelStyle.current
+    val petHabitat = LocalPixelPetState.current.habitat
     val dark = isInDarkTheme()
     val palette = pixelPalette(style, dark)
     val cyberProgress = rememberCyberDataProgress(style)
@@ -93,6 +94,7 @@ fun PixelBackdrop(modifier: Modifier = Modifier) {
             PixelStyle.VikingSnowfield -> drawVikingScene(palette, vikingProgress, dark)
             PixelStyle.JiangnanWatertown -> drawJiangnanScene(palette, jiangnanProgress, dark)
             PixelStyle.CloudTown -> drawCloudTownScene(palette, cloudTownProgress, dark)
+            PixelStyle.PetCompanion -> drawPetCompanionScene(palette, petHabitat)
         }
     }
 }
@@ -340,6 +342,7 @@ fun Modifier.pixelMiuixCardSurface(
 ): Modifier {
     if (!enabled || !isPixelInterfaceStyle()) return this
     val style = LocalPixelStyle.current
+    val petHabitat = LocalPixelPetState.current.habitat
     val dark = isInDarkTheme()
     val palette = pixelPalette(style, dark)
     val paintPalette = pixelCardPaintPalette(style, dark)
@@ -350,8 +353,8 @@ fun Modifier.pixelMiuixCardSurface(
         .drawWithContent {
             drawContent()
             drawPixelCardDecoration(style, paintPalette)
-            if (cardMotionEnabled) {
-                drawPixelCardMotionOverlay(style, paintPalette, cardMotionProgress.value)
+            if (cardMotionEnabled && style != PixelStyle.PetCompanion) {
+                drawPixelCardMotionOverlay(style, paintPalette, cardMotionProgress.value, petHabitat)
             }
         }
         .clip(cardShape)
@@ -401,10 +404,10 @@ fun Modifier.pixelMiuixCardSurface(
             shape = cardShape,
         )
         .drawWithContent {
-            drawPixelCardMaterial(style, paintPalette)
+            drawPixelCardMaterial(style, paintPalette, petHabitat)
             drawPixelCardUnderlay(style, paintPalette)
-            if (cardMotionEnabled) {
-                drawPixelCardMotionUnderlay(style, paintPalette, cardMotionProgress.value)
+            if (cardMotionEnabled && style != PixelStyle.PetCompanion) {
+                drawPixelCardMotionUnderlay(style, paintPalette, cardMotionProgress.value, petHabitat)
             }
             drawContent()
         }
@@ -849,6 +852,13 @@ private fun DrawScope.drawPixelBackdropBase(style: PixelStyle, palette: PixelPal
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
             )
         }
+        PixelStyle.PetCompanion -> {
+            drawRect(
+                color = palette.backgroundAlt.copy(alpha = 0.68f),
+                topLeft = Offset(0f, size.height * 0.70f),
+                size = Size(size.width, size.height * 0.30f),
+            )
+        }
     }
 }
 
@@ -865,7 +875,8 @@ private fun DrawScope.drawPixelGrid(style: PixelStyle, palette: PixelPalette) {
         style == PixelStyle.DunhuangDesert ||
         style == PixelStyle.VikingSnowfield ||
         style == PixelStyle.JiangnanWatertown ||
-        style == PixelStyle.CloudTown
+        style == PixelStyle.CloudTown ||
+        style == PixelStyle.PetCompanion
     ) return
     val cell = when (style) {
         PixelStyle.ClassicHandheld -> 28.dp.toPx()
@@ -882,6 +893,7 @@ private fun DrawScope.drawPixelGrid(style: PixelStyle, palette: PixelPalette) {
         PixelStyle.VikingSnowfield -> 36.dp.toPx()
         PixelStyle.JiangnanWatertown -> 40.dp.toPx()
         PixelStyle.CloudTown -> 42.dp.toPx()
+        PixelStyle.PetCompanion -> 34.dp.toPx()
     }
     val verticalAlpha = when (style) {
         PixelStyle.CyberHacker -> 0.12f
@@ -896,6 +908,7 @@ private fun DrawScope.drawPixelGrid(style: PixelStyle, palette: PixelPalette) {
         PixelStyle.VikingSnowfield -> 0.036f
         PixelStyle.JiangnanWatertown -> 0.030f
         PixelStyle.CloudTown -> 0.026f
+        PixelStyle.PetCompanion -> 0.035f
         else -> 0.045f
     }
     val horizontalAlpha = verticalAlpha * 0.82f
@@ -921,7 +934,11 @@ private fun DrawScope.drawPixelGrid(style: PixelStyle, palette: PixelPalette) {
     }
 }
 
-private fun DrawScope.drawPixelCardMaterial(style: PixelStyle, palette: PixelPalette) {
+private fun DrawScope.drawPixelCardMaterial(
+    style: PixelStyle,
+    palette: PixelPalette,
+    petHabitat: PixelPetHabitat,
+) {
     val line = 2.dp.toPx().coerceAtMost(size.minDimension / 20f)
     when (style) {
         PixelStyle.ClassicHandheld -> {
@@ -977,6 +994,7 @@ private fun DrawScope.drawPixelCardMaterial(style: PixelStyle, palette: PixelPal
         PixelStyle.VikingSnowfield -> drawVikingCardMaterial(palette, line)
         PixelStyle.JiangnanWatertown -> drawJiangnanCardMaterial(palette, line)
         PixelStyle.CloudTown -> drawCloudTownCardMaterial(palette, line)
+        PixelStyle.PetCompanion -> drawPetCompanionCardMaterial(palette, line, petHabitat)
     }
 }
 
@@ -1455,6 +1473,7 @@ internal fun PixelStyle.cardPattern(): PixelCardPattern = when (this) {
     PixelStyle.VikingSnowfield -> PixelCardPattern.VikingSnowfield
     PixelStyle.JiangnanWatertown -> PixelCardPattern.JiangnanWatertown
     PixelStyle.CloudTown -> PixelCardPattern.CloudTown
+    PixelStyle.PetCompanion -> PixelCardPattern.PetCompanion
 }
 
 private fun DrawScope.drawPixelHudAccent(
@@ -1552,6 +1571,10 @@ private fun DrawScope.drawPixelHudAccent(
         PixelStyle.VikingSnowfield -> drawVikingHudAccent(palette, top, unit)
         PixelStyle.JiangnanWatertown -> drawJiangnanHudAccent(palette, top, unit)
         PixelStyle.CloudTown -> drawCloudTownHudAccent(palette, top, unit)
+        PixelStyle.PetCompanion -> {
+            drawRect(palette.secondary.copy(alpha = 0.66f), Offset(centerX - unit * 4f, top + unit), Size(unit * 8f, unit * 0.65f))
+            drawRect(palette.primary.copy(alpha = 0.76f), Offset(centerX - unit * 2f, top), Size(unit * 4f, unit))
+        }
     }
 }
 
@@ -1650,6 +1673,10 @@ private fun DrawScope.drawPixelNavigationAccent(
         PixelStyle.VikingSnowfield -> drawVikingNavigationAccent(palette, unit)
         PixelStyle.JiangnanWatertown -> drawJiangnanNavigationAccent(palette, unit)
         PixelStyle.CloudTown -> drawCloudTownNavigationAccent(palette, unit)
+        PixelStyle.PetCompanion -> {
+            drawRect(palette.secondary.copy(alpha = 0.62f), Offset(centerX - unit * 5f, 0f), Size(unit * 10f, unit * 0.65f))
+            drawRect(palette.primary.copy(alpha = 0.72f), Offset(centerX - unit, unit), Size(unit * 2f, unit))
+        }
     }
 }
 
@@ -1718,6 +1745,10 @@ private fun DrawScope.drawPixelIndicatorAccent(
         PixelStyle.VikingSnowfield -> drawVikingIndicatorAccent(palette, unit)
         PixelStyle.JiangnanWatertown -> drawJiangnanIndicatorAccent(palette, unit)
         PixelStyle.CloudTown -> drawCloudTownIndicatorAccent(palette, unit)
+        PixelStyle.PetCompanion -> {
+            drawRect(palette.primary.copy(alpha = 0.78f), Offset(unit * 2f, unit), Size(unit * 4f, unit))
+            drawRect(palette.secondary.copy(alpha = 0.78f), Offset(size.width - unit * 4f, unit), Size(unit * 2f, unit))
+        }
     }
 }
 

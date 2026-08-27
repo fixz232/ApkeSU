@@ -47,6 +47,7 @@ import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_MODE_OVERLAY
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_FULL
 import me.weishu.kernelsu.ui.util.BUILTIN_MOUNT_VARIANT_LITE
 import me.weishu.kernelsu.ui.util.LauncherIconOption
+import me.weishu.kernelsu.ui.util.KernelStatusEvents
 
 class SettingsViewModel(
     private val repo: SettingsRepository = SettingsRepositoryImpl()
@@ -102,6 +103,7 @@ class SettingsViewModel(
             val inkCardMotionEnabled = repo.inkCardMotionEnabled
             val pixelStyle = repo.pixelStyle
             val pixelCardMotionEnabled = repo.pixelCardMotionEnabled
+            val pixelPetEnabled = repo.pixelPetEnabled
             val uiDecorationConfig = repo.uiDecorationConfig
             val customUiDecorationPresets = repo.getCustomUiDecorationPresets()
             val recentUiDecorationComponents = repo.getRecentUiDecorationComponents()
@@ -172,6 +174,8 @@ class SettingsViewModel(
 
             val kernelUmountStatus = repo.getKernelUmountStatus()
             val isKernelUmountEnabled = repo.isKernelUmountEnabled()
+            val webViewZygoteUmountStatus = repo.getWebViewZygoteUmountStatus()
+            val isWebViewZygoteUmountEnabled = repo.isWebViewZygoteUmountEnabled()
             val selinuxHideStatus = repo.getSelinuxHideStatus()
             val isSelinuxHideEnabled = repo.isSelinuxHideEnabled()
             val sulogStatus = repo.getSulogStatus()
@@ -185,6 +189,7 @@ class SettingsViewModel(
             val kPatchNextStatus = repo.getKPatchNextStatus()
             val isEpkesuHideEnabled = repo.getEpkesuHideStatus()
             val autoJailbreak = repo.autoJailbreak
+            val useSoftReboot = repo.useSoftReboot
             val isLateLoadMode = Natives.isLateLoadMode
 
             _uiState.update {
@@ -221,6 +226,7 @@ class SettingsViewModel(
                     inkCardMotionEnabled = inkCardMotionEnabled,
                     pixelStyle = pixelStyle,
                     pixelCardMotionEnabled = pixelCardMotionEnabled,
+                    pixelPetEnabled = pixelPetEnabled,
                     uiDecorationConfig = uiDecorationConfig,
                     customUiDecorationPresets = customUiDecorationPresets,
                     recentUiDecorationComponents = recentUiDecorationComponents,
@@ -270,6 +276,8 @@ class SettingsViewModel(
                     isAdbRootEnabled = isAdbRootEnabled,
                     kernelUmountStatus = kernelUmountStatus,
                     isKernelUmountEnabled = isKernelUmountEnabled,
+                    webViewZygoteUmountStatus = webViewZygoteUmountStatus,
+                    isWebViewZygoteUmountEnabled = isWebViewZygoteUmountEnabled,
                     selinuxHideStatus = selinuxHideStatus,
                     isSelinuxHideEnabled = isSelinuxHideEnabled,
                     sulogStatus = sulogStatus,
@@ -290,17 +298,50 @@ class SettingsViewModel(
                     builtinMountCompatibility = builtinMountStatus.compatibility,
                     builtinMountLkmPurpose = builtinMountStatus.lkmPurpose,
                     builtinMountIsApkeSuRootDriver = builtinMountStatus.apkeSuRootDriver,
-                    isKPatchNextInstalled = kPatchNextStatus.installed,
-                    isKPatchNextEnabled = kPatchNextStatus.enabled,
-                    isKPatchNextPendingUpdate = kPatchNextStatus.pendingUpdate,
-                    isKPatchNextPendingRemove = kPatchNextStatus.pendingRemove,
-                    isKPatchNextWebUiAvailable = kPatchNextStatus.webUi,
-                    isKPatchNextUnresolved = kPatchNextStatus.unresolved,
-                    kPatchNextVersion = kPatchNextStatus.version,
-                    kPatchNextConflict = kPatchNextStatus.conflict,
+                    isKPatchNextInstalled = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.installed
+                    } else {
+                        it.isKPatchNextInstalled
+                    },
+                    isKPatchNextEnabled = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.enabled
+                    } else {
+                        it.isKPatchNextEnabled
+                    },
+                    isKPatchNextPendingUpdate = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.pendingUpdate
+                    } else {
+                        it.isKPatchNextPendingUpdate
+                    },
+                    isKPatchNextPendingRemove = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.pendingRemove
+                    } else {
+                        it.isKPatchNextPendingRemove
+                    },
+                    isKPatchNextWebUiAvailable = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.webUi
+                    } else {
+                        it.isKPatchNextWebUiAvailable
+                    },
+                    isKPatchNextUnresolved = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.unresolved
+                    } else {
+                        it.isKPatchNextUnresolved
+                    },
+                    kPatchNextVersion = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.version
+                    } else {
+                        it.kPatchNextVersion
+                    },
+                    kPatchNextConflict = if (kPatchNextStatus.error.isBlank()) {
+                        kPatchNextStatus.conflict
+                    } else {
+                        it.kPatchNextConflict
+                    },
                     isEpkesuHideEnabled = isEpkesuHideEnabled,
                     isLkmMode = isLkmMode,
                     autoJailbreak = autoJailbreak,
+                    useSoftReboot = useSoftReboot,
                     isLateLoadMode = isLateLoadMode,
                     runtimeModeResolved = runtimeModeResolved,
                 )
@@ -1124,6 +1165,15 @@ class SettingsViewModel(
         }
     }
 
+    fun setWebViewZygoteUmountEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (repo.setWebViewZygoteUmountEnabled(enabled)) {
+                repo.execKsudFeatureSave()
+                _uiState.update { it.copy(isWebViewZygoteUmountEnabled = enabled) }
+            }
+        }
+    }
+
     fun setSelinuxHideEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val status = repo.setSelinuxHideEnabled(enabled)
@@ -1153,6 +1203,11 @@ class SettingsViewModel(
     fun setAutoJailbreak(enabled: Boolean) {
         repo.autoJailbreak = enabled
         _uiState.update { it.copy(autoJailbreak = repo.autoJailbreak) }
+    }
+
+    fun setUseSoftReboot(enabled: Boolean) {
+        repo.useSoftReboot = enabled
+        _uiState.update { it.copy(useSoftReboot = enabled) }
     }
 
     fun setSulogEnabled(enabled: Boolean) {
@@ -1253,6 +1308,7 @@ class SettingsViewModel(
                     .getOrDefault(false)
                 runCatching { refreshKPatchNextStatus() }
                     .onFailure { Log.e(TAG, "Failed to refresh KPatch Next status", it) }
+                KernelStatusEvents.requestRefresh()
                 withContext(Dispatchers.Main) {
                     val message = when {
                         !success -> R.string.settings_kpatch_next_failed
@@ -1303,6 +1359,10 @@ class SettingsViewModel(
 
     private suspend fun refreshKPatchNextStatus() {
         val status = repo.getKPatchNextStatus()
+        if (status.error.isNotBlank()) {
+            Log.w(TAG, "KPatch Next status is unavailable: ${status.error}")
+            return
+        }
         _uiState.update {
             it.copy(
                 isKPatchNextInstalled = status.installed,

@@ -125,10 +125,10 @@ data class HomeUiState(
         }
 
     val showRequireKernelWarning: Boolean
-        get() = isManager && requiresNewKernel
+        get() = isManager && requiresNewKernel && !uapiMismatch
 
     val showUAPIMisMatchWarning: Boolean
-        get() = isManager && showRequireKernelWarning && uapiMismatch
+        get() = isManager && uapiMismatch
 
     val showRootWarning: Boolean
         get() = rootRuntimeState == RootRuntimeState.DaemonError

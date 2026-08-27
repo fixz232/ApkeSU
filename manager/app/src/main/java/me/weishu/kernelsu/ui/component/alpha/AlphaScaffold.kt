@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
@@ -337,11 +338,13 @@ fun AlphaScreen(
     tertiaryTopActionIcon: ImageVector? = null,
     onTertiaryTopActionClick: () -> Unit = {},
     tertiaryTopActionContentDescription: String? = null,
+    transparentChrome: Boolean = false,
     topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val snowStyle = isSnowStyle()
     val background = when {
+        transparentChrome -> Color.Transparent
         snowStyle -> Color.Transparent
         LocalNightBackgroundEffectActive.current -> AlphaColors.Background.copy(alpha = 0.84f)
         else -> AlphaColors.Background
@@ -379,6 +382,7 @@ fun AlphaScreen(
                     tertiaryActionIcon = tertiaryTopActionIcon,
                     onTertiaryActionClick = onTertiaryTopActionClick,
                     tertiaryActionContentDescription = tertiaryTopActionContentDescription,
+                    forceTransparent = transparentChrome,
                 )
             }
             Box(modifier = Modifier.weight(1f)) {
@@ -400,13 +404,14 @@ fun AlphaTopBar(
     tertiaryActionIcon: ImageVector? = null,
     onTertiaryActionClick: () -> Unit = {},
     tertiaryActionContentDescription: String? = null,
+    forceTransparent: Boolean = false,
 ) {
-    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
-    val topBarColor = immersiveTopBarColor(AlphaColors.TopBar)
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current || forceTransparent
+    val topBarColor = if (forceTransparent) Color.Transparent else immersiveTopBarColor(AlphaColors.TopBar)
     val dividerColor = if (immersiveBackgroundActive) Color.Transparent else AlphaColors.Divider
     val topBarElevation = if (immersiveBackgroundActive) 0.dp else 4.dp
 
-    if (isSnowStyle()) {
+    if (isSnowStyle() && !forceTransparent) {
         val snowTopBarBrush = Brush.verticalGradient(
             colors = listOf(
                 AlphaColors.TopBar.copy(alpha = if (immersiveBackgroundActive) 0.56f else 0.72f),
@@ -777,6 +782,7 @@ fun AlphaSwitch(
 fun AlphaBottomBar(
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -809,7 +815,7 @@ fun AlphaBottomBar(
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AlphaNavDestination.entries.forEachIndexed { index, destination ->
+                destinations.forEachIndexed { index, destination ->
                     AlphaNavItem(
                         destination = destination,
                         selected = selectedIndex == index,
@@ -840,7 +846,7 @@ fun AlphaBottomBar(
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AlphaNavDestination.entries.forEachIndexed { index, destination ->
+        destinations.forEachIndexed { index, destination ->
             AlphaNavItem(
                 destination = destination,
                 selected = selectedIndex == index,
@@ -853,7 +859,7 @@ fun AlphaBottomBar(
 
 @Composable
 private fun AlphaNavItem(
-    destination: AlphaNavDestination,
+    destination: MainDestination,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -924,6 +930,7 @@ private fun AlphaNavItem(
 fun AlphaNavigationRail(
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -954,7 +961,7 @@ fun AlphaNavigationRail(
             modifier = Modifier.fillMaxWidth().height(11.dp),
         )
         Spacer(modifier = Modifier.weight(1f))
-        AlphaNavDestination.entries.forEachIndexed { index, destination ->
+        destinations.forEachIndexed { index, destination ->
             AlphaRailItem(
                 destination = destination,
                 selected = selectedIndex == index,
@@ -967,7 +974,7 @@ fun AlphaNavigationRail(
 
 @Composable
 private fun AlphaRailItem(
-    destination: AlphaNavDestination,
+    destination: MainDestination,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -999,14 +1006,4 @@ private fun AlphaRailItem(
             overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-enum class AlphaNavDestination(
-    @StringRes val label: Int,
-    val icon: ImageVector,
-) {
-    Home(R.string.home, Icons.Rounded.Home),
-    SuperUser(R.string.superuser, Icons.Rounded.Security),
-    Module(R.string.module, Icons.Rounded.Extension),
-    Settings(R.string.settings, Icons.Rounded.Settings),
 }

@@ -372,16 +372,38 @@ fn verify_manager_appid(appid: u32) -> std::io::Result<()> {
 }
 
 fn set_manager_appid_sysfs(appid: u32) -> std::io::Result<()> {
-    std::fs::write(
-        "/sys/module/kernelsu/parameters/ksu_debug_manager_appid",
-        appid.to_string(),
-    )?;
+    use std::io;
 
-    verify_manager_appid(appid)
+    let mut errors = Vec::new();
+    for module_name in ["kernelsu", "apkesu"] {
+        for parameter_name in ["manager_appid", "ksu_debug_manager_appid"] {
+            let path = format!("/sys/module/{module_name}/parameters/{parameter_name}");
+            match std::fs::write(&path, appid.to_string())
+                .and_then(|()| verify_manager_appid(appid))
+            {
+                Ok(()) => return Ok(()),
+                Err(error) => errors.push(format!("{path}: {error}")),
+            }
+        }
+    }
+
+    Err(io::Error::other(format!(
+        "manager appid sysfs fallback failed: {}",
+        errors.join("; "),
+    )))
 }
 
 pub fn set_manager_appid(appid: u32) -> std::io::Result<()> {
     use std::io;
+
+    const FIRST_APPLICATION_APPID: u32 = 10_000;
+    const LAST_APPLICATION_APPID: u32 = 19_999;
+    if !(FIRST_APPLICATION_APPID..=LAST_APPLICATION_APPID).contains(&appid) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("refusing non-application manager appid {appid}"),
+        ));
+    }
 
     let ioctl_err = match set_manager_appid_ioctl(appid).and_then(|()| verify_manager_appid(appid))
     {

@@ -64,6 +64,7 @@ import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassMiuixCardColors
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.util.BlurredBar
+import me.weishu.kernelsu.ui.util.BootPatchMode
 import me.weishu.kernelsu.ui.util.LkmSelection
 import me.weishu.kernelsu.ui.util.ThemeStoreImageSlot
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
@@ -76,6 +77,8 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
@@ -102,6 +105,7 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 internal fun InstallScreenMiuix(
     uiState: InstallUiState,
     actions: InstallScreenActions,
+    snackbarHost: SnackbarHostState,
 ) {
     val enableBlur = LocalEnableBlur.current
     val scrollBehavior = MiuixScrollBehavior()
@@ -120,6 +124,12 @@ internal fun InstallScreenMiuix(
             )
         },
         popupHost = { },
+        snackbarHost = {
+            SnackbarHost(
+                state = snackbarHost,
+                modifier = Modifier.padding(bottom = 20.dp),
+            )
+        },
         contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
@@ -163,6 +173,7 @@ private fun InstallInputPanel(
         SelectInstallMethod(
             state = state,
             onSelected = actions.onSelectMethod,
+            onDownloadFile = actions.onDownloadFile,
             onSelectBootImage = actions.onSelectBootImage,
             onSelectAnyKernel = actions.onSelectAnyKernel,
         )
@@ -234,20 +245,20 @@ private fun OptionalSettingsCard(
                     onSelectPartition = actions.onSelectPartition,
                 )
             }
-            if (state.installMethod is InstallMethod.SelectFile) {
-                CheckboxPreference(
-                    title = stringResource(R.string.hidden_path_lkm_patch),
-                    summary = stringResource(R.string.hidden_path_lkm_patch_summary),
-                    checked = state.hiddenPathLkmEnabled,
-                    onCheckedChange = actions.onSetHiddenPathLkmEnabled,
+            if (state.installMethod != null && state.installMethod !is InstallMethod.AnyKernel && state.installMethod !is InstallMethod.DownloadFile) {
+                PatchModeSelector(state, actions)
+            }
+            val usesBuiltInLkm = state.installMethod !is InstallMethod.DownloadFile && state.installMethod !is InstallMethod.AnyKernel &&
+                    (state.patchMode != BootPatchMode.Normal ||
+                    state.lkmSelection !is LkmSelection.LkmUri
+                    )
+            if (usesBuiltInLkm) {
+                TargetKmiRow(
+                    state = state,
+                    onSelectKmi = actions.onSelectPatchKmi,
                 )
             }
-            if (state.installMethod is InstallMethod.SelectFile && state.hiddenPathLkmEnabled) {
-                HiddenPathLkmInfoRow(
-                    lkmSelection = state.lkmSelection,
-                    onSelectKmi = actions.onSelectHiddenPathKmi,
-                )
-            } else {
+            if (state.patchMode == BootPatchMode.Normal && state.installMethod !is InstallMethod.DownloadFile) {
                 LocalLkmFileRow(
                     lkmSelection = state.lkmSelection,
                     onUploadLkm = actions.onUploadLkm,
@@ -263,19 +274,49 @@ private fun OptionalSettingsCard(
 }
 
 @Composable
+private fun PatchModeSelector(
+    state: InstallUiState,
+    actions: InstallScreenActions,
+) {
+    CheckboxPreference(
+        title = stringResource(R.string.install_patch_mode_normal),
+        summary = stringResource(R.string.install_patch_mode_normal_summary),
+        checked = state.patchMode == BootPatchMode.Normal,
+        onCheckedChange = { actions.onSelectPatchMode(BootPatchMode.Normal) },
+    )
+    CheckboxPreference(
+        title = stringResource(R.string.install_patch_mode_hidden_path),
+        summary = stringResource(R.string.install_patch_mode_hidden_path_summary),
+        checked = state.patchMode == BootPatchMode.HiddenPath,
+        onCheckedChange = { actions.onSelectPatchMode(BootPatchMode.HiddenPath) },
+    )
+}
+
+@Composable
 private fun PartitionSelector(
     state: InstallUiState,
     onSelectPartition: (Int) -> Unit,
 ) {
+    val isDownload = state.installMethod is InstallMethod.DownloadFile
+    val partitionItems = if (isDownload) state.remoteDisplayPartitions else state.displayPartitions
+    val partitionIndex = if (isDownload) {
+        state.remotePartitionSelectionIndex
+    } else {
+        state.partitionSelectionIndex
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
     ) {
         OverlayDropdownPreference(
-            items = state.displayPartitions,
-            selectedIndex = state.partitionSelectionIndex,
-            title = "${stringResource(R.string.install_select_partition)} (${state.slotSuffix})",
+            items = partitionItems,
+            selectedIndex = partitionIndex,
+            title = if (isDownload) {
+                stringResource(R.string.install_select_partition)
+            } else {
+                "${stringResource(R.string.install_select_partition)} (${state.slotSuffix})"
+            },
             onSelectedIndexChange = onSelectPartition,
             startAction = {
                 Icon(
@@ -327,15 +368,13 @@ private fun LocalLkmFileRow(
 }
 
 @Composable
-private fun HiddenPathLkmInfoRow(
-    lkmSelection: LkmSelection,
+private fun TargetKmiRow(
+    state: InstallUiState,
     onSelectKmi: () -> Unit,
 ) {
     BasicComponent(
-        title = stringResource(id = R.string.hidden_path_lkm_builtin_title),
-        summary = (lkmSelection as? LkmSelection.PathMaskKmiString)?.let {
-            stringResource(id = R.string.hidden_path_lkm_selected_kmi, it.value)
-        } ?: stringResource(id = R.string.hidden_path_lkm_builtin_summary),
+        title = stringResource(id = R.string.install_target_kmi),
+        summary = targetKmiSummary(state),
         onClick = onSelectKmi,
         startAction = {
             Icon(
@@ -349,6 +388,16 @@ private fun HiddenPathLkmInfoRow(
             TrailingArrow()
         },
     )
+}
+
+@Composable
+private fun targetKmiSummary(state: InstallUiState): String = when (state.targetKmiSource) {
+    InstallKmiSource.Detecting -> stringResource(R.string.install_kmi_detecting)
+    InstallKmiSource.Automatic -> stringResource(R.string.install_kmi_detected, state.targetKmi)
+    InstallKmiSource.Manual -> stringResource(R.string.install_kmi_manual, state.targetKmi)
+    InstallKmiSource.CurrentDevice -> stringResource(R.string.install_kmi_current, state.targetKmi)
+    InstallKmiSource.Failed -> stringResource(R.string.install_kmi_detection_failed)
+    InstallKmiSource.None -> stringResource(R.string.install_kmi_not_selected)
 }
 
 @Composable
@@ -442,6 +491,7 @@ private fun BottomActionBar(
 private fun SelectInstallMethod(
     state: InstallUiState,
     onSelected: (InstallMethod) -> Unit,
+    onDownloadFile: () -> Unit,
     onSelectBootImage: () -> Unit,
     onSelectAnyKernel: () -> Unit,
 ) {
@@ -456,6 +506,7 @@ private fun SelectInstallMethod(
     val onClick = { option: InstallMethod ->
         when (option) {
             is InstallMethod.SelectFile -> onSelectBootImage()
+            is InstallMethod.DownloadFile -> onDownloadFile()
             is InstallMethod.DirectInstall -> onSelected(option)
             is InstallMethod.DirectInstallToInactiveSlot -> confirmDialog.showConfirm(dialogTitle, dialogContent)
             is InstallMethod.AnyKernel -> onSelectAnyKernel()

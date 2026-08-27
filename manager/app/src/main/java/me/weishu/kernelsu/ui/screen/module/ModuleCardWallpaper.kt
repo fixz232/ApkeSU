@@ -80,12 +80,17 @@ internal const val MODULE_CARD_WALLPAPER_MAX_FILE_BYTES = 24L * 1024L * 1024L
 internal const val MODULE_CARD_WALLPAPER_DEFAULT_INTERVAL_MILLIS = 5_000L
 internal const val MODULE_CARD_WALLPAPER_MIN_INTERVAL_MILLIS = 3_000L
 internal const val MODULE_CARD_WALLPAPER_MAX_INTERVAL_MILLIS = 60_000L
+internal const val KPM_CARD_WALLPAPER_ID_PREFIX = "kpm_card:"
 private const val MODULE_CARD_WALLPAPER_KEY_PREFIX = "module_card_wallpaper"
 private const val MODULE_CARD_WALLPAPER_SCHEMA_VERSION = 2
 
 internal enum class ModuleWallpaperVariant(val value: String) {
     Day("day"),
     Night("night"),
+}
+
+internal fun kpmCardWallpaperId(kpmId: String): String {
+    return KPM_CARD_WALLPAPER_ID_PREFIX + kpmId
 }
 
 internal enum class ModuleWallpaperCarouselOrder(val value: String) {

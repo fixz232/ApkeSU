@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
@@ -93,6 +94,7 @@ fun SettingsNavigationIconPreviewDialog(
 private val CustomNavigationIconSlot.fallbackIcon: ImageVector
     get() = when (this) {
         CustomNavigationIconSlot.Home -> Icons.Filled.Home
+        CustomNavigationIconSlot.Kpm -> Icons.Filled.Memory
         CustomNavigationIconSlot.Superuser -> Icons.Filled.Shield
         CustomNavigationIconSlot.Module -> Icons.Filled.Extension
         CustomNavigationIconSlot.Settings -> Icons.Filled.Settings

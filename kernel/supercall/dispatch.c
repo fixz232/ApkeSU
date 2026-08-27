@@ -328,7 +328,7 @@ static int do_set_manager_appid(void __user *arg)
         return -EFAULT;
     }
 
-    if (cmd.appid >= KSU_PER_USER_RANGE) {
+    if (!ksu_is_normal_appid(cmd.appid)) {
         pr_err("set_manager_appid: invalid appid %u\n", cmd.appid);
         return -EINVAL;
     }

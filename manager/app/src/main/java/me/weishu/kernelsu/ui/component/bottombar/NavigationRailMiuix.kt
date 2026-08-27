@@ -51,6 +51,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun NavigationRailMiuix(
     blurBackdrop: LayerBackdrop?,
     navigationBadge: NavigationBadgeState,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val mainState = LocalMainPagerState.current
@@ -70,11 +71,12 @@ fun NavigationRailMiuix(
                 modifier = modifier,
                 selectedIndex = mainState.selectedPage,
                 navigationBadge = navigationBadge,
+                destinations = destinations,
                 onSelected = mainState::animateToPage,
             )
         } else {
-            val items = BottomBarDestination.entries.map { destination ->
-                Pair(customIcons[destination.slot].displayLabel(stringResource(destination.label)), destination.icon)
+            val items = destinations.map { destination ->
+                Pair(customIcons.labelFor(destination, stringResource(destination.label)), destination.icon)
             }
             NavigationRail(
                 modifier = modifier
@@ -91,7 +93,7 @@ fun NavigationRailMiuix(
                         onClick = {
                             mainState.animateToPage(index)
                         },
-                        badge = navigationBadgeFor(index, navigationBadge),
+                        badge = navigationBadgeFor(destinations[index], navigationBadge),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -107,6 +109,7 @@ private fun MiuixCustomNavigationRail(
     modifier: Modifier,
     selectedIndex: Int,
     navigationBadge: NavigationBadgeState,
+    destinations: List<MainDestination>,
     onSelected: (Int) -> Unit,
 ) {
     val customIcons = LocalCustomNavigationIcons.current
@@ -127,12 +130,12 @@ private fun MiuixCustomNavigationRail(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.weight(1f))
-        BottomBarDestination.entries.forEachIndexed { index, destination ->
+        destinations.forEachIndexed { index, destination ->
             MiuixCustomNavigationRailItem(
                 destination = destination,
-                state = customIcons[destination.slot],
+                state = customIcons.stateFor(destination),
                 selected = selectedIndex == index,
-                badge = navigationBadgeFor(index, navigationBadge),
+                    badge = navigationBadgeFor(destination, navigationBadge),
                 onClick = { onSelected(index) },
             )
         }
@@ -142,7 +145,7 @@ private fun MiuixCustomNavigationRail(
 
 @Composable
 private fun ColumnScope.MiuixCustomNavigationRailItem(
-    destination: BottomBarDestination,
+    destination: MainDestination,
     state: CustomNavigationIconState,
     selected: Boolean,
     badge: (@Composable () -> Unit)?,

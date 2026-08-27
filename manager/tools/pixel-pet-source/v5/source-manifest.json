@@ -1,0 +1,170 @@
+﻿{
+  "version": 5,
+  "format": 3,
+  "stageCanvasSizes": [
+    16,
+    16,
+    32,
+    48
+  ],
+  "framesPerSpecies": 1600,
+  "provenance": "authored-v5-native-semantic-pixel-sheets",
+  "sources": {
+    "penguin": {
+      "egg": {
+        "image": "penguin_egg.png",
+        "imageSha256": "9e37638b8badc3d9464021ceb9d233692c87e7e726a8c005f24310f031eaa489",
+        "metadata": "penguin_egg.json",
+        "metadataSha256": "79c5d1fe4261a2f0c9303c9bc12a4b5b3045ecb94fcbc188d05320aba3847707"
+      },
+      "baby": {
+        "image": "penguin_baby.png",
+        "imageSha256": "d0b0101dc2c570d13872b1c449928e79f605835ff47b5936e5ec28ec02ebf1b3",
+        "metadata": "penguin_baby.json",
+        "metadataSha256": "fd0006a518961734a0e2f3365071c3fda68736832739a6eb4f23d2cd17686b52"
+      },
+      "young": {
+        "image": "penguin_young.png",
+        "imageSha256": "3ce6683271557fa3de05e94fb42c1db78c75b3411a8def56e35b18eb8dfe4b65",
+        "metadata": "penguin_young.json",
+        "metadataSha256": "691d4e0f9ecbe4bfcf9179263f9c93b5963251647019cb29023411679ebc2b64"
+      },
+      "adult": {
+        "image": "penguin_adult.png",
+        "imageSha256": "5b6d074a7e8f70f833f176a473dce8fdd66be88caf2540da2004089ba61e8846",
+        "metadata": "penguin_adult.json",
+        "metadataSha256": "b4d43909fac617b3c55b9dc325cdf613745df148d9c16848eb742aab8517edc0"
+      }
+    },
+    "dog": {
+      "egg": {
+        "image": "dog_egg.png",
+        "imageSha256": "05e6d65c2ff94500c8c540507616a3aed58080e0f4aad5930bd13d3765042502",
+        "metadata": "dog_egg.json",
+        "metadataSha256": "2c84390ca951e7722873a3c6eb9eddbd79fce75008672239ddf852ce293edae1"
+      },
+      "baby": {
+        "image": "dog_baby.png",
+        "imageSha256": "118eb5f1ad410f0ff07c7ced2279e1cb10be510143edd6553cc40dfef74da8d4",
+        "metadata": "dog_baby.json",
+        "metadataSha256": "6f78d2383161a9e6bd7f83bc42fa76432329b688090e7b22ef81c1d6f7ce7ef0"
+      },
+      "young": {
+        "image": "dog_young.png",
+        "imageSha256": "d0f49b8762a92c6efd702717e585ab853e906f009261631ee9947c53452a849c",
+        "metadata": "dog_young.json",
+        "metadataSha256": "c60e8cebc5ba30435921d8f63e2cb473680e41f903a40a48375ffa84c22df609"
+      },
+      "adult": {
+        "image": "dog_adult.png",
+        "imageSha256": "02f81c0be5f7def07dc66f227812f3384d35d96d79b2eb5fcecd09785b9474d9",
+        "metadata": "dog_adult.json",
+        "metadataSha256": "8307fa506f274bc782f16d746ae59cbc3e1c0c8c947ea4a1f6cd5a813ae29803"
+      }
+    },
+    "cat": {
+      "egg": {
+        "image": "cat_egg.png",
+        "imageSha256": "6a3aec02cd66d3a8dc7ccb2200a42c100d43428a75637969d54bc318590c7a10",
+        "metadata": "cat_egg.json",
+        "metadataSha256": "77f7dce0e66cc2a2aa3db626848440b62e229bef5f653631973df82fdef1700d"
+      },
+      "baby": {
+        "image": "cat_baby.png",
+        "imageSha256": "32cce5d3dd73e4c89951b4441a17cf8089ecc6c6cfedf067dc627fadb93ae7b4",
+        "metadata": "cat_baby.json",
+        "metadataSha256": "257eeebef42ec3fec6f547b4aa68baf10a34e5c5d1e366f30f15891add42d630"
+      },
+      "young": {
+        "image": "cat_young.png",
+        "imageSha256": "d0042f6585156f7575e2d7d3082280c885481e4616b0ad85827bd8697ab7ea4d",
+        "metadata": "cat_young.json",
+        "metadataSha256": "8e5c4568e89bfde49e769afc5f5bbe0287d8c1fcf9c966ecad2b9949ff8bd756"
+      },
+      "adult": {
+        "image": "cat_adult.png",
+        "imageSha256": "fabca71651f56b2abb76439284812c1f7933b1130631a29b2c8191e155013ea1",
+        "metadata": "cat_adult.json",
+        "metadataSha256": "566df58ebfdf8ebdb4ffd318793ed1e252811fd4dc6ca57ddc62d436f7955438"
+      }
+    },
+    "bird": {
+      "egg": {
+        "image": "bird_egg.png",
+        "imageSha256": "eb76a48e331e53281c2a93431090e174e8a8557b4ef4f826b880cbe09ed332c8",
+        "metadata": "bird_egg.json",
+        "metadataSha256": "43808ee89389cbbd861406fc0af6edbb708fe24a231ca7e33cf7e29eb683942c"
+      },
+      "baby": {
+        "image": "bird_baby.png",
+        "imageSha256": "a65cf818a5cfc959dde98ee297dc23074d9d961863170bd7d15e37a66a972078",
+        "metadata": "bird_baby.json",
+        "metadataSha256": "b6566341e6b4984da401372dc1f3bb54b0b40582f5361543457d428cc6b76f6a"
+      },
+      "young": {
+        "image": "bird_young.png",
+        "imageSha256": "3340311f5d53906ee257df98b181a9d3824e365ee026cb94ed862f026f8def01",
+        "metadata": "bird_young.json",
+        "metadataSha256": "1612ae2f6c4caa035b6c10427b347f1955c09033f285d640e6f1ba9aa36521f6"
+      },
+      "adult": {
+        "image": "bird_adult.png",
+        "imageSha256": "abc6f54c9eefcac52a584d1060fdc99401cfe2d5a5258f82e26964466954dc63",
+        "metadata": "bird_adult.json",
+        "metadataSha256": "8a46cc7a78bcd18810f248acf04b6855c89aa231fd79ffa491bc24a580b091e7"
+      }
+    },
+    "rabbit": {
+      "egg": {
+        "image": "rabbit_egg.png",
+        "imageSha256": "931a3b500a17074ea6ab3e7a6fad4b774862dcd935485eca65818454c14b4cfb",
+        "metadata": "rabbit_egg.json",
+        "metadataSha256": "b2a7ccf450a47b7289fb7e3f59d03c5887afec38bbac6789336188b5f2415fb7"
+      },
+      "baby": {
+        "image": "rabbit_baby.png",
+        "imageSha256": "563b9acc06ce27e4aad26ba39de80d81b8fe5d014bf24157203c987cf1649009",
+        "metadata": "rabbit_baby.json",
+        "metadataSha256": "8e68f8638b1ba1ef63e99b7475323e8d3ca38d951fad283d96069b8ba62d819a"
+      },
+      "young": {
+        "image": "rabbit_young.png",
+        "imageSha256": "2d127a2026410984b0ea027157af40291f4e1f796e96036490afd9c7456c8832",
+        "metadata": "rabbit_young.json",
+        "metadataSha256": "833b622b04e163c9500c5d211dd8b81375624fd6ba207e6687b38c240dd17961"
+      },
+      "adult": {
+        "image": "rabbit_adult.png",
+        "imageSha256": "fde0d0314af79c03decd077506786ec9c849946e546522cd8fa1beafbd39a271",
+        "metadata": "rabbit_adult.json",
+        "metadataSha256": "a1231f904ec2fe43f5e465470582a1586c22bd07f8c59b25aa587366462866d9"
+      }
+    },
+    "hamster": {
+      "egg": {
+        "image": "hamster_egg.png",
+        "imageSha256": "4cd60790e7744b271adb0f3d2a4409079491d37dec1669fdf494d85ad77b1982",
+        "metadata": "hamster_egg.json",
+        "metadataSha256": "fb154e1531897fc1edc3906a81a4d526740990e9450a844971b4318990a63b04"
+      },
+      "baby": {
+        "image": "hamster_baby.png",
+        "imageSha256": "6aff9306fee3bb4bb15aeb410d636fc9dfc8ebde88c785d2a4cfa5718a46c863",
+        "metadata": "hamster_baby.json",
+        "metadataSha256": "97666ec71df6e09da7fa0066943620b2e3a2675d1e9e351bd4fce017757bee63"
+      },
+      "young": {
+        "image": "hamster_young.png",
+        "imageSha256": "b944d9aa0475b7cd376cc5f6bdfe467b0f006dc199873e0d6f7120fa9a77916e",
+        "metadata": "hamster_young.json",
+        "metadataSha256": "d851cccb112585779b6ae05892ce462bd9789563961cb0d3a5836cd59ebbf2ea"
+      },
+      "adult": {
+        "image": "hamster_adult.png",
+        "imageSha256": "23ca8c78baa6136587ec7c36a9ebb12c6678ce7df73dd6b934e4584034e1faa3",
+        "metadata": "hamster_adult.json",
+        "metadataSha256": "31a6aad24fe786975b0954bdbc6d6e6859caf66944ca58e8f1600e51b6035056"
+      }
+    }
+  }
+}

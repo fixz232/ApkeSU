@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +14,7 @@ import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import me.weishu.kernelsu.ui.resolveRealtimeBlurEnabled
 import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.GLOBAL_SCROLL_EFFECT_ENABLED_KEY
@@ -103,7 +105,7 @@ class MainActivityViewModel(
 
     private val _uiState = MutableStateFlow(readUiStateSafely())
     val uiState: StateFlow<MainActivityUiState> = _uiState.asStateFlow()
-    val selectedMainPage: StateFlow<Int> = mainPageState.selectedPage
+    val selectedMainDestination: StateFlow<MainDestination> = mainPageState.selectedDestination
 
     init {
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -114,8 +116,8 @@ class MainActivityViewModel(
         super.onCleared()
     }
 
-    fun setSelectedMainPage(page: Int) {
-        mainPageState.updateSelectedPage(page)
+    fun setSelectedMainDestination(destination: MainDestination) {
+        mainPageState.updateSelectedDestination(destination)
     }
 
     private fun readUiStateSafely(): MainActivityUiState {
@@ -331,21 +333,35 @@ class MainActivityViewModel(
     }
 }
 
+private const val SELECTED_MAIN_DESTINATION_KEY = "selected_main_destination"
 private const val SELECTED_MAIN_PAGE_KEY = "selected_main_page"
 
 private class MainPageState(
     private val savedStateHandle: SavedStateHandle,
 ) {
-    val selectedPage: StateFlow<Int> = savedStateHandle.getStateFlow(SELECTED_MAIN_PAGE_KEY, 0)
+    private val initialDestination = savedStateHandle
+        .get<String>(SELECTED_MAIN_DESTINATION_KEY)
+        ?.let(::mainDestinationFromStorage)
+        ?: mainDestinationFromLegacyPage(savedStateHandle[SELECTED_MAIN_PAGE_KEY] ?: 0)
 
-    fun updateSelectedPage(page: Int) {
-        savedStateHandle[SELECTED_MAIN_PAGE_KEY] = MainPagerConfig.coercePage(page)
+    private val _selectedDestination = kotlinx.coroutines.flow.MutableStateFlow(initialDestination)
+    val selectedDestination: StateFlow<MainDestination> = _selectedDestination.asStateFlow()
+
+    fun updateSelectedDestination(destination: MainDestination) {
+        savedStateHandle[SELECTED_MAIN_DESTINATION_KEY] = destination.name
+        _selectedDestination.value = destination
     }
 }
 
-object MainPagerConfig {
-    const val PAGE_COUNT = 4
-    const val LAST_PAGE_INDEX = PAGE_COUNT - 1
+private fun mainDestinationFromStorage(value: String): MainDestination? {
+    return MainDestination.entries.firstOrNull { it.name == value }
+}
 
-    fun coercePage(page: Int): Int = page.coerceIn(0, LAST_PAGE_INDEX)
+private fun mainDestinationFromLegacyPage(page: Int): MainDestination {
+    return when (page) {
+        1 -> MainDestination.SuperUser
+        2 -> MainDestination.Module
+        3 -> MainDestination.Settings
+        else -> MainDestination.Home
+    }
 }

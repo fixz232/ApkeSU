@@ -27,6 +27,7 @@ internal enum class PixelCardPattern {
     VikingSnowfield,
     JiangnanWatertown,
     CloudTown,
+    PetCompanion,
 }
 
 internal fun DrawScope.drawPixelCardPattern(
@@ -145,6 +146,10 @@ internal fun DrawScope.drawPixelCardPatternUnderlay(
                 centerColor = highlightColor,
             )
         }
+
+        // The companion card has its own habitat canvas. Decorative pixels on
+        // every ordinary UI card make that stage read like a stale overlay.
+        PixelCardPattern.PetCompanion -> Unit
 
         PixelCardPattern.StarVoyage -> {
             val points = listOf(
@@ -416,6 +421,7 @@ internal fun DrawScope.drawPixelCardPatternOverlay(
     shadow: Color,
     alpha: Float = 1f,
 ) {
+    if (pattern == PixelCardPattern.PetCompanion) return
     val safeInset = pixelCardOverlayInset(unit, size.width, size.height)
     inset(safeInset, safeInset, safeInset, safeInset) {
         drawPixelCardDepthFrame(
@@ -475,7 +481,7 @@ private fun DrawScope.drawPixelCardTopDecoration(
     shadow: Color,
     alpha: Float,
 ) {
-    if (pattern == PixelCardPattern.Generic) return
+    if (pattern == PixelCardPattern.Generic || pattern == PixelCardPattern.PetCompanion) return
     val availableTopHeight = pixelCardTopDecorationHeight(unit, size.width, size.height)
     if (availableTopHeight == 0f) return
     val verticalScale = pixelCardTopDecorationScale(unit, availableTopHeight)
@@ -512,7 +518,9 @@ private fun DrawScope.drawPixelCardTopDecorationContent(
     alpha: Float,
 ) {
     when (pattern) {
-        PixelCardPattern.Generic -> Unit
+        PixelCardPattern.Generic,
+        PixelCardPattern.PetCompanion,
+        -> Unit
         PixelCardPattern.Handheld -> {
             drawRect(shadowColor, Offset(size.width * 0.36f, 0f), Size(size.width * 0.28f, unit * 0.7f))
             drawRect(

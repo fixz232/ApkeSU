@@ -55,6 +55,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -96,6 +97,7 @@ import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.ui.component.AutoHidingNavigationBar
+import me.weishu.kernelsu.ui.component.LocalBackgroundScrollFollowState
 import me.weishu.kernelsu.ui.component.backgroundScrollFollowController
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.preloadCustomPageBackgroundImages
@@ -117,7 +119,9 @@ import me.weishu.kernelsu.ui.component.rememberNavigationBarVisibilityState
 import me.weishu.kernelsu.ui.component.StartupAnimationOverlay
 import me.weishu.kernelsu.ui.component.SwitchStyle
 import me.weishu.kernelsu.ui.component.bottombar.BottomBar
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import me.weishu.kernelsu.ui.component.bottombar.MainPagerState
+import me.weishu.kernelsu.ui.component.bottombar.mainDestinations
 import me.weishu.kernelsu.ui.component.bottombar.NavigationBadgeState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
@@ -133,12 +137,14 @@ import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
+import me.weishu.kernelsu.ui.component.pixel.LocalPixelPetState
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionEnabled
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionProgress
 import me.weishu.kernelsu.ui.component.pixel.PixelBackdrop
 import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.rememberPixelCardMotionProgress
+import me.weishu.kernelsu.ui.component.pixel.rememberPixelPetState
 import me.weishu.kernelsu.ui.component.ink.InkBackdrop
 import me.weishu.kernelsu.ui.component.ink.InkChromeOverlay
 import me.weishu.kernelsu.ui.component.ink.InkStyle
@@ -165,6 +171,7 @@ import me.weishu.kernelsu.ui.component.snow.SeasonChromeOverlay
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyleWallpaper
 import me.weishu.kernelsu.ui.component.snow.rememberSeasonCardMotionProgress
+import me.weishu.kernelsu.ui.component.calculateContinuousPagerPagePosition
 import me.weishu.kernelsu.ui.component.globalScrollEffectController
 import me.weishu.kernelsu.ui.component.rememberBackgroundScrollFollowState
 import me.weishu.kernelsu.ui.component.rememberGlobalScrollEffectState
@@ -203,6 +210,11 @@ import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.ImageToolScreen
+import me.weishu.kernelsu.ui.screen.settings.KpmScreen
+import me.weishu.kernelsu.ui.screen.settings.PixelPetScreen
+import me.weishu.kernelsu.ui.screen.settings.PixelPetChatScreen
+import me.weishu.kernelsu.ui.screen.settings.PixelPetHabitatScreen
+import me.weishu.kernelsu.ui.screen.settings.PixelPetSpriteStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
@@ -259,6 +271,8 @@ import me.weishu.kernelsu.ui.util.ManagerUpdateInfo
 import me.weishu.kernelsu.ui.util.ensureManagerRegistered
 import me.weishu.kernelsu.ui.util.getFileName
 import me.weishu.kernelsu.ui.util.getSuperuserCount
+import me.weishu.kernelsu.ui.util.getKPatchNextStatus
+import me.weishu.kernelsu.ui.util.KPatchNextStatus
 import me.weishu.kernelsu.ui.util.install
 import me.weishu.kernelsu.ui.util.ksuRootAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
@@ -267,7 +281,6 @@ import me.weishu.kernelsu.ui.util.rootAvailable
 import me.weishu.kernelsu.ui.util.StartupSoundPlayer
 import me.weishu.kernelsu.ui.viewmodel.MainActivityUiState
 import me.weishu.kernelsu.ui.viewmodel.MainActivityViewModel
-import me.weishu.kernelsu.ui.viewmodel.MainPagerConfig
 import me.weishu.kernelsu.ui.viewmodel.ModuleViewModel
 import me.weishu.kernelsu.ui.webui.WebUIActivity
 import me.weishu.kernelsu.ui.util.CustomBackgroundState
@@ -365,7 +378,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel = viewModel<MainActivityViewModel>()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            val selectedMainPage by viewModel.selectedMainPage.collectAsStateWithLifecycle()
+            val selectedMainDestination by viewModel.selectedMainDestination.collectAsStateWithLifecycle()
             val managerReady by managerReadyState.collectAsStateWithLifecycle()
             val appSettings = uiState.appSettings
             val uiMode = uiState.uiMode
@@ -406,6 +419,7 @@ class MainActivity : ComponentActivity() {
             val pixelCardMotionProgress = rememberPixelCardMotionProgress(
                 enabled = pixelInterfaceActive && uiState.pixelCardMotionEnabled,
             )
+            val pixelPetState = rememberPixelPetState()
             val darkMode = resolveEffectiveDarkMode(
                 colorMode = appSettings.colorMode,
                 systemDark = isSystemInDarkTheme(),
@@ -450,7 +464,7 @@ class MainActivity : ComponentActivity() {
 
             val navigator = rememberNavigator(Route.Main)
             val currentRoute = navigator.current() as? Route
-            val uiDecorationScope = resolveUiDecorationScope(currentRoute, selectedMainPage)
+            val uiDecorationScope = resolveUiDecorationScope(currentRoute, selectedMainDestination)
             val systemDensity = LocalDensity.current
             val density = remember(systemDensity, uiState.pageScale, uiState.fontScale) {
                 Density(
@@ -499,6 +513,7 @@ class MainActivity : ComponentActivity() {
                     ),
                 LocalInkCardMotionProgress provides inkCardMotionProgress,
                 LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
+                LocalPixelPetState provides pixelPetState.value,
                 LocalPixelCardMotionEnabled provides (
                     pixelInterfaceActive && uiState.pixelCardMotionEnabled
                     ),
@@ -524,10 +539,21 @@ class MainActivity : ComponentActivity() {
                     ManagerUpdatePrompt()
                     ZipFileIntentHandler(intentState = intentState, isManager = managerReady)
                     ShortcutIntentHandler(intentState = intentState)
+                    val mainPagerPageCount = remember { mutableIntStateOf(4) }
+                    val mainPagerState = rememberMainPagerState(
+                        pagerState = rememberPagerState(
+                            initialPage = mainDestinations(kpmActive = false)
+                                .indexOf(selectedMainDestination)
+                                .coerceAtLeast(0),
+                            pageCount = { mainPagerPageCount.intValue },
+                        ),
+                        pageCountState = mainPagerPageCount,
+                        restoredDestination = selectedMainDestination,
+                    )
                     val mainScreenEntry = @Composable {
                         MainScreen(
-                            initialPage = selectedMainPage,
-                            onPageChanged = viewModel::setSelectedMainPage,
+                            onDestinationChanged = viewModel::setSelectedMainDestination,
+                            mainPagerState = mainPagerState,
                         )
                     }
 
@@ -590,6 +616,11 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.CpuSpoof> { CpuSpoofScreen() }
                                 entry<Route.DeviceIdentity> { DeviceIdentityScreen() }
                                 entry<Route.GraphicsRenderer> { GraphicsRendererScreen() }
+                                entry<Route.Kpm> { KpmScreen() }
+                                entry<Route.PixelPet> { PixelPetScreen() }
+                                entry<Route.PixelPetHabitat> { PixelPetHabitatScreen() }
+                                entry<Route.PixelPetChat> { PixelPetChatScreen() }
+                                entry<Route.PixelPetSpriteStudio> { PixelPetSpriteStudioScreen() }
                                 entry<Route.ImageTool> { ImageToolScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }
@@ -619,7 +650,14 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.ModuleTools> { ModuleToolsScreen() }
                                 entry<Route.ModuleWallpaperBackup> { ModuleWallpaperBackupScreen() }
                                 entry<Route.ModuleWallpaperEditor> { key ->
-                                    ModuleWallpaperEditorScreen(key.moduleId)
+                                    ModuleWallpaperEditorScreen(
+                                        moduleId = key.moduleId,
+                                        displayName = key.displayName,
+                                        displayAuthor = key.displayAuthor,
+                                        displayVersion = key.displayVersion,
+                                        displayDescription = key.displayDescription,
+                                        allowBatch = key.allowBatch,
+                                    )
                                 }
                                 entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
                                 entry<Route.TemplateEditor> { key -> TemplateEditorScreen(key.template, key.readOnly) }
@@ -646,6 +684,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     val globalGlassBackdrop = rememberBlurBackdrop(effectiveEnableBlur)
+                    // KPM owns an Android WebView. During a route transition the old
+                    // MainScreen can remain composed briefly, so keep it out of the
+                    // global backdrop even after SettingsCategory becomes current.
+                    val kpmWebViewSurfaceActive = currentRoute == Route.Kpm || mainPagerState.kpmActive
                     var routeInitialized by remember { mutableStateOf(false) }
                     var navigationTransitionActive by remember { mutableStateOf(false) }
                     LaunchedEffect(currentRoute) {
@@ -657,7 +699,17 @@ class MainActivity : ComponentActivity() {
                             navigationTransitionActive = false
                         }
                     }
-                    val effectiveBackground = uiState.effectiveCustomBackground(selectedMainPage, currentRoute)
+                    val effectiveBackground = uiState.effectiveCustomBackground(
+                        mainPagerState.destinationForPage(),
+                        currentRoute,
+                    )
+                    val pagerBackgrounds = if (
+                        uiState.backgroundScrollFollowEnabled && currentRoute.hostsMainPager()
+                    ) {
+                        uiState.mainPagerBackgrounds(mainPagerState.kpmActive)
+                    } else {
+                        emptyList()
+                    }
                     LaunchedEffect(uiState.customPageBackgrounds) {
                         preloadCustomPageBackgroundImages(
                             context = applicationContext,
@@ -687,7 +739,8 @@ class MainActivity : ComponentActivity() {
                     )
                     val backgroundScrollFollowState = rememberBackgroundScrollFollowState(
                         enabled = uiState.backgroundScrollFollowEnabled && !navigationTransitionActive,
-                        resetKey = selectedMainPage to currentRoute,
+                        resetKey = currentRoute,
+                        horizontalPagerDriven = true,
                     )
 
                     Box(
@@ -707,9 +760,18 @@ class MainActivity : ComponentActivity() {
                             passthroughEnabled = uiState.customWallpaperPassthroughEnabled,
                             passthroughOpacity = uiState.customWallpaperPassthroughOpacity,
                             backgroundScrollFollowState = backgroundScrollFollowState,
+                            pagerBackgrounds = pagerBackgrounds,
+                            horizontalPagerPosition = {
+                                calculateContinuousPagerPagePosition(
+                                    currentPage = mainPagerState.pagerState.currentPage,
+                                    currentPageOffsetFraction =
+                                        mainPagerState.pagerState.currentPageOffsetFraction,
+                                )
+                            },
                         ) {
                             CompositionLocalProvider(
                                 LocalImmersiveBackgroundActive provides immersiveBackgroundActive,
+                                LocalBackgroundScrollFollowState provides backgroundScrollFollowState,
                             ) {
                                 Box(modifier = Modifier.fillMaxSize()) {
                                     if (seasonalStyleActive && !hasCustomBackground) {
@@ -743,7 +805,7 @@ class MainActivity : ComponentActivity() {
                                                 .fillMaxSize()
                                                 .customClickSound(clickSoundUri, clickSoundVolume)
                                                 .then(
-                                                    if (globalGlassBackdrop != null) {
+                                                    if (globalGlassBackdrop != null && !kpmWebViewSurfaceActive) {
                                                         Modifier.layerBackdrop(globalGlassBackdrop)
                                                     } else {
                                                         Modifier
@@ -836,7 +898,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private fun MainActivityUiState.effectiveCustomBackground(
-    mainPage: Int,
+    mainDestination: MainDestination,
     currentRoute: Route?,
 ): CustomBackgroundState {
     val routeBackground = when (currentRoute) {
@@ -847,13 +909,30 @@ private fun MainActivityUiState.effectiveCustomBackground(
         return routeBackground
     }
 
-    val pageBackground = CustomPageBackgroundTarget.fromMainPageIndex(mainPage)
-        ?.let { customPageBackgrounds[it] }
-        ?.takeIf { it.hasMedia }
-    if (pageBackground != null) {
-        return pageBackground
-    }
+    return customBackgroundForMainDestination(mainDestination)
+}
 
+private fun MainActivityUiState.mainPagerBackgrounds(kpmActive: Boolean): List<CustomBackgroundState> {
+    return mainDestinations(kpmActive).map(::customBackgroundForMainDestination)
+}
+
+private fun MainActivityUiState.customBackgroundForMainDestination(
+    destination: MainDestination,
+): CustomBackgroundState {
+    val target = when (destination) {
+        MainDestination.Home -> CustomPageBackgroundTarget.Home
+        MainDestination.SuperUser -> CustomPageBackgroundTarget.Superuser
+        MainDestination.Module -> CustomPageBackgroundTarget.Module
+        MainDestination.Settings -> CustomPageBackgroundTarget.Settings
+        MainDestination.Kpm -> CustomPageBackgroundTarget.Kpm
+    }
+    return target
+        .let { customPageBackgrounds[it] }
+        .takeIf { it.hasMedia }
+        ?: globalCustomBackground()
+}
+
+private fun MainActivityUiState.globalCustomBackground(): CustomBackgroundState {
     return CustomBackgroundState(
         wallpaperUriString = customWallpaperUri,
         videoUriString = customVideoBackgroundUri,
@@ -863,6 +942,14 @@ private fun MainActivityUiState.effectiveCustomBackground(
         videoFrameRate = customVideoBackgroundFrameRate,
         visualSettings = customWallpaperVisualSettings,
     )
+}
+
+private fun Route?.hostsMainPager(): Boolean {
+    return this == Route.Main ||
+        this == Route.Home ||
+        this == Route.SuperUser ||
+        this == Route.Module ||
+        this == Route.Settings
 }
 
 @Composable
@@ -1046,18 +1133,21 @@ private fun stableNavPopTransitionContentTransform(): ContentTransform {
 
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> { error("LocalMainPagerState not provided") }
 
-private fun resolveUiDecorationScope(route: Route?, selectedMainPage: Int): UiDecorationScope {
+private fun resolveUiDecorationScope(
+    route: Route?,
+    selectedMainDestination: MainDestination,
+): UiDecorationScope {
     return when (route) {
         Route.Home -> UiDecorationScope.Home
         Route.SuperUser -> UiDecorationScope.SuperUser
         Route.Module -> UiDecorationScope.Modules
         Route.Settings -> UiDecorationScope.Settings
-        Route.Main -> when (selectedMainPage) {
-            0 -> UiDecorationScope.Home
-            1 -> UiDecorationScope.SuperUser
-            2 -> UiDecorationScope.Modules
-            3 -> UiDecorationScope.Settings
-            else -> UiDecorationScope.Secondary
+        Route.Main -> when (selectedMainDestination) {
+            MainDestination.Home -> UiDecorationScope.Home
+            MainDestination.SuperUser -> UiDecorationScope.SuperUser
+            MainDestination.Module -> UiDecorationScope.Modules
+            MainDestination.Settings -> UiDecorationScope.Settings
+            MainDestination.Kpm -> UiDecorationScope.Secondary
         }
         else -> UiDecorationScope.Secondary
     }
@@ -1066,8 +1156,8 @@ private fun resolveUiDecorationScope(route: Route?, selectedMainPage: Int): UiDe
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun MainScreen(
-    initialPage: Int = 0,
-    onPageChanged: (Int) -> Unit = {},
+    onDestinationChanged: (MainDestination) -> Unit = {},
+    mainPagerState: MainPagerState,
 ) {
     val navController = LocalNavigator.current
     val enableBlur = LocalEnableBlur.current
@@ -1083,10 +1173,10 @@ fun MainScreen(
     val pixelStyle = LocalPixelStyle.current
     val systemAnimationsEnabled = rememberSystemAnimationsEnabled()
     val refreshTick by KernelStatusEvents.refreshTick.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { MainPagerConfig.PAGE_COUNT })
-    val mainPagerState = rememberMainPagerState(pagerState)
+    val pagerState = mainPagerState.pagerState
     val fullFeaturedResult by produceState<Boolean?>(initialValue = null, refreshTick) {
-        value = null
+        // Keep the last confirmed value while the refresh probe is running. Writing
+        // null here creates a transient false state that can remove the KPM page.
         val fullFeatured = kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching { Natives.refreshInfo() }
             val managerRegistered = runCatching {
@@ -1110,7 +1200,31 @@ fun MainScreen(
         value = fullFeatured
     }
     val isFullFeatured = fullFeaturedResult == true
-    val userScrollEnabled = isFullFeatured
+    val userScrollEnabled = mainPagerState.fullFeatured
+    val kpmPageActiveResult by produceState<KpmPageAvailability>(
+        initialValue = KpmPageAvailability.Unknown,
+        fullFeaturedResult,
+        refreshTick,
+    ) {
+        value = when (fullFeaturedResult) {
+            // A full-feature probe can briefly fail while manager registration or
+            // the root shell is being refreshed. Keep the committed pager topology
+            // until KPatch-Next itself reports a confirmed inactive state.
+            false -> KpmPageAvailability.Unknown
+            true -> kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { getKPatchNextStatus() }
+                    .fold(
+                        onSuccess = KpmPageAvailability::fromStatus,
+                        onFailure = { KpmPageAvailability.Unknown },
+                    )
+            }
+            null -> KpmPageAvailability.Unknown
+        }
+    }
+    // The pager owns the committed page topology. The async probe only feeds it;
+    // using the probe result directly here can render a page with the old index
+    // while the pager is still reconfiguring its page count.
+    val kpmPageActive = mainPagerState.kpmActive
     val moduleViewModel = viewModel<ModuleViewModel>()
     val moduleUiState by moduleViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(isFullFeatured) {
@@ -1131,8 +1245,7 @@ fun MainScreen(
     val navigationBadge = if (isFullFeatured) {
         NavigationBadgeState(
             superuserCount = superuserCount,
-            moduleEnabledCount = moduleUiState.moduleList.count { it.enabled },
-            moduleUpdatableCount = moduleUiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
+            moduleCount = moduleUiState.modules.size,
         )
     } else {
         NavigationBadgeState()
@@ -1150,16 +1263,14 @@ fun MainScreen(
 
     val settledPage = mainPagerState.pagerState.settledPage
     LaunchedEffect(settledPage) {
-        onPageChanged(settledPage)
-    }
-
-    val currentPage = mainPagerState.pagerState.currentPage
-    LaunchedEffect(currentPage) {
-        mainPagerState.syncPage()
+        onDestinationChanged(mainPagerState.syncSettledPage(settledPage))
     }
 
     LaunchedEffect(fullFeaturedResult) {
         mainPagerState.updateFeatureAvailability(fullFeaturedResult)
+    }
+    LaunchedEffect(kpmPageActiveResult) {
+        mainPagerState.updateKpmAvailability(kpmPageActiveResult.asBooleanOrNull())
     }
 
     MainScreenBackHandler(mainPagerState, navController)
@@ -1186,17 +1297,34 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (blurBackdrop != null) Modifier.layerBackdrop(blurBackdrop) else Modifier),
+                    .then(
+                        // A pager can retain nearby pages. Do not let the global
+                        // backdrop sample a retained KPM WebView on any page.
+                        if (blurBackdrop != null && !kpmPageActive) {
+                            Modifier.layerBackdrop(blurBackdrop)
+                        } else {
+                            Modifier
+                        }
+                    ),
             ) {
                 HorizontalPager(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (floatingBarBackdrop != null) Modifier.layerBackdrop(floatingBarBackdrop) else Modifier),
+                        .then(
+                            if (floatingBarBackdrop != null && !kpmPageActive) {
+                                Modifier.layerBackdrop(floatingBarBackdrop)
+                            } else {
+                                Modifier
+                            }
+                        ),
                     state = mainPagerState.pagerState,
                     beyondViewportPageCount = if (contentReady) 3 else 0,
+                    overscrollEffect = null,
                     userScrollEnabled = userScrollEnabled,
                 ) { page ->
                     val isCurrentPage = page == settledPage
+                    val destination = mainDestinations(kpmPageActive).getOrNull(page)
+                    val containsKpmWebView = destination == MainDestination.Kpm
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -1208,6 +1336,7 @@ fun MainScreen(
                                 inkStyle = inkStyle,
                                 pixelStyle = pixelStyle,
                                 animationsEnabled = systemAnimationsEnabled,
+                                containsEmbeddedAndroidView = containsKpmWebView,
                                 pageOffset = {
                                     page - (
                                         mainPagerState.pagerState.currentPage +
@@ -1216,18 +1345,40 @@ fun MainScreen(
                                 },
                             ),
                     ) {
-                        when (page) {
-                            0 -> if (isCurrentPage || contentReady) HomePager(navController, bottomInnerPadding, isCurrentPage)
-                            1 -> if (isCurrentPage || contentReady) {
-                                SuperUserPager(
+                        if (isCurrentPage || contentReady) {
+                            when (destination) {
+                                MainDestination.Home -> HomePager(
+                                    navController,
+                                    bottomInnerPadding,
+                                    isCurrentPage,
+                                )
+
+                                MainDestination.Kpm -> KpmScreen(
+                                    inPager = true,
+                                    bottomInnerPadding = bottomInnerPadding,
+                                )
+
+                                MainDestination.SuperUser -> SuperUserPager(
                                     navigator = navController,
                                     bottomInnerPadding = bottomInnerPadding,
                                     isCurrentPage = isCurrentPage,
-                                    onOpenSecondary = { onPageChanged(1) },
+                                    onOpenSecondary = {
+                                        onDestinationChanged(MainDestination.SuperUser)
+                                    },
                                 )
+
+                                MainDestination.Module -> ModulePager(
+                                    bottomInnerPadding,
+                                    isCurrentPage,
+                                )
+
+                                MainDestination.Settings -> SettingPager(
+                                    navController,
+                                    bottomInnerPadding,
+                                )
+
+                                null -> Unit
                             }
-                            2 -> if (isCurrentPage || contentReady) ModulePager(bottomInnerPadding, isCurrentPage)
-                            3 -> if (isCurrentPage || contentReady) SettingPager(navController, bottomInnerPadding)
                         }
                     }
                 }
@@ -1308,8 +1459,43 @@ internal fun resolveMainContentBottomPadding(
     return maxOf(scaffoldPadding, floatingBarClearance)
 }
 
-internal fun shouldReturnMainPagerBackToHome(selectedPage: Int): Boolean =
-    selectedPage in 2 until MainPagerConfig.PAGE_COUNT
+internal enum class KpmPageAvailability {
+    Active,
+    Inactive,
+    Unknown;
+
+    fun asBooleanOrNull(): Boolean? = when (this) {
+        Active -> true
+        Inactive -> false
+        Unknown -> null
+    }
+
+    companion object {
+        fun fromStatus(status: KPatchNextStatus): KpmPageAvailability {
+            if (status.error.isNotBlank()) return Unknown
+            return if (shouldShowKpmPage(status)) Active else Inactive
+        }
+    }
+}
+
+internal fun shouldShowKpmPage(status: KPatchNextStatus?): Boolean {
+    return status?.let {
+        it.error.isBlank() && it.installed && it.enabled && !it.pendingRemove
+    } == true
+}
+
+internal fun shouldReturnMainPagerBackToHome(
+    selectedPage: Int,
+    kpmActive: Boolean = false,
+): Boolean {
+    return when (mainDestinations(kpmActive).getOrNull(selectedPage)) {
+        MainDestination.Kpm,
+        MainDestination.Module,
+        MainDestination.Settings,
+        -> true
+        else -> false
+    }
+}
 
 
 @Composable
@@ -1321,7 +1507,10 @@ private fun MainScreenBackHandler(
         derivedStateOf {
             navController.current() is Route.Main &&
                 navController.backStackSize() == 1 &&
-                shouldReturnMainPagerBackToHome(mainState.selectedPage)
+                shouldReturnMainPagerBackToHome(
+                    selectedPage = mainState.selectedPage,
+                    kpmActive = mainState.kpmActive,
+                )
         }
     }
 

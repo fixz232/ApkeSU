@@ -21,13 +21,21 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.parcelize.Parcelize
 import me.weishu.kernelsu.BuildConfig
 import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.core.tasks.BootKernelVersion
+import me.weishu.kernelsu.core.tasks.ExtractImage
+import me.weishu.kernelsu.core.tasks.ProbeResult
+import me.weishu.kernelsu.core.utils.DataSourceChannel
 import me.weishu.kernelsu.ksuApp
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -41,6 +49,8 @@ private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
 const val CPU_SPOOF_PROPERTY_VALUE_LIMIT = 91
 private val managerRegistrationLock = Any()
 private const val MANAGER_REGISTRATION_RETRY_MILLIS = 30_000L
+private const val FIRST_APPLICATION_APPID = 10_000
+private const val LAST_APPLICATION_APPID = 19_999
 private var lastManagerRegistrationFailureKey: String? = null
 private var lastManagerRegistrationFailureAt = 0L
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
@@ -73,7 +83,11 @@ private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
 }
 
-data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) {
+data class FlashResult(
+    val code: Int,
+    val err: String,
+    val showReboot: Boolean,
+) {
     constructor(result: Shell.Result, showReboot: Boolean) : this(result.code, result.err.joinToString("\n"), showReboot)
     constructor(result: Shell.Result) : this(result, result.isSuccess)
 }
@@ -115,6 +129,50 @@ data class KPatchNextStatus(
     val dataDir: Boolean = false,
     val builtinAvailable: Boolean = false,
     val conflict: String? = null,
+    val error: String = "",
+)
+
+data class KpmCaps(
+    val backend: String = "kpatch-next",
+    val managementAvailable: Boolean = false,
+    val supported: Boolean = false,
+    val kernelSupported: Boolean = false,
+    val policyEnabled: Boolean = true,
+    val lateLoad: Boolean = false,
+    val abiVersion: Int = 0,
+    val capabilities: Int = 0,
+    val maxImageSize: Long = 0,
+    val maxLoaded: Int = 0,
+    val disabledReason: String = "",
+    val error: String = "",
+)
+
+data class KpmEntry(
+    val id: String,
+    val name: String = "",
+    val version: String = "",
+    val license: String = "",
+    val author: String = "",
+    val description: String = "",
+    val args: String = "",
+    val enabled: Boolean = false,
+    val loaded: Boolean = false,
+    val quarantined: Boolean = false,
+    val quarantineReason: String = "",
+    val sourceName: String = "",
+    val importedAt: String = "",
+    val error: String = "",
+)
+
+data class KpmCommandResult(
+    val success: Boolean,
+    val output: String = "",
+    val error: String = "",
+)
+
+data class KpmExcludedApp(
+    val packageName: String,
+    val uid: Int,
 )
 
 data class EpkesuHideStatus(
@@ -172,7 +230,22 @@ data class HiddenPathConfigState(
     val resolvedCount: String = "",
     val activeTargetPaths: String = "",
     val lastLog: String = "",
+    val resolvedAppUids: List<String> = emptyList(),
+    val unresolvedAppPackages: List<String> = emptyList(),
 )
+
+data class HiddenPathConfigReadResult(
+    val config: HiddenPathConfigState? = null,
+    val error: String = "",
+)
+
+internal fun HiddenPathConfigState.editableEquals(other: HiddenPathConfigState): Boolean {
+    return targetPaths == other.targetPaths &&
+        appPackages == other.appPackages &&
+        useAppScope == other.useAppScope &&
+        hideDirents == other.hideDirents &&
+        hideIsolated == other.hideIsolated
+}
 
 data class HiddenPathVisibilityResult(
     val uid: Int = -1,
@@ -535,7 +608,7 @@ fun setBuiltinMountVariant(variant: String): Boolean {
 
 suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext KPatchNextStatus()
+        return@withContext KPatchNextStatus(error = "Root shell is unavailable")
     }
 
     runCatching {
@@ -551,12 +624,15 @@ suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO
         if (result == null) {
             Log.w(TAG, "kpatch-next status timed out")
             KsuCli.reset()
-            return@runCatching KPatchNextStatus()
+            return@runCatching KPatchNextStatus(error = "KPatch-Next status timed out")
         }
 
         if (!result.isSuccess) {
-            Log.w(TAG, "kpatch-next status failed: ${stderr.joinToString("\n")}")
-            return@runCatching KPatchNextStatus()
+            val error = stderr.joinToString("\n").trim().ifBlank {
+                "KPatch-Next status command failed"
+            }
+            Log.w(TAG, "kpatch-next status failed: $error")
+            return@runCatching KPatchNextStatus(error = error)
         }
 
         val obj = JSONObject(stdout.joinToString("\n"))
@@ -579,13 +655,209 @@ suspend fun getKPatchNextStatus(): KPatchNextStatus = withContext(Dispatchers.IO
     }.getOrElse {
         Log.w(TAG, "kpatch-next status unavailable", it)
         KsuCli.reset()
-        KPatchNextStatus()
+        KPatchNextStatus(
+            error = it.message.orEmpty().ifBlank { "KPatch-Next status is unavailable" },
+        )
     }
 }
 
 fun setKPatchNextEnabled(enabled: Boolean): Boolean {
     val command = if (enabled) "enable" else "disable"
     return execKsud("kpatch-next $command", true)
+}
+
+private data class KsudCommandOutput(
+    val success: Boolean,
+    val code: Int,
+    val stdout: String,
+    val stderr: String,
+)
+
+private suspend fun runKsudCommandWithOutput(
+    args: String,
+    timeoutMillis: Long = SHELL_JOB_TIMEOUT_MILLIS,
+): KsudCommandOutput = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext KsudCommandOutput(
+            success = false,
+            code = -1,
+            stdout = "",
+            stderr = "Root shell is unavailable",
+        )
+    }
+
+    val stdout = ArrayList<String>()
+    val stderr = ArrayList<String>()
+    val result = withTimeoutOrNull(timeoutMillis) {
+        getRootShell().newJob()
+            .add("${shellQuote(getKsuDaemonPath())} $args")
+            .to(stdout, stderr)
+            .exec()
+    }
+    if (result == null) {
+        KsuCli.reset()
+        return@withContext KsudCommandOutput(
+            success = false,
+            code = -2,
+            stdout = stdout.joinToString("\n"),
+            stderr = "Command timed out after ${timeoutMillis}ms",
+        )
+    }
+    KsudCommandOutput(
+        success = result.isSuccess,
+        code = result.code,
+        stdout = stdout.joinToString("\n"),
+        stderr = stderr.joinToString("\n"),
+    )
+}
+
+private fun KsudCommandOutput.toKpmResult(): KpmCommandResult {
+    return KpmCommandResult(
+        success = success,
+        output = stdout.trim(),
+        error = if (success) "" else stderr.trim().ifBlank { "ksud exited with code $code" },
+    )
+}
+
+suspend fun getKpmCaps(): KpmCaps {
+    val result = runKsudCommandWithOutput("kpm caps").toKpmResult()
+    if (!result.success) {
+        return KpmCaps(error = result.error)
+    }
+    return runCatching {
+        val obj = JSONObject(result.output)
+        val capabilities = obj.optInt("capabilities", 0)
+        KpmCaps(
+            backend = obj.optString("backend", "kpatch-next"),
+            managementAvailable = obj.optBoolean(
+                "managementAvailable",
+                obj.optBoolean("kernelSupported", capabilities != 0),
+            ),
+            supported = obj.optBoolean("supported", capabilities != 0) && capabilities != 0,
+            kernelSupported = obj.optBoolean("kernelSupported", capabilities != 0),
+            policyEnabled = obj.optBoolean("policyEnabled", true),
+            lateLoad = obj.optBoolean("lateLoad", false),
+            abiVersion = obj.optInt("abiVersion", 0),
+            capabilities = capabilities,
+            maxImageSize = obj.optLong("maxImageSize", 0L),
+            maxLoaded = obj.optInt("maxLoaded", 0),
+            disabledReason = obj.optString("disabledReason", ""),
+        )
+    }.getOrElse { error ->
+        KpmCaps(error = "Invalid KPM capability response: ${error.message.orEmpty()}")
+    }
+}
+
+suspend fun setKpmPolicy(enabled: Boolean): KpmCommandResult {
+    val action = if (enabled) "enable" else "disable"
+    return runKsudCommandWithOutput("kpm policy $action", timeoutMillis = 30_000L)
+        .toKpmResult()
+}
+
+suspend fun getKpmList(): KpmCommandResult {
+    return runKsudCommandWithOutput("kpm list", timeoutMillis = SHELL_JOB_TIMEOUT_MILLIS)
+        .toKpmResult()
+}
+
+suspend fun importKpm(
+    source: File,
+    args: String,
+    force: Boolean,
+    enable: Boolean,
+): KpmCommandResult {
+    val options = buildString {
+        append("kpm import ")
+        append(shellQuote(source.absolutePath))
+        append(" --trusted --args ")
+        append(shellQuote(args))
+        if (force) append(" --force")
+        if (enable) append(" --enable")
+    }
+    return runKsudCommandWithOutput(options, timeoutMillis = 30_000L).toKpmResult()
+}
+
+suspend fun setKpmEnabled(id: String, enabled: Boolean): KpmCommandResult {
+    val action = if (enabled) "enable" else "disable"
+    return runKsudCommandWithOutput("kpm $action ${shellQuote(id)}", timeoutMillis = 30_000L)
+        .toKpmResult()
+}
+
+suspend fun loadKpm(id: String): KpmCommandResult {
+    return runKsudCommandWithOutput("kpm load ${shellQuote(id)}", timeoutMillis = 30_000L)
+        .toKpmResult()
+}
+
+suspend fun unloadKpm(id: String): KpmCommandResult {
+    return runKsudCommandWithOutput("kpm unload ${shellQuote(id)}", timeoutMillis = 30_000L)
+        .toKpmResult()
+}
+
+suspend fun removeKpm(id: String): KpmCommandResult {
+    return runKsudCommandWithOutput("kpm remove ${shellQuote(id)}", timeoutMillis = 30_000L)
+        .toKpmResult()
+}
+
+suspend fun controlKpm(id: String, args: String): KpmCommandResult {
+    return runKsudCommandWithOutput(
+        "kpm control ${shellQuote(id)} --args ${shellQuote(args)}",
+        timeoutMillis = 30_000L,
+    ).toKpmResult()
+}
+
+suspend fun getKpmExcludedApps(): List<KpmExcludedApp> {
+    val result = runKsudCommandWithOutput("kpm exclude-list").toKpmResult()
+    if (!result.success) error(result.error)
+    val array = JSONArray(result.output)
+    return buildList {
+        for (index in 0 until array.length()) {
+            val obj = array.optJSONObject(index) ?: continue
+            val packageName = obj.optString("package").trim()
+            val uid = obj.optInt("uid", -1)
+            if (packageName.isNotBlank() && uid > 0) {
+                add(KpmExcludedApp(packageName, uid))
+            }
+        }
+    }
+}
+
+suspend fun setKpmAppExcluded(
+    packageName: String,
+    uid: Int,
+    excluded: Boolean,
+): KpmCommandResult {
+    return runKsudCommandWithOutput(
+        "kpm exclude ${shellQuote(packageName)} $uid --enabled $excluded",
+        timeoutMillis = 30_000L,
+    ).toKpmResult()
+}
+
+fun parseKpmEntries(content: String): List<KpmEntry> {
+    val array = JSONArray(content)
+    return buildList {
+        for (index in 0 until array.length()) {
+            val obj = array.optJSONObject(index) ?: continue
+            val id = obj.optString("id").trim()
+            if (id.isBlank()) continue
+            add(
+                KpmEntry(
+                    id = id,
+                    name = obj.optString("name", id),
+                    version = obj.optString("version", ""),
+                    license = obj.optString("license", ""),
+                    author = obj.optString("author", ""),
+                    description = obj.optString("description", ""),
+                    args = obj.optString("args", ""),
+                    enabled = obj.optBoolean("enabled", false),
+                    loaded = obj.optBoolean("loaded", false),
+                    quarantined = obj.optBoolean("quarantined", false),
+                    quarantineReason = obj.optString("quarantineReason", ""),
+                    sourceName = obj.optString("sourceName", ""),
+                    importedAt = obj.optString("importedAt", ""),
+                    error = obj.optString("error", ""),
+                ),
+            )
+        }
+    }
 }
 
 suspend fun getEpkesuHideStatus(): EpkesuHideStatus = withContext(Dispatchers.IO) {
@@ -1073,9 +1345,9 @@ private suspend fun runCpuSpoofCommand(command: String): CpuSpoofCommandResult =
     CpuSpoofCommandResult(true)
 }
 
-suspend fun getHiddenPathConfig(): HiddenPathConfigState = withContext(Dispatchers.IO) {
+suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext HiddenPathConfigState()
+        return@withContext HiddenPathConfigReadResult(error = "root shell unavailable")
     }
 
     runCatching {
@@ -1091,16 +1363,21 @@ suspend fun getHiddenPathConfig(): HiddenPathConfigState = withContext(Dispatche
         if (result == null) {
             Log.w(TAG, "pathmask status timed out")
             KsuCli.reset()
-            return@runCatching HiddenPathConfigState()
+            return@runCatching HiddenPathConfigReadResult(error = "pathmask status timed out")
         }
 
         if (!result.isSuccess) {
-            Log.w(TAG, "pathmask status failed: ${stderr.joinToString("\n")}")
-            return@runCatching HiddenPathConfigState()
+            val error = stderr.joinToString("\n").trim().ifBlank { "pathmask status failed" }
+            Log.w(TAG, "pathmask status failed: $error")
+            return@runCatching HiddenPathConfigReadResult(error = error)
         }
 
         val obj = JSONObject(stdout.joinToString("\n"))
-        HiddenPathConfigState(
+        val statusError = obj.optString("error", "").trim()
+        if (statusError.isNotBlank()) {
+            return@runCatching HiddenPathConfigReadResult(error = statusError)
+        }
+        HiddenPathConfigReadResult(config = HiddenPathConfigState(
             targetPaths = obj.optJSONArray("targetPaths").toStringList(),
             appPackages = obj.optJSONArray("appPackages").toStringList(),
             useAppScope = obj.optBoolean("useAppScope", true),
@@ -1111,13 +1388,18 @@ suspend fun getHiddenPathConfig(): HiddenPathConfigState = withContext(Dispatche
             resolvedCount = obj.optString("resolvedCount", ""),
             activeTargetPaths = obj.optString("activeTargetPaths", ""),
             lastLog = obj.optString("lastLog", ""),
-        )
+            resolvedAppUids = obj.optJSONArray("resolvedAppUids").toStringList(),
+            unresolvedAppPackages = obj.optJSONArray("unresolvedAppPackages").toStringList(),
+        ))
     }.getOrElse {
         Log.w(TAG, "pathmask status unavailable", it)
         KsuCli.reset()
-        HiddenPathConfigState()
+        HiddenPathConfigReadResult(error = it.message ?: "pathmask status unavailable")
     }
 }
+
+suspend fun getHiddenPathConfig(): HiddenPathConfigState =
+    readHiddenPathConfig().config ?: HiddenPathConfigState()
 
 suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): Boolean = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
@@ -1957,9 +2239,35 @@ sealed class LkmSelection : Parcelable {
     data object KmiNone : LkmSelection()
 }
 
+private fun writeLkmFile(lkm: LkmSelection): File? {
+    if (lkm !is LkmSelection.LkmUri) return null
+    return copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
+}
+
+private fun bootPatchFlags(
+    allowShell: Boolean,
+    enableAdb: Boolean,
+    forceBackup: Boolean,
+): String = buildString {
+    if (allowShell) append(" --allow-shell")
+    if (enableAdb) append(" --enable-adbd")
+    if (forceBackup) append(" --backup")
+}
+
+enum class BootPatchMode {
+    Normal,
+    HiddenPath,
+}
+
+internal fun BootPatchMode.cliArguments(): String = when (this) {
+    BootPatchMode.Normal -> ""
+    BootPatchMode.HiddenPath -> " --pathmask-lkm"
+}
+
 suspend fun installBoot(
     bootUri: Uri?,
     lkm: LkmSelection,
+    patchMode: BootPatchMode,
     ota: Boolean,
     partition: String?,
     allowShell: Boolean,
@@ -1991,6 +2299,13 @@ suspend fun installBoot(
             cmd += " --backup"
         }
 
+        val effectivePatchMode = if (lkm is LkmSelection.PathMaskKmiString) {
+            BootPatchMode.HiddenPath
+        } else {
+            patchMode
+        }
+        cmd += effectivePatchMode.cliArguments()
+
         when (lkm) {
             is LkmSelection.LkmUri -> {
                 val selectedLkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
@@ -2003,7 +2318,7 @@ suspend fun installBoot(
             }
 
             is LkmSelection.PathMaskKmiString -> {
-                cmd += " --pathmask-lkm --kmi ${shellQuote(lkm.value)}"
+                cmd += " --kmi ${shellQuote(lkm.value)}"
             }
 
             LkmSelection.KmiNone -> Unit
@@ -2070,13 +2385,157 @@ suspend fun installBoot(
             onStderr("Warning: patched successfully, but failed to refresh the ApkeSU daemon")
         }
 
-        val showReboot = bootUri == null
-        FlashResult(result, showReboot)
+        FlashResult(result, bootUri == null)
     } finally {
         bootFile?.delete()
         lkmFile?.delete()
         patchedOutput?.delete()
     }
+}
+
+/** Downloads a factory/OTA archive, extracts [partition], then patches it locally. */
+suspend fun downloadBoot(
+    url: String,
+    partition: String,
+    lkm: LkmSelection,
+    patchMode: BootPatchMode,
+    allowShell: Boolean,
+    enableAdb: Boolean,
+    forceBackup: Boolean,
+    onStdout: (String) -> Unit,
+    onStderr: (String) -> Unit,
+): FlashResult = withContext(Dispatchers.IO) {
+    val bootFile = File(ksuApp.cacheDir, "download-boot.img")
+    var lkmFile: File? = null
+    var patchedOutput: File? = null
+    try {
+        onStdout("- Downloading and extracting $partition")
+        val channel = DataSourceChannel(newDownloadClient(), url)
+        val magic = try {
+            readMagic(channel)
+        } finally {
+            channel.position(0)
+        }
+        val image = ExtractImage(bootFile, onStdout)
+        val probeChannel = DataSourceChannel(newDownloadClient(), url)
+        val probedKmi = try {
+            if (magic == "CrAU") {
+                ExtractImage.probePayload(
+                    probeChannel,
+                    withKmi = lkm is LkmSelection.KmiNone,
+                    onProgress = onStdout,
+                ).kmi
+            } else {
+                ExtractImage.probe(
+                    probeChannel,
+                    withKmi = lkm is LkmSelection.KmiNone,
+                    onProgress = onStdout,
+                ).kmi
+            }
+        } finally {
+            probeChannel.close()
+        }
+        try {
+            if (magic == "CrAU") image.consumePayload(channel, partition) else image.consume(channel, partition)
+        } finally {
+            channel.close()
+        }
+
+        val autoKmi = if (lkm is LkmSelection.KmiNone) {
+            (probedKmi ?: BootKernelVersion.parseKmiFromBoot(bootFile))?.also {
+                onStdout("- Auto detected KMI: $it")
+            }
+        } else {
+            null
+        }
+        if (autoKmi == null && lkm is LkmSelection.KmiNone) {
+            return@withContext FlashResult(-1, "Failed to determine KMI from the package", false)
+        }
+
+        val effectivePatchMode = if (lkm is LkmSelection.PathMaskKmiString) {
+            BootPatchMode.HiddenPath
+        } else {
+            patchMode
+        }
+        var cmd = "${shellQuote(getKsuDaemonPath())} boot-patch -b ${shellQuote(bootFile.absolutePath)}"
+        if (allowShell) cmd += " --allow-shell"
+        if (enableAdb) cmd += " --enable-adbd"
+        if (forceBackup) cmd += " --backup"
+        cmd += effectivePatchMode.cliArguments()
+
+        when (lkm) {
+            is LkmSelection.LkmUri -> {
+                val selectedLkmFile = copyUriToCache(lkm.uri, "kernelsu-tmp-lkm.ko")
+                lkmFile = selectedLkmFile
+                cmd += " -m ${shellQuote(selectedLkmFile.absolutePath)}"
+            }
+            is LkmSelection.KmiString -> cmd += " --kmi ${shellQuote(lkm.value)}"
+            is LkmSelection.PathMaskKmiString -> cmd += " --kmi ${shellQuote(lkm.value)}"
+            LkmSelection.KmiNone -> Unit
+        }
+        if (autoKmi != null) cmd += " --kmi ${shellQuote(autoKmi)}"
+        cmd += " --partition ${shellQuote(partition)}"
+
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        val outputName = "apkesu_patched_$timestamp.img"
+        patchedOutput = preparePatchedImageOutput(ksuApp.cacheDir, outputName)
+        cmd += " -o ${shellQuote(ksuApp.cacheDir.absolutePath)} --out-name ${shellQuote(outputName)}"
+
+        val result = flashWithIO(cmd, onStdout, onStderr)
+        if (!result.isSuccess) return@withContext FlashResult(result, false)
+
+        val output = requireNotNull(patchedOutput)
+        var outputError = validatePatchedImageOutput(output)
+        if (outputError != null && output.isFile && output.length() > 0L) {
+            restorePatchedImageAccess(output)
+            outputError = validatePatchedImageOutput(output)
+        }
+        if (outputError != null) {
+            val error = "Patched image output is unavailable: $outputError"
+            onStderr(error)
+            return@withContext FlashResult(1, error, false)
+        }
+        val savedPath = runCatching {
+            saveFileToDownloads(ksuApp, output.name, output)
+        }.getOrElse { throwable ->
+            val error = "Failed to save patched image: ${throwable.localizedMessage ?: throwable.javaClass.simpleName}"
+            onStderr(error)
+            return@withContext FlashResult(1, error, false)
+        }
+        onStdout("- Patched image saved to $savedPath")
+        FlashResult(result, false)
+    } catch (error: Exception) {
+        onStderr(error.localizedMessage ?: error.javaClass.simpleName)
+        FlashResult(-1, error.localizedMessage ?: "Download failed", false)
+    } finally {
+        bootFile.delete()
+        lkmFile?.delete()
+        patchedOutput?.delete()
+    }
+}
+
+suspend fun probeRemoteBootPartitions(url: String): ProbeResult = withContext(Dispatchers.IO) {
+    DataSourceChannel(newDownloadClient(), url).use { channel ->
+        val magic = readMagic(channel)
+        if (magic == "CrAU") {
+            ExtractImage.probePayload(channel, withKmi = false)
+        } else {
+            ExtractImage.probe(channel, withKmi = false)
+        }
+    }
+}
+
+private fun newDownloadClient(): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(10, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .writeTimeout(30, TimeUnit.SECONDS)
+    .build()
+
+private fun readMagic(channel: DataSourceChannel): String {
+    val buffer = ByteBuffer.allocate(4)
+    channel.read(buffer)
+    channel.position(0)
+    return String(buffer.array(), StandardCharsets.ISO_8859_1)
 }
 
 internal fun preparePatchedImageOutput(cacheDir: File, outputName: String): File {
@@ -2367,6 +2826,11 @@ fun ensureManagerRegistered(): Boolean {
         }
 
         val managerUid = Os.getuid()
+        val managerAppId = managerUid.mod(100_000)
+        if (managerAppId !in FIRST_APPLICATION_APPID..LAST_APPLICATION_APPID) {
+            Log.e(TAG, "refusing manager registration for non-application uid $managerUid")
+            return@synchronized false
+        }
         val driverVersion = runCatching { Natives.version }.getOrDefault(0)
         val failureKey = "$driverVersion:$managerUid"
         val now = SystemClock.elapsedRealtime()
@@ -2426,6 +2890,72 @@ private val fallbackSupportedKmis = listOf(
 )
 
 private val kmiNameRegex = Regex("""^android\d+-\d+(?:\.\d+)?$""")
+
+internal enum class BootImageKmiSource {
+    Image,
+    CurrentDevice,
+}
+
+internal data class BootImageKmiDetection(
+    val kmi: String,
+    val source: BootImageKmiSource,
+)
+
+internal suspend fun detectBootImageKmi(
+    uri: Uri,
+    fallbackKmi: String? = null,
+): BootImageKmiDetection = withContext(Dispatchers.IO) {
+    var bootFile: File? = null
+    try {
+        val selectedBootFile = copyUriToCache(uri, "boot-kmi.img")
+        bootFile = selectedBootFile
+        val imageHasNoKernel = runCatching {
+            BootKernelVersion.isKernellessBootImage(selectedBootFile)
+        }.getOrDefault(false)
+
+        // Parse the selected image locally first. This path understands compressed
+        // kernel payloads and also works before the daemon has been installed.
+        runCatching { BootKernelVersion.parseKmiFromBoot(selectedBootFile) }
+            .getOrNull()
+            ?.takeIf { it.matches(kmiNameRegex) }
+            ?.let { return@withContext BootImageKmiDetection(it, BootImageKmiSource.Image) }
+
+        // Keep ksud as a compatibility fallback for boot formats not covered by
+        // the lightweight manager parser.
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val command = "${shellQuote(getKsuDaemonPath())} boot-info image-kmi " +
+            "--boot ${shellQuote(selectedBootFile.absolutePath)}"
+        val result = withNewRootShell {
+            newJob().add(command).to(stdout, stderr).exec()
+        }
+        if (result.isSuccess) {
+            stdout.asSequence()
+                .map(String::trim)
+                .firstOrNull { it.matches(kmiNameRegex) }
+                ?.let { return@withContext BootImageKmiDetection(it, BootImageKmiSource.Image) }
+        }
+
+        // init_boot images intentionally contain no kernel. For those images the
+        // current device KMI is the correct target, while a normal unreadable boot
+        // image must still fail and require manual selection.
+        if (imageHasNoKernel) {
+            val currentKmi = (fallbackKmi ?: getCurrentKmi())
+                .takeIf { it.matches(kmiNameRegex) }
+            if (currentKmi != null) {
+                return@withContext BootImageKmiDetection(
+                    currentKmi,
+                    BootImageKmiSource.CurrentDevice,
+                )
+            }
+        }
+
+        val detail = stderr.joinToString("\n").trim()
+        error(detail.ifBlank { "The selected image does not contain a supported KMI marker" })
+    } finally {
+        bootFile?.delete()
+    }
+}
 
 suspend fun getCurrentKmi(): String = withContext(Dispatchers.IO) {
     runCatching {

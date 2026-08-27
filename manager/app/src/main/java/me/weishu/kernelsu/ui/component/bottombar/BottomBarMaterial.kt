@@ -32,19 +32,15 @@ import me.weishu.kernelsu.ui.LocalMainPagerState
 import me.weishu.kernelsu.ui.util.rootAvailable
 
 @Composable
-fun BottomBarMaterial(navigationBadge: NavigationBadgeState) {
+fun BottomBarMaterial(
+    navigationBadge: NavigationBadgeState,
+    destinations: List<MainDestination>,
+) {
     val isManager = Natives.isManager
     val fullFeatured = isManager && !Natives.requireNewKernel() && rootAvailable()
     val mainPagerState = LocalMainPagerState.current
 
     if (!fullFeatured) return
-
-    val items = listOf(
-        Triple(R.string.home, Icons.Filled.Home, Icons.Outlined.Home),
-        Triple(R.string.superuser, Icons.Filled.Shield, Icons.Outlined.Shield),
-        Triple(R.string.module, Icons.Filled.Extension, Icons.Outlined.Extension),
-        Triple(R.string.settings, Icons.Filled.Settings, Icons.Outlined.Settings)
-    )
 
     ShortNavigationBar(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -52,7 +48,7 @@ fun BottomBarMaterial(navigationBadge: NavigationBadgeState) {
             WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
         )
     ) {
-        items.forEachIndexed { index, (label, selectedIcon, unselectedIcon) ->
+        destinations.forEachIndexed { index, destination ->
             val selected = mainPagerState.selectedPage == index
             ShortNavigationBarItem(
                 selected = selected,
@@ -63,14 +59,14 @@ fun BottomBarMaterial(navigationBadge: NavigationBadgeState) {
                 },
                 icon = {
                     NavigationIconWithBadge(
-                        icon = if (selected) selectedIcon else unselectedIcon,
-                        contentDescription = stringResource(label),
-                        badge = badgeFor(index, navigationBadge),
+                        icon = destination.icon,
+                        contentDescription = stringResource(destination.label),
+                        badge = badgeFor(destination, navigationBadge),
                     )
                 },
                 label = {
                     Text(
-                        stringResource(label),
+                        stringResource(destination.label),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

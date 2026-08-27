@@ -3,7 +3,7 @@ use chrono::Local;
 use const_format::concatcp;
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     ffi::CString,
     fs::{self, OpenOptions},
     io::{self, Write},
@@ -20,6 +20,7 @@ const CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "config.json");
 const LAST_GOOD_CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "last_good.json");
 const LOG_PATH: &str = concatcp!(PATHMASK_DIR, "pathmask.log");
 const PATHMASK_MODULE_NAME: &str = "pathmask";
+const PACKAGES_LIST_PATH: &str = "/data/system/packages.list";
 const MAX_TARGET_PATHS_LEN: usize = 1900;
 const TARGET_WAIT_SECONDS: u64 = 5;
 const TARGET_WAIT_STEP_MS: u64 = 200;
@@ -41,6 +42,12 @@ struct PathmaskConfig {
     hide_isolated: bool,
 }
 
+#[derive(Default)]
+struct DenyUidResolution {
+    uids: BTreeSet<u32>,
+    unresolved_packages: Vec<String>,
+}
+
 impl Default for PathmaskConfig {
     fn default() -> Self {
         Self {
@@ -54,12 +61,27 @@ impl Default for PathmaskConfig {
 }
 
 pub fn print_status() {
-    let config = read_config().unwrap_or_default();
+    let config = match read_config() {
+        Ok(config) => config,
+        Err(error) => {
+            append_log(format!("status failed: {error:#}"));
+            println!(
+                "{}",
+                json!({"error": format!("failed to read pathmask config: {error:#}")})
+            );
+            return;
+        }
+    };
     let current_kmi = boot_patch::get_current_kmi().unwrap_or_default();
     let loaded = is_module_loaded();
     let resolved_count = read_sysfs_param("resolved_count").unwrap_or_default();
     let active_target_paths = read_sysfs_param("target_paths").unwrap_or_default();
     let last_log = tail_file(LOG_PATH, 40).unwrap_or_default();
+    let deny_uid_resolution = if config.use_app_scope {
+        resolve_deny_uids(&config.app_packages)
+    } else {
+        DenyUidResolution::default()
+    };
 
     println!(
         "{}",
@@ -74,6 +96,8 @@ pub fn print_status() {
             "resolvedCount": resolved_count,
             "activeTargetPaths": active_target_paths,
             "lastLog": last_log,
+            "resolvedAppUids": deny_uid_resolution.uids,
+            "unresolvedAppPackages": deny_uid_resolution.unresolved_packages,
         })
     );
 }
@@ -401,11 +425,21 @@ fn build_module_params(config: &PathmaskConfig) -> Result<String> {
     ];
 
     if config.use_app_scope {
-        let deny_uids = resolve_deny_uids(&config.app_packages);
-        if deny_uids.is_empty() {
-            bail!("application scope is enabled but no valid app UID was resolved");
+        let resolution = resolve_deny_uids(&config.app_packages);
+        if resolution.uids.is_empty() {
+            let unresolved = resolution.unresolved_packages.join(", ");
+            bail!(
+                "application scope is enabled but no valid app UID was resolved; unresolved packages: {unresolved}"
+            );
         }
-        let deny_uids = deny_uids
+        if !resolution.unresolved_packages.is_empty() {
+            append_log(format!(
+                "skipping unresolved packages while applying UID scope: {}",
+                resolution.unresolved_packages.join(", ")
+            ));
+        }
+        let deny_uids = resolution
+            .uids
             .iter()
             .map(u32::to_string)
             .collect::<Vec<_>>()
@@ -449,25 +483,54 @@ fn quote_module_param_value(value: &str) -> String {
     }
 }
 
-fn resolve_deny_uids(app_packages: &[String]) -> BTreeSet<u32> {
-    let mut uids = BTreeSet::new();
+fn resolve_deny_uids(app_packages: &[String]) -> DenyUidResolution {
+    let package_uids = read_package_uids();
+    let mut resolution = DenyUidResolution::default();
     for app in app_packages {
         if let Ok(uid) = app.parse::<u32>() {
-            uids.insert(uid);
+            resolution.uids.insert(uid);
             continue;
         }
 
-        let package_path = format!("/data/data/{app}");
-        match rustix::fs::stat(package_path.as_str()) {
-            Ok(stat) => {
-                uids.insert(stat.st_uid);
-            }
-            Err(err) => {
-                append_log(format!("cannot resolve UID for {app}: {err}"));
-            }
+        let uid = package_uids
+            .get(app)
+            .copied()
+            .or_else(|| resolve_uid_from_data_dir(app));
+        if let Some(uid) = uid {
+            resolution.uids.insert(uid);
+        } else {
+            resolution.unresolved_packages.push(app.clone());
         }
     }
-    uids
+    resolution
+}
+
+fn read_package_uids() -> BTreeMap<String, u32> {
+    fs::read_to_string(PACKAGES_LIST_PATH)
+        .map(|contents| parse_package_uids(&contents))
+        .unwrap_or_default()
+}
+
+fn parse_package_uids(contents: &str) -> BTreeMap<String, u32> {
+    let mut package_uids = BTreeMap::new();
+    for line in contents.lines() {
+        let mut fields = line.split_whitespace();
+        let Some(package) = fields.next() else {
+            continue;
+        };
+        let Some(uid) = fields.next().and_then(|value| value.parse::<u32>().ok()) else {
+            continue;
+        };
+        package_uids.entry(package.to_owned()).or_insert(uid);
+    }
+    package_uids
+}
+
+fn resolve_uid_from_data_dir(package: &str) -> Option<u32> {
+    let package_path = format!("/data/data/{package}");
+    rustix::fs::stat(package_path.as_str())
+        .ok()
+        .map(|stat| stat.st_uid)
 }
 
 fn read_config() -> Result<PathmaskConfig> {
@@ -572,8 +635,9 @@ fn sanitize_app_entry(app: &str) -> Option<String> {
 
 fn write_config(path: &str, config: &PathmaskConfig) -> Result<()> {
     utils::ensure_dir_exists(PATHMASK_DIR)?;
+    let temporary_path = format!("{path}.tmp");
     fs::write(
-        path,
+        &temporary_path,
         json!({
             "targetPaths": config.target_paths,
             "appPackages": config.app_packages,
@@ -583,7 +647,8 @@ fn write_config(path: &str, config: &PathmaskConfig) -> Result<()> {
         })
         .to_string(),
     )
-    .with_context(|| format!("failed to write {path}"))
+    .with_context(|| format!("failed to write {temporary_path}"))?;
+    fs::rename(&temporary_path, path).with_context(|| format!("failed to replace {path}"))
 }
 
 fn is_module_loaded() -> bool {
@@ -644,4 +709,34 @@ fn read_kernel_pathmask_log() -> String {
         .collect::<Vec<_>>();
     let start = lines.len().saturating_sub(200);
     lines[start..].join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_package_uids;
+
+    #[test]
+    fn package_list_parser_uses_package_uid_column() {
+        let packages = parse_package_uids(
+            "\
+            com.example.first 10123 0 /data/user/0/com.example.first platform\n\
+            com.example.second 10124 0 /data/user/0/com.example.second platform\n",
+        );
+
+        assert_eq!(packages.get("com.example.first"), Some(&10123));
+        assert_eq!(packages.get("com.example.second"), Some(&10124));
+    }
+
+    #[test]
+    fn package_list_parser_ignores_invalid_rows_and_keeps_first_uid() {
+        let packages = parse_package_uids(
+            "\
+            invalid missing-uid\n\
+            com.example.app 10123 0 /data/user/0/com.example.app platform\n\
+            com.example.app 20123 0 /data/user/10/com.example.app platform\n",
+        );
+
+        assert_eq!(packages.len(), 1);
+        assert_eq!(packages.get("com.example.app"), Some(&10123));
+    }
 }

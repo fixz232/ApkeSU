@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.view.MotionEvent
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.ValueCallback
@@ -19,9 +20,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.webkit.WebViewAssetLoader
 import com.topjohnwu.superuser.io.SuFile
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.ModuleRepositoryImpl
@@ -103,10 +102,21 @@ internal suspend fun prepareWebView(
     activity: Activity,
     moduleId: String,
     webUIState: WebUIState,
+    allowPendingUpdate: Boolean = false,
 ) {
+    val loadGeneration = webUIState.beginLoading()
     withContext(Dispatchers.IO) {
         val repo = ModuleRepositoryImpl()
-        val modules = repo.getModules().getOrDefault(emptyList())
+        val modulesResult = repo.getModules()
+        if (modulesResult.isFailure) {
+            val message = modulesResult.exceptionOrNull()?.message.orEmpty()
+                .ifBlank { activity.getString(R.string.module_failed_to_load) }
+            withContext(Dispatchers.Main) {
+                webUIState.reportError(loadGeneration, message)
+            }
+            return@withContext
+        }
+        val modules = modulesResult.getOrThrow()
         val moduleInfo = modules.find { info -> info.id == moduleId }
 
         val moduleName: String
@@ -119,7 +129,7 @@ internal suspend fun prepareWebView(
         if (moduleInfo == null) {
             if (moduleId != HYBRID_MOUNT_MODULE_ID) {
                 withContext(Dispatchers.Main) {
-                    webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.no_such_module, moduleId))
+                    webUIState.reportError(loadGeneration, activity.getString(R.string.no_such_module, moduleId))
                 }
                 return@withContext
             }
@@ -134,13 +144,13 @@ internal suspend fun prepareWebView(
 
             if (!builtinMountStatus.enabled) {
                 withContext(Dispatchers.Main) {
-                    webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.module_unavailable, moduleName))
+                    webUIState.reportError(loadGeneration, activity.getString(R.string.module_unavailable, moduleName))
                 }
                 return@withContext
             }
-        } else if (!moduleInfo.enabled || moduleInfo.update || moduleInfo.remove) {
+        } else if (!moduleInfo.enabled || (!allowPendingUpdate && moduleInfo.update) || moduleInfo.remove) {
             withContext(Dispatchers.Main) {
-                webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.module_unavailable, moduleInfo.name))
+                webUIState.reportError(loadGeneration, activity.getString(R.string.module_unavailable, moduleInfo.name))
             }
             return@withContext
         } else {
@@ -160,24 +170,39 @@ internal suspend fun prepareWebView(
         if (!hasWebRoot) {
             shell.close()
             withContext(Dispatchers.Main) {
-                webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.module_unavailable, moduleName))
+                webUIState.reportError(loadGeneration, activity.getString(R.string.module_unavailable, moduleName))
             }
             return@withContext
         }
 
-        webUIState.moduleName = moduleName
-        webUIState.moduleId = moduleId
-        webUIState.moduleVersion = moduleVersion
-        webUIState.moduleVersionCode = moduleVersionCode
-        webUIState.isBuiltinModule = isBuiltinModule
-        webUIState.modDir = modDir
-        webUIState.rootShell = shell
-
         withContext(Dispatchers.Main) {
+            if (!webUIState.applyModuleInfo(
+                    loadGeneration = loadGeneration,
+                    moduleId = moduleId,
+                    moduleName = moduleName,
+                    moduleVersion = moduleVersion,
+                    moduleVersionCode = moduleVersionCode,
+                    modDir = modDir,
+                    isBuiltinModule = isBuiltinModule,
+                )
+            ) {
+                shell.close()
+                return@withContext
+            }
             activity.setTaskDescription(activity.getString(R.string.app_name) + " - ${moduleName}")
 
             val webView = WebView(activity)
             webView.setBackgroundColor(Color.TRANSPARENT)
+            webView.setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN,
+                    MotionEvent.ACTION_MOVE -> view.parent?.requestDisallowInterceptTouchEvent(true)
+
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> view.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+                false
+            }
 
             val prefs = activity.getSharedPreferences("settings", Context.MODE_PRIVATE)
             val enableWebDebugging = prefs.getBoolean("enable_web_debugging", false)
@@ -190,12 +215,13 @@ internal suspend fun prepareWebView(
             }
 
             if (SuperUserViewModel.apps.isEmpty()) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    runCatching { SuperUserViewModel().fetchAppList() }
+                webUIState.preload(loadGeneration) {
+                    SuperUserViewModel().fetchAppList()
                 }
             }
 
             val webRoot = File("${webUIState.modDir}/webroot")
+            val kpmWallpaperAssetHandler = KpmWallpaperAssetHandler(activity)
             val webViewAssetLoader = WebViewAssetLoader.Builder()
                 .setDomain(WEB_DOMAIN)
                 .addPathHandler(
@@ -207,6 +233,7 @@ internal suspend fun prepareWebView(
                         { webUIState.currentInsets },
                         { enable -> webUIState.isInsetsEnabled = enable })
                 )
+                .addPathHandler("/apkesu-kpm/", kpmWallpaperAssetHandler)
                 .build()
 
             // WebViewClient
@@ -232,13 +259,16 @@ internal suspend fun prepareWebView(
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    if (!webUIState.owns(view)) return
                     if (enableWebDebugging) {
                         view?.evaluateJavascript(erudaConsole(activity), null)
                         view?.evaluateJavascript("eruda.init();", null)
                     }
+                    view?.let(webUIState::onPageFinished)
                 }
 
                 override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    if (!webUIState.owns(view)) return
                     webUIState.webCanGoBack = view?.canGoBack() ?: false
                     if (webUIState.isInsetsEnabled) webUIState.webView?.evaluateJavascript(webUIState.currentInsets.js, null)
                     view?.evaluateJavascript(DOWNLOAD_JS, null)
@@ -249,13 +279,13 @@ internal suspend fun prepareWebView(
             // WebChromeClient
             webView.webChromeClient = object : WebChromeClient() {
                 override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
-                    if (message == null || result == null) return false
+                    if (!webUIState.owns(view) || message == null || result == null) return false
                     webUIState.uiEvent = WebUIEvent.ShowAlert(message, result)
                     return true
                 }
 
                 override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
-                    if (message == null || result == null) return false
+                    if (!webUIState.owns(view) || message == null || result == null) return false
                     webUIState.uiEvent = WebUIEvent.ShowConfirm(message, result)
                     return true
                 }
@@ -267,7 +297,7 @@ internal suspend fun prepareWebView(
                     defaultValue: String?,
                     result: JsPromptResult?
                 ): Boolean {
-                    if (message == null || result == null || defaultValue == null) return false
+                    if (!webUIState.owns(view) || message == null || result == null || defaultValue == null) return false
                     webUIState.uiEvent = WebUIEvent.ShowPrompt(message, defaultValue, result)
                     return true
                 }
@@ -275,6 +305,7 @@ internal suspend fun prepareWebView(
                 override fun onShowFileChooser(
                     webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?
                 ): Boolean {
+                    if (!webUIState.owns(webView)) return false
                     webUIState.filePathCallback?.onReceiveValue(null)
                     webUIState.filePathCallback = filePathCallback
 
@@ -290,9 +321,21 @@ internal suspend fun prepareWebView(
             // JS Interface
             val webviewInterface = WebViewInterface(webUIState)
             val downloadInterface = WebUIDownloadInterface(webUIState)
-            webUIState.webViewInterface = webviewInterface
-            webUIState.downloadInterface = downloadInterface
-            webUIState.webView = webView
+            if (!webUIState.attachWebView(
+                    loadGeneration = loadGeneration,
+                    view = webView,
+                    rootShell = shell,
+                    webViewInterface = webviewInterface,
+                    downloadInterface = downloadInterface,
+                    kpmWallpaperAssetHandler = kpmWallpaperAssetHandler,
+                )
+            ) {
+                downloadInterface.destroy()
+                webviewInterface.destroy()
+                webView.destroy()
+                shell.close()
+                return@withContext
+            }
             webView.addJavascriptInterface(webviewInterface, "ksu")
             webView.addJavascriptInterface(downloadInterface, "ksu_download")
             webView.setDownloadListener { url, _, contentDisposition, mimetype, _ ->
@@ -300,7 +343,7 @@ internal suspend fun prepareWebView(
                 downloadInterface.download(url, fileName, mimetype)
             }
             webView.evaluateJavascript(DOWNLOAD_JS, null)
-            webUIState.uiEvent = WebUIEvent.WebViewReady
+            webUIState.markWebViewReady(loadGeneration)
         }
     }
 }

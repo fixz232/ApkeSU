@@ -41,6 +41,18 @@ enum class CustomNavigationIconSlot(
         cropRightKey = "custom_navigation_icon_home_crop_right",
         cropBottomKey = "custom_navigation_icon_home_crop_bottom",
     ),
+    Kpm(
+        id = "kpm",
+        labelRes = R.string.kpm_short_title,
+        titleRes = R.string.settings_navigation_icon_kpm,
+        cropTitleRes = R.string.settings_navigation_icon_kpm_crop,
+        previewTitleRes = R.string.settings_navigation_icon_kpm_preview,
+        uriKey = "custom_navigation_icon_kpm_uri",
+        cropLeftKey = "custom_navigation_icon_kpm_crop_left",
+        cropTopKey = "custom_navigation_icon_kpm_crop_top",
+        cropRightKey = "custom_navigation_icon_kpm_crop_right",
+        cropBottomKey = "custom_navigation_icon_kpm_crop_bottom",
+    ),
     Superuser(
         id = "superuser",
         labelRes = R.string.superuser,
@@ -148,6 +160,7 @@ data class CustomNavigationIconState(
 @Immutable
 data class CustomNavigationIconSet(
     val home: CustomNavigationIconState = CustomNavigationIconState(),
+    val kpm: CustomNavigationIconState = CustomNavigationIconState(),
     val superuser: CustomNavigationIconState = CustomNavigationIconState(),
     val module: CustomNavigationIconState = CustomNavigationIconState(),
     val settings: CustomNavigationIconState = CustomNavigationIconState(),
@@ -171,6 +184,7 @@ data class CustomNavigationIconSet(
     operator fun get(slot: CustomNavigationIconSlot): CustomNavigationIconState {
         return when (slot) {
             CustomNavigationIconSlot.Home -> home
+            CustomNavigationIconSlot.Kpm -> kpm
             CustomNavigationIconSlot.Superuser -> superuser
             CustomNavigationIconSlot.Module -> module
             CustomNavigationIconSlot.Settings -> settings
@@ -227,6 +241,7 @@ fun setCustomNavigationIconPresentation(
 internal fun SharedPreferences.readCustomNavigationIconSet(): CustomNavigationIconSet {
     return CustomNavigationIconSet(
         home = readCustomNavigationIconState(CustomNavigationIconSlot.Home),
+        kpm = readCustomNavigationIconState(CustomNavigationIconSlot.Kpm),
         superuser = readCustomNavigationIconState(CustomNavigationIconSlot.Superuser),
         module = readCustomNavigationIconState(CustomNavigationIconSlot.Module),
         settings = readCustomNavigationIconState(CustomNavigationIconSlot.Settings),

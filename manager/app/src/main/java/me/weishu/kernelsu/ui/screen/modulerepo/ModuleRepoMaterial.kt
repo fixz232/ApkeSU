@@ -93,7 +93,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.PagerNavigationSpringSpec
 import me.weishu.kernelsu.data.model.RepoModule
+import me.weishu.kernelsu.ui.component.PagerNavigationSpringSpec
 import me.weishu.kernelsu.ui.component.ScrollToTopOnChange
 import me.weishu.kernelsu.ui.component.dialog.ConfirmDialogHandle
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
@@ -431,6 +433,7 @@ fun ModuleRepoDetailScreenMaterial(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
+                overscrollEffect = null,
             ) { page ->
                 val paddedInnerPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding() + 56.dp + 8.dp,
@@ -473,7 +476,12 @@ fun ModuleRepoDetailScreenMaterial(
             ExpressiveTabRow(
                 selectedTabIndex = pagerState.currentPage,
                 tabs = tabs,
-                onTabClick = { scope.launch { pagerState.animateScrollToPage(it) } },
+                onTabClick = { scope.launch {
+                    pagerState.animateScrollToPage(
+                        page = it,
+                        animationSpec = PagerNavigationSpringSpec,
+                    )
+                } },
                 modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             )
         }

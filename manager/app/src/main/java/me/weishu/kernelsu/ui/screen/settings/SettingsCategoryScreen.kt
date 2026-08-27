@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.ContactPage
@@ -125,7 +126,6 @@ fun SettingsCategoryScreen(routeValue: String) {
     var showSendLogDialog by rememberSaveable { mutableStateOf(false) }
     var showUninstallDialog by rememberSaveable { mutableStateOf(false) }
     val loadingDialog = rememberLoadingDialog()
-
     LifecycleResumeEffect(category.routeValue) {
         viewModel.refresh()
         onPauseOrDispose { }
@@ -164,6 +164,7 @@ fun SettingsCategoryScreen(routeValue: String) {
                 uiState = uiState,
                 onSetSuCompatMode = viewModel::setSuCompatMode,
                 onSetKernelUmount = viewModel::setKernelUmountEnabled,
+                onSetWebViewZygoteUmount = viewModel::setWebViewZygoteUmountEnabled,
                 onSetSelinuxHide = viewModel::setSelinuxHideEnabled,
                 onSetSulog = viewModel::setSulogEnabled,
                 onSetAdbRoot = viewModel::setAdbRootEnabled,
@@ -197,7 +198,12 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onSetEpkesuHide = viewModel::setEpkesuHideEnabled,
                 onOpen = navigator::push,
             )
-            SettingsCategory.Toolbox -> ToolboxSettingsContent(onOpen = navigator::push)
+            SettingsCategory.Toolbox -> ToolboxSettingsContent(
+                onOpen = navigator::push,
+                kpmSupported = uiState.isKPatchNextEnabled &&
+                    !uiState.isKPatchNextPendingRemove &&
+                    !uiState.isLateLoadMode,
+            )
             SettingsCategory.AppAndMaintenance -> AppMaintenanceSettingsContent(
                 uiState = uiState,
                 onSetCheckModuleUpdate = viewModel::setCheckModuleUpdate,
@@ -205,6 +211,7 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onSetGkiWarning = viewModel::setShowGkiWarning,
                 onSetWebDebugging = viewModel::setEnableWebDebugging,
                 onSetAutoJailbreak = viewModel::setAutoJailbreak,
+                onSetUseSoftReboot = viewModel::setUseSoftReboot,
                 onSendLog = { showSendLogDialog = true },
                 onUninstall = { showUninstallDialog = true },
                 onOpen = navigator::push,
@@ -456,6 +463,19 @@ private fun HomeManagerSettingsContent(
             icon = Icons.Rounded.EditNote,
             onClick = onEditHomeTitle,
         )
+        SettingsDivider()
+        SettingsActionRow(
+            title = stringResource(R.string.pixel_pet_title),
+            summary = stringResource(
+                if (uiState.pixelPetEnabled) {
+                    R.string.pixel_pet_enabled_summary
+                } else {
+                    R.string.pixel_pet_disabled_summary
+                }
+            ),
+            icon = Icons.Rounded.AutoFixHigh,
+            onClick = { onOpen(Route.PixelPet) },
+        )
     }
     SettingsGroup(stringResource(R.string.settings_group_home_layout)) {
         SettingsActionRow(
@@ -489,6 +509,7 @@ private fun RootPermissionSettingsContent(
     uiState: SettingsUiState,
     onSetSuCompatMode: (Int) -> Unit,
     onSetKernelUmount: (Boolean) -> Unit,
+    onSetWebViewZygoteUmount: (Boolean) -> Unit,
     onSetSelinuxHide: (Boolean) -> Unit,
     onSetSulog: (Boolean) -> Unit,
     onSetAdbRoot: (Boolean) -> Unit,
@@ -530,6 +551,18 @@ private fun RootPermissionSettingsContent(
             enabled = uiState.kernelUmountStatus == "supported",
             checked = uiState.isKernelUmountEnabled,
             onCheckedChange = onSetKernelUmount,
+        )
+        SettingsDivider()
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_webview_zygote_umount),
+            summary = featureSummary(
+                uiState.webViewZygoteUmountStatus,
+                R.string.settings_webview_zygote_umount_summary,
+            ),
+            icon = Icons.Rounded.Language,
+            enabled = uiState.webViewZygoteUmountStatus == "supported",
+            checked = uiState.isWebViewZygoteUmountEnabled,
+            onCheckedChange = onSetWebViewZygoteUmount,
         )
         SettingsDivider()
         SettingsSwitchRow(
@@ -643,7 +676,10 @@ private fun MountHideSettingsContent(
 }
 
 @Composable
-private fun ToolboxSettingsContent(onOpen: (Route) -> Unit) {
+private fun ToolboxSettingsContent(
+    onOpen: (Route) -> Unit,
+    kpmSupported: Boolean,
+) {
     SettingsGroup(stringResource(R.string.settings_toolbox_group_recovery)) {
         SettingsActionRow(
             title = stringResource(R.string.rescue_protection),
@@ -680,6 +716,15 @@ private fun ToolboxSettingsContent(onOpen: (Route) -> Unit) {
             icon = Icons.Rounded.Tune,
             onClick = { onOpen(Route.GraphicsRenderer) },
         )
+        if (kpmSupported) {
+            SettingsDivider()
+            SettingsActionRow(
+                title = stringResource(R.string.kpm_title),
+                summary = stringResource(R.string.kpm_settings_summary),
+                icon = Icons.Rounded.Bolt,
+                onClick = { onOpen(Route.Kpm) },
+            )
+        }
     }
     SettingsGroup(stringResource(R.string.settings_toolbox_group_creative)) {
         SettingsActionRow(
@@ -699,6 +744,7 @@ private fun AppMaintenanceSettingsContent(
     onSetGkiWarning: (Boolean) -> Unit,
     onSetWebDebugging: (Boolean) -> Unit,
     onSetAutoJailbreak: (Boolean) -> Unit,
+    onSetUseSoftReboot: (Boolean) -> Unit,
     onSendLog: () -> Unit,
     onUninstall: () -> Unit,
     onOpen: (Route) -> Unit,
@@ -759,6 +805,15 @@ private fun AppMaintenanceSettingsContent(
             enabled = uiState.isLateLoadMode,
             checked = uiState.autoJailbreak,
             onCheckedChange = onSetAutoJailbreak,
+        )
+        SettingsDivider()
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_soft_reboot),
+            summary = stringResource(R.string.settings_soft_reboot_summary),
+            icon = Icons.Rounded.ElectricalServices,
+            enabled = !uiState.isLateLoadMode,
+            checked = uiState.useSoftReboot,
+            onCheckedChange = onSetUseSoftReboot,
         )
     }
     SettingsGroup(stringResource(R.string.settings_group_maintenance_about)) {

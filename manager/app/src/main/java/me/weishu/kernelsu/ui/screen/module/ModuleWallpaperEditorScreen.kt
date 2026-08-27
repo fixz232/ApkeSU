@@ -96,13 +96,21 @@ private enum class WallpaperBatchMode { Selected, SameType, All }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModuleWallpaperEditorScreen(moduleId: String) {
+fun ModuleWallpaperEditorScreen(
+    moduleId: String,
+    displayName: String? = null,
+    displayAuthor: String? = null,
+    displayVersion: String? = null,
+    displayDescription: String? = null,
+    allowBatch: Boolean = true,
+) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     val moduleViewModel = viewModel<ModuleViewModel>()
     val moduleUiState by moduleViewModel.uiState.collectAsStateWithLifecycle()
+    val isKpmWallpaper = moduleId.startsWith(KPM_CARD_WALLPAPER_ID_PREFIX)
     val module = moduleUiState.moduleList.firstOrNull { it.id == moduleId }
     var snapshot by remember(moduleId) { mutableStateOf(readModuleCardWallpaperSnapshot(context, moduleId)) }
     var variant by remember { mutableStateOf(ModuleWallpaperVariant.Day) }
@@ -194,8 +202,10 @@ fun ModuleWallpaperEditorScreen(moduleId: String) {
     }
 
     LaunchedEffect(Unit) {
-        moduleViewModel.initializePreferences()
-        moduleViewModel.fetchModuleList(checkUpdate = false)
+        if (!isKpmWallpaper) {
+            moduleViewModel.initializePreferences()
+            moduleViewModel.fetchModuleList(checkUpdate = false)
+        }
     }
     LaunchedEffect(variant, collection.entries.size) {
         selectedIndex = collection.selectedIndex.coerceIn(0, collection.entries.lastIndex.coerceAtLeast(0))
@@ -228,6 +238,10 @@ fun ModuleWallpaperEditorScreen(moduleId: String) {
             item {
                 ModuleWallpaperRealPreview(
                     module = module,
+                    displayName = displayName,
+                    displayAuthor = displayAuthor,
+                    displayVersion = displayVersion,
+                    displayDescription = displayDescription,
                     entry = selectedEntry,
                     loadState = previewState,
                     aspectRatio = previewAspectRatio,
@@ -363,7 +377,7 @@ fun ModuleWallpaperEditorScreen(moduleId: String) {
                     )
                 }
             }
-            item {
+            if (allowBatch) item {
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = snapshot.allEntries().isNotEmpty() && moduleUiState.moduleList.size > 1 && !busy,
@@ -501,6 +515,10 @@ private fun PreviewRatioSelector(selected: Float, onSelected: (Float) -> Unit) {
 @Composable
 private fun ModuleWallpaperRealPreview(
     module: Module?,
+    displayName: String?,
+    displayAuthor: String?,
+    displayVersion: String?,
+    displayDescription: String?,
     entry: ModuleCardWallpaperEntry?,
     loadState: ModuleWallpaperBitmapLoadState,
     aspectRatio: Float,
@@ -532,14 +550,15 @@ private fun ModuleWallpaperRealPreview(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    text = module?.name ?: stringResource(R.string.module_wallpaper_preview_module),
+                    text = module?.name ?: displayName ?: stringResource(R.string.module_wallpaper_preview_module),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = module?.let { "${it.version} · ${it.author}" }.orEmpty(),
+                    text = module?.let { "${it.version} · ${it.author}" }
+                        ?: listOfNotNull(displayVersion, displayAuthor).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -547,7 +566,7 @@ private fun ModuleWallpaperRealPreview(
                 )
             }
             Text(
-                text = module?.description.orEmpty(),
+                text = module?.description ?: displayDescription.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = if (aspectRatio < 1.5f) 3 else 1,
                 overflow = TextOverflow.Ellipsis,

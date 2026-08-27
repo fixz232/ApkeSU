@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
@@ -876,12 +877,20 @@ private fun DeltaActionRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (enabled) DeltaColors.Accent else DeltaColors.Disabled,
-                modifier = Modifier.size(22.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(DeltaShapes.Control)
+                    .background(if (enabled) DeltaColors.AccentMuted else DeltaColors.SurfaceDeep),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (enabled) DeltaColors.Accent else DeltaColors.Disabled,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -903,6 +912,20 @@ private fun DeltaActionRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(DeltaShapes.SmallPill)
+                .background(if (enabled) DeltaColors.SurfaceDeep else DeltaColors.SurfaceDeep.copy(alpha = 0.72f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = if (enabled) DeltaColors.Accent else DeltaColors.Disabled,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

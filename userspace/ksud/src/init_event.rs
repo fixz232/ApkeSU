@@ -27,6 +27,7 @@ pub fn on_post_data_fs() -> Result<()> {
 
     crate::rescue::check_on_post_fs_data();
     let rescue_skip_modules = crate::rescue::take_skip_modules_once();
+    crate::kpm::recover_boot_state();
 
     // Clear all temporary module configs early
     if let Err(e) = crate::module_config::clear_all_temp_configs() {
@@ -51,7 +52,12 @@ pub fn on_post_data_fs() -> Result<()> {
         return Ok(());
     }
 
-    if utils::has_magisk() {
+    let magisk_present = utils::has_magisk();
+    if !magisk_present && let Err(error) = utils::remove_legacy_magisk_module_link() {
+        warn!("failed to remove legacy Magisk module link: {error:#}");
+    }
+
+    if magisk_present {
         warn!("Magisk detected, skip post-fs-data!");
         return Ok(());
     }
@@ -72,9 +78,6 @@ pub fn on_post_data_fs() -> Result<()> {
     let module_dir = defs::MODULE_DIR;
 
     assets::ensure_binaries(true).with_context(|| "Failed to extract bin assets")?;
-    if let Err(e) = utils::ensure_magisk_module_compat() {
-        warn!("ensure magisk module compat failed: {e}");
-    }
 
     // if we are in safe mode, we should disable all modules
     if safe_mode {
@@ -129,6 +132,7 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("init features failed: {e}");
     }
 
+    crate::kpm::load_enabled_at_boot();
     crate::pathmask::apply_if_configured();
 
     // execute metamodule post-fs-data script first (priority)
@@ -180,10 +184,6 @@ pub fn run_stage(stage: &str, block: bool) {
         return;
     }
 
-    if let Err(e) = utils::ensure_magisk_module_compat() {
-        warn!("ensure magisk module compat failed before {stage}: {e}");
-    }
-
     // post-fs-data is the earliest load window, but targets on late-mounted
     // storage may not exist yet. Retry Pathmask during the later Android
     // service milestones; apply_if_configured is idempotent once it is loaded.
@@ -231,6 +231,7 @@ pub fn on_boot_completed() {
     info!("on_boot_completed triggered!");
 
     crate::rescue::mark_boot_completed();
+    crate::kpm::mark_boot_completed();
 
     run_stage("boot-completed", false);
     // post-fs-data is the preferred early window. Retry here for devices whose

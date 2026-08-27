@@ -36,16 +36,17 @@ fun RebootDropdownItems(
     onItemClick: (String) -> Unit,
 ) {
     val options = getRebootListOption()
-    val itemColors = contentColor?.let {
-        MenuDefaults.itemColors(textColor = it)
-    } ?: MenuDefaults.itemColors()
     options.forEachIndexed { index, option ->
         DropdownMenuItem(
             selected = false,
             onClick = { onItemClick(option.reason) },
-            text = { Text("  " + stringResource(option.labelRes)) },
+            text = {
+                Text(
+                    text = "  " + stringResource(option.labelRes),
+                    color = contentColor ?: Color.Unspecified,
+                )
+            },
             shapes = MenuDefaults.itemShape(index = index, count = options.size),
-            colors = itemColors,
         )
     }
 }

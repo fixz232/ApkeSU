@@ -73,6 +73,7 @@ import me.weishu.kernelsu.ui.component.material.TonalCard
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.createRootShell
 import me.weishu.kernelsu.ui.util.execKsud
+import me.weishu.kernelsu.ui.util.getRescueStatus
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -899,23 +900,30 @@ private suspend fun flashImage(
     if (!result.success || !isRescueTrackedPartition(partition)) {
         return@withContext result
     }
-    val partitionName = partition.substringAfterLast('/')
-    val pendingMarked = execKsud(
-        args = "rescue mark-pending image-tool-$partitionName",
-        newShell = true,
-        globalMnt = true,
-    )
+    val rescueStatus = getRescueStatus()
+    val markerMessage = when {
+        !rescueStatus.enabled -> "Rescue protection: disabled, so no verification marker was written"
+        !rescueStatus.ready -> "Rescue protection: backup is not ready, so no verification marker was written"
+        else -> {
+            val partitionName = partition.substringAfterLast('/')
+            if (
+                execKsud(
+                    args = "rescue mark-pending image-tool-$partitionName",
+                    newShell = true,
+                    globalMnt = true,
+                )
+            ) {
+                "Rescue protection: next boot marked for verification"
+            } else {
+                "Rescue protection: pending marker was not written"
+            }
+        }
+    }
     result.copy(
         log = buildString {
             append(result.log)
             if (!result.log.endsWith('\n')) appendLine()
-            appendLine(
-                if (pendingMarked) {
-                    "Rescue protection: next boot marked for verification"
-                } else {
-                    "Rescue protection: pending marker was not written"
-                }
-            )
+            appendLine(markerMessage)
         }
     )
 }

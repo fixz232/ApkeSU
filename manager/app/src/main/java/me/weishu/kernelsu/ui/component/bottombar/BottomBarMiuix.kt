@@ -82,6 +82,7 @@ fun BottomBarMiuix(
     blurBackdrop: LayerBackdrop?,
     backdrop: Backdrop?,
     navigationBadge: NavigationBadgeState,
+    destinations: List<MainDestination>,
     modifier: Modifier,
 ) {
     val mainState = LocalMainPagerState.current
@@ -93,7 +94,6 @@ fun BottomBarMiuix(
     val isInkStyle = isInkInterfaceStyle()
     val isPixelStyle = isPixelInterfaceStyle()
 
-    val destinations = BottomBarDestination.entries.toList()
     val customIcons = LocalCustomNavigationIcons.current
     val barColor = if (isPixelStyle) {
         pixelNavigationContainerColor()
@@ -135,7 +135,7 @@ fun BottomBarMiuix(
             } else {
                 val items = destinations.map { destination ->
                     NavigationItem(
-                        label = customIcons[destination.slot].displayLabel(stringResource(destination.label)),
+                        label = customIcons.labelFor(destination, stringResource(destination.label)),
                         icon = destination.icon,
                     )
                 }
@@ -143,7 +143,8 @@ fun BottomBarMiuix(
                     modifier = navigationModifier,
                     color = barColor,
                     content = {
-                        items.forEachIndexed { index, item ->
+                        destinations.forEachIndexed { index, destination ->
+                            val item = items[index]
                             NavigationBarItem(
                                 modifier = Modifier.weight(1f),
                                 icon = item.icon,
@@ -152,7 +153,7 @@ fun BottomBarMiuix(
                                 onClick = {
                                     mainState.animateToPage(index)
                                 },
-                                badge = navigationBadgeFor(index, navigationBadge),
+                                badge = navigationBadgeFor(destination, navigationBadge),
                             )
                         }
                     }
@@ -175,8 +176,8 @@ fun BottomBarMiuix(
             isBlurEnabled = enableFloatingBottomBarBlur && backdrop != null,
         ) {
             destinations.forEachIndexed { index, destination ->
-                val label = customIcons[destination.slot].displayLabel(stringResource(destination.label))
-                val badge = navigationBadgeFor(index, navigationBadge, floating = true)
+                val label = customIcons.labelFor(destination, stringResource(destination.label))
+                val badge = navigationBadgeFor(destination, navigationBadge, floating = true)
                 FloatingBottomBarItem(
                     onClick = {
                         mainState.animateToPage(index)
@@ -185,7 +186,7 @@ fun BottomBarMiuix(
                 ) {
                     val icon: @Composable () -> Unit = {
                         CustomNavigationIconImage(
-                            state = customIcons[destination.slot],
+                            state = customIcons.stateFor(destination),
                             contentDescription = label,
                             modifier = Modifier.size(24.dp),
                         ) {
@@ -220,7 +221,7 @@ fun BottomBarMiuix(
 private fun MiuixCustomNavigationBar(
     modifier: Modifier,
     color: Color,
-    destinations: List<BottomBarDestination>,
+    destinations: List<MainDestination>,
     customIcons: CustomNavigationIconSet,
     selectedIndex: Int,
     navigationBadge: NavigationBadgeState,
@@ -242,9 +243,9 @@ private fun MiuixCustomNavigationBar(
             destinations.forEachIndexed { index, destination ->
                 MiuixCustomNavigationBarItem(
                     destination = destination,
-                    state = customIcons[destination.slot],
+                    state = customIcons.stateFor(destination),
                     selected = selectedIndex == index,
-                    badge = navigationBadgeFor(index, navigationBadge),
+                    badge = navigationBadgeFor(destination, navigationBadge),
                     onClick = { onSelected(index) },
                 )
             }
@@ -255,7 +256,7 @@ private fun MiuixCustomNavigationBar(
 
 @Composable
 private fun RowScope.MiuixCustomNavigationBarItem(
-    destination: BottomBarDestination,
+    destination: MainDestination,
     state: CustomNavigationIconState,
     selected: Boolean,
     badge: (@Composable () -> Unit)?,
@@ -347,11 +348,11 @@ private fun RowScope.MiuixCustomNavigationBarItem(
 }
 
 internal fun navigationBadgeFor(
-    index: Int,
+    destination: MainDestination,
     state: NavigationBadgeState,
     floating: Boolean = false,
 ): (@Composable () -> Unit)? {
-    val badge = badgeFor(index, state) ?: return null
+    val badge = badgeFor(destination, state) ?: return null
     return when (badge.tone) {
         BadgeTone.Alert -> {
             {
@@ -380,15 +381,4 @@ internal fun navigationBadgeFor(
             }
         }
     }
-}
-
-enum class BottomBarDestination(
-    @get:StringRes val label: Int,
-    val icon: ImageVector,
-    val slot: CustomNavigationIconSlot,
-) {
-    Home(R.string.home, Icons.Rounded.Cottage, CustomNavigationIconSlot.Home),
-    SuperUser(R.string.superuser, Icons.Rounded.Security, CustomNavigationIconSlot.Superuser),
-    Module(R.string.module, Icons.Rounded.Extension, CustomNavigationIconSlot.Module),
-    Setting(R.string.settings, Icons.Rounded.Settings, CustomNavigationIconSlot.Settings)
 }

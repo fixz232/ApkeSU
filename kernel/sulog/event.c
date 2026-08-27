@@ -329,6 +329,46 @@ int ksu_sulog_emit_grant_root(int retval, __u32 uid, __u32 euid, gfp_t gfp)
     return 0;
 }
 
+int ksu_sulog_emit_kpm(const char *operation, const char *name, int retval, gfp_t gfp)
+{
+    struct ksu_sulog_event *event;
+    void *payload;
+    char *operation_buf;
+    char *name_buf;
+    size_t operation_len;
+    size_t name_len;
+    size_t payload_len;
+
+    if (!ksu_sulog_is_enabled())
+        return 0;
+
+    operation = operation ?: "unknown";
+    name = name ?: "";
+    operation_len = strnlen(operation, KSU_SULOG_MAX_FILENAME_LEN - 1) + 1;
+    name_len = strnlen(name, KSU_SULOG_MAX_ARG_CHUNK - 1) + 1;
+    if (check_add_overflow(sizeof(*event), operation_len, &payload_len) ||
+        check_add_overflow(payload_len, name_len, &payload_len))
+        return -EOVERFLOW;
+
+    payload = kzalloc(payload_len, gfp);
+    if (!payload) {
+        ksu_event_queue_drop(&sulog_queue);
+        return -ENOMEM;
+    }
+
+    event = payload;
+    ksu_sulog_fill_task_info(event, KSU_SULOG_EVENT_KPM, retval);
+    operation_buf = (char *)payload + sizeof(*event);
+    name_buf = operation_buf + operation_len;
+    strscpy(operation_buf, operation, operation_len);
+    strscpy(name_buf, name, name_len);
+    event->filename_len = operation_len;
+    event->argv_len = name_len;
+    ksu_event_queue_push(&sulog_queue, KSU_SULOG_EVENT_KPM, 0, payload, payload_len, gfp);
+    kfree(payload);
+    return 0;
+}
+
 struct ksu_event_queue *ksu_sulog_get_queue(void)
 {
     return &sulog_queue;

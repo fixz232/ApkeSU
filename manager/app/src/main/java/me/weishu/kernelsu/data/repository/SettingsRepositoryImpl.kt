@@ -49,6 +49,7 @@ import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_PET_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CUSTOM_PRESETS_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_RECENT_COMPONENTS_KEY
@@ -146,12 +147,42 @@ import me.weishu.kernelsu.ui.util.setCustomNavigationIcon as writeCustomNavigati
 import me.weishu.kernelsu.ui.util.setCustomNavigationIconCrop as writeCustomNavigationIconCrop
 import me.weishu.kernelsu.ui.util.setCustomNavigationIconPresentation as writeCustomNavigationIconPresentation
 import org.json.JSONArray
+import java.security.SecureRandom
 import java.util.UUID
+
+private const val SETTINGS_PREFS = "settings"
 
 class SettingsRepositoryImpl : SettingsRepository {
 
+    private companion object {
+        private const val INTENT_TOKEN_KEY = "intent_token"
+        private val secureRandom = SecureRandom()
+        const val CUSTOM_MANAGER_NAME_KEY = "custom_manager_name"
+        const val MAX_CUSTOM_MANAGER_NAME_LENGTH = 40
+        const val MAX_CUSTOM_HOME_TITLE_LENGTH = 40
+        const val CUSTOM_THEME_PRESET_IDS_KEY = "custom_theme_preset_ids"
+        const val MAX_RECENT_UI_DECORATION_COMPONENTS = 16
+        val CUSTOM_THEME_PRESET_FIELDS = listOf(
+            "name",
+            "ui_mode",
+            "updated_at",
+            "color_mode",
+            "miuix_monet",
+            "key_color",
+            "color_style",
+            "color_spec",
+            "monet_surface_opacity",
+            "enable_blur",
+            "enable_floating_bottom_bar",
+            "enable_floating_bottom_bar_blur",
+            "page_scale",
+            "font_scale",
+            "blur_intensity",
+        )
+    }
+
     private val prefs by lazy {
-        ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        ksuApp.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
     }
 
     override var uiMode: String
@@ -390,6 +421,12 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, DEFAULT_PIXEL_CARD_MOTION_ENABLED)
         set(value) = prefs.edit { putBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, value) }
 
+    override var pixelPetEnabled: Boolean
+        get() = ksuApp.getSharedPreferences("pixel_pet", Context.MODE_PRIVATE)
+            .getBoolean(PIXEL_PET_ENABLED_KEY, false)
+        set(value) = ksuApp.getSharedPreferences("pixel_pet", Context.MODE_PRIVATE)
+            .edit { putBoolean(PIXEL_PET_ENABLED_KEY, value) }
+
     override val uiDecorationConfig: UiDecorationConfig
         get() = UiDecorationConfig.fromJsonString(prefs.getString(UI_DECORATION_CONFIG_KEY, null))
 
@@ -593,6 +630,10 @@ class SettingsRepositoryImpl : SettingsRepository {
                 }
             }
         }
+
+    override var useSoftReboot: Boolean
+        get() = prefs.getBoolean(SOFT_REBOOT_KEY, false)
+        set(value) = prefs.edit { putBoolean(SOFT_REBOOT_KEY, value) }
 
     override var launcherIcon: String
         get() = LauncherIconOption.fromValue(
@@ -896,6 +937,16 @@ class SettingsRepositoryImpl : SettingsRepository {
         writeCustomNavigationIconPresentation(ksuApp, slot, state)
     }
 
+    override val intentToken: String
+        get() {
+            val existing = prefs.getString(INTENT_TOKEN_KEY, null)
+            if (!existing.isNullOrBlank()) return existing
+            val token = ByteArray(32).also(secureRandom::nextBytes)
+                .joinToString(separator = "") { "%02x".format(it) }
+            prefs.edit { putString(INTENT_TOKEN_KEY, token) }
+            return token
+        }
+
     override suspend fun getSuCompatStatus(): String = getFeatureStatus("su_compat")
 
     override suspend fun getSuCompatPersistValue(): Long? = getFeaturePersistValue("su_compat")
@@ -913,6 +964,14 @@ class SettingsRepositoryImpl : SettingsRepository {
     override fun isKernelUmountEnabled(): Boolean = Natives.isKernelUmountEnabled()
 
     override fun setKernelUmountEnabled(enabled: Boolean): Boolean = Natives.setKernelUmountEnabled(enabled)
+
+    override suspend fun getWebViewZygoteUmountStatus(): String =
+        getFeatureStatus("webview_zygote_umount")
+
+    override fun isWebViewZygoteUmountEnabled(): Boolean = Natives.isWebViewZygoteUmountEnabled()
+
+    override fun setWebViewZygoteUmountEnabled(enabled: Boolean): Boolean =
+        Natives.setWebViewZygoteUmountEnabled(enabled)
 
     override suspend fun getSelinuxHideStatus(): String {
         val status = getFeatureStatus("selinux_hide")
@@ -1238,28 +1297,4 @@ class SettingsRepositoryImpl : SettingsRepository {
         return value.orEmpty().trim().take(MAX_CUSTOM_HOME_TITLE_LENGTH)
     }
 
-    private companion object {
-        const val CUSTOM_MANAGER_NAME_KEY = "custom_manager_name"
-        const val MAX_CUSTOM_MANAGER_NAME_LENGTH = 40
-        const val MAX_CUSTOM_HOME_TITLE_LENGTH = 40
-        const val CUSTOM_THEME_PRESET_IDS_KEY = "custom_theme_preset_ids"
-        const val MAX_RECENT_UI_DECORATION_COMPONENTS = 16
-        val CUSTOM_THEME_PRESET_FIELDS = listOf(
-            "name",
-            "ui_mode",
-            "updated_at",
-            "color_mode",
-            "miuix_monet",
-            "key_color",
-            "color_style",
-            "color_spec",
-            "monet_surface_opacity",
-            "enable_blur",
-            "enable_floating_bottom_bar",
-            "enable_floating_bottom_bar_blur",
-            "page_scale",
-            "font_scale",
-            "blur_intensity",
-        )
-    }
 }

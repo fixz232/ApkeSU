@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ImageSearch
@@ -297,6 +298,19 @@ fun SettingPagerMaterial(
                             },
                             {
                                 SegmentedSwitchItem(
+                                    icon = Icons.Rounded.Language,
+                                    title = stringResource(R.string.settings_webview_zygote_umount),
+                                    summary = materialFeatureSummary(
+                                        uiState.webViewZygoteUmountStatus,
+                                        R.string.settings_webview_zygote_umount_summary,
+                                    ),
+                                    enabled = uiState.webViewZygoteUmountStatus == "supported",
+                                    checked = uiState.isWebViewZygoteUmountEnabled,
+                                    onCheckedChange = actions.onSetWebViewZygoteUmountEnabled,
+                                )
+                            },
+                            {
+                                SegmentedSwitchItem(
                                     icon = Icons.Filled.Policy,
                                     title = stringResource(R.string.settings_selinux_hide),
                                     summary = materialFeatureSummary(
@@ -345,6 +359,16 @@ fun SettingPagerMaterial(
                                     enabled = uiState.avcSpoofStatus == "supported",
                                     checked = uiState.isAvcSpoofEnabled,
                                     onCheckedChange = actions.onSetAvcSpoofEnabled,
+                                )
+                            },
+                            {
+                                SegmentedSwitchItem(
+                                    icon = Icons.Filled.RestartAlt,
+                                    title = stringResource(R.string.settings_soft_reboot),
+                                    summary = stringResource(R.string.settings_soft_reboot_summary),
+                                    enabled = !uiState.isLateLoadMode,
+                                    checked = uiState.isLateLoadMode || uiState.useSoftReboot,
+                                    onCheckedChange = actions.onSetUseSoftReboot,
                                 )
                             },
                         ),

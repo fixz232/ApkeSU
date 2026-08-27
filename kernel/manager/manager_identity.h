@@ -6,6 +6,18 @@
 
 #define KSU_INVALID_APPID -1
 #define KSU_PER_USER_RANGE 100000
+#define KSU_FIRST_APPLICATION_APPID 10000
+#define KSU_LAST_APPLICATION_APPID 19999
+
+static inline uid_t ksu_normalize_appid(uid_t uid)
+{
+    return uid % KSU_PER_USER_RANGE;
+}
+
+static inline bool ksu_is_normal_appid(uid_t appid)
+{
+    return appid >= KSU_FIRST_APPLICATION_APPID && appid <= KSU_LAST_APPLICATION_APPID;
+}
 
 #ifdef CONFIG_KSU_DISABLE_MANAGER
 static inline bool ksu_is_manager_appid_valid()
@@ -46,12 +58,12 @@ static inline bool ksu_is_manager_appid_valid()
 
 static inline bool is_manager()
 {
-    return unlikely(ksu_manager_appid == current_uid().val % KSU_PER_USER_RANGE);
+    return unlikely(ksu_manager_appid == ksu_normalize_appid(current_uid().val));
 }
 
 static inline bool is_uid_manager(uid_t uid)
 {
-    return unlikely(ksu_manager_appid == uid % KSU_PER_USER_RANGE);
+    return unlikely(ksu_manager_appid == ksu_normalize_appid(uid));
 }
 
 static inline uid_t ksu_get_manager_appid()
@@ -61,7 +73,7 @@ static inline uid_t ksu_get_manager_appid()
 
 static inline void ksu_set_manager_appid(uid_t appid)
 {
-    ksu_manager_appid = appid;
+    ksu_manager_appid = ksu_normalize_appid(appid);
 }
 
 static inline void ksu_invalidate_manager_uid()

@@ -89,6 +89,23 @@ class PageTransitionEffectTest {
     }
 
     @Test
+    fun skrootproPagerKeepsFullOpaquePageBoundsDuringTransition() {
+        PageTransitionVisual.entries.forEach { visual ->
+            listOf(-0.75f, -0.25f, 0.25f, 0.75f).forEach { offset ->
+                assertEquals(
+                    PageTransitionTransform(),
+                    resolveMainPageTransitionTransform(
+                        visual = visual,
+                        interfaceStyle = InterfaceStyle.Skrootpro.value,
+                        pageOffset = offset,
+                        animationsEnabled = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
     fun nonMaterialPagerRetainsSelectedTransition() {
         val expected = resolvePageTransitionTransform(
             visual = PageTransitionVisual.Depth,
@@ -104,5 +121,21 @@ class PageTransitionEffectTest {
                 animationsEnabled = true,
             ),
         )
+    }
+
+    @Test
+    fun embeddedAndroidViewsKeepIdentityTransformInEveryInterfaceStyle() {
+        PageTransitionVisual.entries.forEach { visual ->
+            assertEquals(
+                PageTransitionTransform(),
+                resolveMainPageTransitionTransform(
+                    visual = visual,
+                    interfaceStyle = InterfaceStyle.Pixel.value,
+                    pageOffset = 0.65f,
+                    animationsEnabled = true,
+                    containsEmbeddedAndroidView = true,
+                ),
+            )
+        }
     }
 }

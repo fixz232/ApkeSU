@@ -2,6 +2,8 @@ package me.weishu.kernelsu.ui.webui
 
 import android.app.Activity
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
@@ -17,6 +19,7 @@ import com.topjohnwu.superuser.internal.UiThreadHandler
 import me.weishu.kernelsu.ui.util.createRootShell
 import me.weishu.kernelsu.ui.util.listModules
 import me.weishu.kernelsu.ui.util.withNewRootShell
+import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import me.weishu.kernelsu.ui.webui.file.KsuIO
 import org.json.JSONArray
@@ -221,12 +224,11 @@ class WebViewInterface(private val state: WebUIState) {
 
     @JavascriptInterface
     fun listPackages(type: String): String {
-        val packageNames = SuperUserViewModel.apps
-            .filter { appInfo ->
-                val flags = appInfo.packageInfo.applicationInfo?.flags ?: 0
+        val packageNames = packageRecords()
+            .filter { record ->
                 when (type.lowercase()) {
-                    "system" -> (flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    "user" -> (flags and ApplicationInfo.FLAG_SYSTEM) == 0
+                    "system" -> record.isSystem
+                    "user" -> !record.isSystem
                     else -> true
                 }
             }
@@ -244,20 +246,18 @@ class WebViewInterface(private val state: WebUIState) {
     fun getPackagesInfo(packageNamesJson: String): String {
         val packageNames = JSONArray(packageNamesJson)
         val jsonArray = JSONArray()
-        val appMap = SuperUserViewModel.apps.associateBy { it.packageName }
+        val appMap = packageRecords().associateBy { it.packageName }
         for (i in 0 until packageNames.length()) {
             val pkgName = packageNames.getString(i)
             val appInfo = appMap[pkgName]
             if (appInfo != null) {
-                val pkg = appInfo.packageInfo
-                val app = pkg.applicationInfo
                 val obj = JSONObject()
-                obj.put("packageName", pkg.packageName)
-                obj.put("versionName", pkg.versionName ?: "")
-                obj.put("versionCode", PackageInfoCompat.getLongVersionCode(pkg))
+                obj.put("packageName", appInfo.packageName)
+                obj.put("versionName", appInfo.versionName)
+                obj.put("versionCode", appInfo.versionCode)
                 obj.put("appLabel", appInfo.label)
-                obj.put("isSystem", if (app != null) ((app.flags and ApplicationInfo.FLAG_SYSTEM) != 0) else JSONObject.NULL)
-                obj.put("uid", app?.uid ?: JSONObject.NULL)
+                obj.put("isSystem", appInfo.isSystem)
+                obj.put("uid", appInfo.uid)
                 jsonArray.put(obj)
             } else {
                 val obj = JSONObject()
@@ -267,6 +267,62 @@ class WebViewInterface(private val state: WebUIState) {
             }
         }
         return jsonArray.toString()
+    }
+
+    private data class PackageRecord(
+        val packageName: String,
+        val versionName: String,
+        val versionCode: Long,
+        val label: String,
+        val isSystem: Boolean,
+        val uid: Int,
+    )
+
+    /**
+     * WebUI calls this synchronously during its first render. The root-backed
+     * SuperUser cache may still be loading, so use PackageManager as an immediate
+     * fallback instead of returning an empty list once.
+     */
+    private fun packageRecords(): List<PackageRecord> {
+        val records = LinkedHashMap<String, PackageRecord>()
+        val cached = SuperUserViewModel.apps.mapNotNull { appInfo ->
+            val packageInfo = appInfo.packageInfo
+            val applicationInfo = packageInfo.applicationInfo ?: return@mapNotNull null
+            PackageRecord(
+                packageName = packageInfo.packageName,
+                versionName = packageInfo.versionName.orEmpty(),
+                versionCode = PackageInfoCompat.getLongVersionCode(packageInfo),
+                label = appInfo.label,
+                isSystem = (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                uid = applicationInfo.uid,
+            )
+        }
+        cached.forEach { record -> records[record.packageName] = record }
+
+        val installed = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ksuApp.packageManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                ksuApp.packageManager.getInstalledPackages(0)
+            }
+        }.getOrDefault(emptyList())
+
+        installed.mapNotNull { packageInfo ->
+            val applicationInfo = packageInfo.applicationInfo ?: return@mapNotNull null
+            PackageRecord(
+                packageName = packageInfo.packageName,
+                versionName = packageInfo.versionName.orEmpty(),
+                versionCode = PackageInfoCompat.getLongVersionCode(packageInfo),
+                label = runCatching {
+                    applicationInfo.loadLabel(ksuApp.packageManager).toString()
+                }.getOrDefault(packageInfo.packageName),
+                isSystem = (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                uid = applicationInfo.uid,
+            )
+        }.forEach { record -> records[record.packageName] = record }
+
+        return records.values.toList()
     }
 
     @JavascriptInterface

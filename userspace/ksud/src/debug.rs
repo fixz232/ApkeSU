@@ -1,4 +1,4 @@
-use anyhow::{Context, Ok, Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use std::{
     ffi::CString,
     fs,
@@ -8,26 +8,49 @@ use std::{
 
 use crate::ksucalls;
 
-const KERNEL_PARAM_PATH: &str = "/sys/module/kernelsu";
+const KERNEL_MODULE_NAMES: [&str; 2] = ["kernelsu", "apkesu"];
+const FIRST_APPLICATION_APPID: u32 = 10_000;
+const LAST_APPLICATION_APPID: u32 = 19_999;
 
-fn read_u32(path: &PathBuf) -> Result<u32> {
+fn read_i32(path: &PathBuf) -> Result<i32> {
     let content = std::fs::read_to_string(path)?;
     let content = content.trim();
-    let content = content.parse::<u32>()?;
+    let content = content.parse::<i32>()?;
     Ok(content)
 }
 
 fn set_kernel_param(appid: u32) -> Result<()> {
-    let kernel_param_path = Path::new(KERNEL_PARAM_PATH).join("parameters");
+    if !(FIRST_APPLICATION_APPID..=LAST_APPLICATION_APPID).contains(&appid) {
+        bail!("refusing non-application manager appid {appid}");
+    }
 
-    let ksu_debug_manager_appid = kernel_param_path.join("ksu_debug_manager_appid");
-    let before_appid = read_u32(&ksu_debug_manager_appid)?;
-    std::fs::write(&ksu_debug_manager_appid, appid.to_string())?;
-    let after_appid = read_u32(&ksu_debug_manager_appid)?;
-
-    println!("set manager appid: {before_appid} -> {after_appid}");
-
-    Ok(())
+    let mut errors = Vec::new();
+    for module_name in KERNEL_MODULE_NAMES {
+        let parameter = Path::new("/sys/module")
+            .join(module_name)
+            .join("parameters")
+            .join("manager_appid");
+        match (|| -> Result<()> {
+            let before_appid = read_i32(&parameter)?;
+            std::fs::write(&parameter, appid.to_string())?;
+            let after_appid = read_i32(&parameter)?;
+            ensure!(
+                after_appid == appid as i32,
+                "manager appid verification failed: {after_appid}"
+            );
+            let registered_appid = ksucalls::get_manager_appid()?;
+            ensure!(
+                registered_appid == appid,
+                "kernel manager appid verification failed: {registered_appid}"
+            );
+            println!("set manager appid: {before_appid} -> {after_appid}");
+            Ok(())
+        })() {
+            Ok(()) => return Ok(()),
+            Err(error) => errors.push(format!("{}: {error:#}", parameter.display())),
+        }
+    }
+    bail!("could not set manager appid: {}", errors.join("; "))
 }
 
 fn get_pkg_appid(pkg: &str) -> Result<u32> {
@@ -39,11 +62,6 @@ fn get_pkg_appid(pkg: &str) -> Result<u32> {
 }
 
 pub fn set_manager(pkg: &str) -> Result<()> {
-    ensure!(
-        Path::new(KERNEL_PARAM_PATH).exists(),
-        "CONFIG_KSU_DEBUG is not enabled"
-    );
-
     let appid = get_pkg_appid(pkg)?;
     set_kernel_param(appid)?;
     // force-stop it

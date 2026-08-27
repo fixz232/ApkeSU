@@ -37,14 +37,14 @@ fn dump_process_info(label: &str) {
 
 const PER_USER_RANGE: u32 = 100_000;
 const FIRST_APPLICATION_APPID: u32 = 10_000;
-const FIRST_ISOLATED_APPID: u32 = 90_000;
+const LAST_APPLICATION_APPID: u32 = 19_999;
 
 const fn normalize_appid(uid: u32) -> u32 {
     uid % PER_USER_RANGE
 }
 
 fn is_normal_appid(appid: u32) -> bool {
-    (FIRST_APPLICATION_APPID..FIRST_ISOLATED_APPID).contains(&appid)
+    (FIRST_APPLICATION_APPID..=LAST_APPLICATION_APPID).contains(&appid)
 }
 
 fn get_pkg_appid_from_stat(pkg: &str) -> Result<u32> {
@@ -98,9 +98,9 @@ fn get_pkg_appid(pkg: &str) -> Result<u32> {
 
 fn ensure_this_manager_package(package_name: &str) -> Result<()> {
     anyhow::ensure!(
-        package_name == defs::DEFAULT_MANAGER_PACKAGE,
-        "refusing to register manager appid for package {package_name}; this build only trusts {}",
-        defs::DEFAULT_MANAGER_PACKAGE
+        defs::is_trusted_manager_package(package_name),
+        "refusing to register manager appid for package {package_name}; this build trusts {}",
+        defs::TRUSTED_MANAGER_PACKAGES.join(", ")
     );
     Ok(())
 }
@@ -160,7 +160,12 @@ fn register_manager_appid(appid: Option<u32>) {
 }
 
 pub fn register_default_manager_appid() {
-    register_manager_appid(resolve_manager_appid(defs::DEFAULT_MANAGER_PACKAGE, None));
+    for package_name in defs::TRUSTED_MANAGER_PACKAGES {
+        if let Some(appid) = resolve_manager_appid(package_name, None) {
+            register_manager_appid(Some(appid));
+            return;
+        }
+    }
 }
 
 pub fn register_manager(package_name: &str, manager_uid: Option<u32>) -> Result<()> {

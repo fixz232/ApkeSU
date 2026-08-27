@@ -139,6 +139,7 @@ int __init kernelsu_init(void)
     ksu_avc_spoof_init();
 
     ksu_supercalls_init();
+    ksu_app_profile_init();
 
     if (ksu_late_loaded) {
         pr_info("late load mode, skipping kprobe hooks\n");

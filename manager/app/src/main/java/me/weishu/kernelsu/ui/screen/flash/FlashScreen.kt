@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.data.repository.isSoftRebootPreferred
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -35,7 +36,7 @@ fun FlashScreen(flashIt: FlashIt) {
     val flashViewModel = viewModel<FlashViewModel>()
     val executionState by flashViewModel.state.collectAsStateWithLifecycle()
     val needJailbreakWarning = flashIt.needsJailbreakFlashWarning() && Natives.isLateLoadMode
-    val softReboot = flashIt is FlashIt.FlashModules && Natives.isLateLoadMode
+    val softReboot = flashIt is FlashIt.FlashModules && isSoftRebootPreferred()
     var flashingEnabled by rememberSaveable { mutableStateOf(!needJailbreakWarning) }
     var operationRequested by rememberSaveable(flashIt) { mutableStateOf(false) }
     var refreshSent by rememberSaveable(flashIt) { mutableStateOf(false) }

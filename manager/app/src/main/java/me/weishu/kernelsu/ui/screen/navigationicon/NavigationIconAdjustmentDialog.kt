@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.FilterChip
@@ -175,6 +176,7 @@ internal fun NavigationIconAdjustmentDialog(
 private val CustomNavigationIconSlot.fallbackIcon: ImageVector
     get() = when (this) {
         CustomNavigationIconSlot.Home -> Icons.Rounded.Home
+        CustomNavigationIconSlot.Kpm -> Icons.Rounded.Memory
         CustomNavigationIconSlot.Superuser -> Icons.Rounded.Security
         CustomNavigationIconSlot.Module -> Icons.Rounded.Extension
         CustomNavigationIconSlot.Settings -> Icons.Rounded.Settings

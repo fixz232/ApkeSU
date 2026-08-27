@@ -13,6 +13,7 @@ enum ksu_sulog_event_type {
     KSU_SULOG_EVENT_ROOT_EXECVE = 1,
     KSU_SULOG_EVENT_SUCOMPAT = 2,
     KSU_SULOG_EVENT_IOCTL_GRANT_ROOT = 3,
+    KSU_SULOG_EVENT_KPM = 4,
 };
 
 struct ksu_sulog_event {

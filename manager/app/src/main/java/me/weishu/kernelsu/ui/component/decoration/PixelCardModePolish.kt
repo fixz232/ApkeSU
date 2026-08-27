@@ -22,6 +22,7 @@ internal fun DrawScope.drawPixelPatternFramePolish(
     val shadowColor = shadow.pixelAlpha(alpha * 0.58f)
     when (pattern) {
         PixelCardPattern.Generic,
+        PixelCardPattern.PetCompanion,
         PixelCardPattern.Ocean,
         PixelCardPattern.Cyber,
         -> Unit

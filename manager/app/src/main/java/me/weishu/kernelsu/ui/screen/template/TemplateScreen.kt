@@ -1,7 +1,6 @@
 package me.weishu.kernelsu.ui.screen.template
 
 import android.content.ClipData
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.isNetworkAvailable
 import me.weishu.kernelsu.ui.viewmodel.TemplateViewModel
+import top.yukonga.miuix.kmp.basic.SnackbarHostState as MiuixSnackbarHostState
 
 @Composable
 fun AppProfileTemplateScreen() {
@@ -34,6 +34,8 @@ fun AppProfileTemplateScreen() {
     val scope = rememberCoroutineScope()
     val materialSnackbarHost = remember { androidx.compose.material3.SnackbarHostState() }
     val requestKey = "template_edit"
+    val miuixSnackbarHost = remember { MiuixSnackbarHostState() }
+    val uiMode = LocalUiMode.current
 
     LaunchedEffect(Unit) {
         if (screenState.templateList.isEmpty()) {
@@ -56,7 +58,11 @@ fun AppProfileTemplateScreen() {
 
     fun showMessage(message: String) {
         scope.launch {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if (uiMode == UiMode.Material) {
+                materialSnackbarHost.showSnackbar(message)
+            } else {
+                miuixSnackbarHost.showSnackbar(message)
+            }
         }
     }
 
@@ -114,8 +120,17 @@ fun AppProfileTemplateScreen() {
         },
     )
 
-    when (LocalUiMode.current) {
-        UiMode.Miuix -> AppProfileTemplateScreenMiuix(uiState, actions)
-        UiMode.Material -> AppProfileTemplateScreenMaterial(uiState, actions, materialSnackbarHost)
+    when (uiMode) {
+        UiMode.Miuix -> AppProfileTemplateScreenMiuix(
+            state = uiState,
+            actions = actions,
+            snackBarHost = miuixSnackbarHost,
+        )
+
+        UiMode.Material -> AppProfileTemplateScreenMaterial(
+            state = uiState,
+            actions = actions,
+            snackBarHost = materialSnackbarHost,
+        )
     }
 }

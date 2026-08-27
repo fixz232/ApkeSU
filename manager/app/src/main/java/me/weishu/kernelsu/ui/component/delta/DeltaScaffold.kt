@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -231,10 +232,16 @@ fun DeltaScreen(
     secondaryTopActionIcon: ImageVector? = null,
     onSecondaryTopActionClick: () -> Unit = {},
     secondaryTopActionContentDescription: String? = null,
+    tertiaryTopActionIcon: ImageVector? = null,
+    onTertiaryTopActionClick: () -> Unit = {},
+    tertiaryTopActionContentDescription: String? = null,
+    transparentChrome: Boolean = false,
     topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val background = if (LocalNightBackgroundEffectActive.current) {
+    val background = if (transparentChrome) {
+        Color.Transparent
+    } else if (LocalNightBackgroundEffectActive.current) {
         DeltaColors.Background.copy(alpha = 0.84f)
     } else {
         DeltaColors.Background
@@ -264,6 +271,10 @@ fun DeltaScreen(
                 secondaryActionIcon = secondaryTopActionIcon,
                 onSecondaryActionClick = onSecondaryTopActionClick,
                 secondaryActionContentDescription = secondaryTopActionContentDescription,
+                tertiaryActionIcon = tertiaryTopActionIcon,
+                onTertiaryActionClick = onTertiaryTopActionClick,
+                tertiaryActionContentDescription = tertiaryTopActionContentDescription,
+                forceTransparent = transparentChrome,
             )
         }
         Box(modifier = Modifier.weight(1f)) {
@@ -283,13 +294,17 @@ fun DeltaTopBar(
     secondaryActionIcon: ImageVector? = null,
     onSecondaryActionClick: () -> Unit = {},
     secondaryActionContentDescription: String? = null,
+    tertiaryActionIcon: ImageVector? = null,
+    onTertiaryActionClick: () -> Unit = {},
+    tertiaryActionContentDescription: String? = null,
+    forceTransparent: Boolean = false,
 ) {
-    val actionCount = listOfNotNull(actionIcon, secondaryActionIcon).size
+    val actionCount = listOfNotNull(actionIcon, secondaryActionIcon, tertiaryActionIcon).size
     val titleHorizontalPadding = 36 + (actionCount - 1).coerceAtLeast(0) * 40
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(immersiveTopBarColor(DeltaColors.Background))
+            .background(if (forceTransparent) Color.Transparent else immersiveTopBarColor(DeltaColors.Background))
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
             .padding(bottom = 12.dp),
     ) {
@@ -340,6 +355,16 @@ fun DeltaTopBar(
                         Icon(
                             imageVector = secondaryActionIcon,
                             contentDescription = secondaryActionContentDescription,
+                            tint = DeltaColors.Accent,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                }
+                if (tertiaryActionIcon != null) {
+                    IconButton(onClick = onTertiaryActionClick) {
+                        Icon(
+                            imageVector = tertiaryActionIcon,
+                            contentDescription = tertiaryActionContentDescription,
                             tint = DeltaColors.Accent,
                             modifier = Modifier.size(26.dp),
                         )
@@ -583,6 +608,7 @@ fun DeltaEmptyCard(
 fun DeltaBottomBar(
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -599,7 +625,7 @@ fun DeltaBottomBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DeltaNavDestination.entries.forEachIndexed { index, destination ->
+        destinations.forEachIndexed { index, destination ->
             DeltaNavItem(
                 destination = destination,
                 selected = selectedIndex == index,
@@ -612,7 +638,7 @@ fun DeltaBottomBar(
 
 @Composable
 private fun DeltaNavItem(
-    destination: DeltaNavDestination,
+    destination: MainDestination,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -646,14 +672,4 @@ private fun DeltaNavItem(
             )
         }
     }
-}
-
-enum class DeltaNavDestination(
-    @StringRes val label: Int,
-    val icon: ImageVector,
-) {
-    Home(R.string.home, Icons.Rounded.Home),
-    SuperUser(R.string.superuser, Icons.Rounded.Security),
-    Module(R.string.module, Icons.Rounded.Extension),
-    Settings(R.string.settings, Icons.Rounded.Settings),
 }

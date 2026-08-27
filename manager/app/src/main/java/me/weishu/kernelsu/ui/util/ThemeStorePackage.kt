@@ -13,6 +13,10 @@ import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.component.BACKGROUND_SCROLL_FOLLOW_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.SWITCH_STYLE_KEY
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
+import me.weishu.kernelsu.ui.component.pixel.PIXEL_PET_ENABLED_KEY
+import me.weishu.kernelsu.ui.component.pixel.PixelPetStore
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_ACTIVE_ID_KEY
 import me.weishu.kernelsu.ui.component.custom.CUSTOM_CARD_STYLE_LIBRARY_KEY
 import me.weishu.kernelsu.ui.component.custom.CUSTOM_SWITCH_STYLE_ACTIVE_ID_KEY
@@ -330,6 +334,8 @@ data class ThemeStoreAppearanceState(
     val colorStyle: String,
     val colorSpec: String,
     val monetSurfaceOpacity: Float,
+    val pixelStyle: String = PixelStyle.DEFAULT_VALUE,
+    val pixelPetEnabled: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("themeMode", themeMode)
@@ -338,6 +344,8 @@ data class ThemeStoreAppearanceState(
         .put("colorStyle", colorStyle)
         .put("colorSpec", colorSpec)
         .put("monetSurfaceOpacity", sanitizeMonetSurfaceOpacity(monetSurfaceOpacity))
+        .put("pixelStyle", PixelStyle.fromValue(pixelStyle).value)
+        .put("pixelPetEnabled", pixelPetEnabled)
 
     companion object {
         fun fromJson(json: JSONObject, fallback: ThemeStoreAppearanceState): ThemeStoreAppearanceState {
@@ -366,6 +374,8 @@ data class ThemeStoreAppearanceState(
                         fallback.monetSurfaceOpacity.toDouble(),
                     ).toFloat()
                 ),
+                pixelStyle = PixelStyle.fromValue(json.optString("pixelStyle", fallback.pixelStyle)).value,
+                pixelPetEnabled = json.optBoolean("pixelPetEnabled", fallback.pixelPetEnabled),
             )
         }
     }
@@ -551,7 +561,7 @@ fun readThemeStoreSummary(context: Context): ThemeStoreSummary {
         ),
         startupAnimationUri = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null),
         appFont = readAppFontState(context),
-        appearance = prefs.readThemeStoreAppearance(),
+        appearance = prefs.readThemeStoreAppearance(context),
     )
 }
 
@@ -1130,7 +1140,7 @@ fun exportThemeStorePackage(context: Context, destination: Uri): ThemeStorePacka
                         budget = assetBudget,
                     ),
                 )
-                config.put("appearance", prefs.readThemeStoreAppearance().toJson())
+                config.put("appearance", prefs.readThemeStoreAppearance(appContext).toJson())
 
                 val layoutStickerAssets = mutableMapOf<String, JSONObject?>()
                 var layoutStickerIndex = 0
@@ -2029,6 +2039,9 @@ fun importThemeStorePackage(
             try {
                 require(editor.commit()) { "Unable to save imported theme settings" }
                 preferencesCommitted = true
+                pendingAppearance?.let { appearance ->
+                    PixelPetStore.applyThemeEnabled(appContext, appearance.pixelPetEnabled)
+                }
             } finally {
                 if (!preferencesCommitted) {
                     directorySwap.rollback()
@@ -2076,7 +2089,7 @@ private fun themeStorePrefs(context: Context): SharedPreferences {
     return context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 }
 
-private fun SharedPreferences.readThemeStoreAppearance(): ThemeStoreAppearanceState {
+private fun SharedPreferences.readThemeStoreAppearance(context: Context): ThemeStoreAppearanceState {
     val uiMode = InterfaceStyle.normalizeValue(getString("ui_mode", UiMode.DEFAULT_VALUE))
     val defaultPreset = defaultThemePresetForUiMode(uiMode)
     val strategy = ThemeSyncStrategy.fromValue(
@@ -2094,6 +2107,10 @@ private fun SharedPreferences.readThemeStoreAppearance(): ThemeStoreAppearanceSt
         monetSurfaceOpacity = sanitizeMonetSurfaceOpacity(
             getFloat(key("monet_surface_opacity"), defaultPreset.monetSurfaceOpacity)
         ),
+        pixelStyle = PixelStyle.fromValue(getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE)).value,
+        pixelPetEnabled = context.applicationContext
+            .getSharedPreferences("pixel_pet", Context.MODE_PRIVATE)
+            .getBoolean(PIXEL_PET_ENABLED_KEY, false),
     )
 }
 
@@ -2113,6 +2130,7 @@ private fun SharedPreferences.Editor.putThemeStoreAppearance(
     putString(key("color_spec"), appearance.colorSpec)
     putFloat(key("monet_surface_opacity"), sanitizeMonetSurfaceOpacity(appearance.monetSurfaceOpacity))
     putString(key("theme_preset"), ThemePreset.CUSTOM.value)
+    putString(PIXEL_STYLE_KEY, PixelStyle.fromValue(appearance.pixelStyle).value)
 }
 
 private fun stageImportedComponentStyles(
@@ -3123,6 +3141,8 @@ private fun validateThemeStoreAppearance(appearance: JSONObject) {
         "colorStyle",
         "colorSpec",
         "monetSurfaceOpacity",
+        "pixelStyle",
+        "pixelPetEnabled",
     )
     require(appearance.keys().asSequence().all { it in allowedKeys }) {
         "Theme package contains unknown appearance settings"
@@ -3155,6 +3175,14 @@ private fun validateThemeStoreAppearance(appearance: JSONObject) {
                 value >= ThemeAppearanceDefaults.MIN_MONET_SURFACE_OPACITY &&
                 value <= ThemeAppearanceDefaults.MAX_MONET_SURFACE_OPACITY
         ) { "Theme Monet surface opacity is invalid" }
+    }
+    appearance.opt("pixelStyle")?.let { raw ->
+        require(raw is String && PixelStyle.entries.any { it.value == raw }) {
+            "Theme pixel style is invalid"
+        }
+    }
+    appearance.opt("pixelPetEnabled")?.let { raw ->
+        require(raw is Boolean) { "Theme pixel pet setting is invalid" }
     }
 }
 

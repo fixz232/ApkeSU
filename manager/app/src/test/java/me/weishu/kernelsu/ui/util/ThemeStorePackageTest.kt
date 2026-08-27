@@ -1,5 +1,6 @@
 package me.weishu.kernelsu.ui.util
 
+import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.component.custom.CustomCardStyle
 import me.weishu.kernelsu.ui.component.custom.CustomSwitchSource
 import me.weishu.kernelsu.ui.component.custom.CustomSwitchStyle
@@ -197,6 +198,27 @@ class ThemeStorePackageTest {
         assertEquals(ColorMode.MONET_DARK.value, parsed.themeMode)
         assertTrue(parsed.miuixMonet)
         assertEquals(0.72f, parsed.monetSurfaceOpacity, 0.0001f)
+    }
+
+    @Test
+    fun themeStoreAppearance_acceptsPixelPetFields() {
+        val appearance = ThemeStoreAppearanceState(
+            themeMode = ColorMode.DARK.value,
+            miuixMonet = false,
+            keyColor = 0xFF6750A4.toInt(),
+            colorStyle = "TonalSpot",
+            colorSpec = ColorSpec.SpecVersion.entries.first().name,
+            monetSurfaceOpacity = 0.72f,
+            pixelStyle = "pet_companion",
+            pixelPetEnabled = true,
+        )
+        val config = currentThemeConfig().put("appearance", appearance.toJson())
+
+        validateThemeStoreConfig(config)
+
+        val parsed = ThemeStoreAppearanceState.fromJson(appearance.toJson(), appearance.copy(pixelPetEnabled = false))
+        assertEquals("pet_companion", parsed.pixelStyle)
+        assertTrue(parsed.pixelPetEnabled)
     }
 
     @Test
@@ -417,6 +439,19 @@ class ThemeStorePackageTest {
             JSONObject().put(
                 "module",
                 JSONObject().put("nightAsset", JSONObject().put("path", "assets/module-night.png")),
+            ),
+        )
+
+        assertEquals(1, countConfiguredThemeStoreResources(config))
+    }
+
+    @Test
+    fun countConfiguredThemeStoreResources_countsKpmPageBackground() {
+        val config = JSONObject().put(
+            "pageBackgrounds",
+            JSONObject().put(
+                CustomPageBackgroundTarget.Kpm.id,
+                JSONObject().put("asset", JSONObject().put("path", "assets/kpm.png")),
             ),
         )
 

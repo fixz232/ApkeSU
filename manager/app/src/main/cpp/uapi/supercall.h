@@ -5,7 +5,6 @@
 #include <linux/types.h>
 
 #include "uapi/app_profile.h"
-
 // 2: allowlist v4 root profile flags
 static const __u32 KERNEL_SU_UAPI_VERSION = 2;
 
@@ -181,5 +180,4 @@ static const __u32 KSU_IOCTL_SET_INIT_PGRP = _IO('K', 19);
 static const __u32 KSU_IOCTL_GET_SULOG_FD = _IOW('K', 20, struct ksu_get_sulog_fd_cmd);
 static const __u32 KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT = _IO('K', 21);
 static const __u32 KSU_IOCTL_SET_MANAGER_APPID = _IOW('K', 22, struct ksu_set_manager_appid_cmd);
-
 #endif

@@ -833,9 +833,6 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     // Ensure module directory exists and set SELinux context
     ensure_dir_exists(defs::MODULE_UPDATE_DIR)?;
     setsyscon(defs::MODULE_UPDATE_DIR)?;
-    if let Err(e) = ensure_magisk_module_compat() {
-        warn!("ensure magisk module compat failed: {e}");
-    }
 
     // Prepare target directory
     println!("- Installing to {}", updated_dir.display());

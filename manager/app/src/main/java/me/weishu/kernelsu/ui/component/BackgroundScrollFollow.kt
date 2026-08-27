@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -44,24 +45,27 @@ private const val MIN_FRAME_SECONDS = 1f / 240f
 private const val MAX_FRAME_SECONDS = 1f / 20f
 private const val POINTER_SCROLL_SUPPRESSION_MILLIS = 72L
 
+val LocalBackgroundScrollFollowState = staticCompositionLocalOf<BackgroundScrollFollowState?> { null }
+
 @Composable
 fun rememberBackgroundScrollFollowState(
     enabled: Boolean,
     resetKey: Any? = Unit,
+    horizontalPagerDriven: Boolean = false,
 ): BackgroundScrollFollowState {
     val state = remember { BackgroundScrollFollowState() }
     val systemAnimationsEnabled = rememberSystemAnimationsEnabled()
     val effectiveEnabled = enabled && systemAnimationsEnabled
 
     SideEffect {
-        state.updateConfig(effectiveEnabled)
+        state.updateConfig(effectiveEnabled, horizontalPagerDriven)
     }
 
     LaunchedEffect(state, resetKey) {
         state.resetImmediately()
     }
 
-    LaunchedEffect(state, effectiveEnabled) {
+    LaunchedEffect(state, effectiveEnabled, horizontalPagerDriven) {
         if (!effectiveEnabled) {
             state.resetImmediately()
             return@LaunchedEffect
@@ -136,6 +140,7 @@ class BackgroundScrollFollowState {
     private var renderedOffset by mutableStateOf(Offset.Zero)
     private var targetOffset = Offset.Zero
     private var travelBounds = Offset.Zero
+    private var horizontalPagerDriven = false
     private var lastNestedScrollMillis = 0L
     private val motionRequests = Channel<Unit>(capacity = Channel.CONFLATED)
 
@@ -148,7 +153,12 @@ class BackgroundScrollFollowState {
             available: Offset,
             source: NestedScrollSource,
         ): Offset {
-            val delta = consumed + available * BACKGROUND_SCROLL_OVERSCROLL_FACTOR
+            val rawDelta = consumed + available * BACKGROUND_SCROLL_OVERSCROLL_FACTOR
+            val delta = if (horizontalPagerDriven) {
+                Offset(0f, rawDelta.y)
+            } else {
+                rawDelta
+            }
             if (delta != Offset.Zero) {
                 lastNestedScrollMillis = SystemClock.uptimeMillis()
                 moveBy(delta)
@@ -157,10 +167,12 @@ class BackgroundScrollFollowState {
         }
     }
 
-    fun updateConfig(enabled: Boolean) {
-        if (this.enabled == enabled) return
+    fun updateConfig(enabled: Boolean, horizontalPagerDriven: Boolean = false) {
+        val modeChanged = this.horizontalPagerDriven != horizontalPagerDriven
+        this.horizontalPagerDriven = horizontalPagerDriven
+        if (this.enabled == enabled && !modeChanged) return
         this.enabled = enabled
-        if (!enabled) {
+        if (!enabled || modeChanged) {
             lastNestedScrollMillis = 0L
             resetImmediately()
         }
@@ -188,7 +200,13 @@ class BackgroundScrollFollowState {
         if (!enabled) return
         val now = SystemClock.uptimeMillis()
         if (now - lastNestedScrollMillis <= POINTER_SCROLL_SUPPRESSION_MILLIS) return
-        moveBy(delta)
+        moveBy(if (horizontalPagerDriven) Offset(0f, delta.y) else delta)
+    }
+
+    /** Receives gesture-direction deltas from embedded scroll containers such as WebView. */
+    fun onEmbeddedViewScroll(delta: Offset) {
+        if (!enabled) return
+        moveBy(if (horizontalPagerDriven) Offset(0f, delta.y) else delta)
     }
 
     fun resetImmediately() {
@@ -272,6 +290,14 @@ internal fun calculateBackgroundScrollTravelBounds(
         x = min(desiredHorizontal, horizontalOverscan).coerceAtLeast(0f),
         y = min(desiredVertical, verticalOverscan).coerceAtLeast(0f),
     )
+}
+
+internal fun calculateContinuousPagerPagePosition(
+    currentPage: Int,
+    currentPageOffsetFraction: Float,
+): Float {
+    val safeOffsetFraction = currentPageOffsetFraction.takeIf(Float::isFinite) ?: 0f
+    return currentPage.toFloat() + safeOffsetFraction
 }
 
 internal fun approachBackgroundScrollOffset(

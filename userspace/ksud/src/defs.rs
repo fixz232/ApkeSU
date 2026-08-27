@@ -8,6 +8,9 @@ mod android {
     pub const LIBRARY_DIR: &str = concatcp!(WORKING_DIR, "lib/");
     pub const LOG_DIR: &str = concatcp!(WORKING_DIR, "log/");
     pub const SULOGD_LOCK_PATH: &str = concatcp!(WORKING_DIR, "sulogd.lock");
+    pub const KPM_DIR: &str = concatcp!(WORKING_DIR, "kpm/");
+    pub const KPM_BOOT_PENDING_PATH: &str = concatcp!(KPM_DIR, ".boot_pending.json");
+    pub const KPM_POLICY_PATH: &str = concatcp!(KPM_DIR, ".policy.json");
 
     pub const PROFILE_DIR: &str = concatcp!(WORKING_DIR, "profile/");
     pub const PROFILE_SELINUX_DIR: &str = concatcp!(PROFILE_DIR, "selinux/");
@@ -54,6 +57,15 @@ mod android {
 
 #[allow(unused)]
 pub const DEFAULT_MANAGER_PACKAGE: &str = "io.github.fixz.apkesu";
+
+#[allow(unused)]
+pub const VIVO_MANAGER_PACKAGE: &str = "io.github.fixz.apkesu.vivo";
+
+pub const TRUSTED_MANAGER_PACKAGES: &[&str] = &[DEFAULT_MANAGER_PACKAGE, VIVO_MANAGER_PACKAGE];
+
+pub fn is_trusted_manager_package(package_name: &str) -> bool {
+    TRUSTED_MANAGER_PACKAGES.contains(&package_name)
+}
 
 #[allow(unused)]
 pub const VERSION_CODE: &str = include_str!(concat!(env!("OUT_DIR"), "/VERSION_CODE"));

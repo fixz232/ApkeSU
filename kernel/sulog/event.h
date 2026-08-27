@@ -18,6 +18,7 @@ struct ksu_sulog_pending_event *ksu_sulog_capture_sucompat(const char __user *fi
                                                            const char __user *const __user *argv_user, gfp_t gfp);
 void ksu_sulog_emit_pending(struct ksu_sulog_pending_event *pending, int retval, gfp_t gfp);
 int ksu_sulog_emit_grant_root(int retval, __u32 uid, __u32 euid, gfp_t gfp);
+int ksu_sulog_emit_kpm(const char *operation, const char *name, int retval, gfp_t gfp);
 
 struct ksu_event_queue *ksu_sulog_get_queue(void);
 

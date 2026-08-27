@@ -142,6 +142,22 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
+    data object PixelPet : Route
+
+    @Parcelize
+    @Serializable
+    data object PixelPetHabitat : Route
+
+    @Parcelize
+    @Serializable
+    data object PixelPetChat : Route
+
+    @Parcelize
+    @Serializable
+    data object PixelPetSpriteStudio : Route
+
+    @Parcelize
+    @Serializable
     data object RescueProtection : Route
 
     @Parcelize
@@ -155,6 +171,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object GraphicsRenderer : Route
+
+    @Parcelize
+    @Serializable
+    data object Kpm : Route
 
     @Parcelize
     @Serializable
@@ -222,7 +242,14 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
-    data class ModuleWallpaperEditor(val moduleId: String) : Route
+    data class ModuleWallpaperEditor(
+        val moduleId: String,
+        val displayName: String? = null,
+        val displayAuthor: String? = null,
+        val displayVersion: String? = null,
+        val displayDescription: String? = null,
+        val allowBatch: Boolean = true,
+    ) : Route
 
     @Parcelize
     @Serializable

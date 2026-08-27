@@ -61,6 +61,73 @@ class BackgroundScrollFollowTest {
         }
     }
 
+    @Test
+    fun pagerPositionStaysContinuousWhenCurrentPageRollsOver() {
+        val beforeRollover = calculateContinuousPagerPagePosition(
+            currentPage = 0,
+            currentPageOffsetFraction = 0.499f,
+        )
+        val afterRollover = calculateContinuousPagerPagePosition(
+            currentPage = 1,
+            currentPageOffsetFraction = -0.499f,
+        )
+
+        assertEquals(0.002f, afterRollover - beforeRollover, 0.0001f)
+    }
+
+    @Test
+    fun invalidPagerFractionFallsBackToCurrentPage() {
+        assertEquals(
+            2f,
+            calculateContinuousPagerPagePosition(
+                currentPage = 2,
+                currentPageOffsetFraction = Float.NaN,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun pagerBackgroundCrossfadeStaysFullyOpaque() {
+        listOf(0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 1f).forEach { position ->
+            val outgoing = calculatePagerBackgroundTransform(
+                pages = listOf(0),
+                pagerPosition = position,
+            )
+            val incoming = calculatePagerBackgroundTransform(
+                pages = listOf(1),
+                pagerPosition = position,
+            )
+
+            assertEquals(1f, outgoing.alpha + incoming.alpha, 0.0001f)
+            assertTrue(outgoing.alpha in 0f..1f)
+            assertTrue(incoming.alpha in 0f..1f)
+        }
+    }
+
+    @Test
+    fun sharedBackgroundRemainsFixedAcrossAdjacentPages() {
+        listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { position ->
+            val transform = calculatePagerBackgroundTransform(
+                pages = listOf(0, 1),
+                pagerPosition = position,
+            )
+
+            assertEquals(1f, transform.alpha, 0.0001f)
+            assertEquals(0f, transform.translationXFraction, 0.0001f)
+        }
+    }
+
+    @Test
+    fun activePagerBackgroundPagesFollowFractionWithoutRolloverGap() {
+        assertEquals(listOf(0), calculateActivePagerBackgroundPages(0f, 4))
+        assertEquals(listOf(0, 1), calculateActivePagerBackgroundPages(0.499f, 4))
+        assertEquals(listOf(0, 1), calculateActivePagerBackgroundPages(0.501f, 4))
+        assertEquals(listOf(1), calculateActivePagerBackgroundPages(1f, 4))
+        assertEquals(listOf(2, 3), calculateActivePagerBackgroundPages(2.75f, 4))
+        assertEquals(listOf(3), calculateActivePagerBackgroundPages(3f, 4))
+    }
+
     private fun advanceFrames(
         target: Offset,
         frameCount: Int,

@@ -23,6 +23,7 @@ pub enum FeatureId {
     AdbRoot = 3,
     SelinuxHide = 4,
     AvcSpoof = 5,
+    WebviewZygoteUmount = 7,
 }
 
 impl FeatureId {
@@ -34,6 +35,7 @@ impl FeatureId {
             3 => Some(Self::AdbRoot),
             4 => Some(Self::SelinuxHide),
             5 | AVC_SPOOF_LEGACY_ID => Some(Self::AvcSpoof),
+            7 => Some(Self::WebviewZygoteUmount),
             _ => None,
         }
     }
@@ -46,6 +48,7 @@ impl FeatureId {
             Self::AdbRoot => "adb_root",
             Self::SelinuxHide => "selinux_hide",
             Self::AvcSpoof => "avc_spoof",
+            Self::WebviewZygoteUmount => "webview_zygote_umount",
         }
     }
 
@@ -76,6 +79,9 @@ impl FeatureId {
                 "SELinux Hide - sanitize /sys/fs/selinux access results for app UIDs"
             }
             Self::AvcSpoof => "AVC Spoof - hide KernelSU SELinux domains in AVC audit logs",
+            Self::WebviewZygoteUmount => {
+                "WebView Zygote Umount - unmount modules from WebView zygote and its isolated children"
+            }
         }
     }
 }
@@ -88,6 +94,7 @@ fn parse_feature_id(name: &str) -> Result<FeatureId> {
         "adb_root" | "3" => Ok(FeatureId::AdbRoot),
         "selinux_hide" | "4" => Ok(FeatureId::SelinuxHide),
         "avc_spoof" | "5" | "10003" => Ok(FeatureId::AvcSpoof),
+        "webview_zygote_umount" | "7" => Ok(FeatureId::WebviewZygoteUmount),
         _ => bail!("Unknown feature: {name}"),
     }
 }
@@ -366,6 +373,7 @@ pub fn list_features() {
         FeatureId::AdbRoot,
         FeatureId::SelinuxHide,
         FeatureId::AvcSpoof,
+        FeatureId::WebviewZygoteUmount,
     ];
 
     for feature_id in &all_features {
@@ -430,6 +438,7 @@ pub fn save_config() -> Result<()> {
         FeatureId::AdbRoot,
         FeatureId::SelinuxHide,
         FeatureId::AvcSpoof,
+        FeatureId::WebviewZygoteUmount,
     ];
 
     for feature_id in &all_features {

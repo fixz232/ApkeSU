@@ -206,20 +206,29 @@ internal fun resolveMainPageTransitionTransform(
     interfaceStyle: String,
     pageOffset: Float,
     animationsEnabled: Boolean,
+    containsEmbeddedAndroidView: Boolean = false,
 ): PageTransitionTransform {
+    // Android View interop does not reliably retain input hit testing while Compose
+    // applies a transformed render layer to it. KPM embeds a WebView, so the pager
+    // continues its native scroll while this page itself stays in an identity layer.
+    if (containsEmbeddedAndroidView) return PageTransitionTransform()
+
     val transform = resolvePageTransitionTransform(
         visual = visual,
         pageOffset = pageOffset,
         animationsEnabled = animationsEnabled,
     )
-    if (InterfaceStyle.normalizeValue(interfaceStyle) != InterfaceStyle.Material.value) {
-        return transform
+    return when (InterfaceStyle.normalizeValue(interfaceStyle)) {
+        InterfaceStyle.Material.value,
+        InterfaceStyle.Skrootpro.value,
+        -> {
+            // HorizontalPager already provides directional motion. Applying a second
+            // transform to Material or SKRoot(Pro) pages can reveal the backing
+            // surface at the page edge.
+            PageTransitionTransform()
+        }
+        else -> transform
     }
-
-    // HorizontalPager already provides Material's directional motion. Transforming the
-    // whole translucent page creates an offscreen layer that can expose a black backing
-    // surface while two pages are visible during navigation.
-    return PageTransitionTransform()
 }
 
 @Composable
@@ -231,6 +240,7 @@ fun Modifier.mainPageTransition(
     inkStyle: InkStyle,
     pixelStyle: PixelStyle,
     animationsEnabled: Boolean,
+    containsEmbeddedAndroidView: Boolean = false,
     pageOffset: () -> Float,
 ): Modifier {
     val visual = resolvePageTransitionVisual(effect, interfaceStyle)
@@ -246,7 +256,9 @@ fun Modifier.mainPageTransition(
         }
     }
 
-    if (!animationsEnabled || visual == PageTransitionVisual.Off) return this
+    if (!animationsEnabled || visual == PageTransitionVisual.Off || containsEmbeddedAndroidView) {
+        return this
+    }
 
     return this
         .graphicsLayer {
@@ -256,6 +268,7 @@ fun Modifier.mainPageTransition(
                 interfaceStyle = interfaceStyle,
                 pageOffset = offset,
                 animationsEnabled = animationsEnabled,
+                containsEmbeddedAndroidView = containsEmbeddedAndroidView,
             )
             translationX = size.width * transform.translationXFraction
             scaleX = transform.scaleX

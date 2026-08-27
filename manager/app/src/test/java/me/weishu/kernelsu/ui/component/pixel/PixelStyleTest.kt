@@ -41,6 +41,7 @@ class PixelStyleTest {
         assertEquals(PixelStyle.VikingSnowfield, PixelStyle.fromIndex(14))
         assertEquals(PixelStyle.JiangnanWatertown, PixelStyle.fromIndex(15))
         assertEquals(PixelStyle.CloudTown, PixelStyle.fromIndex(16))
+        assertEquals(PixelStyle.PetCompanion, PixelStyle.fromIndex(17))
         assertEquals(PixelStyle.ClassicHandheld, PixelStyle.fromIndex(-1))
         assertEquals(PixelStyle.ClassicHandheld, PixelStyle.fromIndex(99))
     }
@@ -56,7 +57,7 @@ class PixelStyleTest {
 
     @Test
     fun variantsHaveUniqueValuesAndKeyColors() {
-        assertEquals(17, PixelStyle.entries.size)
+        assertEquals(18, PixelStyle.entries.size)
         assertEquals(PixelStyle.entries.size, PixelStyle.entries.map { it.value }.toSet().size)
         assertEquals(PixelStyle.entries.size, PixelStyle.entries.map { it.keyColor }.toSet().size)
         PixelStyle.entries.forEach { style ->
@@ -117,7 +118,8 @@ class PixelStyleTest {
         assertEquals(PixelCardPattern.VikingSnowfield, PixelStyle.VikingSnowfield.cardPattern())
         assertEquals(PixelCardPattern.JiangnanWatertown, PixelStyle.JiangnanWatertown.cardPattern())
         assertEquals(PixelCardPattern.CloudTown, PixelStyle.CloudTown.cardPattern())
-        assertEquals(17, PixelStyle.entries.map(PixelStyle::cardPattern).toSet().size)
+        assertEquals(PixelCardPattern.PetCompanion, PixelStyle.PetCompanion.cardPattern())
+        assertEquals(PixelStyle.entries.size, PixelStyle.entries.map(PixelStyle::cardPattern).toSet().size)
     }
 
     @Test
@@ -144,6 +146,7 @@ class PixelStyleTest {
         assertEquals(PixelCardMotionScene.VikingSnowfield, PixelStyle.VikingSnowfield.cardMotionScene())
         assertEquals(PixelCardMotionScene.JiangnanWatertown, PixelStyle.JiangnanWatertown.cardMotionScene())
         assertEquals(PixelCardMotionScene.CloudTown, PixelStyle.CloudTown.cardMotionScene())
+        assertEquals(PixelCardMotionScene.PetCompanion, PixelStyle.PetCompanion.cardMotionScene())
     }
 
     @Test

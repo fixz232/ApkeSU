@@ -10,6 +10,7 @@ enum ksu_feature_id {
     KSU_FEATURE_AVC_SPOOF = 5,
     /* Read-only runtime report for the core Hook dispatcher. */
     KSU_FEATURE_HOOK_STATUS = 6,
+    KSU_FEATURE_WEBVIEW_ZYGOTE_UMOUNT = 7,
 
     KSU_FEATURE_MAX
 };

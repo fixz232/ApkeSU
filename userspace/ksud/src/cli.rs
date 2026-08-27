@@ -10,7 +10,7 @@ use crate::lkm_image::BootPatchV2Args;
 use crate::module::regenerate_preinit_rc;
 use crate::{
     apk_sign, assets, builtin_mount, cpu_spoof, debug, defs, epkesu_hide, init_event, kpatch_next,
-    ksu_uapi, ksucalls, module, module_config, pathmask, rescue, sulog, utils,
+    kpm, ksu_uapi, ksucalls, module, module_config, pathmask, rescue, sulog, utils,
 };
 
 /// KernelSU userspace cli
@@ -39,6 +39,12 @@ enum Commands {
     KpatchNext {
         #[command(subcommand)]
         command: KpatchNext,
+    },
+
+    /// Manage KPatch-Next KPM modules
+    Kpm {
+        #[command(subcommand)]
+        command: Kpm,
     },
 
     /// Manage ApkeSU Hide
@@ -171,9 +177,9 @@ enum Commands {
     /// Restore boot or init_boot images patched by KernelSU
     BootRestore(BootRestoreArgs),
 
-    /// Patch KernelSU into a boot image
+    /// Patch the KernelSU LKM directly into a boot image
     ///
-    /// Always operates on a boot image; never selects init_boot or vendor_boot.
+    /// This path always targets boot and never selects init_boot or vendor_boot.
     BootPatchV2(BootPatchV2Args),
 
     /// Show boot information
@@ -214,6 +220,13 @@ enum BootInfo {
 
     /// show supported kmi versions
     SupportedKmis,
+
+    /// detect the KMI embedded in a boot image
+    ImageKmi {
+        /// boot image to inspect
+        #[arg(short, long)]
+        boot: std::path::PathBuf,
+    },
 
     /// check if device is A/B capable
     IsAbDevice,
@@ -302,6 +315,68 @@ enum Rescue {
 
     /// Clear rescue logs
     ClearLogs,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Kpm {
+    /// Print KPatch-Next KPM loader capabilities
+    Caps,
+    /// Print or change the overall KPM policy
+    Policy {
+        #[command(subcommand)]
+        command: KpmPolicy,
+    },
+    /// List imported and loaded KPMs as JSON
+    List,
+    /// Print details for a KPM as JSON
+    Info { id: String },
+    /// Import a relocatable KPM ELF; --trusted acknowledges executable kernel code
+    Import {
+        file: PathBuf,
+        #[arg(long, default_value = "")]
+        args: String,
+        #[arg(long)]
+        trusted: bool,
+        #[arg(long)]
+        force: bool,
+        #[arg(long)]
+        enable: bool,
+    },
+    /// Enable and load an imported KPM
+    Enable { id: String },
+    /// Disable and unload an imported KPM
+    Disable { id: String },
+    /// Remove an imported KPM
+    Remove { id: String },
+    /// Load an enabled imported KPM without changing its enabled state
+    Load { id: String },
+    /// Unload a live KPM
+    Unload { id: String },
+    /// Invoke a KPM control callback
+    Control {
+        id: String,
+        #[arg(long, default_value = "")]
+        args: String,
+    },
+    /// List package UIDs excluded from KPM hooks
+    ExcludeList,
+    /// Set or clear a package UID exclusion
+    Exclude {
+        package: String,
+        uid: u32,
+        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+        enabled: bool,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum KpmPolicy {
+    /// Print the effective KPM policy
+    Status,
+    /// Allow KPM imports and loads through KPatch-Next
+    Enable,
+    /// Stop and disallow KPM loads
+    Disable,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -658,7 +733,7 @@ enum Profile {
 enum Feature {
     /// Get feature value and support status
     Get {
-        /// Feature ID or name (su_compat, kernel_umount, sulog, adb_root, selinux_hide, avc_spoof)
+        /// Feature ID or name (su_compat, kernel_umount, sulog, adb_root, selinux_hide, avc_spoof, webview_zygote_umount)
         id: String,
         /// Read from config file
         #[arg(long, default_value_t = false)]
@@ -678,7 +753,7 @@ enum Feature {
 
     /// Check feature status (supported/unsupported/managed)
     Check {
-        /// Feature ID or name (su_compat, kernel_umount, sulog, adb_root, selinux_hide, avc_spoof)
+        /// Feature ID or name (su_compat, kernel_umount, sulog, adb_root, selinux_hide, avc_spoof, webview_zygote_umount)
         id: String,
     },
 
@@ -739,7 +814,7 @@ pub fn run() -> Result<()> {
 
     // the kernel executes su with argv[0] = "su" and replace it with us
     let arg0 = std::env::args().next().unwrap_or_default();
-    if arg0 == "su" || arg0 == "/system/bin/su" {
+    if arg0 == "su" || arg0.ends_with("/su") {
         return crate::su::root_shell();
     }
 
@@ -897,6 +972,44 @@ pub fn run() -> Result<()> {
                 }
                 KpatchNext::Enable => kpatch_next::enable(),
                 KpatchNext::Disable => kpatch_next::disable(),
+            }
+        }
+        Commands::Kpm { command } => {
+            utils::switch_mnt_ns(1)?;
+            match command {
+                Kpm::Caps => {
+                    kpm::print_caps();
+                    Ok(())
+                }
+                Kpm::Policy { command } => match command {
+                    KpmPolicy::Status => {
+                        kpm::print_policy();
+                        Ok(())
+                    }
+                    KpmPolicy::Enable => kpm::set_policy(true),
+                    KpmPolicy::Disable => kpm::set_policy(false),
+                },
+                Kpm::List => kpm::print_list(),
+                Kpm::Info { id } => kpm::print_info(&id),
+                Kpm::Import {
+                    file,
+                    args,
+                    trusted,
+                    force,
+                    enable,
+                } => kpm::import(&file, &args, trusted, force, enable),
+                Kpm::Enable { id } => kpm::enable_module(&id),
+                Kpm::Disable { id } => kpm::disable_module(&id),
+                Kpm::Remove { id } => kpm::remove_module(&id),
+                Kpm::Load { id } => kpm::load_module(&id),
+                Kpm::Unload { id } => kpm::unload_module(&id),
+                Kpm::Control { id, args } => kpm::control_module(&id, &args),
+                Kpm::ExcludeList => kpm::print_exclude_list(),
+                Kpm::Exclude {
+                    package,
+                    uid,
+                    enabled,
+                } => kpm::set_excluded_package(&package, uid, enabled),
             }
         }
         Commands::EpkesuHide { command } => {
@@ -1119,6 +1232,8 @@ pub fn run() -> Result<()> {
 
         Commands::BootPatch(boot_patch) => crate::boot_patch::patch(boot_patch),
 
+        Commands::BootPatchV2(boot_patch) => crate::lkm_image::patch_boot(&boot_patch),
+
         Commands::BootInfo { command } => match command {
             BootInfo::CurrentKmi => {
                 let kmi = crate::boot_patch::get_current_kmi()?;
@@ -1131,6 +1246,11 @@ pub fn run() -> Result<()> {
                 for kmi in &kmi {
                     println!("{kmi}");
                 }
+                return Ok(());
+            }
+            BootInfo::ImageKmi { boot } => {
+                let kmi = crate::boot_patch::get_kmi_from_boot(&boot)?;
+                println!("{kmi}");
                 return Ok(());
             }
             BootInfo::IsAbDevice => {
@@ -1162,7 +1282,6 @@ pub fn run() -> Result<()> {
             }
         },
         Commands::BootRestore(boot_restore) => crate::boot_patch::restore(boot_restore),
-        Commands::BootPatchV2(patch) => crate::lkm_image::patch_boot(&patch),
         Commands::Resetprop { args } => {
             let mut full_args = vec!["resetprop".to_string()];
             full_args.extend(args);

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,6 +44,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
+import me.weishu.kernelsu.ui.util.CustomBackgroundState
 import me.weishu.kernelsu.ui.util.CustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundSet
 import me.weishu.kernelsu.ui.util.CustomPageBackgroundTarget
@@ -59,12 +61,14 @@ import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperCrop
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperOpacity
 import me.weishu.kernelsu.ui.util.sanitizeCustomWallpaperPassthroughOpacity
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 private const val WALLPAPER_BACKGROUND_MAX_SIDE = 1800
 private const val WALLPAPER_PREVIEW_MAX_SIDE = 1400
 private const val WALLPAPER_PRELOAD_BATCH_SIZE = 2
 private const val WALLPAPER_CACHE_MIN_KIB = 16 * 1024
 private const val WALLPAPER_CACHE_MAX_KIB = 48 * 1024
+private const val PAGER_BACKGROUND_PARALLAX_FACTOR = 0.035f
 
 private data class WallpaperBitmapCacheKey(
     val uriString: String,
@@ -204,10 +208,14 @@ fun CustomWallpaperRoot(
     passthroughEnabled: Boolean = false,
     passthroughOpacity: Float = DEFAULT_CUSTOM_WALLPAPER_PASSTHROUGH_OPACITY,
     backgroundScrollFollowState: BackgroundScrollFollowState? = null,
+    pagerBackgrounds: List<CustomBackgroundState> = emptyList(),
+    horizontalPagerPosition: (() -> Float)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val isLiquidGlass = isLiquidGlassTheme()
     val surfaceColor = liquidGlassBackdropColor()
+    val usePagerBackgrounds = pagerBackgrounds.isNotEmpty() && horizontalPagerPosition != null
+    // Retain pager interpolation while allowing embedded scroll containers to move the backdrop.
     val backgroundMotionModifier = Modifier.backgroundScrollFollowMotion(backgroundScrollFollowState)
 
     Box(
@@ -215,20 +223,38 @@ fun CustomWallpaperRoot(
             .fillMaxSize()
             .background(surfaceColor),
     ) {
-        CustomBackgroundMedia(
-            imageUriString = uriString,
-            videoUriString = videoUriString,
-            videoDurationSeconds = videoDurationSeconds,
-            videoFrameRate = videoFrameRate,
-            opacity = if (isLiquidGlass) opacity.coerceAtMost(0.42f) else opacity,
-            crop = crop,
-            visualSettings = visualSettings,
-            modifier = backgroundMotionModifier,
-        )
+        if (usePagerBackgrounds) {
+            PagerAnchoredBackgroundLayers(
+                backgrounds = pagerBackgrounds,
+                pagerPosition = horizontalPagerPosition,
+                isLiquidGlass = isLiquidGlass,
+                modifier = backgroundMotionModifier,
+            )
+        } else {
+            CustomBackgroundMedia(
+                imageUriString = uriString,
+                videoUriString = videoUriString,
+                videoDurationSeconds = videoDurationSeconds,
+                videoFrameRate = videoFrameRate,
+                opacity = if (isLiquidGlass) opacity.coerceAtMost(0.42f) else opacity,
+                crop = crop,
+                visualSettings = visualSettings,
+                modifier = backgroundMotionModifier,
+            )
+        }
         content()
         if (passthroughEnabled) {
             val passthroughAlpha = sanitizeCustomWallpaperPassthroughOpacity(passthroughOpacity)
             when {
+                usePagerBackgrounds -> PagerAnchoredBackgroundLayers(
+                    backgrounds = pagerBackgrounds,
+                    pagerPosition = horizontalPagerPosition,
+                    isLiquidGlass = isLiquidGlass,
+                    imageAlpha = passthroughAlpha,
+                    drawOverlay = false,
+                    modifier = backgroundMotionModifier,
+                )
+
                 !videoUriString.isNullOrBlank() -> CustomVideoPassthroughBackground(
                     uriString = videoUriString,
                     durationSeconds = videoDurationSeconds,
@@ -252,6 +278,135 @@ fun CustomWallpaperRoot(
             }
         }
     }
+}
+
+@Composable
+private fun PagerAnchoredBackgroundLayers(
+    backgrounds: List<CustomBackgroundState>,
+    pagerPosition: () -> Float,
+    isLiquidGlass: Boolean,
+    modifier: Modifier = Modifier,
+    imageAlpha: Float = 1f,
+    drawOverlay: Boolean = true,
+) {
+    if (backgrounds.isEmpty()) return
+
+    val latestPagerPosition by rememberUpdatedState(pagerPosition)
+    val activePages by remember(backgrounds.size) {
+        derivedStateOf {
+            calculateActivePagerBackgroundPages(
+                pagerPosition = latestPagerPosition(),
+                pageCount = backgrounds.size,
+            )
+        }
+    }
+    val groups = remember(backgrounds) { groupPagerBackgrounds(backgrounds) }
+    val groupsToRender = if (groups.any { it.background.hasVideo }) {
+        groups.filter { group -> group.pages.any(activePages::contains) }
+    } else {
+        groups
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        groupsToRender.forEach { group ->
+            key(group.background) {
+                CustomBackgroundMedia(
+                    imageUriString = group.background.wallpaperUriString,
+                    videoUriString = group.background.videoUriString,
+                    videoDurationSeconds = group.background.videoDurationSeconds,
+                    videoFrameRate = group.background.videoFrameRate,
+                    opacity = if (isLiquidGlass) {
+                        group.background.opacity.coerceAtMost(0.42f)
+                    } else {
+                        group.background.opacity
+                    },
+                    crop = group.background.crop,
+                    visualSettings = group.background.visualSettings,
+                    imageAlpha = imageAlpha,
+                    drawOverlay = drawOverlay,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val transform = calculatePagerBackgroundTransform(
+                                pages = group.pages,
+                                pagerPosition = latestPagerPosition(),
+                            )
+                            alpha = transform.alpha
+                            translationX = size.width * transform.translationXFraction
+                        },
+                )
+            }
+        }
+    }
+}
+
+private data class PagerBackgroundGroup(
+    val background: CustomBackgroundState,
+    val pages: List<Int>,
+)
+
+private fun groupPagerBackgrounds(
+    backgrounds: List<CustomBackgroundState>,
+): List<PagerBackgroundGroup> {
+    return backgrounds
+        .withIndex()
+        .groupBy(keySelector = { it.value }, valueTransform = { it.index })
+        .map { (background, pages) -> PagerBackgroundGroup(background, pages) }
+}
+
+internal data class PagerBackgroundTransform(
+    val alpha: Float,
+    val translationXFraction: Float,
+)
+
+internal fun calculateActivePagerBackgroundPages(
+    pagerPosition: Float,
+    pageCount: Int,
+): List<Int> {
+    if (pageCount <= 0) return emptyList()
+    val lastPage = pageCount - 1
+    val safePosition = pagerPosition
+        .takeIf(Float::isFinite)
+        ?.coerceIn(0f, lastPage.toFloat())
+        ?: 0f
+    val firstPage = safePosition.toInt().coerceIn(0, lastPage)
+    val secondPage = (firstPage + 1).coerceAtMost(lastPage)
+    return if (secondPage == firstPage || safePosition == firstPage.toFloat()) {
+        listOf(firstPage)
+    } else {
+        listOf(firstPage, secondPage)
+    }
+}
+
+internal fun calculatePagerBackgroundTransform(
+    pages: List<Int>,
+    pagerPosition: Float,
+): PagerBackgroundTransform {
+    if (pages.isEmpty()) return PagerBackgroundTransform(alpha = 0f, translationXFraction = 0f)
+    val safePosition = pagerPosition.takeIf(Float::isFinite) ?: 0f
+    var alpha = 0f
+    var weightedOffset = 0f
+    pages.forEach { page ->
+        val pageOffset = page - safePosition
+        val distance = abs(pageOffset).coerceIn(0f, 1f)
+        val weight = 1f - smoothPagerBackgroundProgress(distance)
+        alpha += weight
+        weightedOffset += pageOffset.coerceIn(-1f, 1f) * weight
+    }
+    val safeAlpha = alpha.coerceIn(0f, 1f)
+    if (pages.size > 1) {
+        return PagerBackgroundTransform(alpha = safeAlpha, translationXFraction = 0f)
+    }
+    val averageOffset = if (alpha > 0.0001f) weightedOffset / alpha else 0f
+    return PagerBackgroundTransform(
+        alpha = safeAlpha,
+        translationXFraction = averageOffset * PAGER_BACKGROUND_PARALLAX_FACTOR,
+    )
+}
+
+private fun smoothPagerBackgroundProgress(value: Float): Float {
+    val safeValue = value.coerceIn(0f, 1f)
+    return safeValue * safeValue * (3f - 2f * safeValue)
 }
 
 @Composable

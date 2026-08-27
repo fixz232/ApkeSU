@@ -25,7 +25,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.ui.InterfaceStyle
-import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.CUSTOM_BACKGROUND_MIME_TYPES
@@ -147,6 +146,7 @@ fun SettingPager(
         onOpenNavigationIcons = { navigator.push(Route.NavigationIcons) },
         onOpenHomeLayout = { navigator.push(Route.HomeLayout) },
         onOpenHomeCardWallpapers = { navigator.push(Route.HomeCardWallpapers) },
+        onOpenPixelPet = { navigator.push(Route.PixelPet) },
         onOpenVisualEffects = { navigator.push(Route.VisualEffects) },
         onOpenUiDecorationLibrary = { navigator.push(Route.UiDecorationLibrary) },
         onPickWallpaper = { wallpaperLauncher.launch(CUSTOM_BACKGROUND_MIME_TYPES) },
@@ -192,6 +192,7 @@ fun SettingPager(
         onOpenProfileTemplate = { navigator.push(Route.AppProfileTemplate) },
         onSetSuCompatMode = viewModel::setSuCompatMode,
         onSetKernelUmountEnabled = viewModel::setKernelUmountEnabled,
+        onSetWebViewZygoteUmountEnabled = viewModel::setWebViewZygoteUmountEnabled,
         onSetSelinuxHideEnabled = viewModel::setSelinuxHideEnabled,
         onSetSulogEnabled = viewModel::setSulogEnabled,
         onSetAdbRootEnabled = viewModel::setAdbRootEnabled,
@@ -230,6 +231,7 @@ fun SettingPager(
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,
         onSetAutoJailbreak = viewModel::setAutoJailbreak,
+        onSetUseSoftReboot = viewModel::setUseSoftReboot,
         onSetDeltaColorVariant = viewModel::setDeltaColorVariant,
         onOpenAbout = dropUnlessResumed {
             if (navigator.current() !is Route.About) {
@@ -239,17 +241,11 @@ fun SettingPager(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when (LocalInterfaceStyle.current) {
-            InterfaceStyle.Material.value -> SettingPagerMaterial(uiState, actions, bottomInnerPadding)
-            InterfaceStyle.Skrootpro.value -> SettingPagerSkrootpro(uiState, actions, bottomInnerPadding)
-            InterfaceStyle.Delta.value -> SettingPagerDelta(uiState, actions, bottomInnerPadding)
-            InterfaceStyle.Alpha.value -> SettingPagerAlpha(uiState, actions, bottomInnerPadding)
-            InterfaceStyle.Snow.value,
-            InterfaceStyle.Rain.value,
-            InterfaceStyle.Ink.value,
-            InterfaceStyle.Pixel.value -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
-            else -> SettingPagerMiuix(uiState, actions, bottomInnerPadding)
-        }
+        // Settings use one stable Xiaomi/Miuix layout across interface themes.
+        // Theme-specific colors, backgrounds, decorations, and motion are still
+        // supplied through composition locals and remain available to the shared
+        // screen without duplicating the settings hierarchy.
+        SettingPagerMiuix(uiState, actions, bottomInnerPadding)
 
         SettingsPageModeButton(
             currentMode = SettingsPageMode.Collapsed,

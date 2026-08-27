@@ -105,10 +105,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.Module
 import me.weishu.kernelsu.data.model.ModuleUpdateInfo
+import me.weishu.kernelsu.data.repository.isSoftRebootPreferred
 import me.weishu.kernelsu.ui.component.ListPopupDefaults
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.ObserveAsEvents
@@ -249,8 +249,8 @@ fun ModulePagerMiuix(
             is ModuleEffect.SnackBar -> {
                 snackbarJob.value?.cancel()
                 snackbarHostState.newestSnackbarData()?.dismiss()
-                // A full reboot drops the jailbreak, a soft reboot still applies module changes
-                val softReboot = Natives.isLateLoadMode
+                // Soft reboot keeps the jailbreak and still applies module changes
+                val softReboot = isSoftRebootPreferred()
                 snackbarJob.value = scope.launch {
                     snackbarHostState.dismissVisibleSnackbars()
                     val result = snackbarHostState.showSnackbar(

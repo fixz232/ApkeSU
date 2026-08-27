@@ -26,7 +26,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.util.FlashResult
+import me.weishu.kernelsu.ui.util.BootPatchMode
 import me.weishu.kernelsu.ui.util.LkmSelection
+import me.weishu.kernelsu.ui.util.downloadBoot
 import me.weishu.kernelsu.ui.util.flashAnyKernelZip
 import me.weishu.kernelsu.ui.util.flashModule
 import me.weishu.kernelsu.ui.util.installBoot
@@ -62,8 +64,20 @@ sealed class FlashIt : Parcelable {
     data class FlashBoot(
         val boot: Uri? = null,
         val lkm: LkmSelection,
+        val patchMode: BootPatchMode = BootPatchMode.Normal,
         val ota: Boolean,
         val partition: String? = null,
+        val allowShell: Boolean = false,
+        val enableAdb: Boolean = false,
+        val backup: Boolean = false,
+    ) : FlashIt()
+
+    @Parcelize
+    data class DownloadBoot(
+        val url: String,
+        val partition: String,
+        val lkm: LkmSelection,
+        val patchMode: BootPatchMode = BootPatchMode.Normal,
         val allowShell: Boolean = false,
         val enableAdb: Boolean = false,
         val backup: Boolean = false,
@@ -85,6 +99,7 @@ sealed class FlashIt : Parcelable {
 fun FlashIt.needsJailbreakFlashWarning(): Boolean {
     return when (this) {
         is FlashIt.FlashBoot,
+        is FlashIt.DownloadBoot,
         is FlashIt.FlashAnyKernel,
         FlashIt.FlashRestore,
         FlashIt.FlashUninstall -> true
@@ -117,6 +132,7 @@ suspend fun flashIt(
         is FlashIt.FlashBoot -> installBoot(
             flashIt.boot,
             flashIt.lkm,
+            flashIt.patchMode,
             flashIt.ota,
             flashIt.partition,
             flashIt.allowShell,
@@ -124,6 +140,18 @@ suspend fun flashIt(
             flashIt.backup,
             onStdout,
             onStderr
+        )
+
+        is FlashIt.DownloadBoot -> downloadBoot(
+            url = flashIt.url,
+            partition = flashIt.partition,
+            lkm = flashIt.lkm,
+            patchMode = flashIt.patchMode,
+            allowShell = flashIt.allowShell,
+            enableAdb = flashIt.enableAdb,
+            forceBackup = flashIt.backup,
+            onStdout = onStdout,
+            onStderr = onStderr,
         )
 
         is FlashIt.FlashModules -> {

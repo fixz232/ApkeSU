@@ -1,0 +1,151 @@
+﻿{
+  "schemaVersion": 1,
+  "sourceVersion": 5,
+  "provenance": "native-semantic-pixel-masters",
+  "palette": [
+    "o",
+    "b",
+    "s",
+    "c",
+    "h",
+    "a",
+    "m",
+    "r",
+    "e",
+    "x"
+  ],
+  "species": {
+    "penguin": {
+      "egg": {
+        "image": "penguin_egg.png",
+        "canvasSize": 16,
+        "sha256": "d35db7464ca1555d68e8cc609bcb6ec2a9b983be3e8b4ac3dbcef6c61cde2e4a"
+      },
+      "baby": {
+        "image": "penguin_baby.png",
+        "canvasSize": 16,
+        "sha256": "5831ed6ef28c70bbc8ccd82c3a10450133f2a7108fb32281098140fe2dac0841"
+      },
+      "young": {
+        "image": "penguin_young.png",
+        "canvasSize": 32,
+        "sha256": "7742c1aecefa51f674b2cceb79992500ddd5882267588b1f5c1f3c8bf67ff2a6"
+      },
+      "adult": {
+        "image": "penguin_adult.png",
+        "canvasSize": 48,
+        "sha256": "c436e3f37dfd072c32677000ed6450e0b1f3387e88665ea7f77a72f332a4a08a"
+      }
+    },
+    "dog": {
+      "egg": {
+        "image": "dog_egg.png",
+        "canvasSize": 16,
+        "sha256": "b4353f98f7dbb609e4ce7bf9f603c3e6039337833901dc3a3dfe92a923a28aaa"
+      },
+      "baby": {
+        "image": "dog_baby.png",
+        "canvasSize": 16,
+        "sha256": "66a6f44e9f7b24d8ee26af243097069ca03de199843f195a7d1f75486ae7c4d4"
+      },
+      "young": {
+        "image": "dog_young.png",
+        "canvasSize": 32,
+        "sha256": "4a04fd7adb561386599b3aa686e312de89a62dbd447fd90b89f2688e995025fe"
+      },
+      "adult": {
+        "image": "dog_adult.png",
+        "canvasSize": 48,
+        "sha256": "98614f5022cae9c3d0b9c5e6b776e342beb14d177a05fdac757738cb655e088d"
+      }
+    },
+    "cat": {
+      "egg": {
+        "image": "cat_egg.png",
+        "canvasSize": 16,
+        "sha256": "bbc3d6d06740478b85bab7d3965336bc2fe46adab9c1d1bbb6380522c044cb91"
+      },
+      "baby": {
+        "image": "cat_baby.png",
+        "canvasSize": 16,
+        "sha256": "eb660253153283c94b098a79518172d3c89fead1273d3722cbc841c7c7877926"
+      },
+      "young": {
+        "image": "cat_young.png",
+        "canvasSize": 32,
+        "sha256": "2273564fda2d774f644fff2b22d780bdd0c88a7e6922159b630ecd933ab5f747"
+      },
+      "adult": {
+        "image": "cat_adult.png",
+        "canvasSize": 48,
+        "sha256": "e03d5d235abf05f83e08b116ab3974668ca9a24d5d4500ca20b29b4fc4438130"
+      }
+    },
+    "bird": {
+      "egg": {
+        "image": "bird_egg.png",
+        "canvasSize": 16,
+        "sha256": "40657e980cee892ecebee95fe1a60f708fcfa6359c5a6e617b5f9c29d3b10604"
+      },
+      "baby": {
+        "image": "bird_baby.png",
+        "canvasSize": 16,
+        "sha256": "7b0be78e9340a19628979a98f79181be1f222284e97c85eb66a5f4b8697de478"
+      },
+      "young": {
+        "image": "bird_young.png",
+        "canvasSize": 32,
+        "sha256": "94e607e108b45284e2586306f07c16edc4aa6b1def730f42af4b5e69f69a8760"
+      },
+      "adult": {
+        "image": "bird_adult.png",
+        "canvasSize": 48,
+        "sha256": "3f03cb06ecdc5431f8124c2c2261358e87f656292eca5747e12adf1ff4e94a02"
+      }
+    },
+    "rabbit": {
+      "egg": {
+        "image": "rabbit_egg.png",
+        "canvasSize": 16,
+        "sha256": "1d36783408138b260d1aef49eae9c343029e1f6b29d6bfa69480d57ceb527a91"
+      },
+      "baby": {
+        "image": "rabbit_baby.png",
+        "canvasSize": 16,
+        "sha256": "1b25677539403493661301b1c7095413ca41ca620caad69dd7419716af80a77d"
+      },
+      "young": {
+        "image": "rabbit_young.png",
+        "canvasSize": 32,
+        "sha256": "4fdbe12213faf70480ebe845a3195764717c9d6187c7ae279ca21de3ce6b594e"
+      },
+      "adult": {
+        "image": "rabbit_adult.png",
+        "canvasSize": 48,
+        "sha256": "3f467766abf0efe74792adb6b9a637ef8f8966a7460545cf72db148dbb46620a"
+      }
+    },
+    "hamster": {
+      "egg": {
+        "image": "hamster_egg.png",
+        "canvasSize": 16,
+        "sha256": "35126082a043dd81e89931845dfb1437e79aefefc4d9ab69023e935ee0c9d33f"
+      },
+      "baby": {
+        "image": "hamster_baby.png",
+        "canvasSize": 16,
+        "sha256": "052f5136bdebc3969e538a47a4737dfaefa316ef38270083989a84ceb4a0dfaf"
+      },
+      "young": {
+        "image": "hamster_young.png",
+        "canvasSize": 32,
+        "sha256": "3745c0be89e8482bbaa536cbc7697be334944746b41e1196c58462af51e218bc"
+      },
+      "adult": {
+        "image": "hamster_adult.png",
+        "canvasSize": 48,
+        "sha256": "da7e5c078b674ca0a7c6fd536e62a2ceaa862a91e756531264239ead83c9c602"
+      }
+    }
+  }
+}

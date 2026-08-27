@@ -76,23 +76,6 @@ check_sepolicy() {
     return $?
 }
 
-magisk() {
-  case "$1" in
-    "--path")
-      echo "$NVBASE"
-      ;;
-    "-V")
-      echo "$MAGISK_VER_CODE"
-      ;;
-    "-v")
-      echo "$MAGISK_VER"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 ######################
 # Environment Related
 ######################
@@ -387,13 +370,6 @@ install_module() {
   local MODDIRNAME=modules
   $BOOTMODE && MODDIRNAME=modules_update
   local MODULEROOT=$NVBASE/$MODDIRNAME
-  mkdir -p $NVBASE/.magisk
-  if [ -L $NVBASE/.magisk/modules ]; then
-    rm -f $NVBASE/.magisk/modules
-  fi
-  if [ ! -e $NVBASE/.magisk/modules ]; then
-    ln -s $NVBASE/modules $NVBASE/.magisk/modules 2>/dev/null
-  fi
   MODID=`grep_prop id $TMPDIR/module.prop`
   MODNAME=`grep_prop name $TMPDIR/module.prop`
   MODAUTH=`grep_prop author $TMPDIR/module.prop`
@@ -497,7 +473,3 @@ NVBASE=/data/adb
 TMPDIR=/dev/tmp
 POSTFSDATAD=$NVBASE/post-fs-data.d
 SERVICED=$NVBASE/service.d
-
-# Some modules dependents on this
-export MAGISK_VER=27.0
-export MAGISK_VER_CODE=27000

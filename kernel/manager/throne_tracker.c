@@ -1,5 +1,6 @@
 #include <linux/err.h>
 #include <linux/fs.h>
+#include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
@@ -15,10 +16,37 @@
 
 uid_t ksu_manager_appid = KSU_INVALID_APPID;
 int ksu_manager_appid_param = KSU_INVALID_APPID;
-module_param_named(manager_appid, ksu_manager_appid_param, int, 0);
+
+static int set_manager_appid_param(const char *val,
+                                  const struct kernel_param *kp)
+{
+    int appid;
+    int ret = kstrtoint(val, 0, &appid);
+
+    if (ret) {
+        return ret;
+    }
+    if (!ksu_is_normal_appid((uid_t)appid)) {
+        pr_err("manager_appid rejected invalid appid %d\n", appid);
+        return -EINVAL;
+    }
+
+    *(int *)kp->arg = appid;
+    ksu_set_manager_appid((uid_t)appid);
+    pr_info("manager appid set from module param: %d\n", appid);
+    return 0;
+}
+
+static const struct kernel_param_ops manager_appid_param_ops = {
+    .set = set_manager_appid_param,
+    .get = param_get_int,
+};
+
+module_param_cb(manager_appid, &manager_appid_param_ops,
+                &ksu_manager_appid_param, S_IRUSR | S_IWUSR);
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
-#define KSU_APPID(uid) ((uid) % KSU_PER_USER_RANGE)
+#define KSU_APPID(uid) ksu_normalize_appid(uid)
 
 struct uid_data {
     struct list_head list;
@@ -41,8 +69,14 @@ static void crown_manager(const char *apk, struct list_head *uid_data)
 
     list_for_each_entry (np, list, list) {
         if (strncmp(np->package, pkg, KSU_MAX_PACKAGE_NAME) == 0) {
+            uid_t appid = KSU_APPID(np->uid);
+            if (!ksu_is_normal_appid(appid)) {
+                pr_warn("Ignoring manager package %s with invalid appid %u\n",
+                        pkg, appid);
+                break;
+            }
             pr_info("Crowning manager: %s(uid=%d)\n", pkg, np->uid);
-            ksu_set_manager_appid(KSU_APPID(np->uid));
+            ksu_set_manager_appid(appid);
             break;
         }
     }
@@ -350,7 +384,8 @@ out:
 
 void __init ksu_throne_tracker_init()
 {
-    if (ksu_manager_appid_param >= 0 && ksu_manager_appid_param < KSU_PER_USER_RANGE) {
+    if (ksu_manager_appid_param >= 0 &&
+        ksu_is_normal_appid((uid_t)ksu_manager_appid_param)) {
         ksu_set_manager_appid(ksu_manager_appid_param);
         pr_info("manager appid initialized from module param: %d\n", ksu_manager_appid_param);
     }

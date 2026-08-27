@@ -293,20 +293,31 @@ int ksu_debug_manager_appid = -1;
 
 #include "manager/manager_identity.h"
 
-static int set_expected_size(const char *val, const struct kernel_param *kp)
+static int set_debug_manager_appid(const char *val,
+                                  const struct kernel_param *kp)
 {
-    int rv = param_set_uint(val, kp);
-    ksu_set_manager_appid(ksu_debug_manager_appid);
-    pr_info("ksu_manager_appid set to %d\n", ksu_debug_manager_appid);
-    return rv;
+    int appid;
+    int rv = kstrtoint(val, 0, &appid);
+    if (rv) {
+        return rv;
+    }
+    if (!ksu_is_normal_appid((uid_t)appid)) {
+        pr_err("ksu_manager_appid rejected invalid appid %d\n", appid);
+        return -EINVAL;
+    }
+    *(int *)kp->arg = appid;
+    ksu_set_manager_appid((uid_t)appid);
+    pr_info("ksu_manager_appid set to %d\n", appid);
+    return 0;
 }
 
-static struct kernel_param_ops expected_size_ops = {
-    .set = set_expected_size,
-    .get = param_get_uint,
+static const struct kernel_param_ops debug_manager_appid_param_ops = {
+    .set = set_debug_manager_appid,
+    .get = param_get_int,
 };
 
-module_param_cb(ksu_debug_manager_appid, &expected_size_ops, &ksu_debug_manager_appid, S_IRUSR | S_IWUSR);
+module_param_cb(ksu_debug_manager_appid, &debug_manager_appid_param_ops,
+                &ksu_debug_manager_appid, S_IRUSR | S_IWUSR);
 
 #endif
 
@@ -359,7 +370,11 @@ bool is_manager_apk(char *path)
     }
 
     // pkg is `<real package>`
-    if (strncmp(pkg, KSU_MANAGER_PACKAGE, sizeof(KSU_MANAGER_PACKAGE))) {
+    bool package_matches = strcmp(pkg, KSU_MANAGER_PACKAGE) == 0;
+#ifdef KSU_MANAGER_PACKAGE2
+    package_matches = package_matches || strcmp(pkg, KSU_MANAGER_PACKAGE2) == 0;
+#endif
+    if (!package_matches) {
         return false;
     }
 #endif

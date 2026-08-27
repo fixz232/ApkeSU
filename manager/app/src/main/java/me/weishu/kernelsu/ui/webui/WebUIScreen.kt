@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
@@ -30,6 +31,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import me.weishu.kernelsu.ui.component.LocalBackgroundScrollFollowState
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 
 @Composable
 fun rememberFileLauncher(webUIState: WebUIState): ActivityResultLauncher<Intent> {
@@ -48,14 +51,30 @@ fun rememberFileLauncher(webUIState: WebUIState): ActivityResultLauncher<Intent>
 }
 
 @Composable
-fun WebUIScreen(webUIState: WebUIState) {
+fun WebUIScreen(
+    webUIState: WebUIState,
+    modifier: Modifier = Modifier,
+    respectSafeDrawingInsets: Boolean = true,
+    embeddedTheme: String? = null,
+    embeddedDarkTheme: Boolean = isInDarkTheme(),
+) {
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val drawingInsets = WindowInsets.safeDrawing
     val systemBarsInsets = WindowInsets.systemBars
     val imeInsets = WindowInsets.ime
-    val innerPadding = if (webUIState.isInsetsEnabled) imeInsets.asPaddingValues() else drawingInsets.asPaddingValues()
+    val backgroundScrollFollowState = LocalBackgroundScrollFollowState.current
+    val innerPadding = when {
+        webUIState.isInsetsEnabled -> imeInsets.asPaddingValues()
+        respectSafeDrawingInsets -> drawingInsets.asPaddingValues()
+        else -> PaddingValues()
+    }
     val fileLauncher = rememberFileLauncher(webUIState)
+
+    LaunchedEffect(webUIState.uiEvent, embeddedTheme, embeddedDarkTheme) {
+        val theme = embeddedTheme ?: return@LaunchedEffect
+        webUIState.configureEmbeddedTheme(theme, embeddedDarkTheme)
+    }
 
     LaunchedEffect(density, layoutDirection, systemBarsInsets, webUIState.isInsetsEnabled) {
         if (!webUIState.isInsetsEnabled) {
@@ -79,8 +98,27 @@ fun WebUIScreen(webUIState: WebUIState) {
         webUIState.webView?.goBack()
     }
 
+    DisposableEffect(webUIState.webView, backgroundScrollFollowState) {
+        val webView = webUIState.webView
+        if (webView == null || backgroundScrollFollowState == null) {
+            onDispose { }
+        } else {
+            val listener = View.OnScrollChangeListener { _, scrollX, scrollY, oldScrollX, oldScrollY ->
+                // WebView positions increase while the finger moves up; Compose uses the gesture direction.
+                backgroundScrollFollowState.onEmbeddedViewScroll(
+                    androidx.compose.ui.geometry.Offset(
+                        (oldScrollX - scrollX).toFloat(),
+                        (oldScrollY - scrollY).toFloat(),
+                    ),
+                )
+            }
+            webView.setOnScrollChangeListener(listener)
+            onDispose { webView.setOnScrollChangeListener(null) }
+        }
+    }
+
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(innerPadding)
     ) {
@@ -115,9 +153,6 @@ fun WebUIScreen(webUIState: WebUIState) {
                         }
                     }
                 },
-                update = { view ->
-                    view.requestLayout()
-                }
             )
         }
     }

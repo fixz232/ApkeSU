@@ -34,6 +34,7 @@ const LEGACY_PANIC_FLAG_PATH: &str = "/cache/mochen_kernel_panic";
 const LEGACY_TMP_MODULE_DISABLE_PATH: &str = "/cache/tmp_modules_disable";
 const MAX_AUTO_RESTORE_ATTEMPTS: u32 = 3;
 const PENDING_BOOT_FAILURE_TRIGGER_COUNT: u32 = 2;
+const MODULE_RESCUE_FAILURE_TRIGGER_COUNT: u32 = 2;
 
 #[derive(Clone, Debug, Default)]
 struct RescueConfig {
@@ -72,6 +73,46 @@ struct RestorePlan {
     description: String,
     specs: Vec<PartitionSpec>,
     activate_slot: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BootRescueAction {
+    None,
+    RestoreBackups,
+    DisableModules,
+}
+
+const fn post_fs_data_rescue_action(
+    pending_boot: bool,
+    previous_boot_ok: bool,
+    boot_count: u32,
+    failure_hint: bool,
+) -> BootRescueAction {
+    if pending_boot
+        && (failure_hint || (boot_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT && !previous_boot_ok))
+    {
+        BootRescueAction::RestoreBackups
+    } else if !pending_boot
+        && (failure_hint
+            || (boot_count >= MODULE_RESCUE_FAILURE_TRIGGER_COUNT && !previous_boot_ok))
+    {
+        // An unverified image must never be overwritten solely because a normal
+        // boot was interrupted. Recover modules first; image rollback stays tied
+        // to an explicit post-flash verification marker.
+        BootRescueAction::DisableModules
+    } else {
+        BootRescueAction::None
+    }
+}
+
+const fn recovery_boot_rescue_action(pending_boot: bool, failure_hint: bool) -> BootRescueAction {
+    if pending_boot {
+        BootRescueAction::RestoreBackups
+    } else if failure_hint {
+        BootRescueAction::DisableModules
+    } else {
+        BootRescueAction::None
+    }
 }
 
 pub fn print_status() {
@@ -416,21 +457,28 @@ pub fn check_on_post_fs_data() {
 
     // On the first patched boot, pstore still describes the boot that performed the
     // flash. Only trust failure evidence after another attempted boot.
-    let failure_hint = pending_boot && next_count > 1 && has_boot_failure_hint();
-    let pending_boot_failed =
-        pending_boot && next_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT && !previous_boot_ok;
-    if failure_hint || pending_boot_failed {
-        append_log(format!(
-            "auto restore triggered on post-fs-data: failure_hint={failure_hint}, pending_boot_failed={pending_boot_failed}"
-        ));
-    } else if !pending_boot {
-        append_log("no pending flashed boot; normal boot counter will not trigger auto restore");
-    }
-
-    if (failure_hint || pending_boot_failed)
-        && let Err(err) = auto_restore_backups()
-    {
-        append_log(format!("auto restore failed: {err:#}"));
+    let failure_hint = next_count > 1 && has_boot_failure_hint();
+    match post_fs_data_rescue_action(pending_boot, previous_boot_ok, next_count, failure_hint) {
+        BootRescueAction::RestoreBackups => {
+            append_log(format!(
+                "auto image rollback triggered on post-fs-data: failure_hint={failure_hint}, pending_boot={pending_boot}, boot_count={next_count}"
+            ));
+            if let Err(err) = auto_restore_backups() {
+                append_log(format!("auto image rollback failed: {err:#}"));
+            }
+        }
+        BootRescueAction::DisableModules => {
+            rescue_modules_for_failed_boot(format!(
+                "unverified boot failure: failure_hint={failure_hint}, boot_count={next_count}"
+            ));
+        }
+        BootRescueAction::None => {
+            if !pending_boot {
+                append_log(
+                    "no pending flashed boot; image rollback remains armed only for verified flashes",
+                );
+            }
+        }
     }
 }
 
@@ -466,16 +514,24 @@ pub fn check_on_recovery_boot() {
     let _ = fs::remove_file(BOOT_OK_PATH);
     write_boot_count(next_count);
 
-    let failure_hint = pending_boot && has_boot_failure_hint();
+    let failure_hint = has_boot_failure_hint();
     append_log(format!(
         "recovery rescue check: boot_mode={}, previous_boot_ok={previous_boot_ok}, pending_boot={pending_boot}, boot_count={next_count}, failure_hint={failure_hint}",
         boot_mode()
     ));
 
-    if (pending_boot || failure_hint)
-        && let Err(err) = auto_restore_backups()
-    {
-        append_log(format!("auto restore failed in recovery: {err:#}"));
+    match recovery_boot_rescue_action(pending_boot, failure_hint) {
+        BootRescueAction::RestoreBackups => {
+            if let Err(err) = auto_restore_backups() {
+                append_log(format!("auto image rollback failed in recovery: {err:#}"));
+            }
+        }
+        BootRescueAction::DisableModules => {
+            rescue_modules_for_failed_boot(
+                "recovery boot failure evidence without a pending image flash",
+            );
+        }
+        BootRescueAction::None => {}
     }
 }
 
@@ -820,7 +876,7 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     }
     mark_skip_modules_once();
     mark_legacy_tmp_module_disable();
-    disable_all_modules_after_restore();
+    disable_all_modules_for_rescue();
     mark_legacy_fix_done_lock();
     cleanup_legacy_rescue_flags();
     fs::write(RESTORE_LOCK_PATH, b"1").context("failed to write restore lock")?;
@@ -1076,12 +1132,16 @@ fn mark_legacy_tmp_module_disable() {
     }
 }
 
-fn disable_all_modules_after_restore() {
+fn rescue_modules_for_failed_boot(reason: impl AsRef<str>) {
+    append_log(format!("module rescue triggered: {}", reason.as_ref()));
+    mark_skip_modules_once();
+    disable_all_modules_for_rescue();
+}
+
+fn disable_all_modules_for_rescue() {
     match module::disable_all_modules() {
-        Ok(()) => append_log("all modules disabled after rescue restore"),
-        Err(err) => append_log(format!(
-            "failed to disable all modules after rescue restore: {err:#}"
-        )),
+        Ok(()) => append_log("all modules disabled for rescue"),
+        Err(err) => append_log(format!("failed to disable all modules for rescue: {err:#}")),
     }
 }
 
@@ -1778,7 +1838,8 @@ fn tail_file(path: &str, max_lines: usize) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        PartitionSpec, backup_path, normalize_partition_name, parse_config, preserve_file,
+        BootRescueAction, PartitionSpec, backup_path, normalize_partition_name, parse_config,
+        post_fs_data_rescue_action, preserve_file, recovery_boot_rescue_action,
         restore_preserved_file, validate_import_source_against_partition,
     };
     use std::fs;
@@ -1842,5 +1903,33 @@ mod tests {
         fs::write(&target, b"partial-import").unwrap();
         restore_preserved_file(&target_text).unwrap();
         assert!(!target.exists());
+    }
+
+    #[test]
+    fn keeps_image_rollback_scoped_to_pending_flashes() {
+        assert_eq!(
+            post_fs_data_rescue_action(true, false, 2, false),
+            BootRescueAction::RestoreBackups,
+        );
+        assert_eq!(
+            post_fs_data_rescue_action(false, false, 2, false),
+            BootRescueAction::DisableModules,
+        );
+        assert_eq!(
+            post_fs_data_rescue_action(false, true, 1, false),
+            BootRescueAction::None,
+        );
+    }
+
+    #[test]
+    fn recovery_only_rolls_back_images_when_a_flash_is_pending() {
+        assert_eq!(
+            recovery_boot_rescue_action(true, false),
+            BootRescueAction::RestoreBackups,
+        );
+        assert_eq!(
+            recovery_boot_rescue_action(false, true),
+            BootRescueAction::DisableModules,
+        );
     }
 }

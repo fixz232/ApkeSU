@@ -143,6 +143,10 @@ ifndef KSU_MANAGER_PACKAGE
 KSU_MANAGER_PACKAGE := io.github.fixz.apkesu
 endif
 
+ifndef KSU_MANAGER_PACKAGE2
+KSU_MANAGER_PACKAGE2 := io.github.fixz.apkesu.vivo
+endif
+
 ifndef KSU_EXPECTED_SIZE
 KSU_EXPECTED_SIZE := 0x02e8
 endif
@@ -154,6 +158,11 @@ endif
 ifdef KSU_MANAGER_PACKAGE
 ccflags-y += -DKSU_MANAGER_PACKAGE=\"$(KSU_MANAGER_PACKAGE)\"
 $(info -- KernelSU Manager package name: $(KSU_MANAGER_PACKAGE))
+endif
+
+ifdef KSU_MANAGER_PACKAGE2
+ccflags-y += -DKSU_MANAGER_PACKAGE2=\"$(KSU_MANAGER_PACKAGE2)\"
+$(info -- KernelSU Manager package name 2: $(KSU_MANAGER_PACKAGE2))
 endif
 
 $(info -- KernelSU Manager signature size: $(KSU_EXPECTED_SIZE))

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -135,6 +136,16 @@ object SkrootproColors {
         get() = if (isInDarkTheme()) Dark else Light
 }
 
+internal fun skrootproScreenSurfaceAlpha(
+    immersiveBackgroundActive: Boolean,
+    nightEffectActive: Boolean,
+    darkTheme: Boolean,
+): Float = when {
+    !immersiveBackgroundActive && !nightEffectActive -> 1f
+    darkTheme -> 0.86f
+    else -> 0.90f
+}
+
 @Composable
 fun skrootproSp(value: Float, maxScale: Float = 1.12f): TextUnit {
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(0.85f)
@@ -156,13 +167,22 @@ fun SkrootproScreen(
     onTertiaryActionClick: () -> Unit = {},
     tertiaryActionContentDescription: String? = null,
     bottomInnerPadding: Dp,
+    transparentChrome: Boolean = false,
     topBarVisible: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val background = if (LocalNightBackgroundEffectActive.current) {
-        SkrootproColors.Surface.copy(alpha = 0.72f)
-    } else {
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
+    val nightEffectActive = LocalNightBackgroundEffectActive.current
+    val background = if (transparentChrome) {
         Color.Transparent
+    } else {
+        SkrootproColors.Surface.copy(
+            alpha = skrootproScreenSurfaceAlpha(
+                immersiveBackgroundActive = immersiveBackgroundActive,
+                nightEffectActive = nightEffectActive,
+                darkTheme = isInDarkTheme(),
+            ),
+        )
     }
     Column(
         modifier = Modifier
@@ -192,6 +212,7 @@ fun SkrootproScreen(
                 tertiaryActionIcon = tertiaryActionIcon,
                 onTertiaryActionClick = onTertiaryActionClick,
                 tertiaryActionContentDescription = tertiaryActionContentDescription,
+                forceTransparent = transparentChrome,
             )
         }
         Box(modifier = Modifier.weight(1f)) {
@@ -213,10 +234,11 @@ fun SkrootproTopBar(
     tertiaryActionIcon: ImageVector? = null,
     onTertiaryActionClick: () -> Unit = {},
     tertiaryActionContentDescription: String? = null,
+    forceTransparent: Boolean = false,
 ) {
-    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current
-    val statusBarColor = immersiveTopBarColor(SkrootproColors.PurpleDark)
-    val appBarColor = immersiveTopBarColor(SkrootproColors.Purple)
+    val immersiveBackgroundActive = LocalImmersiveBackgroundActive.current || forceTransparent
+    val statusBarColor = if (forceTransparent) Color.Transparent else immersiveTopBarColor(SkrootproColors.PurpleDark)
+    val appBarColor = if (forceTransparent) Color.Transparent else immersiveTopBarColor(SkrootproColors.Purple)
     val contentColor = if (immersiveBackgroundActive) SkrootproColors.Text else Color.White
     Column(
         modifier = Modifier
@@ -280,6 +302,7 @@ fun SkrootproTopBar(
 fun SkrootproBottomBar(
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -295,7 +318,7 @@ fun SkrootproBottomBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SkrootproNavDestination.entries.forEachIndexed { index, destination ->
+        destinations.forEachIndexed { index, destination ->
             SkrootproNavItem(
                 destination = destination,
                 selected = selectedIndex == index,
@@ -308,7 +331,7 @@ fun SkrootproBottomBar(
 
 @Composable
 private fun SkrootproNavItem(
-    destination: SkrootproNavDestination,
+    destination: MainDestination,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -334,16 +357,6 @@ private fun SkrootproNavItem(
             overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-enum class SkrootproNavDestination(
-    @StringRes val label: Int,
-    val icon: ImageVector,
-) {
-    Home(R.string.home, Icons.Rounded.Home),
-    SuperUser(R.string.skrootpro_nav_superuser, Icons.Rounded.Security),
-    Module(R.string.module, Icons.Rounded.Extension),
-    Settings(R.string.settings, Icons.Rounded.Settings),
 }
 
 @Composable

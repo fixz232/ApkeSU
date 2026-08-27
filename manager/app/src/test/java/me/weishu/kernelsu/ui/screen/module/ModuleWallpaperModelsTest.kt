@@ -9,6 +9,15 @@ import org.junit.Test
 
 class ModuleWallpaperModelsTest {
     @Test
+    fun kpmWallpaperIdsAreIsolatedFromRegularModuleIds() {
+        val kpmId = kpmCardWallpaperId("demo")
+
+        assertTrue(kpmId.startsWith(KPM_CARD_WALLPAPER_ID_PREFIX))
+        assertEquals("kpm_card:demo", kpmId)
+        assertNotEquals("demo", kpmId)
+    }
+
+    @Test
     fun collectionNormalizationClampsImportedValues() {
         val entries = List(MODULE_CARD_WALLPAPER_MAX_COUNT + 4) { entry("day-$it") }
 

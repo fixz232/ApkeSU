@@ -72,6 +72,19 @@ enum class CustomPageBackgroundTarget(
         cropBottomKey = "custom_page_background_settings_crop_bottom",
         videoDurationSecondsKey = "custom_page_background_settings_video_duration_seconds",
     ),
+    Kpm(
+        id = "kpm",
+        mainPageIndex = -1,
+        titleRes = R.string.settings_page_background_kpm,
+        wallpaperUriKey = "custom_page_background_kpm_wallpaper_uri",
+        videoUriKey = "custom_page_background_kpm_video_uri",
+        opacityKey = "custom_page_background_kpm_opacity",
+        cropLeftKey = "custom_page_background_kpm_crop_left",
+        cropTopKey = "custom_page_background_kpm_crop_top",
+        cropRightKey = "custom_page_background_kpm_crop_right",
+        cropBottomKey = "custom_page_background_kpm_crop_bottom",
+        videoDurationSecondsKey = "custom_page_background_kpm_video_duration_seconds",
+    ),
     Install(
         id = "install",
         mainPageIndex = -1,
@@ -124,6 +137,7 @@ data class CustomPageBackgroundSet(
     val superuser: CustomBackgroundState = CustomBackgroundState(),
     val module: CustomBackgroundState = CustomBackgroundState(),
     val settings: CustomBackgroundState = CustomBackgroundState(),
+    val kpm: CustomBackgroundState = CustomBackgroundState(),
     val install: CustomBackgroundState = CustomBackgroundState(),
 ) {
     operator fun get(target: CustomPageBackgroundTarget): CustomBackgroundState {
@@ -132,6 +146,7 @@ data class CustomPageBackgroundSet(
             CustomPageBackgroundTarget.Superuser -> superuser
             CustomPageBackgroundTarget.Module -> module
             CustomPageBackgroundTarget.Settings -> settings
+            CustomPageBackgroundTarget.Kpm -> kpm
             CustomPageBackgroundTarget.Install -> install
         }
     }
@@ -285,6 +300,7 @@ internal fun SharedPreferences.readCustomPageBackgroundSet(): CustomPageBackgrou
         superuser = readCustomPageBackgroundState(CustomPageBackgroundTarget.Superuser),
         module = readCustomPageBackgroundState(CustomPageBackgroundTarget.Module),
         settings = readCustomPageBackgroundState(CustomPageBackgroundTarget.Settings),
+        kpm = readCustomPageBackgroundState(CustomPageBackgroundTarget.Kpm),
         install = readCustomPageBackgroundState(CustomPageBackgroundTarget.Install),
     )
 }

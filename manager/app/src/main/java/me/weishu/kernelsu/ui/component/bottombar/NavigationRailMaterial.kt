@@ -43,6 +43,7 @@ import me.weishu.kernelsu.ui.util.rootAvailable
 @Composable
 fun NavigationRailMaterial(
     navigationBadge: NavigationBadgeState,
+    destinations: List<MainDestination>,
     modifier: Modifier = Modifier,
 ) {
     val isManager = Natives.isManager
@@ -50,13 +51,6 @@ fun NavigationRailMaterial(
     val mainPagerState = LocalMainPagerState.current
 
     if (!fullFeatured) return
-
-    val items = listOf(
-        Triple(R.string.home, Icons.Filled.Home, Icons.Outlined.Home),
-        Triple(R.string.superuser, Icons.Filled.Shield, Icons.Outlined.Shield),
-        Triple(R.string.module, Icons.Filled.Extension, Icons.Outlined.Extension),
-        Triple(R.string.settings, Icons.Filled.Settings, Icons.Outlined.Settings)
-    )
 
     val state = rememberWideNavigationRailState()
     val scope = rememberCoroutineScope()
@@ -91,7 +85,7 @@ fun NavigationRailMaterial(
             }
         },
     ) {
-        items.forEachIndexed { index, (label, selectedIcon, unselectedIcon) ->
+        destinations.forEachIndexed { index, destination ->
             val selected = mainPagerState.selectedPage == index
             WideNavigationRailItem(
                 railExpanded = expanded,
@@ -103,12 +97,12 @@ fun NavigationRailMaterial(
                 },
                 icon = {
                     NavigationIconWithBadge(
-                        icon = if (selected) selectedIcon else unselectedIcon,
-                        contentDescription = stringResource(label),
-                        badge = badgeFor(index, navigationBadge),
+                        icon = destination.icon,
+                        contentDescription = stringResource(destination.label),
+                        badge = badgeFor(destination, navigationBadge),
                     )
                 },
-                label = { Text(stringResource(label)) }
+                label = { Text(stringResource(destination.label)) }
             )
         }
     }

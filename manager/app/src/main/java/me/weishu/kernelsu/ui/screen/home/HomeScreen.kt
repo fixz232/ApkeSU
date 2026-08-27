@@ -39,6 +39,7 @@ import me.weishu.kernelsu.magica.MagicaService
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.LocalMainPagerState
+import me.weishu.kernelsu.ui.component.bottombar.MainDestination
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.navigation3.Navigator
 import me.weishu.kernelsu.ui.navigation3.Route
@@ -126,8 +127,8 @@ fun HomePager(
                 navigator.push(Route.Install)
             }
         },
-        onSuperuserClick = { if (uiState.isFullFeatured) mainState.animateToPage(1) },
-        onModuleClick = { if (uiState.isFullFeatured) mainState.animateToPage(2) },
+        onSuperuserClick = { if (uiState.isFullFeatured) mainState.animateTo(MainDestination.SuperUser) },
+        onModuleClick = { if (uiState.isFullFeatured) mainState.animateTo(MainDestination.Module) },
         onOpenUrl = uriHandler::openUri,
         onStyleSettingsClick = { navigator.push(Route.PreInstallStyleSettings) },
         onDiagnoseClick = viewModel::runRootDiagnostics,
@@ -222,7 +223,7 @@ fun HomePager(
             FloatingActionButton(
                 onClick = {
                     if (uiState.isKernelActive) {
-                        mainState.animateToPage(3)
+                        mainState.animateTo(MainDestination.Settings)
                     } else {
                         actions.onStyleSettingsClick()
                     }

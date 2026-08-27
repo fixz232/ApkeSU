@@ -1,5 +1,8 @@
 package me.weishu.kernelsu.data.repository
 
+import android.content.Context
+import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.theme.ThemePreset
 import me.weishu.kernelsu.ui.theme.CustomThemePreset
 import me.weishu.kernelsu.ui.theme.ThemeSyncStrategy
@@ -24,6 +27,12 @@ const val SHOW_HOME_LEARN_CARD_KEY = "show_home_learn_card"
 const val MIUIX_CLASSIC_HOME_LAYOUT_KEY = "miuix_classic_home_layout"
 const val GRAPHICS_RENDERER_FEATURE_ENABLED_KEY = "graphics_renderer_feature_enabled"
 const val CUSTOM_HOME_TITLE_KEY = "custom_home_title"
+internal const val SOFT_REBOOT_KEY = "soft_reboot"
+
+/** Jailbreak mode requires a soft reboot; LKM mode can opt in through Settings. */
+fun isSoftRebootPreferred(): Boolean =
+    Natives.isLateLoadMode || ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        .getBoolean(SOFT_REBOOT_KEY, false)
 
 interface SettingsRepository {
     var uiMode: String
@@ -61,6 +70,7 @@ interface SettingsRepository {
     var inkCardMotionEnabled: Boolean
     var pixelStyle: String
     var pixelCardMotionEnabled: Boolean
+    var pixelPetEnabled: Boolean
     val uiDecorationConfig: UiDecorationConfig
     fun saveUiDecorationConfig(config: UiDecorationConfig): Boolean
     fun getCustomUiDecorationPresets(): List<CustomUiDecorationPreset>
@@ -81,6 +91,7 @@ interface SettingsRepository {
     var themeSyncStrategy: ThemeSyncStrategy
     var enableWebDebugging: Boolean
     var autoJailbreak: Boolean
+    var useSoftReboot: Boolean
     var launcherIcon: String
     var customManagerName: String
     var customHomeTitle: String
@@ -115,6 +126,7 @@ interface SettingsRepository {
     fun setCustomNavigationIcon(slot: CustomNavigationIconSlot, uriString: String?)
     fun setCustomNavigationIconCrop(slot: CustomNavigationIconSlot, crop: CustomWallpaperCrop)
     fun setCustomNavigationIconPresentation(slot: CustomNavigationIconSlot, state: CustomNavigationIconState)
+    val intentToken: String
 
     suspend fun getSuCompatStatus(): String
     suspend fun getSuCompatPersistValue(): Long?
@@ -126,6 +138,10 @@ interface SettingsRepository {
     suspend fun getKernelUmountStatus(): String
     fun isKernelUmountEnabled(): Boolean
     fun setKernelUmountEnabled(enabled: Boolean): Boolean
+
+    suspend fun getWebViewZygoteUmountStatus(): String
+    fun isWebViewZygoteUmountEnabled(): Boolean
+    fun setWebViewZygoteUmountEnabled(enabled: Boolean): Boolean
 
     suspend fun getSelinuxHideStatus(): String
     fun isSelinuxHideEnabled(): Boolean

@@ -159,9 +159,9 @@ pub fn run(
     allow_shell: bool,
 ) -> Result<()> {
     anyhow::ensure!(
-        package_name == crate::defs::DEFAULT_MANAGER_PACKAGE,
-        "refusing Magica for package {package_name}; this build only trusts {}",
-        crate::defs::DEFAULT_MANAGER_PACKAGE
+        crate::defs::is_trusted_manager_package(package_name),
+        "refusing Magica for package {package_name}; this build trusts {}",
+        crate::defs::TRUSTED_MANAGER_PACKAGES.join(", ")
     );
 
     if let Err(error) = enable_adb_root(port) {

@@ -169,6 +169,7 @@ impl SulogEvent {
             1 => "root_execve",
             2 => "sucompat",
             3 => "ioctl_grant_root",
+            4 => "kpm",
             _ => "unknown",
         }
     }
