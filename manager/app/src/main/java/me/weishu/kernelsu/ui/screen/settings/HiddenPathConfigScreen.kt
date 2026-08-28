@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -53,6 +54,7 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -102,11 +104,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.ApkeMetricGrid
+import me.weishu.kernelsu.ui.component.ApkeMetricItem
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.component.AppIconImage
 import me.weishu.kernelsu.ui.component.LocalSwitchStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.theme.immersivePageColor
@@ -117,10 +123,13 @@ import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_MIME_TYPE
 import me.weishu.kernelsu.ui.util.HiddenPathConfigState
 import me.weishu.kernelsu.ui.util.HiddenPathVisibilityResult
 import me.weishu.kernelsu.ui.util.clearHiddenPathLogs
+import me.weishu.kernelsu.ui.util.deleteHiddenPathConfig
+import me.weishu.kernelsu.ui.util.getHiddenPathDiagnostics
 import me.weishu.kernelsu.ui.util.getHiddenPathLogs
 import me.weishu.kernelsu.ui.util.parseHiddenPathConfigJson
 import me.weishu.kernelsu.ui.util.readHiddenPathConfig
 import me.weishu.kernelsu.ui.util.saveAndApplyHiddenPathConfig
+import me.weishu.kernelsu.ui.util.setHiddenPathAutoLoad
 import me.weishu.kernelsu.ui.util.toConfigJson
 import me.weishu.kernelsu.ui.util.testHiddenPathVisibility
 import me.weishu.kernelsu.ui.util.unloadHiddenPathKernelPaths
@@ -130,9 +139,9 @@ import org.json.JSONObject
 
 private fun hiddenPathText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
 
-private val TEXT_CONFIG get() = hiddenPathText(R.string.hidden_path_tab_config)
-private val TEXT_LOG get() = hiddenPathText(R.string.hidden_path_tab_log)
-private val TEXT_HELP get() = hiddenPathText(R.string.hidden_path_tab_help)
+private val TEXT_PATHS_TAB get() = hiddenPathText(R.string.hidden_path_tab_paths)
+private val TEXT_APPS_TAB get() = hiddenPathText(R.string.hidden_path_tab_apps)
+private val TEXT_DIAGNOSTICS_TAB get() = hiddenPathText(R.string.hidden_path_tab_diagnostics)
 private val TEXT_SUSUF_CONFIG get() = hiddenPathText(R.string.hidden_path_options)
 private val TEXT_PATH_CONFIG get() = hiddenPathText(R.string.hidden_path_paths)
 private val TEXT_APP_CONFIG get() = hiddenPathText(R.string.hidden_path_apps)
@@ -194,6 +203,9 @@ private val TEXT_STATUS_UNAVAILABLE get() = hiddenPathText(R.string.hidden_path_
 private val TEXT_PENDING_CHANGES get() = hiddenPathText(R.string.hidden_path_pending_changes)
 private const val PREF_HIDDEN_PATH_TEMPLATES = "hidden_path_config_templates"
 private const val PREF_KEY_TEMPLATES = "templates"
+private const val MAX_HIDDEN_PATHS = 64
+private const val MAX_HIDDEN_APPS = 256
+private const val MAX_PATH_PARAMETER_BYTES = 1900
 
 private val COMMON_HIDDEN_PATHS = listOf(
     "/data/adb/ksu",
@@ -229,7 +241,6 @@ fun HiddenPathConfigScreen() {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val onBack = dropUnlessResumed { navigator.pop() }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var config by remember { mutableStateOf(HiddenPathConfigState()) }
@@ -247,6 +258,11 @@ fun HiddenPathConfigScreen() {
     var visibilityPathInput by rememberSaveable { mutableStateOf("") }
     var visibilityTesting by remember { mutableStateOf(false) }
     var visibilityResult by remember { mutableStateOf<HiddenPathVisibilityResult?>(null) }
+    var autoLoadChanging by remember { mutableStateOf(false) }
+    var deletingConfig by remember { mutableStateOf(false) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var diagnosticExportText by remember { mutableStateOf("") }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument(HIDDEN_PATH_CONFIG_MIME_TYPE),
@@ -291,7 +307,7 @@ fun HiddenPathConfigScreen() {
                 }
         }
     }
-    val logExportLauncher = rememberLauncherForActivityResult(
+    val diagnosticExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -299,7 +315,7 @@ fun HiddenPathConfigScreen() {
             val ok = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
-                        output.write(displayLogText(logs).toByteArray(Charsets.UTF_8))
+                        output.write(diagnosticExportText.toByteArray(Charsets.UTF_8))
                     } ?: error("Unable to open log output stream")
                 }.isSuccess
             }
@@ -312,6 +328,18 @@ fun HiddenPathConfigScreen() {
     }
 
     val hasPendingChanges = lastAppliedConfig?.let { !config.editableEquals(it) } == true
+    val performBack = dropUnlessResumed { navigator.pop() }
+    val requestBack = {
+        if (hasPendingChanges) {
+            showDiscardConfirm = true
+        } else {
+            performBack()
+        }
+    }
+
+    BackHandler(enabled = hasPendingChanges) {
+        showDiscardConfirm = true
+    }
 
     fun refreshLogs() {
         scope.launch {
@@ -402,10 +430,10 @@ fun HiddenPathConfigScreen() {
         applying = true
         scope.launch {
             try {
-                val ok = saveAndApplyHiddenPathConfig(
+                val result = saveAndApplyHiddenPathConfig(
                     sanitizeHiddenPathConfig(config)
                 )
-                if (ok) {
+                if (result.success) {
                     val applied = sanitizeHiddenPathConfig(config)
                     val refreshed = readHiddenPathConfig()
                     if (refreshed.config != null) {
@@ -421,11 +449,11 @@ fun HiddenPathConfigScreen() {
                 logs = getHiddenPathLogs()
                 Toast.makeText(
                     context,
-                    if (ok) TEXT_APPLY_OK else TEXT_APPLY_FAIL,
+                    if (result.success) TEXT_APPLY_OK else result.errorMessage.ifBlank { TEXT_APPLY_FAIL },
                     Toast.LENGTH_LONG,
                 ).show()
-                if (!ok) {
-                    selectedTab = 1
+                if (!result.success) {
+                    selectedTab = 2
                 }
             } finally {
                 applying = false
@@ -438,8 +466,8 @@ fun HiddenPathConfigScreen() {
         unloadingActive = true
         scope.launch {
             try {
-                val ok = unloadHiddenPathKernelPaths()
-                if (ok) {
+                val result = unloadHiddenPathKernelPaths()
+                if (result.success) {
                     val refreshed = readHiddenPathConfig()
                     if (refreshed.config != null) {
                         config = refreshed.config
@@ -456,11 +484,11 @@ fun HiddenPathConfigScreen() {
                 logs = getHiddenPathLogs()
                 Toast.makeText(
                     context,
-                    if (ok) TEXT_UNLOAD_ACTIVE_OK else TEXT_UNLOAD_ACTIVE_FAIL,
+                    if (result.success) TEXT_UNLOAD_ACTIVE_OK else result.errorMessage.ifBlank { TEXT_UNLOAD_ACTIVE_FAIL },
                     Toast.LENGTH_LONG,
                 ).show()
-                if (!ok) {
-                    selectedTab = 1
+                if (!result.success) {
+                    selectedTab = 2
                 }
             } finally {
                 unloadingActive = false
@@ -493,6 +521,71 @@ fun HiddenPathConfigScreen() {
         }
     }
 
+    fun setAutoLoad(enabled: Boolean) {
+        if (autoLoadChanging || applying || unloadingActive || deletingConfig) return
+        autoLoadChanging = true
+        scope.launch {
+            try {
+                val result = setHiddenPathAutoLoad(enabled)
+                if (result.success) {
+                    config = config.copy(autoLoadEnabled = enabled)
+                    lastAppliedConfig = lastAppliedConfig?.copy(autoLoadEnabled = enabled)
+                }
+                Toast.makeText(
+                    context,
+                    if (result.success) {
+                        hiddenPathText(
+                            if (enabled) R.string.hidden_path_auto_load_enabled
+                            else R.string.hidden_path_auto_load_disabled
+                        )
+                    } else {
+                        result.errorMessage.ifBlank { TEXT_APPLY_FAIL }
+                    },
+                    Toast.LENGTH_LONG,
+                ).show()
+            } finally {
+                autoLoadChanging = false
+            }
+        }
+    }
+
+    fun deleteConfiguration() {
+        if (deletingConfig || applying || unloadingActive) return
+        deletingConfig = true
+        scope.launch {
+            try {
+                val result = deleteHiddenPathConfig()
+                if (result.success) {
+                    val refreshed = readHiddenPathConfig()
+                    config = refreshed.config ?: HiddenPathConfigState()
+                    lastAppliedConfig = config
+                    statusError = refreshed.error
+                }
+                logs = getHiddenPathLogs()
+                Toast.makeText(
+                    context,
+                    if (result.success) {
+                        hiddenPathText(R.string.hidden_path_delete_config_success)
+                    } else {
+                        result.errorMessage.ifBlank {
+                            hiddenPathText(R.string.hidden_path_delete_config_failed)
+                        }
+                    },
+                    Toast.LENGTH_LONG,
+                ).show()
+            } finally {
+                deletingConfig = false
+            }
+        }
+    }
+
+    fun exportDiagnostics() {
+        scope.launch {
+            diagnosticExportText = getHiddenPathDiagnostics().ifBlank { displayLogText(logs) }
+            diagnosticExportLauncher.launch("pathmask-diagnostics.txt")
+        }
+    }
+
     LaunchedEffect(Unit) {
         val initial = readHiddenPathConfig()
         if (initial.config != null) {
@@ -508,51 +601,36 @@ fun HiddenPathConfigScreen() {
         loading = false
     }
 
-    Scaffold(
+    ApkeSecondaryScaffold(
+        title = stringResource(R.string.hidden_path_config),
+        onBack = requestBack,
         containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.hidden_path_config)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = !loading && !applying && !unloadingActive && !hasPendingChanges,
-                        onClick = ::refreshStatus,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = TEXT_REFRESH,
-                        )
-                    }
-                    ForegroundToolProtectionTopBarAction(
-                        onClick = { navigator.push(Route.ForegroundToolProtection) },
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
+        actions = {
+            IconButton(
+                enabled = !loading && !applying && !unloadingActive && !hasPendingChanges,
+                onClick = ::refreshStatus,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = TEXT_REFRESH,
+                )
+            }
+            ForegroundToolProtectionTopBarAction(
+                onClick = { navigator.push(Route.ForegroundToolProtection) },
             )
         },
         bottomBar = {
-            if (!loading && selectedTab == 0) {
+            if (!loading && selectedTab in 0..1) {
                 FixedApplyBar(
                     applying = applying,
-                    enabled = !applying && !unloadingActive && config.blockReason() == null,
+                    enabled = !applying && !unloadingActive && !deletingConfig &&
+                        config.blockReason() == null,
                     blockReason = config.blockReason(),
                     onApply = ::applyHiddenPathConfig,
                 )
             }
         },
-    ) { innerPadding ->
+    ) { innerPadding, _ ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -560,7 +638,8 @@ fun HiddenPathConfigScreen() {
         ) {
             val activeTab = selectedTab.coerceIn(0, 2)
             PrimaryTabRow(selectedTabIndex = activeTab) {
-                listOf(TEXT_CONFIG, TEXT_LOG, TEXT_HELP).forEachIndexed { index, title ->
+                listOf(TEXT_PATHS_TAB, TEXT_APPS_TAB, TEXT_DIAGNOSTICS_TAB)
+                    .forEachIndexed { index, title ->
                     Tab(
                         selected = activeTab == index,
                         onClick = { selectedTab = index },
@@ -573,7 +652,8 @@ fun HiddenPathConfigScreen() {
                 LoadingContent()
             } else {
                 when (activeTab) {
-                    0 -> HiddenPathConfigTab(
+                    0, 1 -> HiddenPathConfigTab(
+                        section = activeTab,
                          config = config,
                          pendingChanges = hasPendingChanges,
                          statusError = statusError,
@@ -583,10 +663,6 @@ fun HiddenPathConfigScreen() {
                         templates = templates,
                         applying = applying,
                         unloadingActive = unloadingActive,
-                        visibilityUidInput = visibilityUidInput,
-                        visibilityPathInput = visibilityPathInput,
-                        visibilityTesting = visibilityTesting,
-                        visibilityResult = visibilityResult,
                         onPathInputChange = { pathInput = it },
                         onAppInputChange = { appInput = it },
                         onTemplateNameChange = { templateName = it },
@@ -594,20 +670,6 @@ fun HiddenPathConfigScreen() {
                              config = it.forPendingApply()
                              statusError = ""
                          },
-                        onVisibilityUidChange = {
-                            visibilityUidInput = it.filter(Char::isDigit).take(10)
-                            visibilityResult = null
-                        },
-                        onVisibilityPathChange = {
-                            visibilityPathInput = it
-                            visibilityResult = null
-                        },
-                        onUseVisibilityConfig = {
-                            visibilityPathInput = config.targetPaths.firstOrNull().orEmpty()
-                            visibilityUidInput = config.resolvedAppUids.firstOrNull().orEmpty()
-                            visibilityResult = null
-                        },
-                        onTestVisibility = ::testConfiguredVisibility,
                         onImportConfig = {
                             importLauncher.launch(arrayOf(HIDDEN_PATH_CONFIG_MIME_TYPE, "text/*", "*/*"))
                         },
@@ -623,36 +685,105 @@ fun HiddenPathConfigScreen() {
                         onAddApp = {
                             addAppEntry(appInput, clearInput = true)
                         },
-                        onUnloadActive = ::unloadActiveHiddenPaths,
+                        autoLoadChanging = autoLoadChanging,
+                        onAutoLoadChange = ::setAutoLoad,
                         onAddPathValue = { path ->
                             addPath(path, clearInput = false)
                         },
-                        onAddAppUid = { uid ->
-                            addAppEntry(uid.toString(), clearInput = false)
+                        onAddAppPackage = { packageName ->
+                            addAppEntry(packageName, clearInput = false)
                         },
                     )
-                    1 -> HiddenPathLogTab(
+                    else -> HiddenPathDiagnosticsTab(
+                        config = config,
+                        statusError = statusError,
                         logs = logs,
-                         onRefresh = { refreshLogs() },
+                        busy = applying || unloadingActive || deletingConfig || autoLoadChanging,
+                        unloadingActive = unloadingActive,
+                        deletingConfig = deletingConfig,
+                        visibilityUidInput = visibilityUidInput,
+                        visibilityPathInput = visibilityPathInput,
+                        visibilityTesting = visibilityTesting,
+                        visibilityResult = visibilityResult,
+                        onVisibilityUidChange = {
+                            visibilityUidInput = it.filter(Char::isDigit).take(10)
+                            visibilityResult = null
+                        },
+                        onVisibilityPathChange = {
+                            visibilityPathInput = it
+                            visibilityResult = null
+                        },
+                        onUseVisibilityConfig = {
+                            visibilityPathInput = config.targetPaths.firstOrNull().orEmpty()
+                            visibilityUidInput = config.resolvedAppUids.firstOrNull().orEmpty()
+                            visibilityResult = null
+                        },
+                        onTestVisibility = ::testConfiguredVisibility,
+                        onRefresh = { refreshLogs() },
                         onCopy = {
                             copyTextToClipboard(context, "pathmask.log", displayLogText(logs))
                             Toast.makeText(context, TEXT_LOG_COPY_OK, Toast.LENGTH_SHORT).show()
                         },
-                        onExport = {
-                            logExportLauncher.launch(TEXT_LOG_FILE_NAME)
-                        },
+                        onExportDiagnostics = ::exportDiagnostics,
+                        onUnloadThisBoot = ::unloadActiveHiddenPaths,
+                        onDeleteConfig = { showDeleteConfirm = true },
                         onClear = {
                             scope.launch {
-                                if (clearHiddenPathLogs()) {
+                                if (clearHiddenPathLogs().success) {
                                     logs = getHiddenPathLogs()
                                 }
                             }
                         },
                     )
-                    else -> HiddenPathHelpTab()
                 }
             }
         }
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text(hiddenPathText(R.string.hidden_path_discard_changes_title)) },
+            text = { Text(hiddenPathText(R.string.hidden_path_discard_changes_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardConfirm = false
+                        performBack()
+                    },
+                ) {
+                    Text(hiddenPathText(R.string.hidden_path_discard_changes_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardConfirm = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(hiddenPathText(R.string.hidden_path_delete_config_title)) },
+            text = { Text(hiddenPathText(R.string.hidden_path_delete_config_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        deleteConfiguration()
+                    },
+                ) {
+                    Text(hiddenPathText(R.string.hidden_path_delete_config_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -670,7 +801,7 @@ private fun HiddenPathUnavailableScreen() {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },
@@ -715,6 +846,7 @@ private fun LoadingContent() {
 
 @Composable
 private fun HiddenPathConfigTab(
+    section: Int,
     config: HiddenPathConfigState,
     pendingChanges: Boolean,
     statusError: String,
@@ -724,18 +856,11 @@ private fun HiddenPathConfigTab(
     templates: List<HiddenPathTemplate>,
     applying: Boolean,
     unloadingActive: Boolean,
-    visibilityUidInput: String,
-    visibilityPathInput: String,
-    visibilityTesting: Boolean,
-    visibilityResult: HiddenPathVisibilityResult?,
+    autoLoadChanging: Boolean,
     onPathInputChange: (String) -> Unit,
     onAppInputChange: (String) -> Unit,
     onTemplateNameChange: (String) -> Unit,
     onConfigChange: (HiddenPathConfigState) -> Unit,
-    onVisibilityUidChange: (String) -> Unit,
-    onVisibilityPathChange: (String) -> Unit,
-    onUseVisibilityConfig: () -> Unit,
-    onTestVisibility: () -> Unit,
     onImportConfig: () -> Unit,
     onExportConfig: () -> Unit,
     onSaveTemplate: () -> Unit,
@@ -743,11 +868,12 @@ private fun HiddenPathConfigTab(
     onDeleteTemplate: (HiddenPathTemplate) -> Unit,
     onAddPath: () -> Unit,
     onAddApp: () -> Unit,
-    onUnloadActive: () -> Unit,
+    onAutoLoadChange: (Boolean) -> Unit,
     onAddPathValue: (String) -> Unit,
-    onAddAppUid: (Int) -> Unit,
+    onAddAppPackage: (String) -> Unit,
 ) {
     var showAppPicker by rememberSaveable { mutableStateOf(false) }
+    val busy = applying || unloadingActive || autoLoadChanging
 
     Column(
         modifier = Modifier
@@ -760,148 +886,152 @@ private fun HiddenPathConfigTab(
             config = config,
             pendingChanges = pendingChanges,
             statusError = statusError,
-            unloadingActive = unloadingActive,
-            onUnloadActive = onUnloadActive,
+            autoLoadChanging = autoLoadChanging,
+            onAutoLoadChange = onAutoLoadChange,
         )
 
-        VisibilityProbeSection(
-            uidInput = visibilityUidInput,
-            pathInput = visibilityPathInput,
-            testing = visibilityTesting,
-            busy = applying || unloadingActive,
-            result = visibilityResult,
-            hasCurrentConfig = config.targetPaths.isNotEmpty() &&
-                config.resolvedAppUids.isNotEmpty(),
-            onUidChange = onVisibilityUidChange,
-            onPathChange = onVisibilityPathChange,
-            onUseCurrentConfig = onUseVisibilityConfig,
-            onTest = onTestVisibility,
-        )
-
-        ConfigSection(
-            title = TEXT_IMPORT_EXPORT_CONFIG,
-            summary = hiddenPathText(R.string.hidden_path_import_export_summary),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        if (section == 0) {
+            ConfigSection(
+                title = TEXT_SUSUF_CONFIG,
+                summary = hiddenPathText(R.string.hidden_path_options_summary),
             ) {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = !applying && !unloadingActive,
-                    onClick = onImportConfig,
+                ToggleRow(
+                    title = hiddenPathText(R.string.hidden_path_hide_directory_entries),
+                    summary = hiddenPathText(R.string.hidden_path_hide_directory_entries_summary),
+                    checked = config.hideDirents,
+                    enabled = !busy,
+                    onCheckedChange = { onConfigChange(config.copy(hideDirents = it)) },
+                )
+                ToggleRow(
+                    title = hiddenPathText(R.string.hidden_path_hide_isolated_processes),
+                    summary = hiddenPathText(R.string.hidden_path_hide_isolated_processes_summary),
+                    checked = config.hideIsolated,
+                    enabled = !busy,
+                    onCheckedChange = { onConfigChange(config.copy(hideIsolated = it)) },
+                )
+            }
+
+            ConfigSection(title = "$TEXT_PATH_CONFIG (${config.targetPaths.size}/64)") {
+                AddRow(
+                    value = pathInput,
+                    label = hiddenPathText(R.string.hidden_path_path_label),
+                    placeholder = "/data/local/tmp/pathmask",
+                    enabled = !busy,
+                    onValueChange = onPathInputChange,
+                    onAdd = onAddPath,
+                )
+                SmartPathActions(
+                    currentValue = pathInput,
+                    enabled = !busy,
+                    onUsePath = onPathInputChange,
+                    onAddPath = onAddPathValue,
+                )
+                EditableList(
+                    items = config.targetPaths,
+                    emptyText = TEXT_EMPTY_PATH,
+                    emptyKind = EmptyListKind.Path,
+                    onDelete = { item ->
+                        onConfigChange(config.copy(targetPaths = config.targetPaths - item))
+                    },
+                    enabled = !busy,
+                )
+            }
+
+            ConfigSection(
+                title = TEXT_IMPORT_EXPORT_CONFIG,
+                summary = hiddenPathText(R.string.hidden_path_import_export_summary),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(TEXT_IMPORT_CONFIG)
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        enabled = !busy,
+                        onClick = onImportConfig,
+                    ) {
+                        Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(TEXT_IMPORT_CONFIG)
+                    }
+                    FilledTonalButton(
+                        modifier = Modifier.weight(1f),
+                        enabled = !busy,
+                        onClick = onExportConfig,
+                    ) {
+                        Icon(Icons.Rounded.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(TEXT_EXPORT_CONFIG)
+                    }
                 }
+            }
+
+            ConfigSection(
+                title = TEXT_TEMPLATE_CONFIG,
+                summary = hiddenPathText(R.string.hidden_path_templates_summary),
+            ) {
+                TemplateControls(
+                    templateName = templateName,
+                    templates = templates,
+                    enabled = !busy,
+                    onTemplateNameChange = onTemplateNameChange,
+                    onSaveTemplate = onSaveTemplate,
+                    onApplyTemplate = onApplyTemplate,
+                    onDeleteTemplate = onDeleteTemplate,
+                )
+            }
+        } else {
+            ConfigSection(
+                title = hiddenPathText(R.string.hidden_path_app_scope_title),
+                summary = hiddenPathText(R.string.hidden_path_app_scope_multi_user_summary),
+            ) {
+                ToggleRow(
+                    title = hiddenPathText(R.string.hidden_path_uid_scope),
+                    summary = hiddenPathText(R.string.hidden_path_uid_scope_summary),
+                    checked = config.useAppScope,
+                    enabled = !busy,
+                    onCheckedChange = { onConfigChange(config.copy(useAppScope = it)) },
+                )
+            }
+
+            ConfigSection(title = "$TEXT_APP_CONFIG (${config.appPackages.size}/256)") {
                 FilledTonalButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = !applying && !unloadingActive,
-                    onClick = onExportConfig,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    onClick = { showAppPicker = true },
                 ) {
-                    Icon(Icons.Rounded.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(TEXT_EXPORT_CONFIG)
+                    Icon(Icons.Rounded.Android, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(TEXT_ADD_APP_FROM_LIST)
+                }
+                AddRow(
+                    value = appInput,
+                    label = hiddenPathText(R.string.hidden_path_package_name),
+                    placeholder = "com.example.app",
+                    enabled = !busy,
+                    onValueChange = onAppInputChange,
+                    onAdd = onAddApp,
+                )
+                EditableList(
+                    items = config.appPackages,
+                    emptyText = TEXT_EMPTY_APP,
+                    emptyKind = EmptyListKind.App,
+                    onDelete = { item ->
+                        onConfigChange(config.copy(appPackages = config.appPackages - item))
+                    },
+                    enabled = !busy,
+                )
+                if (config.unresolvedAppPackages.isNotEmpty()) {
+                    Text(
+                        text = hiddenPathText(
+                            R.string.hidden_path_unresolved_apps,
+                            config.unresolvedAppPackages.joinToString(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
                 }
             }
-        }
-
-        ConfigSection(
-            title = TEXT_TEMPLATE_CONFIG,
-            summary = hiddenPathText(R.string.hidden_path_templates_summary),
-        ) {
-            TemplateControls(
-                templateName = templateName,
-                templates = templates,
-                enabled = !applying && !unloadingActive,
-                onTemplateNameChange = onTemplateNameChange,
-                onSaveTemplate = onSaveTemplate,
-                onApplyTemplate = onApplyTemplate,
-                onDeleteTemplate = onDeleteTemplate,
-            )
-        }
-
-        ConfigSection(
-            title = TEXT_SUSUF_CONFIG,
-            summary = hiddenPathText(R.string.hidden_path_options_summary),
-        ) {
-            ToggleRow(
-                title = hiddenPathText(R.string.hidden_path_uid_scope),
-                summary = hiddenPathText(R.string.hidden_path_uid_scope_summary),
-                checked = config.useAppScope,
-                enabled = !applying && !unloadingActive,
-                onCheckedChange = { onConfigChange(config.copy(useAppScope = it)) },
-            )
-            ToggleRow(
-                title = hiddenPathText(R.string.hidden_path_hide_directory_entries),
-                summary = hiddenPathText(R.string.hidden_path_hide_directory_entries_summary),
-                checked = config.hideDirents,
-                enabled = !applying && !unloadingActive,
-                onCheckedChange = { onConfigChange(config.copy(hideDirents = it)) },
-            )
-            ToggleRow(
-                title = hiddenPathText(R.string.hidden_path_hide_isolated_processes),
-                summary = hiddenPathText(R.string.hidden_path_hide_isolated_processes_summary),
-                checked = config.hideIsolated,
-                enabled = !applying && !unloadingActive,
-                onCheckedChange = { onConfigChange(config.copy(hideIsolated = it)) },
-            )
-        }
-
-        ConfigSection(title = "$TEXT_PATH_CONFIG (${config.targetPaths.size})") {
-            AddRow(
-                value = pathInput,
-                label = hiddenPathText(R.string.hidden_path_path_label),
-                placeholder = "/data/local/tmp/pathmask",
-                enabled = !applying && !unloadingActive,
-                onValueChange = onPathInputChange,
-                onAdd = onAddPath,
-            )
-            SmartPathActions(
-                currentValue = pathInput,
-                enabled = !applying && !unloadingActive,
-                onUsePath = onPathInputChange,
-                onAddPath = onAddPathValue,
-            )
-            EditableList(
-                items = config.targetPaths,
-                emptyText = TEXT_EMPTY_PATH,
-                emptyKind = EmptyListKind.Path,
-                onDelete = { item ->
-                    onConfigChange(config.copy(targetPaths = config.targetPaths - item))
-                },
-                enabled = !applying && !unloadingActive,
-            )
-        }
-
-        ConfigSection(title = "$TEXT_APP_CONFIG (${config.appPackages.size})") {
-            FilledTonalButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !applying && !unloadingActive,
-                onClick = { showAppPicker = true },
-            ) {
-                Icon(Icons.Rounded.Android, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(TEXT_ADD_APP_FROM_LIST)
-            }
-            AddRow(
-                value = appInput,
-                label = hiddenPathText(R.string.hidden_path_package_or_uid),
-                placeholder = "com.example.app",
-                enabled = !applying && !unloadingActive,
-                onValueChange = onAppInputChange,
-                onAdd = onAddApp,
-            )
-            EditableList(
-                items = config.appPackages,
-                emptyText = TEXT_EMPTY_APP,
-                emptyKind = EmptyListKind.App,
-                onDelete = { item ->
-                    onConfigChange(config.copy(appPackages = config.appPackages - item))
-                },
-                enabled = !applying && !unloadingActive,
-            )
         }
 
         Spacer(modifier = Modifier.size(96.dp))
@@ -911,7 +1041,7 @@ private fun HiddenPathConfigTab(
         HiddenPathAppPickerDialog(
             selectedEntries = config.appPackages,
             onDismissRequest = { showAppPicker = false },
-            onSelectUid = onAddAppUid,
+            onSelectPackage = onAddAppPackage,
         )
     }
 }
@@ -1204,8 +1334,8 @@ private fun HiddenPathStatusPanel(
     config: HiddenPathConfigState,
     pendingChanges: Boolean,
     statusError: String,
-    unloadingActive: Boolean,
-    onUnloadActive: () -> Unit,
+    autoLoadChanging: Boolean,
+    onAutoLoadChange: (Boolean) -> Unit,
 ) {
     val statusText = when {
         statusError.isNotBlank() -> TEXT_STATUS_UNAVAILABLE
@@ -1221,94 +1351,125 @@ private fun HiddenPathStatusPanel(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = when {
-                        statusError.isNotBlank() -> TEXT_STATUS_UNAVAILABLE
-                        config.loaded -> hiddenPathText(R.string.hidden_path_loaded)
-                        else -> hiddenPathText(R.string.hidden_path_not_loaded)
-                    },
+                    text = statusText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "KMI ${config.currentKmi.ifBlank { "-" }}",
+                    text = "KMI ${config.currentKmi.ifBlank { "-" }} · ${config.phase}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        StatusBadge(
-            text = statusText,
-            positive = statusError.isBlank() && config.loaded,
+            StatusBadge(
+                text = if (config.loaded) {
+                    hiddenPathText(R.string.hidden_path_loaded)
+                } else {
+                    hiddenPathText(R.string.hidden_path_not_loaded)
+                },
+                positive = when {
+                    statusError.isNotBlank() -> false
+                    config.loaded -> true
+                    else -> null
+                },
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        StatusLine(
-            hiddenPathText(R.string.hidden_path_load_status),
-            if (config.loaded) hiddenPathText(R.string.hidden_path_loaded) else hiddenPathText(R.string.hidden_path_not_loaded),
-        )
-        StatusLine("KMI", config.currentKmi.ifBlank { "-" })
-        StatusLine(hiddenPathText(R.string.hidden_path_resolved_paths), config.resolvedCount.ifBlank { "-" })
-        if (config.useAppScope) {
-            StatusLine(
-                hiddenPathText(R.string.hidden_path_resolved_uids),
-                config.resolvedAppUids.joinToString().ifBlank { "-" },
-            )
-        }
-        if (config.unresolvedAppPackages.isNotEmpty()) {
-            Text(
-                text = hiddenPathText(
-                    R.string.hidden_path_unresolved_apps,
-                    config.unresolvedAppPackages.joinToString(),
+        ApkeMetricGrid(
+            items = listOf(
+                ApkeMetricItem(
+                    label = hiddenPathText(R.string.hidden_path_saved_count),
+                    value = config.savedCount.toString(),
                 ),
+                ApkeMetricItem(
+                    label = hiddenPathText(R.string.hidden_path_active_count),
+                    value = config.activeCount.toString(),
+                ),
+                ApkeMetricItem(
+                    label = hiddenPathText(R.string.hidden_path_missing_count),
+                    value = config.missingTargetPaths.size.toString(),
+                ),
+                ApkeMetricItem(
+                    label = hiddenPathText(R.string.hidden_path_auto_load),
+                    value = hiddenPathText(
+                        if (config.autoLoadEnabled) R.string.rescue_value_enabled
+                        else R.string.rescue_value_disabled
+                    ),
+                ),
+                ApkeMetricItem(
+                    label = hiddenPathText(R.string.hidden_path_module_status),
+                    value = hiddenPathText(
+                        if (config.loaded) R.string.hidden_path_loaded
+                        else R.string.hidden_path_not_loaded
+                    ),
+                ),
+            ),
+        )
+        ToggleRow(
+            title = hiddenPathText(R.string.hidden_path_auto_load),
+            summary = hiddenPathText(R.string.hidden_path_auto_load_summary),
+            checked = config.autoLoadEnabled,
+            enabled = !autoLoadChanging,
+            onCheckedChange = onAutoLoadChange,
+        )
+        if (statusError.isNotBlank()) {
+            Text(
+                text = statusError,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-            if (statusError.isNotBlank()) {
-                Text(
-                    text = statusError,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (pendingChanges) {
-                Text(
-                    text = TEXT_PENDING_CHANGES,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        if (statusError.isBlank() && !config.loaded) {
-            config.blockReason()?.let { reason ->
-                StatusLine(hiddenPathText(R.string.hidden_path_reason), reason)
-            }
+        if (pendingChanges) {
+            Text(
+                text = TEXT_PENDING_CHANGES,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
-        if (config.activeTargetPaths.isNotBlank()) {
-            StatusLine(hiddenPathText(R.string.hidden_path_kernel_active_paths), config.activeTargetPaths)
+        if (config.requiresReload || config.requiresReboot) {
+            Text(
+                text = hiddenPathText(
+                    if (config.requiresReboot) R.string.hidden_path_reboot_required
+                    else R.string.hidden_path_reload_required
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
         }
-        if (config.loaded || config.activeTargetPaths.isNotBlank()) {
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !unloadingActive,
-                onClick = onUnloadActive,
-            ) {
-                if (unloadingActive) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = TEXT_UNLOAD_ACTIVE,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+    }
+}
+
+@Composable
+private fun StatusMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.54f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -1316,9 +1477,15 @@ private fun HiddenPathStatusPanel(
 private fun HiddenPathConfigState.blockReason(): String? {
     return when {
         targetPaths.isEmpty() -> TEXT_NO_PATH
+        targetPaths.size > MAX_HIDDEN_PATHS ->
+            hiddenPathText(R.string.hidden_path_too_many_paths, MAX_HIDDEN_PATHS)
+        targetPaths.joinToString(",").toByteArray(Charsets.UTF_8).size > MAX_PATH_PARAMETER_BYTES ->
+            hiddenPathText(R.string.hidden_path_path_parameter_too_long)
         targetPaths.any { normalizeHiddenPath(it) == null } -> TEXT_INVALID_PATH
         !useAppScope && targetPaths.any(::isManagedRootPath) -> TEXT_MANAGED_PATH_GLOBAL_BLOCK
         useAppScope && appPackages.isEmpty() -> TEXT_NO_APP
+        appPackages.size > MAX_HIDDEN_APPS ->
+            hiddenPathText(R.string.hidden_path_too_many_apps, MAX_HIDDEN_APPS)
         useAppScope && appPackages.any { normalizeAppEntry(it) == null } -> TEXT_INVALID_APP
         else -> null
     }
@@ -1330,9 +1497,12 @@ private fun ConfigSection(
     summary: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = RoundedCornerShape(8.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .uiDecoratedCard(shape = shape),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f),
         tonalElevation = 1.dp,
     ) {
@@ -1409,12 +1579,12 @@ private fun FixedApplyBar(
 @Composable
 private fun StatusBadge(
     text: String,
-    positive: Boolean,
+    positive: Boolean?,
 ) {
-    val contentColor = if (positive) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.error
+    val contentColor = when (positive) {
+        true -> MaterialTheme.colorScheme.primary
+        false -> MaterialTheme.colorScheme.error
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         shape = RoundedCornerShape(50),
@@ -1686,95 +1856,28 @@ private fun StatusLine(label: String, value: String) {
 }
 
 @Composable
-private fun HiddenPathLogTab(
+private fun HiddenPathDiagnosticsTab(
+    config: HiddenPathConfigState,
+    statusError: String,
     logs: String,
+    busy: Boolean,
+    unloadingActive: Boolean,
+    deletingConfig: Boolean,
+    visibilityUidInput: String,
+    visibilityPathInput: String,
+    visibilityTesting: Boolean,
+    visibilityResult: HiddenPathVisibilityResult?,
+    onVisibilityUidChange: (String) -> Unit,
+    onVisibilityPathChange: (String) -> Unit,
+    onUseVisibilityConfig: () -> Unit,
+    onTestVisibility: () -> Unit,
     onRefresh: () -> Unit,
     onCopy: () -> Unit,
-    onExport: () -> Unit,
+    onExportDiagnostics: () -> Unit,
+    onUnloadThisBoot: () -> Unit,
+    onDeleteConfig: () -> Unit,
     onClear: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilledTonalButton(
-                modifier = Modifier.weight(1f),
-                onClick = onRefresh,
-            ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(TEXT_REFRESH)
-            }
-            FilledTonalButton(
-                modifier = Modifier.weight(1f),
-                onClick = onCopy,
-            ) {
-                Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(TEXT_COPY_LOG)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                onClick = onExport,
-            ) {
-                Icon(Icons.Rounded.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(TEXT_EXPORT_LOG)
-            }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                onClick = onClear,
-            ) {
-                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(TEXT_CLEAR)
-            }
-        }
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-        ) {
-            SelectionContainer {
-                Text(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp),
-                    text = displayLogText(logs),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HiddenPathHelpTab() {
-    val items = listOf(
-        hiddenPathText(R.string.hidden_path_help_builtin),
-        hiddenPathText(R.string.hidden_path_help_absolute_paths),
-        hiddenPathText(R.string.hidden_path_help_app_scope),
-        hiddenPathText(R.string.hidden_path_help_managed_paths),
-        hiddenPathText(R.string.hidden_path_help_apply),
-        hiddenPathText(R.string.hidden_path_help_debug),
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1782,9 +1885,182 @@ private fun HiddenPathHelpTab() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ConfigSection(title = TEXT_HELP) {
-            items.forEachIndexed { index, item ->
-                HelpLine(index = index + 1, text = item)
+        ConfigSection(title = hiddenPathText(R.string.hidden_path_runtime_diagnostics)) {
+            StatusLine(
+                hiddenPathText(R.string.hidden_path_load_status),
+                if (config.loaded) {
+                    hiddenPathText(R.string.hidden_path_loaded)
+                } else {
+                    hiddenPathText(R.string.hidden_path_not_loaded)
+                },
+            )
+            StatusLine("KMI", config.currentKmi.ifBlank { "-" })
+            StatusLine(
+                hiddenPathText(R.string.hidden_path_saved_count),
+                config.savedCount.toString(),
+            )
+            StatusLine(
+                hiddenPathText(R.string.hidden_path_available_count),
+                config.availableCount.toString(),
+            )
+            StatusLine(
+                hiddenPathText(R.string.hidden_path_active_count),
+                config.activeCount.toString(),
+            )
+            if (config.missingTargetPaths.isNotEmpty()) {
+                StatusLine(
+                    hiddenPathText(R.string.hidden_path_missing_paths),
+                    config.missingTargetPaths.joinToString(),
+                )
+            }
+            if (config.activeTargetPaths.isNotBlank()) {
+                StatusLine(
+                    hiddenPathText(R.string.hidden_path_kernel_active_paths),
+                    config.activeTargetPaths,
+                )
+            }
+            if (config.useAppScope) {
+                StatusLine(
+                    hiddenPathText(R.string.hidden_path_resolved_uids),
+                    config.resolvedAppUids.joinToString().ifBlank { "-" },
+                )
+            }
+            val error = statusError.ifBlank { config.lastErrorMessage }
+            if (error.isNotBlank()) {
+                Text(
+                    text = listOf(config.lastErrorCode, error)
+                        .filter(String::isNotBlank)
+                        .joinToString(": "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        VisibilityProbeSection(
+            uidInput = visibilityUidInput,
+            pathInput = visibilityPathInput,
+            testing = visibilityTesting,
+            busy = busy,
+            result = visibilityResult,
+            hasCurrentConfig = config.targetPaths.isNotEmpty() &&
+                config.resolvedAppUids.isNotEmpty(),
+            onUidChange = onVisibilityUidChange,
+            onPathChange = onVisibilityPathChange,
+            onUseCurrentConfig = onUseVisibilityConfig,
+            onTest = onTestVisibility,
+        )
+
+        ConfigSection(
+            title = hiddenPathText(R.string.hidden_path_runtime_controls),
+            summary = hiddenPathText(R.string.hidden_path_runtime_controls_summary),
+        ) {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                onClick = onUnloadThisBoot,
+            ) {
+                if (unloadingActive) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(hiddenPathText(R.string.hidden_path_unload_this_boot))
+            }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                onClick = onDeleteConfig,
+            ) {
+                if (deletingConfig) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(hiddenPathText(R.string.hidden_path_delete_saved_config))
+            }
+        }
+
+        ConfigSection(title = hiddenPathText(R.string.rescue_logs)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onRefresh,
+                ) {
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(TEXT_REFRESH)
+                }
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onCopy,
+                ) {
+                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(TEXT_COPY_LOG)
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onExportDiagnostics,
+                ) {
+                    Icon(Icons.Rounded.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(hiddenPathText(R.string.hidden_path_export_diagnostics))
+                }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !busy,
+                    onClick = onClear,
+                ) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(TEXT_CLEAR)
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 160.dp, max = 360.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+            ) {
+                SelectionContainer {
+                    Text(
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp),
+                        text = displayLogText(logs),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        ConfigSection(title = hiddenPathText(R.string.hidden_path_tab_help)) {
+            listOf(
+                hiddenPathText(R.string.hidden_path_help_builtin),
+                hiddenPathText(R.string.hidden_path_help_absolute_paths),
+                hiddenPathText(R.string.hidden_path_help_app_scope),
+                hiddenPathText(R.string.hidden_path_help_managed_paths),
+                hiddenPathText(R.string.hidden_path_help_apply),
+                hiddenPathText(R.string.hidden_path_help_debug),
+            ).forEachIndexed { index, item ->
+                HelpLine(index + 1, item)
             }
         }
     }
@@ -1818,7 +2094,7 @@ private fun HelpLine(
 private fun HiddenPathAppPickerDialog(
     selectedEntries: List<String>,
     onDismissRequest: () -> Unit,
-    onSelectUid: (Int) -> Unit,
+    onSelectPackage: (String) -> Unit,
 ) {
     val context = LocalContext.current
     var loading by remember { mutableStateOf(true) }
@@ -1917,13 +2193,13 @@ private fun HiddenPathAppPickerDialog(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             items(filteredApps, key = { it.packageName }) { app ->
-                                val selected = app.uid.toString() in selectedSet || app.packageName in selectedSet
+                                val selected = app.packageName in selectedSet
                                 HiddenPathAppPickerRow(
                                     app = app,
                                     selected = selected,
                                     onClick = {
                                         if (!selected) {
-                                            onSelectUid(app.uid)
+                                            onSelectPackage(app.packageName)
                                         }
                                     },
                                 )
@@ -2041,11 +2317,7 @@ private fun displayLogText(logs: String): String {
 }
 
 private fun displayConfigItem(item: String, kind: EmptyListKind): String {
-    return if (kind == EmptyListKind.App && item.all(Char::isDigit)) {
-        "UID $item"
-    } else {
-        item
-    }
+    return item
 }
 
 private fun sanitizeHiddenPathConfig(config: HiddenPathConfigState): HiddenPathConfigState {
@@ -2087,23 +2359,8 @@ private fun isManagedRootPath(path: String): Boolean {
 
 private fun normalizeAppEntry(rawEntry: String): String? {
     val entry = rawEntry.trim()
-    if (entry.isBlank()) {
-        return null
-    }
-    if (entry.all(Char::isDigit)) {
-        return entry.takeIf { it.toLongOrNull() != null }
-    }
-    return entry.takeIf { value ->
-        value.all { char ->
-            char in 'a'..'z' ||
-                char in 'A'..'Z' ||
-                char in '0'..'9' ||
-                char == '.' ||
-                char == '_' ||
-                char == '-' ||
-                char == ':'
-        }
-    }
+    val packagePattern = Regex("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$")
+    return entry.takeIf(packagePattern::matches)
 }
 
 private fun loadHiddenPathTemplates(context: Context): List<HiddenPathTemplate> {

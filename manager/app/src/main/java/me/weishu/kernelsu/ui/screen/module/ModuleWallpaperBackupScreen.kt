@@ -461,7 +461,7 @@ fun ModuleWallpaperBackupScreen() {
                     MiuixIconButton(onClick = dropUnlessResumed { navigator.pop() }) {
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                             tint = colorScheme.onBackground,
                         )
                     }

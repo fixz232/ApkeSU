@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,7 +27,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Save
@@ -62,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -72,8 +76,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.ApkeMetricGrid
+import me.weishu.kernelsu.ui.component.ApkeMetricItem
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
 import me.weishu.kernelsu.ksuApp
-import me.weishu.kernelsu.ui.component.material.ExpressiveSwitch
+import me.weishu.kernelsu.ui.component.LocalSwitchStyle
+import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.SwitchStyle
+import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.theme.immersivePageColor
 import me.weishu.kernelsu.ui.theme.immersiveSurfaceColor
@@ -81,14 +91,19 @@ import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.RescueConfigState
 import me.weishu.kernelsu.ui.util.RescueImageState
 import me.weishu.kernelsu.ui.util.RescueStatus
+import me.weishu.kernelsu.ui.util.enableRescueModule
+import me.weishu.kernelsu.ui.util.getRescueDiagnostics
 import me.weishu.kernelsu.ui.util.getRescueLogs
 import me.weishu.kernelsu.ui.util.getRescueStatus
 import me.weishu.kernelsu.ui.util.importRescueImage
 import me.weishu.kernelsu.ui.util.runRescueCommand
 import me.weishu.kernelsu.ui.util.saveRescueConfig
 import me.weishu.kernelsu.ui.util.testRescueEnvironment
+import me.weishu.kernelsu.ui.util.verifyRescueBackups
 import java.io.File
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 private fun rescueText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
@@ -98,9 +113,9 @@ private const val RESCUE_IMPORT_CACHE_MAX_AGE_MILLIS = 24L * 60L * 60L * 1000L
 
 private val rescueTabs: List<String>
     get() = listOf(
-        rescueText(R.string.rescue_tab_home),
+        rescueText(R.string.rescue_tab_protection),
         rescueText(R.string.rescue_tab_config),
-        rescueText(R.string.rescue_tab_help),
+        rescueText(R.string.rescue_tab_diagnostics),
     )
 
 @Composable
@@ -120,6 +135,7 @@ fun RescueProtectionScreen() {
     var pendingImportExpectedSize by remember { mutableLongStateOf(0L) }
     var pendingImportForce by remember { mutableStateOf(false) }
     var testReport by remember { mutableStateOf("") }
+    var diagnosticExportText by remember { mutableStateOf("") }
     var includeDtbo by remember { mutableStateOf(false) }
     var includeVbmeta by remember { mutableStateOf(false) }
     var backupOtherSlot by remember { mutableStateOf(false) }
@@ -129,6 +145,29 @@ fun RescueProtectionScreen() {
     var initBootPath by remember { mutableStateOf("") }
     var dtboPath by remember { mutableStateOf("") }
     var vbmetaPath by remember { mutableStateOf("") }
+
+    val diagnosticExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(diagnosticExportText.toByteArray(Charsets.UTF_8))
+                    } ?: error("Unable to open diagnostic output")
+                }.isSuccess
+            }
+            Toast.makeText(
+                context,
+                rescueText(
+                    if (ok) R.string.rescue_diagnostics_exported
+                    else R.string.rescue_diagnostics_export_failed
+                ),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
 
     val imageImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -197,21 +236,87 @@ fun RescueProtectionScreen() {
     fun runAction(command: String, success: String, fail: String, timeoutMultiplier: Long = 6) {
         scope.launch {
             busy = true
-            val ok = try {
+            val result = try {
                 runRescueCommand(command, timeoutMultiplier)
             } finally {
                 status = getRescueStatus()
                 logs = getRescueLogs()
                 busy = false
             }
-            Toast.makeText(context, if (ok) success else fail, Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                if (result.success) success else result.errorMessage.ifBlank { fail },
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun verifyBackups() {
+        scope.launch {
+            busy = true
+            val report = try {
+                verifyRescueBackups().also { testReport = it.text.ifBlank { it.reason } }
+            } finally {
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
+            }
+            Toast.makeText(
+                context,
+                if (report.ok) {
+                    rescueText(R.string.rescue_verification_passed)
+                } else {
+                    report.reason.ifBlank { rescueText(R.string.rescue_verification_failed) }
+                },
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun refreshAndEnable() {
+        runAction(
+            command = "refresh-enable",
+            success = rescueText(R.string.rescue_refresh_enable_success),
+            fail = rescueText(R.string.rescue_refresh_enable_failed),
+            timeoutMultiplier = 90,
+        )
+    }
+
+    fun reenableModule(id: String) {
+        scope.launch {
+            busy = true
+            val result = try {
+                enableRescueModule(id)
+            } finally {
+                status = getRescueStatus()
+                logs = getRescueLogs()
+                busy = false
+            }
+            Toast.makeText(
+                context,
+                if (result.success) {
+                    rescueText(R.string.rescue_module_enabled)
+                } else {
+                    result.errorMessage.ifBlank { rescueText(R.string.rescue_operation_failed) }
+                },
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun exportDiagnostics() {
+        scope.launch {
+            diagnosticExportText = getRescueDiagnostics().ifBlank {
+                logs.ifBlank { status.log }
+            }
+            diagnosticExportLauncher.launch("apkesu-rescue-diagnostics.txt")
         }
     }
 
     fun saveConfig() {
         scope.launch {
             busy = true
-            val ok = try {
+            val result = try {
                 val custom = mapOf(
                     "boot" to bootPath,
                     "vendor_boot" to vendorBootPath,
@@ -235,7 +340,11 @@ fun RescueProtectionScreen() {
             }
             Toast.makeText(
                 context,
-                if (ok) rescueText(R.string.rescue_config_saved) else rescueText(R.string.rescue_config_save_failed),
+                if (result.success) {
+                    rescueText(R.string.rescue_config_saved)
+                } else {
+                    result.errorMessage.ifBlank { rescueText(R.string.rescue_config_save_failed) }
+                },
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -278,34 +387,17 @@ fun RescueProtectionScreen() {
         refresh(syncConfig = true)
     }
 
-    val pageContainerColor = immersivePageColor(
-        MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-    )
+    val pageContainerColor = Color.Transparent
     val barContainerColor = immersiveSurfaceColor(
         MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
     )
     val tabs = rescueTabs
     val activeTab = selectedTab.coerceIn(tabs.indices)
-    Scaffold(
+    ApkeSecondaryScaffold(
+        title = rescueText(R.string.rescue_protection),
+        onBack = { navigator.pop() },
         containerColor = pageContainerColor,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(rescueText(R.string.rescue_protection)) },
-                navigationIcon = {
-                    IconButton(onClick = { navigator.pop() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = immersiveTopBarColor(barContainerColor),
-                    scrolledContainerColor = barContainerColor,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            )
-        },
-    ) { innerPadding ->
+    ) { innerPadding, _ ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -339,16 +431,7 @@ fun RescueProtectionScreen() {
                 when (activeTab) {
                     0 -> RescueHomePage(
                         status = status,
-                        logs = logs,
                         busy = busy,
-                        testReport = testReport,
-                        onImport = { image ->
-                            if (image.exists) {
-                                showImportConfirmFor = image
-                            } else {
-                                launchImageImport(image.name, image.partitionSize, force = false)
-                            }
-                        },
                         onBackup = {
                             val backupExists = status.manifestCreatedAt.isNotBlank() ||
                                 status.images.any(RescueImageState::exists)
@@ -364,6 +447,8 @@ fun RescueProtectionScreen() {
                             }
                         },
                         onTest = ::testEnvironment,
+                        onVerify = ::verifyBackups,
+                        onRefreshEnable = ::refreshAndEnable,
                         onToggle = { enabled ->
                             runAction(
                                 if (enabled) "enable" else "disable",
@@ -376,7 +461,51 @@ fun RescueProtectionScreen() {
                             )
                         },
                         onRestore = { showRestoreConfirm = true },
+                    )
+
+                    1 -> {
+                        RescueConfigCard(
+                            busy = busy,
+                            includeDtbo = includeDtbo,
+                            includeVbmeta = includeVbmeta,
+                            backupOtherSlot = backupOtherSlot,
+                            allowDangerousAutoRestore = allowDangerousAutoRestore,
+                            bootPath = bootPath,
+                            vendorBootPath = vendorBootPath,
+                            initBootPath = initBootPath,
+                            dtboPath = dtboPath,
+                            vbmetaPath = vbmetaPath,
+                            onIncludeDtboChange = { includeDtbo = it },
+                            onIncludeVbmetaChange = { includeVbmeta = it },
+                            onBackupOtherSlotChange = { backupOtherSlot = it },
+                            onAllowDangerousAutoRestoreChange = { allowDangerousAutoRestore = it },
+                            onBootPathChange = { bootPath = it },
+                            onVendorBootPathChange = { vendorBootPath = it },
+                            onInitBootPathChange = { initBootPath = it },
+                            onDtboPathChange = { dtboPath = it },
+                            onVbmetaPathChange = { vbmetaPath = it },
+                            onSave = ::saveConfig,
+                        )
+                        RescueImagesCard(
+                            status = status,
+                            onImport = { image ->
+                                if (image.exists) {
+                                    showImportConfirmFor = image
+                                } else {
+                                    launchImageImport(image.name, image.partitionSize, force = false)
+                                }
+                            },
+                        )
+                    }
+
+                    else -> RescueDiagnosticsPage(
+                        status = status,
+                        logs = logs,
+                        busy = busy,
+                        testReport = testReport,
                         onRefresh = { refresh(syncConfig = true) },
+                        onExport = ::exportDiagnostics,
+                        onEnableModule = ::reenableModule,
                         onClearLogs = {
                             runAction(
                                 "clear-logs",
@@ -385,31 +514,6 @@ fun RescueProtectionScreen() {
                             )
                         },
                     )
-
-                    1 -> RescueConfigCard(
-                        busy = busy,
-                        includeDtbo = includeDtbo,
-                        includeVbmeta = includeVbmeta,
-                        backupOtherSlot = backupOtherSlot,
-                        allowDangerousAutoRestore = allowDangerousAutoRestore,
-                        bootPath = bootPath,
-                        vendorBootPath = vendorBootPath,
-                        initBootPath = initBootPath,
-                        dtboPath = dtboPath,
-                        vbmetaPath = vbmetaPath,
-                        onIncludeDtboChange = { includeDtbo = it },
-                        onIncludeVbmetaChange = { includeVbmeta = it },
-                        onBackupOtherSlotChange = { backupOtherSlot = it },
-                        onAllowDangerousAutoRestoreChange = { allowDangerousAutoRestore = it },
-                        onBootPathChange = { bootPath = it },
-                        onVendorBootPathChange = { vendorBootPath = it },
-                        onInitBootPathChange = { initBootPath = it },
-                        onDtboPathChange = { dtboPath = it },
-                        onVbmetaPathChange = { vbmetaPath = it },
-                        onSave = ::saveConfig,
-                    )
-
-                    else -> RescueHelpCard()
                 }
             }
         }
@@ -421,7 +525,49 @@ fun RescueProtectionScreen() {
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null) },
             title = { Text(rescueText(R.string.rescue_restore_confirm_title)) },
             text = {
-                Text(rescueText(R.string.rescue_restore_confirm_message))
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(rescueText(R.string.rescue_restore_confirm_message))
+                    StatusLine(
+                        rescueText(R.string.rescue_restore_partitions),
+                        status.images
+                            .filter { it.restore && it.exists }
+                            .joinToString { it.label.ifBlank { it.name } }
+                            .ifBlank { "-" },
+                    )
+                    StatusLine(
+                        rescueText(R.string.rescue_manifest_slot),
+                        status.manifestSlot.ifBlank { "-" },
+                    )
+                    StatusLine(
+                        rescueText(R.string.rescue_backup_age),
+                        formatBackupAge(status.manifestCreatedAt),
+                    )
+                    StatusLine(
+                        rescueText(R.string.rescue_manifest_size),
+                        formatSize(status.manifestTotalSize),
+                    )
+                    StatusLine(
+                        rescueText(R.string.rescue_verification),
+                        rescueText(
+                            if (status.verified && status.images.all { !it.exists || (it.sizeOk && it.sha256Ok) }) {
+                                R.string.rescue_verification_passed
+                            } else {
+                                R.string.rescue_verification_failed
+                            }
+                        ),
+                    )
+                    if (status.manifestFingerprint.isNotBlank()) {
+                        Text(
+                            text = "${rescueText(R.string.rescue_manifest_fingerprint)}\n${status.manifestFingerprint}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 Button(
@@ -505,84 +651,139 @@ fun RescueProtectionScreen() {
 @Composable
 private fun RescueHomePage(
     status: RescueStatus,
-    logs: String,
     busy: Boolean,
-    testReport: String,
-    onImport: (RescueImageState) -> Unit,
     onBackup: () -> Unit,
     onTest: () -> Unit,
+    onVerify: () -> Unit,
+    onRefreshEnable: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onRestore: () -> Unit,
-    onRefresh: () -> Unit,
-    onClearLogs: () -> Unit,
 ) {
     RescueStatusCard(status = status)
-    RescueImagesCard(status = status, onImport = onImport)
-    RescueActionCard(
+    if (status.configChangedProtectionDisabled) {
+        RescueCard(title = rescueText(R.string.rescue_config_changed_title)) {
+            Text(
+                text = rescueText(R.string.rescue_config_changed_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            FilledTonalButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy,
+                onClick = onRefreshEnable,
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(rescueText(R.string.rescue_refresh_enable_action))
+            }
+        }
+    }
+    RescueGuidedFlowCard(
         status = status,
         busy = busy,
         onBackup = onBackup,
         onTest = onTest,
+        onVerify = onVerify,
         onToggle = onToggle,
         onRestore = onRestore,
-        onRefresh = onRefresh,
-        onClearLogs = onClearLogs,
-    )
-    if (testReport.isNotBlank()) {
-        RescueTextCard(rescueText(R.string.rescue_test_report), testReport)
-    }
-    RescueTextCard(
-        rescueText(R.string.rescue_logs),
-        logs.ifBlank { status.log }.ifBlank { rescueText(R.string.rescue_logs_empty) },
     )
 }
 
 @Composable
 private fun RescueStatusCard(status: RescueStatus) {
     RescueCard(title = rescueText(R.string.rescue_current_status)) {
-        StatusLine(
-            rescueText(R.string.rescue_status_protection),
-            when {
-                !status.available -> rescueText(R.string.rescue_value_unknown)
-                status.enabled -> rescueText(R.string.rescue_value_enabled)
-                else -> rescueText(R.string.rescue_value_disabled)
-            },
-        )
-        StatusLine(
-            rescueText(R.string.rescue_status_backup_complete),
-            when {
-                !status.available -> rescueText(R.string.rescue_value_unknown)
-                status.requiredReady -> rescueText(R.string.rescue_value_available)
-                else -> rescueText(R.string.rescue_value_incomplete)
-            },
-        )
-        val statusReason = if (status.available) status.readyReason else status.statusError
-        if ((!status.requiredReady || !status.available) && statusReason.isNotBlank()) {
-            StatusLine(rescueText(R.string.rescue_status_reason), statusReason)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = rescuePhaseLabel(status),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = status.readyReason.ifBlank {
+                        status.statusError.ifBlank { rescueText(R.string.rescue_status_ready_summary) }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = rescuePhaseColor(status).copy(alpha = 0.14f),
+                contentColor = rescuePhaseColor(status),
+            ) {
+                Text(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    text = rescuePhaseLabel(status),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
-        StatusLine(
-            rescueText(R.string.rescue_status_current_slot),
-            status.currentSlot.ifBlank { rescueText(R.string.rescue_value_no_slot) },
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        ApkeMetricGrid(
+            items = listOf(
+                ApkeMetricItem(
+                    label = rescueText(R.string.rescue_status_current_slot),
+                    value = status.currentSlot.ifBlank { "-" },
+                ),
+                ApkeMetricItem(
+                    label = rescueText(R.string.rescue_status_backup_complete),
+                    value = "${status.images.count { it.exists && it.sizeOk }}/${status.images.count { !it.otherSlot || it.restore }}",
+                ),
+                ApkeMetricItem(
+                    label = rescueText(R.string.rescue_verification),
+                    value = rescueText(
+                        if (status.verified) R.string.rescue_value_yes else R.string.rescue_value_no
+                    ),
+                ),
+            ),
         )
-        StatusLine(
-            rescueText(R.string.rescue_status_boot_mode),
-            status.bootMode.ifBlank { rescueText(R.string.rescue_value_not_detected) },
-        )
-        StatusLine(
-            rescueText(R.string.rescue_status_device),
-            status.device.ifBlank { rescueText(R.string.rescue_value_not_detected) },
-        )
-        StatusLine(
-            rescueText(R.string.rescue_status_backup_time),
-            status.manifestCreatedAt.ifBlank { rescueText(R.string.rescue_value_not_backed_up) },
-        )
-        StatusLine(
-            rescueText(R.string.rescue_status_pending_boot),
-            if (status.pendingBoot) rescueText(R.string.rescue_value_yes) else rescueText(R.string.rescue_value_no),
-        )
-        StatusLine(rescueText(R.string.rescue_status_failure_count), status.bootCount.toString())
-        StatusLine(rescueText(R.string.rescue_status_restore_attempts), status.autoRestoreAttempts.toString())
+        if (status.restoreInterrupted) {
+            Text(
+                text = status.restoreTransactionError.ifBlank {
+                    status.restoreTransaction?.errorMessage.orEmpty().ifBlank {
+                        rescueText(R.string.rescue_restore_interrupted)
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
+}
+
+@Composable
+private fun rescuePhaseLabel(status: RescueStatus): String = rescueText(
+    when {
+        !status.available -> R.string.rescue_phase_unconfigured
+        status.restoreInterrupted || status.phase == "restore_error" -> R.string.rescue_phase_restore_error
+        status.images.any { it.exists && (!it.sizeOk || !it.sha256Ok) } -> R.string.rescue_phase_verification_failed
+        status.configChangedProtectionDisabled || status.phase == "config_changed" ->
+            R.string.rescue_phase_paused
+        status.phase == "needs_backup" -> R.string.rescue_phase_needs_backup
+        status.phase == "needs_verification" -> R.string.rescue_phase_needs_verification
+        status.phase == "protected" || status.enabled -> R.string.rescue_phase_protected
+        status.phase == "ready_to_enable" -> R.string.rescue_phase_ready
+        else -> R.string.rescue_phase_unconfigured
+    }
+)
+
+@Composable
+private fun rescuePhaseColor(status: RescueStatus): Color = when {
+    status.restoreInterrupted || status.phase == "restore_error" ||
+        status.images.any { it.exists && (!it.sizeOk || !it.sha256Ok) } ->
+        MaterialTheme.colorScheme.error
+    status.phase == "protected" || status.enabled -> MaterialTheme.colorScheme.primary
+    status.configChangedProtectionDisabled || status.phase == "config_changed" ->
+        MaterialTheme.colorScheme.tertiary
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable
@@ -649,6 +850,21 @@ private fun RescueImageRow(
                 },
                 style = MaterialTheme.typography.labelMedium,
             )
+            if (image.restore && !image.otherSlot) {
+                IconButton(
+                    enabled = image.partition.isNotBlank() && image.partitionSize > 0,
+                    onClick = { onImport(image) },
+                ) {
+                    Icon(
+                        Icons.Rounded.FileUpload,
+                        contentDescription = if (image.exists) {
+                            rescueText(R.string.rescue_import_image_overwrite)
+                        } else {
+                            rescueText(R.string.rescue_import_image_backup)
+                        },
+                    )
+                }
+            }
         }
         Text(
             text = image.partition.ifBlank { rescueText(R.string.rescue_partition_not_detected) },
@@ -669,22 +885,183 @@ private fun RescueImageRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (image.restore && !image.otherSlot) {
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = image.partition.isNotBlank() && image.partitionSize > 0,
-                onClick = { onImport(image) },
-            ) {
+    }
+}
+
+@Composable
+private fun RescueDiagnosticsPage(
+    status: RescueStatus,
+    logs: String,
+    busy: Boolean,
+    testReport: String,
+    onRefresh: () -> Unit,
+    onExport: () -> Unit,
+    onEnableModule: (String) -> Unit,
+    onClearLogs: () -> Unit,
+) {
+    RescueCard(title = rescueText(R.string.rescue_diagnostic_status)) {
+        StatusLine(
+            rescueText(R.string.rescue_status_protection),
+            rescuePhaseLabel(status),
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_current_slot),
+            status.currentSlot.ifBlank { rescueText(R.string.rescue_value_no_slot) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_boot_mode),
+            status.bootMode.ifBlank { rescueText(R.string.rescue_value_not_detected) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_device),
+            status.device.ifBlank { rescueText(R.string.rescue_value_not_detected) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_status_backup_time),
+            status.manifestCreatedAt.ifBlank { rescueText(R.string.rescue_value_not_backed_up) },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_manifest_slot),
+            status.manifestSlot.ifBlank { "-" },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_manifest_device),
+            status.manifestDevice.ifBlank { "-" },
+        )
+        StatusLine(
+            rescueText(R.string.rescue_manifest_size),
+            formatSize(status.manifestTotalSize),
+        )
+        if (status.manifestFingerprint.isNotBlank()) {
+            StatusLine(
+                rescueText(R.string.rescue_manifest_fingerprint),
+                status.manifestFingerprint,
+            )
+        }
+        StatusLine(
+            rescueText(R.string.rescue_status_pending_boot),
+            rescueText(
+                if (status.pendingBoot) R.string.rescue_value_yes else R.string.rescue_value_no
+            ),
+        )
+        StatusLine(rescueText(R.string.rescue_status_failure_count), status.bootCount.toString())
+        StatusLine(
+            rescueText(R.string.rescue_status_restore_attempts),
+            status.autoRestoreAttempts.toString(),
+        )
+    }
+
+    status.restoreTransaction?.let { transaction ->
+        RescueCard(title = rescueText(R.string.rescue_restore_transaction)) {
+            StatusLine(rescueText(R.string.rescue_transaction_id), transaction.id.ifBlank { "-" })
+            StatusLine(rescueText(R.string.rescue_transaction_phase), transaction.phase.ifBlank { "-" })
+            StatusLine(rescueText(R.string.rescue_transaction_updated), transaction.updatedAt.ifBlank { "-" })
+            transaction.entries.forEach { entry ->
+                StatusLine(
+                    entry.label.ifBlank { entry.name },
+                    "${entry.status} · ${formatSize(entry.expectedSize)}",
+                )
+            }
+            val error = transaction.errorMessage.ifBlank { status.restoreTransactionError }
+            if (error.isNotBlank()) {
                 Text(
-                    if (image.exists) {
-                        rescueText(R.string.rescue_import_image_overwrite)
-                    } else {
-                        rescueText(R.string.rescue_import_image_backup)
-                    }
+                    text = listOf(transaction.errorCode, error)
+                        .filter(String::isNotBlank)
+                        .joinToString(": "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
     }
+
+    if (
+        status.rescueDisabledModules.isNotEmpty() ||
+        status.skipModulesOnce ||
+        status.skipModulesThisBoot
+    ) {
+        RescueCard(title = rescueText(R.string.rescue_disabled_modules)) {
+            Text(
+                text = rescueText(R.string.rescue_disabled_modules_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            status.rescueDisabledModules.forEachIndexed { index, module ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            module.name.ifBlank { module.id },
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            listOf(module.id, module.version)
+                                .filter(String::isNotBlank)
+                                .joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        enabled = !busy && module.installed && module.disabled,
+                        onClick = { onEnableModule(module.id) },
+                    ) {
+                        Text(rescueText(R.string.rescue_enable_module_action))
+                    }
+                }
+            }
+        }
+    }
+
+    if (testReport.isNotBlank()) {
+        RescueTextCard(rescueText(R.string.rescue_test_report), testReport)
+    }
+    RescueTextCard(
+        rescueText(R.string.rescue_logs),
+        logs.ifBlank { status.log }.ifBlank { rescueText(R.string.rescue_logs_empty) },
+    )
+    RescueCard(title = rescueText(R.string.rescue_diagnostic_actions)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilledTonalButton(
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+                onClick = onRefresh,
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(rescueText(R.string.rescue_refresh))
+            }
+            FilledTonalButton(
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+                onClick = onExport,
+            ) {
+                Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(rescueText(R.string.rescue_export_diagnostics))
+            }
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !busy,
+            onClick = onClearLogs,
+        ) {
+            Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(6.dp))
+            Text(rescueText(R.string.rescue_clear_logs))
+        }
+    }
+    RescueHelpCard()
 }
 
 @Composable
@@ -759,70 +1136,126 @@ private fun RescueConfigCard(
 }
 
 @Composable
-private fun RescueActionCard(
+private fun RescueGuidedFlowCard(
     status: RescueStatus,
     busy: Boolean,
     onBackup: () -> Unit,
     onTest: () -> Unit,
+    onVerify: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onRestore: () -> Unit,
-    onRefresh: () -> Unit,
-    onClearLogs: () -> Unit,
 ) {
-    RescueCard(title = rescueText(R.string.rescue_actions)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(rescueText(R.string.rescue_enable_protection), style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    rescueText(R.string.rescue_enable_protection_summary),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            ExpressiveSwitch(
-                checked = status.enabled,
-                enabled = status.available && !busy && (status.requiredReady || status.enabled),
-                onCheckedChange = onToggle,
-                showThumbIcon = false,
-            )
-        }
-        FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onTest) {
-            Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-            Text(rescueText(R.string.rescue_check_environment))
-        }
-        FilledTonalButton(
-            modifier = Modifier.fillMaxWidth(),
+    RescueCard(title = rescueText(R.string.rescue_guided_flow)) {
+        RescueFlowStep(
+            index = 1,
+            title = rescueText(R.string.rescue_check_environment),
+            summary = rescueText(R.string.rescue_flow_environment_summary),
+            completed = status.environmentChecked,
             enabled = status.available && !busy,
+            action = rescueText(R.string.rescue_flow_check_action),
+            onClick = onTest,
+        )
+        RescueFlowStep(
+            index = 2,
+            title = rescueText(R.string.rescue_backup_current_images),
+            summary = rescueText(R.string.rescue_flow_backup_summary),
+            completed = status.ready,
+            enabled = status.available && status.environmentChecked && !busy,
+            action = rescueText(R.string.rescue_flow_backup_action),
             onClick = onBackup,
-        ) {
-            Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.size(8.dp))
-            Text(rescueText(R.string.rescue_backup_current_images))
-        }
+        )
+        RescueFlowStep(
+            index = 3,
+            title = rescueText(R.string.rescue_full_verification),
+            summary = rescueText(R.string.rescue_flow_verify_summary),
+            completed = status.verified,
+            enabled = status.ready && !busy,
+            action = rescueText(R.string.rescue_flow_verify_action),
+            onClick = onVerify,
+        )
+        RescueFlowStep(
+            index = 4,
+            title = rescueText(R.string.rescue_enable_protection),
+            summary = rescueText(R.string.rescue_flow_enable_summary),
+            completed = status.enabled,
+            enabled = status.verified && !busy,
+            action = rescueText(
+                if (status.enabled) R.string.rescue_disable_action
+                else R.string.rescue_enable_action
+            ),
+            onClick = { onToggle(!status.enabled) },
+        )
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
-            enabled = status.available && !busy && status.requiredReady,
+            enabled = status.available && status.ready && status.verified && !busy,
             onClick = onRestore,
         ) {
             Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
             Text(rescueText(R.string.rescue_restore_preserve_data))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy, onClick = onRefresh) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(6.dp))
-                Text(rescueText(R.string.rescue_refresh))
+    }
+}
+
+@Composable
+private fun RescueFlowStep(
+    index: Int,
+    title: String,
+    summary: String,
+    completed: Boolean,
+    enabled: Boolean,
+    action: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = if (completed) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHighest
+            },
+            contentColor = if (completed) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        ) {
+            if (completed) {
+                Icon(
+                    Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.padding(6.dp).size(18.dp),
+                )
+            } else {
+                Text(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    text = index.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
-            OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy, onClick = onClearLogs) {
-                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(6.dp))
-                Text(rescueText(R.string.rescue_clear_logs))
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                enabled = enabled,
+                onClick = onClick,
+                contentPadding = PaddingValues(horizontal = 0.dp),
+            ) {
+                Text(action)
             }
         }
     }
@@ -913,11 +1346,19 @@ private fun SwitchLine(
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        ExpressiveSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            showThumbIcon = false,
-        )
+        val switchStyle = LocalSwitchStyle.current
+        if (switchStyle == SwitchStyle.Original) {
+            androidx.compose.material3.Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+            )
+        } else {
+            StyledSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                style = switchStyle,
+            )
+        }
     }
 }
 
@@ -938,9 +1379,12 @@ private fun RescueCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = RoundedCornerShape(8.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .uiDecoratedCard(shape = shape),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
         tonalElevation = 1.dp,
     ) {
@@ -1029,6 +1473,22 @@ private fun formatSize(size: Long): String {
     if (size <= 0) return "-"
     val mib = size / 1024.0 / 1024.0
     return String.format(Locale.getDefault(), "%.1f MiB", mib)
+}
+
+private fun formatBackupAge(createdAt: String, nowMillis: Long = System.currentTimeMillis()): String {
+    if (createdAt.isBlank()) return rescueText(R.string.rescue_value_not_backed_up)
+    val created = runCatching {
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).apply {
+            isLenient = false
+        }.parse(createdAt)
+    }.getOrNull() ?: return createdAt
+    val ageMinutes = ((nowMillis - created.time).coerceAtLeast(0L) / 60_000L)
+    return when {
+        ageMinutes < 1 -> rescueText(R.string.rescue_backup_age_now)
+        ageMinutes < 60 -> rescueText(R.string.rescue_backup_age_minutes, ageMinutes)
+        ageMinutes < 24 * 60 -> rescueText(R.string.rescue_backup_age_hours, ageMinutes / 60)
+        else -> rescueText(R.string.rescue_backup_age_days, ageMinutes / (24 * 60))
+    }
 }
 
 private suspend fun copyRescueImageToCache(

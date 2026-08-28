@@ -1,12 +1,13 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use chrono::Local;
 use const_format::concatcp;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::CString,
-    fs::{self, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, Write},
+    os::fd::AsRawFd,
     path::{Component, Path},
     process::Command,
     thread,
@@ -17,15 +18,28 @@ use crate::{assets, boot_patch, defs, ksucalls, utils};
 
 const PATHMASK_DIR: &str = concatcp!(defs::WORKING_DIR, "pathmask/");
 const CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "config.json");
+const CANDIDATE_CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "candidate.json");
 const LAST_GOOD_CONFIG_PATH: &str = concatcp!(PATHMASK_DIR, "last_good.json");
+const RUNTIME_STATE_PATH: &str = concatcp!(PATHMASK_DIR, "runtime_state.json");
+const OPERATION_LOCK_PATH: &str = concatcp!(PATHMASK_DIR, "operation.lock");
+const UNLOAD_BOOT_ID_PATH: &str = concatcp!(PATHMASK_DIR, "unload_boot_id");
 const LOG_PATH: &str = concatcp!(PATHMASK_DIR, "pathmask.log");
+const BOOT_ID_PATH: &str = "/proc/sys/kernel/random/boot_id";
 const PATHMASK_MODULE_NAME: &str = "pathmask";
 const PACKAGES_LIST_PATH: &str = "/data/system/packages.list";
+const USER_DATA_ROOTS: &[&str] = &["/data/user", "/data/user_de"];
+const MAX_TARGET_PATHS: usize = 64;
+const MAX_APP_PACKAGES: usize = 256;
 const MAX_TARGET_PATHS_LEN: usize = 1900;
+const MAX_DENY_UIDS_LEN: usize = 1900;
+const MAX_MODULE_PARAMS_LEN: usize = 3900;
 const TARGET_WAIT_SECONDS: u64 = 5;
 const TARGET_WAIT_STEP_MS: u64 = 200;
 const MODULE_UNLOAD_WAIT_MS: u64 = 2000;
 const MODULE_UNLOAD_STEP_MS: u64 = 100;
+const LOG_MAX_BYTES: u64 = 512 * 1024;
+const LOG_ROTATION_COUNT: usize = 3;
+const ERROR_PREFIX: &str = "APKESU_ERROR";
 const MANAGED_ROOT_PATHS: &[&str] = &[
     "/data/adb/modules",
     "/data/adb/modules_update",
@@ -33,13 +47,15 @@ const MANAGED_ROOT_PATHS: &[&str] = &[
     "/data/adb/ap",
 ];
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 struct PathmaskConfig {
     target_paths: Vec<String>,
     app_packages: Vec<String>,
     use_app_scope: bool,
     hide_dirents: bool,
     hide_isolated: bool,
+    auto_load_enabled: bool,
 }
 
 #[derive(Default)]
@@ -56,8 +72,41 @@ impl Default for PathmaskConfig {
             use_app_scope: true,
             hide_dirents: true,
             hide_isolated: true,
+            auto_load_enabled: true,
         }
     }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct PathmaskRuntimeState {
+    phase: String,
+    error_code: String,
+    error_message: String,
+    requires_reboot: bool,
+    updated_at: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReconcileAction {
+    Disabled,
+    WaitForTargets,
+    Load,
+    Reload,
+    Noop,
+}
+
+struct OperationLock(File);
+
+impl Drop for OperationLock {
+    fn drop(&mut self) {
+        unsafe {
+            libc::flock(self.0.as_raw_fd(), libc::LOCK_UN);
+        }
+    }
+}
+
+fn coded_error(code: &str, message: impl AsRef<str>) -> anyhow::Error {
+    anyhow!("{ERROR_PREFIX}:{code}:{}", message.as_ref())
 }
 
 pub fn print_status() {
@@ -67,15 +116,32 @@ pub fn print_status() {
             append_log(format!("status failed: {error:#}"));
             println!(
                 "{}",
-                json!({"error": format!("failed to read pathmask config: {error:#}")})
+                json!({
+                    "errorCode": "pathmask.config_read_failed",
+                    "error": format!("failed to read pathmask config: {error:#}"),
+                })
             );
             return;
         }
     };
     let current_kmi = boot_patch::get_current_kmi().unwrap_or_default();
     let loaded = is_module_loaded();
-    let resolved_count = read_sysfs_param("resolved_count").unwrap_or_default();
+    let resolved_count = read_resolved_count();
     let active_target_paths = read_sysfs_param("target_paths").unwrap_or_default();
+    let available_paths = existing_target_paths(&config);
+    let missing_target_paths = missing_target_paths(&config);
+    let active_config_matches = active_target_paths_match(&config, &active_target_paths);
+    let requires_reload =
+        loaded && (!active_config_matches || resolved_count < available_paths.len());
+    let runtime_state = read_runtime_state().unwrap_or_default();
+    let phase = derive_phase(
+        &config,
+        loaded,
+        available_paths.len(),
+        resolved_count,
+        requires_reload,
+        runtime_state.requires_reboot,
+    );
     let last_log = tail_file(LOG_PATH, 40).unwrap_or_default();
     let deny_uid_resolution = if config.use_app_scope {
         resolve_deny_uids(&config.app_packages)
@@ -91,10 +157,23 @@ pub fn print_status() {
             "useAppScope": config.use_app_scope,
             "hideDirents": config.hide_dirents,
             "hideIsolated": config.hide_isolated,
+            "autoLoadEnabled": config.auto_load_enabled,
             "loaded": loaded,
             "currentKmi": current_kmi,
+            "phase": phase,
+            "savedCount": config.target_paths.len(),
+            "availableCount": available_paths.len(),
+            "activeCount": resolved_count,
             "resolvedCount": resolved_count,
             "activeTargetPaths": active_target_paths,
+            "missingTargetPaths": missing_target_paths,
+            "requiresReload": requires_reload,
+            "requiresReboot": runtime_state.requires_reboot,
+            "hasPendingCandidate": Path::new(CANDIDATE_CONFIG_PATH).exists(),
+            "lastErrorCode": runtime_state.error_code,
+            "lastErrorMessage": runtime_state.error_message,
+            "lastPhase": runtime_state.phase,
+            "stateUpdatedAt": runtime_state.updated_at,
             "lastLog": last_log,
             "resolvedAppUids": deny_uid_resolution.uids,
             "unresolvedAppPackages": deny_uid_resolution.unresolved_packages,
@@ -183,23 +262,74 @@ fn import_config_inner(file: &Path) -> Result<()> {
 
 fn import_config_text_inner(content: &str, source: &str) -> Result<()> {
     let config = parse_config(content)?;
-    write_config(CONFIG_PATH, &config)?;
-    append_log(format!("imported config from {source}"));
+    validate_config(&config)?;
+    write_config(CANDIDATE_CONFIG_PATH, &config)?;
+    append_log(format!("staged candidate config from {source}"));
     Ok(())
 }
 
 pub fn apply() -> Result<()> {
-    let result = apply_inner();
+    let result = acquire_operation_lock().and_then(|_lock| apply_inner(true));
     if let Err(err) = &result {
         append_log(format!("apply failed: {err:#}"));
+        record_runtime_error(err, error_requires_reboot(err));
     }
     result
 }
 
-fn apply_inner() -> Result<()> {
+pub fn apply_config_text(content: &str) -> Result<()> {
+    let result = acquire_operation_lock().and_then(|_lock| {
+        let config = parse_config(content)?;
+        validate_config(&config)?;
+        write_config(CANDIDATE_CONFIG_PATH, &config)?;
+        apply_inner(true)
+    });
+    if let Err(err) = &result {
+        append_log(format!("atomic apply failed: {err:#}"));
+        record_runtime_error(err, error_requires_reboot(err));
+    }
+    result
+}
+
+fn apply_inner(clear_boot_suppression: bool) -> Result<()> {
     ensure_pathmask_runtime_supported()?;
 
-    let config = read_config()?;
+    let has_candidate = Path::new(CANDIDATE_CONFIG_PATH).exists();
+    let config = if has_candidate {
+        read_config_from_path(CANDIDATE_CONFIG_PATH)?
+    } else {
+        read_config()?
+    };
+    validate_config(&config)?;
+
+    if clear_boot_suppression {
+        clear_boot_unload_suppression();
+    }
+
+    if !config.auto_load_enabled {
+        if has_candidate {
+            promote_candidate_config()?;
+        }
+        if is_module_loaded()
+            && let Err(error) = unload_loaded_pathmask()
+        {
+            let message = format!(
+                "auto-load is disabled, but the active module is busy; reboot is required: {error:#}"
+            );
+            write_runtime_state(
+                "disabled_runtime_active",
+                "pathmask.reboot_required",
+                &message,
+                true,
+            );
+            append_log(&message);
+            return Ok(());
+        }
+        write_runtime_state("disabled", "", "", false);
+        append_log("pathmask auto-load disabled");
+        return Ok(());
+    }
+
     let module_params = build_module_params(&config)?;
     let kmi = boot_patch::get_current_kmi().context("failed to detect current KMI")?;
     let ko_name = format!("{kmi}_pathmask.ko");
@@ -208,19 +338,24 @@ fn apply_inner() -> Result<()> {
 
     append_log(format!("applying pathmask for KMI {kmi}: {module_params}"));
 
-    if is_module_loaded() {
+    let previous_loaded = is_module_loaded();
+    if previous_loaded {
         append_log("pathmask already loaded; reload is required for new target paths");
-        unload_loaded_pathmask(true).context("failed to unload old pathmask")?;
+        unload_loaded_pathmask().map_err(|error| {
+            coded_error(
+                "pathmask.module_busy",
+                format!(
+                    "active pathmask cannot be unloaded safely; reboot before applying: {error:#}"
+                ),
+            )
+        })?;
         append_log("unloaded old pathmask module");
     }
 
     let existing_count = match wait_for_any_target_path(&config) {
         Ok(count) => count,
         Err(error) => {
-            if let Err(restore_err) = restore_last_good(&kmi, &ko_data) {
-                append_log(format!("restore last good config failed: {restore_err:#}"));
-            }
-            return Err(error);
+            return Err(error_after_rollback(error, previous_loaded, &kmi, &ko_data));
         }
     };
     append_log(format!(
@@ -230,27 +365,40 @@ fn apply_inner() -> Result<()> {
 
     if let Err(err) = load_pathmask(&ko_data, &module_params) {
         append_log(format!("load failed: {err:#}"));
-        if let Err(restore_err) = restore_last_good(&kmi, &ko_data) {
-            append_log(format!("restore last good config failed: {restore_err:#}"));
-        }
-        return Err(err.context("failed to load pathmask with current config"));
+        let error = coded_error(
+            "pathmask.load_failed",
+            format!("failed to load pathmask with candidate config: {err:#}"),
+        );
+        return Err(error_after_rollback(error, previous_loaded, &kmi, &ko_data));
     }
 
-    let resolved_count = read_sysfs_param("resolved_count")
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(0);
-    if resolved_count == 0 {
-        append_log("pathmask loaded but resolved_count is zero; rolling back");
-        let _ = unload_loaded_pathmask(true);
-        if let Err(restore_err) = restore_last_good(&kmi, &ko_data) {
-            append_log(format!("restore last good config failed: {restore_err:#}"));
-        }
-        bail!("pathmask did not resolve any configured target path");
+    let resolved_count = read_resolved_count();
+    let candidate = has_candidate.then(|| Path::new(CANDIDATE_CONFIG_PATH));
+    if let Err(error) = commit_candidate_after_verification(
+        candidate,
+        Path::new(CONFIG_PATH),
+        verify_loaded_target_count(resolved_count, existing_count),
+    ) {
+        append_log(format!(
+            "candidate verification or commit failed: {error:#}; rolling back"
+        ));
+        return Err(error_after_rollback(error, previous_loaded, &kmi, &ko_data));
     }
 
-    write_config(LAST_GOOD_CONFIG_PATH, &config)?;
+    if let Err(error) = write_config(LAST_GOOD_CONFIG_PATH, &config) {
+        append_log(format!(
+            "active config committed, but last-good snapshot update failed: {error:#}"
+        ));
+    }
+    let phase = if existing_count < config.target_paths.len() {
+        "partial"
+    } else {
+        "active"
+    };
+    write_runtime_state(phase, "", "", false);
     append_log(format!(
-        "pathmask loaded successfully, resolved_count={resolved_count}"
+        "pathmask loaded successfully, resolved_count={resolved_count}, available={existing_count}, configured={}",
+        config.target_paths.len()
     ));
     Ok(())
 }
@@ -260,17 +408,67 @@ pub fn apply_if_configured() {
         return;
     }
 
+    let Ok(_lock) = acquire_operation_lock() else {
+        append_log("skip boot auto-load: another pathmask operation is active");
+        return;
+    };
+
+    let config = match read_config() {
+        Ok(config) => config,
+        Err(error) => {
+            append_log(format!(
+                "skip boot auto-load: failed to read config: {error:#}"
+            ));
+            return;
+        }
+    };
+    if !config.auto_load_enabled {
+        write_runtime_state("disabled", "", "", is_module_loaded());
+        return;
+    }
+    if is_unload_suppressed_this_boot() {
+        write_runtime_state("unloaded_this_boot", "", "", false);
+        append_log("skip boot auto-load: manually unloaded for this boot");
+        return;
+    }
+
     if let Err(err) = ensure_pathmask_runtime_supported() {
         append_log(format!("skip boot auto-load: {err:#}"));
         return;
     }
 
-    if is_module_loaded() {
-        append_log("skip boot auto-load: pathmask already loaded");
-        return;
+    let loaded = is_module_loaded();
+    let available_count = count_existing_target_paths(&config);
+    let resolved_count = read_resolved_count();
+    let active_paths = read_sysfs_param("target_paths").unwrap_or_default();
+    let active_matches = active_target_paths_match(&config, &active_paths);
+    let action = reconcile_action(
+        config.auto_load_enabled,
+        loaded,
+        available_count,
+        resolved_count,
+        active_matches,
+    );
+    match action {
+        ReconcileAction::Disabled | ReconcileAction::Noop => {
+            let phase = if available_count < config.target_paths.len() {
+                "partial"
+            } else {
+                "active"
+            };
+            write_runtime_state(phase, "", "", false);
+            return;
+        }
+        ReconcileAction::WaitForTargets => {
+            write_runtime_state("waiting_targets", "", "", false);
+            append_log("defer auto-load: configured target paths are not mounted yet");
+            return;
+        }
+        ReconcileAction::Load | ReconcileAction::Reload => {}
     }
 
-    if let Err(err) = apply() {
+    if let Err(err) = apply_inner(false) {
+        record_runtime_error(&err, error_requires_reboot(&err));
         append_log(format!("boot auto-load failed: {err:#}"));
         log::warn!("pathmask: boot auto-load failed: {err:#}");
     }
@@ -278,31 +476,92 @@ pub fn apply_if_configured() {
 
 fn ensure_pathmask_runtime_supported() -> Result<()> {
     if ksucalls::is_late_load() {
-        bail!("pathmask LKM is disabled in jailbreak mode");
+        return Err(coded_error(
+            "pathmask.unsupported_late_load",
+            "pathmask LKM is disabled in jailbreak mode",
+        ));
     }
     if !ksucalls::is_lkm_mode() {
-        bail!("pathmask LKM is only available in LKM mode; use SUSFS path config in GKI mode");
+        return Err(coded_error(
+            "pathmask.requires_lkm",
+            "pathmask LKM is only available in LKM mode; use SUSFS path config in GKI mode",
+        ));
     }
     Ok(())
 }
 
 pub fn unload() -> Result<()> {
-    let result = unload_inner();
+    let result = acquire_operation_lock().and_then(|_lock| unload_inner());
     if let Err(err) = &result {
         append_log(format!("unload failed: {err:#}"));
+        record_runtime_error(err, error_requires_reboot(err));
     }
     result
 }
 
 fn unload_inner() -> Result<()> {
+    mark_unload_suppressed_this_boot()?;
     if !is_module_loaded() {
+        write_runtime_state("unloaded_this_boot", "", "", false);
         append_log("pathmask unload skipped: module is not loaded");
         return Ok(());
     }
 
-    unload_loaded_pathmask(true).context("failed to unload pathmask")?;
-    append_log("pathmask unloaded; kernel hidden paths are cleared");
+    unload_loaded_pathmask().map_err(|error| {
+        coded_error(
+            "pathmask.module_busy",
+            format!("pathmask cannot be unloaded safely this boot: {error:#}"),
+        )
+    })?;
+    write_runtime_state("unloaded_this_boot", "", "", false);
+    append_log("pathmask unloaded for this boot; auto-load configuration is preserved");
     Ok(())
+}
+
+pub fn set_auto_load(enabled: bool) -> Result<()> {
+    let result = acquire_operation_lock().and_then(|_lock| {
+        let mut config = read_config()?;
+        config.auto_load_enabled = enabled;
+        write_config(CANDIDATE_CONFIG_PATH, &config)?;
+        apply_inner(enabled)
+    });
+    if let Err(error) = &result {
+        append_log(format!("set auto-load failed: {error:#}"));
+        record_runtime_error(error, error_requires_reboot(error));
+    }
+    result
+}
+
+pub fn delete_config() -> Result<()> {
+    let result = acquire_operation_lock().and_then(|_lock| {
+        mark_unload_suppressed_this_boot()?;
+        for path in [CONFIG_PATH, CANDIDATE_CONFIG_PATH, LAST_GOOD_CONFIG_PATH] {
+            remove_file_if_exists(path)?;
+        }
+        if is_module_loaded()
+            && let Err(error) = unload_loaded_pathmask()
+        {
+            let message = format!(
+                "configuration was deleted, but the active module is busy; reboot is required: {error:#}"
+            );
+            write_runtime_state(
+                "deleted_runtime_active",
+                "pathmask.reboot_required",
+                &message,
+                true,
+            );
+            append_log(&message);
+            return Ok(());
+        }
+        write_runtime_state("unconfigured", "", "", false);
+        append_log("pathmask configuration deleted");
+        Ok(())
+    });
+    if let Err(error) = &result {
+        append_log(format!("delete config failed: {error:#}"));
+        record_runtime_error(error, false);
+    }
+    result
 }
 
 pub fn print_logs() {
@@ -333,19 +592,94 @@ pub fn print_logs() {
     print!("{output}");
 }
 
+pub fn print_diagnostics() {
+    println!("=== ApkeSU Pathmask diagnostic ===");
+    println!("generatedAt={}", Local::now().to_rfc3339());
+    println!("=== status ===");
+    print_status();
+    println!("=== logs ===");
+    print_logs();
+}
+
 pub fn clear_logs() -> Result<()> {
     utils::ensure_dir_exists(PATHMASK_DIR)?;
     fs::write(LOG_PATH, "").with_context(|| format!("failed to clear {LOG_PATH}"))?;
+    for index in 1..=LOG_ROTATION_COUNT {
+        remove_file_if_exists(&format!("{LOG_PATH}.{index}"))?;
+    }
     append_log("cleared manager log; kernel dmesg history is not cleared");
     Ok(())
 }
 
-fn restore_last_good(kmi: &str, ko_data: &[u8]) -> Result<()> {
-    let config = read_config_from_path(LAST_GOOD_CONFIG_PATH)?;
+fn restore_committed_config(kmi: &str, ko_data: &[u8]) -> Result<()> {
+    let config = read_config().or_else(|_| read_config_from_path(LAST_GOOD_CONFIG_PATH))?;
+    if !config.auto_load_enabled || config.target_paths.is_empty() {
+        return Ok(());
+    }
     let module_params = build_module_params(&config)?;
-    append_log(format!("restoring last good pathmask config for KMI {kmi}"));
+    let available_count = wait_for_any_target_path(&config).map_err(|error| {
+        coded_error(
+            "pathmask.rollback_targets_not_mounted",
+            format!("committed config cannot be restored: {error:#}"),
+        )
+    })?;
+    append_log(format!("restoring committed pathmask config for KMI {kmi}"));
     load_pathmask(ko_data, &module_params)?;
+    let resolved_count = read_resolved_count();
+    if resolved_count < available_count {
+        return Err(coded_error(
+            "pathmask.rollback_incomplete",
+            format!("rollback resolved {resolved_count} of {available_count} mounted target paths"),
+        ));
+    }
     Ok(())
+}
+
+fn rollback_loaded_candidate(previous_loaded: bool, kmi: &str, ko_data: &[u8]) -> Result<()> {
+    if is_module_loaded() {
+        unload_loaded_pathmask().map_err(|error| {
+            coded_error(
+                "pathmask.rollback_unload_failed",
+                format!("failed to unload rejected candidate config: {error:#}"),
+            )
+        })?;
+    }
+    if previous_loaded {
+        restore_committed_config(kmi, ko_data).map_err(|error| {
+            coded_error(
+                "pathmask.rollback_failed",
+                format!("failed to restore committed config: {error:#}"),
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn error_after_rollback(
+    operation_error: anyhow::Error,
+    previous_loaded: bool,
+    kmi: &str,
+    ko_data: &[u8],
+) -> anyhow::Error {
+    match rollback_loaded_candidate(previous_loaded, kmi, ko_data) {
+        Ok(()) => operation_error,
+        Err(rollback_error) => {
+            append_log(format!("rollback failed: {rollback_error:#}"));
+            combine_operation_and_rollback_error(&operation_error, &rollback_error)
+        }
+    }
+}
+
+fn combine_operation_and_rollback_error(
+    operation_error: &anyhow::Error,
+    rollback_error: &anyhow::Error,
+) -> anyhow::Error {
+    coded_error(
+        "pathmask.rollback_failed",
+        format!(
+            "pathmask operation failed: {operation_error:#}; rollback failed: {rollback_error:#}"
+        ),
+    )
 }
 
 fn load_pathmask(ko_data: &[u8], module_params: &str) -> Result<()> {
@@ -353,18 +687,14 @@ fn load_pathmask(ko_data: &[u8], module_params: &str) -> Result<()> {
     ksuinit::load_module(ko_data, &params).context("init_module failed")
 }
 
-fn unload_loaded_pathmask(force_busy: bool) -> Result<()> {
+fn unload_loaded_pathmask() -> Result<()> {
     let graceful_flags = libc::O_NONBLOCK;
     match rustix::system::delete_module(c"pathmask", graceful_flags) {
         Ok(()) => wait_for_pathmask_unloaded(),
-        Err(err) if force_busy && is_busy_unload_error(err) => {
-            append_log(format!(
-                "pathmask is busy during unload ({err}); trying forced unload"
-            ));
-            rustix::system::delete_module(c"pathmask", libc::O_NONBLOCK | libc::O_TRUNC)
-                .context("forced unload failed")?;
-            wait_for_pathmask_unloaded()
-        }
+        Err(err) if is_busy_unload_error(err) => Err(coded_error(
+            "pathmask.module_busy",
+            format!("delete_module reported {err}; forced unload is intentionally disabled"),
+        )),
         Err(err) => Err(err).context("delete_module failed"),
     }
 }
@@ -396,21 +726,110 @@ fn wait_for_any_target_path(config: &PathmaskConfig) -> Result<usize> {
         thread::sleep(Duration::from_millis(TARGET_WAIT_STEP_MS));
     }
 
-    bail!("no configured target path exists now; pathmask cannot resolve targets at load time");
+    Err(coded_error(
+        "pathmask.targets_not_mounted",
+        "no configured target path exists now; wait for storage mounts and retry",
+    ))
 }
 
 fn count_existing_target_paths(config: &PathmaskConfig) -> usize {
+    existing_target_paths(config).len()
+}
+
+fn existing_target_paths(config: &PathmaskConfig) -> Vec<String> {
     config
         .target_paths
         .iter()
         .filter(|path| Path::new(path.as_str()).exists())
-        .count()
+        .cloned()
+        .collect()
+}
+
+fn missing_target_paths(config: &PathmaskConfig) -> Vec<String> {
+    config
+        .target_paths
+        .iter()
+        .filter(|path| !Path::new(path.as_str()).exists())
+        .cloned()
+        .collect()
+}
+
+fn read_resolved_count() -> usize {
+    read_sysfs_param("resolved_count")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0)
+}
+
+fn active_target_paths_match(config: &PathmaskConfig, active_target_paths: &str) -> bool {
+    if active_target_paths.is_empty() {
+        return !is_module_loaded();
+    }
+    let active = active_target_paths
+        .split(',')
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .collect::<BTreeSet<_>>();
+    let expected = config
+        .target_paths
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    active == expected
+}
+
+const fn reconcile_action(
+    enabled: bool,
+    loaded: bool,
+    available_count: usize,
+    resolved_count: usize,
+    active_config_matches: bool,
+) -> ReconcileAction {
+    if !enabled {
+        ReconcileAction::Disabled
+    } else if available_count == 0 {
+        ReconcileAction::WaitForTargets
+    } else if !loaded {
+        ReconcileAction::Load
+    } else if !active_config_matches || resolved_count < available_count {
+        ReconcileAction::Reload
+    } else {
+        ReconcileAction::Noop
+    }
+}
+
+const fn derive_phase(
+    config: &PathmaskConfig,
+    loaded: bool,
+    available_count: usize,
+    resolved_count: usize,
+    requires_reload: bool,
+    requires_reboot: bool,
+) -> &'static str {
+    if config.target_paths.is_empty() {
+        "unconfigured"
+    } else if !config.auto_load_enabled {
+        if loaded {
+            "disabled_runtime_active"
+        } else {
+            "disabled"
+        }
+    } else if requires_reboot {
+        "reboot_required"
+    } else if available_count == 0 {
+        "waiting_targets"
+    } else if !loaded {
+        "waiting_load"
+    } else if requires_reload || resolved_count < available_count {
+        "reload_required"
+    } else if available_count < config.target_paths.len() {
+        "partial"
+    } else {
+        "active"
+    }
 }
 
 fn build_module_params(config: &PathmaskConfig) -> Result<String> {
-    if config.target_paths.is_empty() {
-        bail!("no target path configured");
-    }
+    validate_config(config)?;
     ensure_safe_scope(config)?;
 
     let target_paths = config.target_paths.join(",");
@@ -444,13 +863,32 @@ fn build_module_params(config: &PathmaskConfig) -> Result<String> {
             .map(u32::to_string)
             .collect::<Vec<_>>()
             .join(",");
+        if deny_uids.len() > MAX_DENY_UIDS_LEN {
+            return Err(coded_error(
+                "pathmask.uid_parameter_too_long",
+                format!(
+                    "resolved UID parameter is {} bytes; maximum is {MAX_DENY_UIDS_LEN}",
+                    deny_uids.len()
+                ),
+            ));
+        }
         params.push("scope_mode=deny".to_string());
         params.push(format!("deny_uids={deny_uids}"));
     } else {
         params.push("scope_mode=global".to_string());
     }
 
-    Ok(params.join(" "))
+    let params = params.join(" ");
+    if params.len() > MAX_MODULE_PARAMS_LEN {
+        return Err(coded_error(
+            "pathmask.module_parameter_too_long",
+            format!(
+                "module parameter string is {} bytes; maximum is {MAX_MODULE_PARAMS_LEN}",
+                params.len()
+            ),
+        ));
+    }
+    Ok(params)
 }
 
 const fn bool_param(value: bool) -> &'static str {
@@ -492,17 +930,60 @@ fn resolve_deny_uids(app_packages: &[String]) -> DenyUidResolution {
             continue;
         }
 
-        let uid = package_uids
+        let base_uid = package_uids
             .get(app)
             .copied()
             .or_else(|| resolve_uid_from_data_dir(app));
-        if let Some(uid) = uid {
-            resolution.uids.insert(uid);
-        } else {
+        let package_uids = resolve_package_uids_for_all_users(app, base_uid);
+        if package_uids.is_empty() {
             resolution.unresolved_packages.push(app.clone());
+        } else {
+            resolution.uids.extend(package_uids);
         }
     }
     resolution
+}
+
+fn resolve_package_uids_for_all_users(package: &str, base_uid: Option<u32>) -> BTreeSet<u32> {
+    resolve_package_uids_from_roots(
+        package,
+        base_uid,
+        USER_DATA_ROOTS.iter().map(Path::new),
+        |package_path| rustix::fs::stat(package_path).ok().map(|stat| stat.st_uid),
+    )
+}
+
+fn resolve_package_uids_from_roots<'a, I, F>(
+    package: &str,
+    base_uid: Option<u32>,
+    roots: I,
+    uid_for_path: F,
+) -> BTreeSet<u32>
+where
+    I: IntoIterator<Item = &'a Path>,
+    F: Fn(&Path) -> Option<u32>,
+{
+    let mut uids = BTreeSet::new();
+    for root in roots {
+        let Ok(users) = fs::read_dir(root) else {
+            continue;
+        };
+        for user in users.flatten() {
+            if user.file_name().to_string_lossy().parse::<u32>().is_err() {
+                continue;
+            }
+            let package_path = user.path().join(package);
+            if let Some(uid) = uid_for_path(&package_path) {
+                uids.insert(uid);
+            }
+        }
+    }
+    if uids.is_empty()
+        && let Some(uid) = base_uid
+    {
+        uids.insert(uid);
+    }
+    uids
 }
 
 fn read_package_uids() -> BTreeMap<String, u32> {
@@ -533,6 +1014,58 @@ fn resolve_uid_from_data_dir(package: &str) -> Option<u32> {
         .map(|stat| stat.st_uid)
 }
 
+fn validate_config(config: &PathmaskConfig) -> Result<()> {
+    if config.target_paths.is_empty() {
+        return Err(coded_error(
+            "pathmask.no_targets",
+            "no target path is configured",
+        ));
+    }
+    if config.target_paths.len() > MAX_TARGET_PATHS {
+        return Err(coded_error(
+            "pathmask.too_many_targets",
+            format!(
+                "{} target paths exceed the limit of {MAX_TARGET_PATHS}",
+                config.target_paths.len()
+            ),
+        ));
+    }
+    if config.app_packages.len() > MAX_APP_PACKAGES {
+        return Err(coded_error(
+            "pathmask.too_many_apps",
+            format!(
+                "{} app entries exceed the limit of {MAX_APP_PACKAGES}",
+                config.app_packages.len()
+            ),
+        ));
+    }
+    ensure_no_duplicates(
+        &config.target_paths,
+        "pathmask.duplicate_path",
+        "target path",
+    )?;
+    ensure_no_duplicates(
+        &config.app_packages,
+        "pathmask.duplicate_app",
+        "application entry",
+    )?;
+    if config.use_app_scope && config.app_packages.is_empty() {
+        return Err(coded_error(
+            "pathmask.no_apps",
+            "application scope is enabled but no application is configured",
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_no_duplicates(values: &[String], code: &str, label: &str) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    if let Some(duplicate) = values.iter().find(|value| !seen.insert(value.as_str())) {
+        return Err(coded_error(code, format!("duplicate {label}: {duplicate}")));
+    }
+    Ok(())
+}
+
 fn read_config() -> Result<PathmaskConfig> {
     read_config_from_path(CONFIG_PATH)
 }
@@ -547,17 +1080,36 @@ fn read_config_from_path(path: &str) -> Result<PathmaskConfig> {
 }
 
 fn parse_config(content: &str) -> Result<PathmaskConfig> {
-    let value: Value = serde_json::from_str(content).context("invalid pathmask config JSON")?;
+    let value: Value = serde_json::from_str(content).map_err(|error| {
+        coded_error(
+            "pathmask.invalid_json",
+            format!("invalid pathmask config JSON: {error}"),
+        )
+    })?;
     let target_paths = string_array(value.get("targetPaths"))
         .into_iter()
-        .filter_map(|path| sanitize_target_path(&path))
-        .collect::<Vec<_>>();
+        .map(|path| {
+            sanitize_target_path(&path).ok_or_else(|| {
+                coded_error(
+                    "pathmask.invalid_target",
+                    format!("invalid target path: {path}"),
+                )
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let app_packages = string_array(value.get("appPackages"))
         .into_iter()
-        .filter_map(|package| sanitize_app_entry(&package))
-        .collect::<Vec<_>>();
+        .map(|package| {
+            sanitize_app_entry(&package).ok_or_else(|| {
+                coded_error(
+                    "pathmask.invalid_app",
+                    format!("invalid application entry: {package}"),
+                )
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
 
-    Ok(PathmaskConfig {
+    let config = PathmaskConfig {
         target_paths,
         app_packages,
         use_app_scope: value
@@ -572,7 +1124,13 @@ fn parse_config(content: &str) -> Result<PathmaskConfig> {
             .get("hideIsolated")
             .and_then(Value::as_bool)
             .unwrap_or(true),
-    })
+        auto_load_enabled: value
+            .get("autoLoadEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+    };
+    validate_config(&config)?;
+    Ok(config)
 }
 
 fn string_array(value: Option<&Value>) -> Vec<String> {
@@ -634,21 +1192,224 @@ fn sanitize_app_entry(app: &str) -> Option<String> {
 }
 
 fn write_config(path: &str, config: &PathmaskConfig) -> Result<()> {
+    let content = json!({
+        "schemaVersion": 2,
+        "targetPaths": config.target_paths,
+        "appPackages": config.app_packages,
+        "useAppScope": config.use_app_scope,
+        "hideDirents": config.hide_dirents,
+        "hideIsolated": config.hide_isolated,
+        "autoLoadEnabled": config.auto_load_enabled,
+    })
+    .to_string();
+    write_atomic(path, content.as_bytes())
+}
+
+fn write_atomic(path: &str, content: &[u8]) -> Result<()> {
     utils::ensure_dir_exists(PATHMASK_DIR)?;
-    let temporary_path = format!("{path}.tmp");
-    fs::write(
-        &temporary_path,
-        json!({
-            "targetPaths": config.target_paths,
-            "appPackages": config.app_packages,
-            "useAppScope": config.use_app_scope,
-            "hideDirents": config.hide_dirents,
-            "hideIsolated": config.hide_isolated,
-        })
-        .to_string(),
+    let temporary_path = format!("{path}.tmp.{}", std::process::id());
+    let result = (|| {
+        let mut file = File::create(&temporary_path)
+            .with_context(|| format!("failed to create {temporary_path}"))?;
+        file.write_all(content)
+            .with_context(|| format!("failed to write {temporary_path}"))?;
+        file.sync_all()
+            .with_context(|| format!("failed to sync {temporary_path}"))?;
+        fs::rename(&temporary_path, path).with_context(|| format!("failed to replace {path}"))?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+    result
+}
+
+fn promote_candidate_config() -> Result<()> {
+    promote_config_files(Path::new(CANDIDATE_CONFIG_PATH), Path::new(CONFIG_PATH))
+}
+
+fn promote_config_files(candidate: &Path, committed: &Path) -> Result<()> {
+    if !candidate.exists() {
+        return Err(coded_error(
+            "pathmask.candidate_missing",
+            "candidate config disappeared before commit",
+        ));
+    }
+    fs::rename(candidate, committed).context("failed to atomically commit candidate config")?;
+    Ok(())
+}
+
+fn verify_loaded_target_count(resolved_count: usize, existing_count: usize) -> Result<()> {
+    if resolved_count < existing_count {
+        return Err(coded_error(
+            "pathmask.partial_resolution",
+            format!(
+                "pathmask resolved {resolved_count} of {existing_count} currently mounted target paths"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn commit_candidate_after_verification(
+    candidate: Option<&Path>,
+    committed: &Path,
+    verification: Result<()>,
+) -> Result<()> {
+    verification?;
+    if let Some(candidate) = candidate {
+        promote_config_files(candidate, committed)?;
+    }
+    Ok(())
+}
+
+fn acquire_operation_lock() -> Result<OperationLock> {
+    utils::ensure_dir_exists(PATHMASK_DIR)?;
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(OPERATION_LOCK_PATH)
+        .context("failed to open pathmask operation lock")?;
+    let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if result != 0 {
+        return Err(coded_error(
+            "pathmask.operation_busy",
+            format!(
+                "another pathmask operation is active: {}",
+                io::Error::last_os_error()
+            ),
+        ));
+    }
+    Ok(OperationLock(file))
+}
+
+fn mark_unload_suppressed_this_boot() -> Result<()> {
+    let boot_id = current_boot_id()?;
+    write_atomic(UNLOAD_BOOT_ID_PATH, boot_id.as_bytes())
+}
+
+fn clear_boot_unload_suppression() {
+    let _ = fs::remove_file(UNLOAD_BOOT_ID_PATH);
+}
+
+fn is_unload_suppressed_this_boot() -> bool {
+    let Ok(current) = current_boot_id() else {
+        return false;
+    };
+    let saved = fs::read_to_string(UNLOAD_BOOT_ID_PATH)
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
+    saved == current
+}
+
+fn current_boot_id() -> Result<String> {
+    let boot_id = fs::read_to_string(BOOT_ID_PATH)
+        .with_context(|| format!("failed to read {BOOT_ID_PATH}"))?;
+    let boot_id = boot_id.trim().to_owned();
+    if boot_id.is_empty() {
+        return Err(coded_error(
+            "pathmask.boot_id_empty",
+            "current boot ID is empty",
+        ));
+    }
+    Ok(boot_id)
+}
+
+fn remove_file_if_exists(path: &str) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).with_context(|| format!("failed to remove {path}")),
+    }
+}
+
+fn write_runtime_state(phase: &str, code: &str, message: &str, requires_reboot: bool) {
+    let content = json!({
+        "phase": phase,
+        "errorCode": code,
+        "errorMessage": message,
+        "requiresReboot": requires_reboot,
+        "updatedAt": Local::now().to_rfc3339(),
+    })
+    .to_string();
+    if let Err(error) = write_atomic(RUNTIME_STATE_PATH, content.as_bytes()) {
+        append_log(format!("failed to persist runtime state: {error:#}"));
+    }
+}
+
+fn read_runtime_state() -> Result<PathmaskRuntimeState> {
+    read_runtime_state_from(Path::new(RUNTIME_STATE_PATH))
+}
+
+fn read_runtime_state_from(path: &Path) -> Result<PathmaskRuntimeState> {
+    if !path.exists() {
+        return Ok(PathmaskRuntimeState::default());
+    }
+    let content =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    parse_runtime_state(&content)
+}
+
+fn parse_runtime_state(content: &str) -> Result<PathmaskRuntimeState> {
+    let value: Value = serde_json::from_str(content).context("invalid pathmask runtime state")?;
+    Ok(PathmaskRuntimeState {
+        phase: value
+            .get("phase")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        error_code: value
+            .get("errorCode")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        error_message: value
+            .get("errorMessage")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        requires_reboot: value
+            .get("requiresReboot")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        updated_at: value
+            .get("updatedAt")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+    })
+}
+
+fn error_code(error: &anyhow::Error) -> String {
+    let rendered = format!("{error:#}");
+    rendered
+        .split_once(&format!("{ERROR_PREFIX}:"))
+        .and_then(|(_, suffix)| suffix.split_once(':').map(|(code, _)| code))
+        .unwrap_or("pathmask.unknown")
+        .to_owned()
+}
+
+fn error_requires_reboot(error: &anyhow::Error) -> bool {
+    matches!(
+        error_code(error).as_str(),
+        "pathmask.module_busy"
+            | "pathmask.rollback_failed"
+            | "pathmask.rollback_unload_failed"
+            | "pathmask.rollback_incomplete"
+            | "pathmask.rollback_targets_not_mounted"
     )
-    .with_context(|| format!("failed to write {temporary_path}"))?;
-    fs::rename(&temporary_path, path).with_context(|| format!("failed to replace {path}"))
+}
+
+fn record_runtime_error(error: &anyhow::Error, requires_reboot: bool) {
+    write_runtime_state(
+        "error",
+        &error_code(error),
+        &format!("{error:#}"),
+        requires_reboot,
+    );
 }
 
 fn is_module_loaded() -> bool {
@@ -674,6 +1435,7 @@ fn append_log(message: impl AsRef<str>) {
 
 fn append_log_inner(message: &str) -> Result<()> {
     utils::ensure_dir_exists(PATHMASK_DIR)?;
+    rotate_log_if_needed()?;
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -681,6 +1443,27 @@ fn append_log_inner(message: &str) -> Result<()> {
         .with_context(|| format!("failed to open {LOG_PATH}"))?;
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
     writeln!(file, "[{timestamp}] {message}").context("failed to write pathmask log")
+}
+
+fn rotate_log_if_needed() -> Result<()> {
+    let Ok(metadata) = fs::metadata(LOG_PATH) else {
+        return Ok(());
+    };
+    if metadata.len() < LOG_MAX_BYTES {
+        return Ok(());
+    }
+
+    remove_file_if_exists(&format!("{LOG_PATH}.{LOG_ROTATION_COUNT}"))?;
+    for index in (1..LOG_ROTATION_COUNT).rev() {
+        let source = format!("{LOG_PATH}.{index}");
+        let destination = format!("{LOG_PATH}.{}", index + 1);
+        if Path::new(&source).exists() {
+            fs::rename(&source, &destination).with_context(|| {
+                format!("failed to rotate pathmask log {source} to {destination}")
+            })?;
+        }
+    }
+    fs::rename(LOG_PATH, format!("{LOG_PATH}.1")).context("failed to rotate current pathmask log")
 }
 
 fn tail_file(path: &str, max_lines: usize) -> Result<String> {
@@ -713,7 +1496,14 @@ fn read_kernel_pathmask_log() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_package_uids;
+    use std::fs;
+
+    use super::{
+        MAX_TARGET_PATHS, PathmaskConfig, PathmaskRuntimeState, ReconcileAction, coded_error,
+        combine_operation_and_rollback_error, commit_candidate_after_verification, error_code,
+        error_requires_reboot, parse_config, parse_package_uids, read_runtime_state_from,
+        reconcile_action, resolve_package_uids_from_roots, validate_config,
+    };
 
     #[test]
     fn package_list_parser_uses_package_uid_column() {
@@ -738,5 +1528,190 @@ mod tests {
 
         assert_eq!(packages.len(), 1);
         assert_eq!(packages.get("com.example.app"), Some(&10123));
+    }
+
+    #[test]
+    fn legacy_config_defaults_auto_load_to_enabled() {
+        let config = parse_config(
+            r#"{
+                "targetPaths":["/data/local/tmp/example"],
+                "appPackages":["com.example.app"],
+                "useAppScope":true
+            }"#,
+        )
+        .expect("legacy config should remain compatible");
+
+        assert!(config.auto_load_enabled);
+    }
+
+    #[test]
+    fn duplicate_paths_are_rejected_instead_of_silently_dropped() {
+        let error = parse_config(
+            r#"{
+                "targetPaths":["/data/local/tmp/example","/data/local/tmp/example"],
+                "appPackages":["com.example.app"]
+            }"#,
+        )
+        .expect_err("duplicate target paths must be rejected");
+
+        assert_eq!(error_code(&error), "pathmask.duplicate_path");
+    }
+
+    #[test]
+    fn target_count_limit_is_enforced() {
+        let config = PathmaskConfig {
+            target_paths: (0..=MAX_TARGET_PATHS)
+                .map(|index| format!("/data/local/tmp/path-{index}"))
+                .collect(),
+            app_packages: vec!["com.example.app".to_owned()],
+            ..PathmaskConfig::default()
+        };
+
+        let error = validate_config(&config).expect_err("target limit must be enforced");
+        assert_eq!(error_code(&error), "pathmask.too_many_targets");
+    }
+
+    #[test]
+    fn late_mounted_target_requests_reload() {
+        assert_eq!(
+            reconcile_action(true, true, 1, 1, true),
+            ReconcileAction::Noop,
+        );
+        assert_eq!(
+            reconcile_action(true, true, 2, 1, true),
+            ReconcileAction::Reload,
+        );
+    }
+
+    #[test]
+    fn disabled_and_unmounted_states_do_not_load() {
+        assert_eq!(
+            reconcile_action(false, false, 1, 0, false),
+            ReconcileAction::Disabled,
+        );
+        assert_eq!(
+            reconcile_action(true, false, 0, 0, false),
+            ReconcileAction::WaitForTargets,
+        );
+    }
+
+    #[test]
+    fn candidate_is_promoted_only_at_commit_point() {
+        let temp = tempfile::tempdir().expect("create temp directory");
+        let candidate = temp.path().join("candidate.json");
+        let committed = temp.path().join("config.json");
+        fs::write(&committed, "old").expect("write committed config");
+        fs::write(&candidate, "new").expect("write candidate config");
+
+        commit_candidate_after_verification(Some(&candidate), &committed, Ok(()))
+            .expect("promote verified candidate");
+
+        assert!(!candidate.exists());
+        assert_eq!(fs::read_to_string(committed).unwrap(), "new");
+    }
+
+    #[test]
+    fn rejected_candidate_preserves_committed_config() {
+        let temp = tempfile::tempdir().expect("create temp directory");
+        let candidate = temp.path().join("candidate.json");
+        let committed = temp.path().join("config.json");
+        fs::write(&committed, "known-good").expect("write committed config");
+        fs::write(&candidate, "rejected").expect("write candidate config");
+
+        let result = commit_candidate_after_verification(
+            Some(&candidate),
+            &committed,
+            Err(coded_error(
+                "pathmask.partial_resolution",
+                "candidate resolved only some targets",
+            )),
+        );
+
+        assert_eq!(
+            error_code(&result.expect_err("candidate must be rejected")),
+            "pathmask.partial_resolution",
+        );
+        assert_eq!(fs::read_to_string(&committed).unwrap(), "known-good");
+        assert_eq!(fs::read_to_string(&candidate).unwrap(), "rejected");
+    }
+
+    #[test]
+    fn rollback_failure_reports_both_operation_and_rollback_errors() {
+        let error = combine_operation_and_rollback_error(
+            &coded_error(
+                "pathmask.targets_not_mounted",
+                "candidate targets are unavailable",
+            ),
+            &coded_error(
+                "pathmask.rollback_incomplete",
+                "committed targets are unavailable",
+            ),
+        );
+        let rendered = format!("{error:#}");
+        assert_eq!(error_code(&error), "pathmask.rollback_failed");
+        assert!(error_requires_reboot(&error));
+        assert!(rendered.contains("candidate targets are unavailable"));
+        assert!(rendered.contains("committed targets are unavailable"));
+    }
+
+    #[test]
+    fn package_resolution_includes_secondary_and_work_profile_users() {
+        let temp = tempfile::tempdir().expect("create temp directory");
+        let credential_root = temp.path().join("user");
+        let device_root = temp.path().join("user_de");
+        let package = "com.example.app";
+        for path in [
+            credential_root.join("0").join(package),
+            credential_root.join("10").join(package),
+            device_root.join("11").join(package),
+        ] {
+            fs::create_dir_all(path).expect("create user package directory");
+        }
+        fs::create_dir_all(credential_root.join("not-a-user").join(package))
+            .expect("create ignored directory");
+
+        let roots = [credential_root.as_path(), device_root.as_path()];
+        let resolved =
+            resolve_package_uids_from_roots(package, Some(10123), roots, |package_path| {
+                let user_id = package_path
+                    .parent()?
+                    .file_name()?
+                    .to_str()?
+                    .parse::<u32>()
+                    .ok()?;
+                Some(user_id.saturating_mul(100_000).saturating_add(10_123))
+            });
+
+        assert_eq!(
+            resolved.into_iter().collect::<Vec<_>>(),
+            vec![10123, 1_010_123, 1_110_123]
+        );
+    }
+
+    #[test]
+    fn runtime_state_survives_repeated_reads_after_process_restart() {
+        let temp = tempfile::tempdir().expect("create temp directory");
+        let state_path = temp.path().join("runtime_state.json");
+        fs::write(
+            &state_path,
+            r#"{
+                "phase":"partial",
+                "errorCode":"pathmask.partial_resolution",
+                "errorMessage":"one target is not mounted",
+                "requiresReboot":true,
+                "updatedAt":"2026-08-27T12:00:00+08:00"
+            }"#,
+        )
+        .expect("persist runtime state");
+
+        let expected = PathmaskRuntimeState {
+            phase: "partial".to_owned(),
+            error_code: "pathmask.partial_resolution".to_owned(),
+            error_message: "one target is not mounted".to_owned(),
+            requires_reboot: true,
+            updated_at: "2026-08-27T12:00:00+08:00".to_owned(),
+        };
+        assert_eq!(read_runtime_state_from(&state_path).unwrap(), expected);
+        assert_eq!(read_runtime_state_from(&state_path).unwrap(), expected);
     }
 }

@@ -29,6 +29,11 @@ data class AppFreezeError(
 
 sealed interface AppFreezeNotice {
     data class Changed(val label: String, val frozen: Boolean) : AppFreezeNotice
+    data class BatchChanged(
+        val changedCount: Int,
+        val requestedCount: Int,
+        val frozen: Boolean,
+    ) : AppFreezeNotice
     data class Failed(
         val label: String,
         val failure: AppFreezeFailure,
@@ -167,6 +172,66 @@ class AppFreezeViewModel(
                         )
                     }
                 }
+        }
+    }
+
+    fun setFrozenBatch(apps: List<FreezableApp>, frozen: Boolean) {
+        val targets = apps
+            .distinctBy(FreezableApp::key)
+            .filter { app -> app.frozen != frozen && (!frozen || app.protection == null) }
+        if (targets.isEmpty()) return
+        val keys = targets.mapTo(linkedSetOf(), FreezableApp::key)
+        if (_uiState.value.busyKeys.any(keys::contains)) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    busyKeys = it.busyKeys + keys,
+                    notice = null,
+                )
+            }
+            var changed = 0
+            var firstFailure: Pair<FreezableApp, AppFreezeError>? = null
+            targets.forEach { app ->
+                freezer.setFrozen(app.key, frozen)
+                    .onSuccess { updated ->
+                        changed++
+                        _uiState.update { state ->
+                            state.copy(
+                                apps = state.apps.map { current ->
+                                    if (current.key == updated.key) updated else current
+                                },
+                                busyKeys = state.busyKeys - app.key,
+                            )
+                        }
+                    }
+                    .onFailure { error ->
+                        val failure = error.toAppFreezeError()
+                        if (firstFailure == null) firstFailure = app to failure
+                        _uiState.update { state ->
+                            state.copy(busyKeys = state.busyKeys - app.key)
+                        }
+                    }
+            }
+            _uiState.update { state ->
+                val failure = firstFailure
+                state.copy(
+                    busyKeys = state.busyKeys - keys,
+                    notice = if (failure == null) {
+                        AppFreezeNotice.BatchChanged(
+                            changedCount = changed,
+                            requestedCount = targets.size,
+                            frozen = frozen,
+                        )
+                    } else {
+                        AppFreezeNotice.Failed(
+                            label = failure.first.label,
+                            failure = failure.second.failure,
+                            detail = failure.second.detail,
+                        )
+                    },
+                )
+            }
         }
     }
 

@@ -168,18 +168,31 @@ fun saveCurrentStartupAnimationPreset(context: Context, name: String): StartupAn
 fun applyStartupAnimationPreset(context: Context, preset: StartupAnimationPreset): Boolean {
     val value = preset.normalized()
     if (value.uriString.isBlank()) return false
-    return context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val prefs = context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val previous = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null)
+    val applied = prefs
         .edit()
         .putString(CUSTOM_STARTUP_ANIMATION_URI_KEY, value.uriString)
         .putString(CUSTOM_STARTUP_ANIMATION_SETTINGS_KEY, value.settings.toJson().toString())
         .commit()
+    if (applied && previous != value.uriString &&
+        !isStartupAnimationUriReferencedByPreset(context, previous)
+    ) {
+        releasePersistableStartupAnimationReadPermission(context, previous)
+    }
+    return applied
 }
 
 fun deleteStartupAnimationPreset(context: Context, id: String): Boolean {
     val current = readStartupAnimationPresets(context)
+    val removed = current.firstOrNull { it.id == id } ?: return false
     val updated = current.filterNot { it.id == id }
-    if (current.size == updated.size) return false
     writeStartupAnimationPresets(context, updated)
+    val activeUri = context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        .getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null)
+    if (removed.uriString != activeUri && updated.none { it.uriString == removed.uriString }) {
+        releasePersistableStartupAnimationReadPermission(context, removed.uriString)
+    }
     return true
 }
 
@@ -226,6 +239,7 @@ fun releasePersistableStartupAnimationReadPermission(context: Context, uriString
             Intent.FLAG_GRANT_READ_URI_PERMISSION
         )
     }
+    deletePersistedStartupAnimationReference(context, uriString)
 }
 
 fun isCustomStartupAnimationVideo(context: Context, uri: Uri): Boolean {

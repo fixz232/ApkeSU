@@ -261,6 +261,9 @@ enum Rescue {
     /// Print rescue environment test report
     Test,
 
+    /// Fully verify all rescue backups and persist the verification marker
+    Verify,
+
     /// Import rescue config JSON from an argument
     ImportConfigJson {
         /// JSON config text
@@ -290,6 +293,9 @@ enum Rescue {
     /// Enable rescue protection
     Enable,
 
+    /// Recheck, replace backups, fully verify, and enable protection
+    RefreshEnable,
+
     /// Disable rescue protection
     Disable,
 
@@ -315,6 +321,12 @@ enum Rescue {
 
     /// Clear rescue logs
     ClearLogs,
+
+    /// Re-enable a module that rescue protection disabled
+    EnableModule { id: String },
+
+    /// Print status and logs as a diagnostic bundle
+    Diagnostics,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -668,6 +680,18 @@ enum Pathmask {
     /// Apply saved config by hot-reloading pathmask LKM
     Apply,
 
+    /// Atomically validate, apply, and commit config JSON
+    ApplyJson {
+        /// config JSON content
+        json: String,
+    },
+
+    /// Persistently enable or disable pathmask auto-load
+    SetAutoLoad {
+        /// true to auto-load, false to keep the saved config disabled
+        enabled: bool,
+    },
+
     /// Probe whether a path is visible after dropping to an Android UID
     TestVisibility {
         /// Android application UID to probe as
@@ -682,11 +706,17 @@ enum Pathmask {
     /// Unload current pathmask LKM and clear kernel hidden paths
     Unload,
 
+    /// Delete saved, candidate, and last-good pathmask configurations
+    DeleteConfig,
+
     /// Print manager and kernel pathmask logs
     Logs,
 
     /// Clear manager pathmask logs
     ClearLogs,
+
+    /// Print status and logs as a diagnostic bundle
+    Diagnostics,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -1047,13 +1077,20 @@ pub fn run() -> Result<()> {
                 Pathmask::Import { file } => pathmask::import_config(&file),
                 Pathmask::ImportJson { json } => pathmask::import_config_text(&json),
                 Pathmask::Apply => pathmask::apply(),
+                Pathmask::ApplyJson { json } => pathmask::apply_config_text(&json),
+                Pathmask::SetAutoLoad { enabled } => pathmask::set_auto_load(enabled),
                 Pathmask::TestVisibility { uid, path } => pathmask::test_visibility(uid, &path),
                 Pathmask::Unload => pathmask::unload(),
+                Pathmask::DeleteConfig => pathmask::delete_config(),
                 Pathmask::Logs => {
                     pathmask::print_logs();
                     Ok(())
                 }
                 Pathmask::ClearLogs => pathmask::clear_logs(),
+                Pathmask::Diagnostics => {
+                    pathmask::print_diagnostics();
+                    Ok(())
+                }
             }
         }
         Commands::Rescue { command } => {
@@ -1064,13 +1101,17 @@ pub fn run() -> Result<()> {
             } else {
                 utils::switch_mnt_ns(1)?;
             }
-            match command {
+            let result = match command {
                 Rescue::Status => {
                     rescue::print_status();
                     Ok(())
                 }
                 Rescue::Test => {
                     rescue::print_test_report();
+                    Ok(())
+                }
+                Rescue::Verify => {
+                    rescue::print_verify_report();
                     Ok(())
                 }
                 Rescue::ImportConfigJson { json } => rescue::import_config_text(&json),
@@ -1081,6 +1122,7 @@ pub fn run() -> Result<()> {
                 } => rescue::import_image(&partition, &source, force),
                 Rescue::Backup { force } => rescue::backup(force),
                 Rescue::Enable => rescue::enable(),
+                Rescue::RefreshEnable => rescue::refresh_and_enable(),
                 Rescue::Disable => rescue::disable(),
                 Rescue::Restore => rescue::restore_now(),
                 Rescue::RestoreKeepData => rescue::restore_keep_data_now(),
@@ -1094,7 +1136,13 @@ pub fn run() -> Result<()> {
                     Ok(())
                 }
                 Rescue::ClearLogs => rescue::clear_logs(),
-            }
+                Rescue::EnableModule { id } => rescue::enable_rescue_module(&id),
+                Rescue::Diagnostics => {
+                    rescue::print_diagnostics();
+                    Ok(())
+                }
+            };
+            result.map_err(rescue::structured_error)
         }
         Commands::Install {
             libadbroot,

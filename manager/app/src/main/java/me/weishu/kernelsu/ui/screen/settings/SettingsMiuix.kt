@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContactPage
 import androidx.compose.material.icons.rounded.Dashboard
@@ -54,6 +57,7 @@ import androidx.compose.material.icons.rounded.Fence
 import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Palette
@@ -82,6 +86,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -154,14 +159,35 @@ fun SettingPagerMiuix(
     )
     val topBarColors = skrootproTopBarColors(barColor, colorScheme.onSurface)
     val loadingDialog = rememberLoadingDialog()
+    val context = LocalContext.current
     val showUninstallDialog = rememberSaveable { mutableStateOf(false) }
     val showSendLogDialog = rememberSaveable { mutableStateOf(false) }
-    var appearanceExpanded by rememberSaveable { mutableStateOf(false) }
-    var homeManagerExpanded by rememberSaveable { mutableStateOf(false) }
-    var rootPermissionsExpanded by rememberSaveable { mutableStateOf(false) }
-    var mountHideExpanded by rememberSaveable { mutableStateOf(false) }
-    var toolboxExpanded by rememberSaveable { mutableStateOf(false) }
-    var maintenanceExpanded by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var expandedCategoryRoute by rememberSaveable {
+        mutableStateOf(readLastSettingsCategory(context)?.routeValue)
+    }
+    var recentCategoryRoutes by rememberSaveable {
+        mutableStateOf(
+            readRecentSettingsCategories(context).joinToString(",") { it.routeValue }
+        )
+    }
+    val recentCategories = recentCategoryRoutes
+        .split(',')
+        .filter(String::isNotBlank)
+        .map(SettingsCategory::fromRouteValue)
+        .distinct()
+    fun categoryVisible(category: SettingsCategory): Boolean =
+        SettingsCatalog.categoryMatches(context, category, uiState, searchQuery)
+    fun categoryExpanded(category: SettingsCategory): Boolean =
+        searchQuery.isNotBlank() || expandedCategoryRoute == category.routeValue
+    fun updateCategory(category: SettingsCategory, expanded: Boolean) {
+        expandedCategoryRoute = if (expanded) category.routeValue else null
+        if (expanded) {
+            recordSettingsCategoryInteraction(context, category)
+            recentCategoryRoutes = readRecentSettingsCategories(context)
+                .joinToString(",") { it.routeValue }
+        }
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -190,13 +216,83 @@ fun SettingPagerMiuix(
                 overscrollEffect = null,
             ) {
                 item {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        placeholder = {
+                            androidx.compose.material3.Text(stringResource(R.string.settings_search_hint))
+                        },
+                        leadingIcon = {
+                            androidx.compose.material3.Icon(
+                                Icons.Rounded.Search,
+                                contentDescription = null,
+                            )
+                        },
+                        trailingIcon = if (searchQuery.isNotBlank()) {
+                            {
+                                androidx.compose.material3.IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.size(48.dp),
+                                ) {
+                                    androidx.compose.material3.Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = stringResource(R.string.settings_search_clear),
+                                    )
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                    )
+
+                    if (searchQuery.isBlank() && recentCategories.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.settings_recent_changes),
+                            color = colorScheme.onSurfaceVariantSummary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 10.dp),
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            recentCategories.forEach { category ->
+                                androidx.compose.material3.FilterChip(
+                                    selected = expandedCategoryRoute == category.routeValue,
+                                    onClick = { updateCategory(category, true) },
+                                    label = {
+                                        androidx.compose.material3.Text(stringResource(category.titleRes))
+                                    },
+                                    modifier = Modifier.height(48.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    val hasSearchResults = SettingsCategory.entries.any(::categoryVisible)
+                    if (!hasSearchResults) {
+                        Text(
+                            text = stringResource(R.string.settings_search_empty, searchQuery),
+                            color = colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 28.dp),
+                        )
+                    }
+
+                    if (categoryVisible(SettingsCategory.Appearance)) {
                     CollapsibleMiuixSection(
                         title = stringResource(R.string.settings_hub_appearance),
                         summary = stringResource(R.string.settings_hub_appearance_summary),
                         icon = Icons.Rounded.Palette,
-                        itemCount = uiState.appearanceCategoryItemCount(),
-                        expanded = appearanceExpanded,
-                        onExpandedChange = { appearanceExpanded = it },
+                        itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.Appearance, uiState),
+                        expanded = categoryExpanded(SettingsCategory.Appearance),
+                        onExpandedChange = { updateCategory(SettingsCategory.Appearance, it) },
                         topPadding = 12.dp,
                     ) {
                         val dayNightChecked = isDayNightSwitchChecked(uiState.themeMode)
@@ -287,14 +383,16 @@ fun SettingPagerMiuix(
                             onClick = actions.onOpenThemeStore,
                         )
                     }
+                    }
 
+                    if (categoryVisible(SettingsCategory.HomeAndManager)) {
                     CollapsibleMiuixSection(
                         title = stringResource(R.string.settings_hub_home_manager),
                         summary = stringResource(R.string.settings_hub_home_manager_summary),
                         icon = Icons.Rounded.Dashboard,
-                        itemCount = HOME_MANAGER_ITEM_COUNT,
-                        expanded = homeManagerExpanded,
-                        onExpandedChange = { homeManagerExpanded = it },
+                        itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.HomeAndManager, uiState),
+                        expanded = categoryExpanded(SettingsCategory.HomeAndManager),
+                        onExpandedChange = { updateCategory(SettingsCategory.HomeAndManager, it) },
                     ) {
                         CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.settings_manager_identity),
@@ -348,15 +446,17 @@ fun SettingPagerMiuix(
                             onCheckedChange = actions.onSetShowHomeLearnCard,
                         )
                     }
+                    }
 
                     KsuIsValid {
+                        if (categoryVisible(SettingsCategory.RootAndPermissions)) {
                         CollapsibleMiuixSection(
                             title = stringResource(R.string.settings_hub_root_permissions),
                             summary = stringResource(R.string.settings_hub_root_permissions_summary),
                             icon = Icons.Rounded.Security,
-                            itemCount = ROOT_PERMISSIONS_ITEM_COUNT,
-                            expanded = rootPermissionsExpanded,
-                            onExpandedChange = { rootPermissionsExpanded = it },
+                            itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.RootAndPermissions, uiState),
+                            expanded = categoryExpanded(SettingsCategory.RootAndPermissions),
+                            onExpandedChange = { updateCategory(SettingsCategory.RootAndPermissions, it) },
                         ) {
                             val profileTemplate = stringResource(id = R.string.settings_profile_template)
                             CategorizedMiuixActionRow(
@@ -492,14 +592,16 @@ fun SettingPagerMiuix(
                                 onCheckedChange = actions.onSetUseSoftReboot
                             )
                         }
+                        }
 
+                        if (categoryVisible(SettingsCategory.MountAndHide)) {
                         CollapsibleMiuixSection(
                             title = stringResource(R.string.settings_hub_mount_hide),
                             summary = stringResource(R.string.settings_hub_mount_hide_summary),
                             icon = Icons.Rounded.Layers,
-                            itemCount = MOUNT_HIDE_ITEM_COUNT,
-                            expanded = mountHideExpanded,
-                            onExpandedChange = { mountHideExpanded = it },
+                            itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.MountAndHide, uiState),
+                            expanded = categoryExpanded(SettingsCategory.MountAndHide),
+                            onExpandedChange = { updateCategory(SettingsCategory.MountAndHide, it) },
                         ) {
                             CategorizedMiuixSwitchRow(
                                 title = stringResource(id = R.string.settings_umount_modules_default),
@@ -557,15 +659,16 @@ fun SettingPagerMiuix(
                                 onCheckedChange = actions.onSetEpkesuHideEnabled,
                             )
                         }
+                        }
 
+                        if (categoryVisible(SettingsCategory.Toolbox)) {
                         CollapsibleMiuixSection(
                             title = stringResource(R.string.settings_hub_toolbox),
                             summary = stringResource(R.string.settings_hub_toolbox_summary),
                             icon = Icons.Rounded.DeveloperMode,
-                            itemCount = TOOLBOX_ITEM_COUNT +
-                                if (uiState.graphicsRendererFeatureEnabled) 1 else 0,
-                            expanded = toolboxExpanded,
-                            onExpandedChange = { toolboxExpanded = it },
+                            itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.Toolbox, uiState),
+                            expanded = categoryExpanded(SettingsCategory.Toolbox),
+                            onExpandedChange = { updateCategory(SettingsCategory.Toolbox, it) },
                         ) {
                             CategorizedMiuixActionRow(
                                 title = stringResource(id = R.string.rescue_protection),
@@ -613,16 +716,26 @@ fun SettingPagerMiuix(
                                     onClick = actions.onOpenGraphicsRenderer,
                                 )
                             }
+                            if (uiState.isKpmSettingsEntryVisible) {
+                                CategorizedMiuixActionRow(
+                                    title = stringResource(R.string.kpm_title),
+                                    summary = stringResource(R.string.kpm_settings_summary),
+                                    icon = Icons.Rounded.Bolt,
+                                    onClick = actions.onOpenKpm,
+                                )
+                            }
+                        }
                         }
                     }
 
+                    if (categoryVisible(SettingsCategory.AppAndMaintenance)) {
                     CollapsibleMiuixSection(
                         title = stringResource(R.string.settings_hub_app_maintenance),
                         summary = stringResource(R.string.settings_hub_app_maintenance_summary),
                         icon = Icons.Rounded.BugReport,
-                        itemCount = uiState.maintenanceCategoryItemCount(),
-                        expanded = maintenanceExpanded,
-                        onExpandedChange = { maintenanceExpanded = it },
+                        itemCount = SettingsCatalog.visibleEntryCount(SettingsCategory.AppAndMaintenance, uiState),
+                        expanded = categoryExpanded(SettingsCategory.AppAndMaintenance),
+                        onExpandedChange = { updateCategory(SettingsCategory.AppAndMaintenance, it) },
                         bottomPadding = 12.dp,
                     ) {
                         CategorizedMiuixActionRow(
@@ -698,6 +811,7 @@ fun SettingPagerMiuix(
                             icon = Icons.Rounded.ContactPage,
                             onClick = actions.onOpenAbout,
                         )
+                    }
                     }
                     Spacer(Modifier.height(bottomInnerPadding))
                 }
@@ -906,27 +1020,6 @@ private fun CollapsibleMiuixSection(
         ) {
             content()
         }
-    }
-}
-
-private const val HOME_MANAGER_ITEM_COUNT = 6
-private const val ROOT_PERMISSIONS_ITEM_COUNT = 8
-private const val MOUNT_HIDE_ITEM_COUNT = 6
-private const val TOOLBOX_ITEM_COUNT = 6
-
-private fun SettingsUiState.appearanceCategoryItemCount(): Int {
-    return 6 + when (uiMode) {
-        InterfaceStyle.Miuix.value -> 1
-        InterfaceStyle.Alpha.value,
-        InterfaceStyle.Delta.value,
-        -> 1
-        InterfaceStyle.Rain.value,
-        InterfaceStyle.Snow.value,
-        InterfaceStyle.Ink.value,
-        -> 2
-        InterfaceStyle.Pixel.value,
-        -> 2
-        else -> 0
     }
 }
 
@@ -1592,10 +1685,6 @@ private fun DayNightMiuixPreference(
             onCheckedChange = onCheckedChange,
         )
     }
-}
-
-private fun SettingsUiState.maintenanceCategoryItemCount(): Int {
-    return if (isLkmMode) 9 else 8
 }
 
 @Composable

@@ -2620,7 +2620,9 @@ internal data class PixelPetModelColors(
     val cream: Color,
     val highlight: Color,
     val accent: Color,
+    val accentSecondary: Color,
     val reflection: Color,
+    val detail: Color,
     val eye: Color,
 )
 
@@ -2640,7 +2642,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFFFDDA8),
         highlight = Color(0xFFFFF0CF),
         accent = Color(0xFFF1A04D),
+        accentSecondary = Color(0xFFE46F72),
         reflection = Color(0xFFFFC879),
+        detail = Color(0xFF7B4B36),
         eye = Color(0xFF2F2220),
     )
     PixelPetSpecies.Dog -> PixelPetModelColors(
@@ -2650,7 +2654,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFFFE5BD),
         highlight = Color(0xFFFFD7A1),
         accent = Color(0xFFD96762),
+        accentSecondary = Color(0xFF6E493A),
         reflection = Color(0xFFFFDCAF),
+        detail = Color(0xFF704735),
         eye = Color(0xFF2E211D),
     )
     PixelPetSpecies.Bird -> PixelPetModelColors(
@@ -2660,7 +2666,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFF2CD69),
         highlight = Color(0xFFD7F4FF),
         accent = Color(0xFFF29A4B),
+        accentSecondary = Color(0xFF8A77BE),
         reflection = Color(0xFFC8EEFF),
+        detail = Color(0xFF426C82),
         eye = Color(0xFF203343),
     )
     PixelPetSpecies.Rabbit -> PixelPetModelColors(
@@ -2670,7 +2678,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFFFF8FD),
         highlight = Color(0xFFFFFFFF),
         accent = Color(0xFFF08BA6),
+        accentSecondary = Color(0xFFE8A64D),
         reflection = Color(0xFFE6F6FF),
+        detail = Color(0xFF76606F),
         eye = Color(0xFF372A35),
     )
     PixelPetSpecies.Penguin -> PixelPetModelColors(
@@ -2680,7 +2690,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFF2F6FF),
         highlight = Color(0xFFD8F0FF),
         accent = Color(0xFFF4A64E),
+        accentSecondary = Color(0xFFD85D66),
         reflection = Color(0xFFBFE9FF),
+        detail = Color(0xFF334863),
         eye = Color(0xFF172131),
     )
     PixelPetSpecies.Hamster -> PixelPetModelColors(
@@ -2690,7 +2702,9 @@ internal fun pixelPetModelColors(
         cream = Color(0xFFFFE3BD),
         highlight = Color(0xFFFFF3DC),
         accent = Color(0xFFEF8E9E),
+        accentSecondary = Color(0xFFB96B52),
         reflection = Color(0xFFFFDEAD),
+        detail = Color(0xFF67402F),
         eye = Color(0xFF2A1A17),
     )
     }
@@ -2726,18 +2740,18 @@ internal fun pixelPetModelColors(
         else -> weatherTint
     }
     val tintAmount = when {
-        warmLight -> 0.16f
-        night -> 0.20f
-        weather == PixelPetWeather.Drizzle -> 0.18f
-        else -> 0.10f
+        warmLight -> 0.08f
+        night -> 0.10f
+        weather == PixelPetWeather.Drizzle -> 0.08f
+        else -> 0.035f
     }
     fun tint(color: Color, amount: Float = tintAmount): Color = lerp(color, materialTint, amount)
     fun coat(color: Color, amount: Float = coatAmount): Color = lerp(color, coatTint, amount)
     return base.copy(
-        outline = tint(coat(base.outline, coatAmount * 0.48f), if (night) 0.18f else 0.08f),
+        outline = tint(coat(base.outline, coatAmount * 0.48f), if (night) 0.12f else 0.035f),
         base = tint(coat(base.base)),
-        shade = tint(coat(base.shade, coatAmount * 0.62f), tintAmount * 0.8f),
-        cream = tint(coat(base.cream, coatAmount * 0.28f), tintAmount * 0.58f),
+        shade = tint(coat(base.shade, coatAmount * 0.62f), tintAmount * 0.72f),
+        cream = tint(coat(base.cream, coatAmount * 0.28f), tintAmount * 0.42f),
         highlight = when {
             weather == PixelPetWeather.Meteor -> lerp(tint(coat(base.highlight), 0.16f), Color(0xFFFFC6F3), 0.34f)
             weather == PixelPetWeather.Drizzle -> lerp(tint(coat(base.highlight), 0.12f), Color(0xFFE4F8FF), 0.46f)
@@ -2745,16 +2759,21 @@ internal fun pixelPetModelColors(
             else -> tint(coat(base.highlight), tintAmount * 0.42f)
         },
         accent = if (weather == PixelPetWeather.Drizzle) {
-            lerp(tint(coat(base.accent, coatAmount * 0.48f)), Color(0xFFD6F4FF), 0.18f)
+            lerp(tint(coat(base.accent, coatAmount * 0.48f)), Color(0xFFD6F4FF), 0.10f)
         } else {
             tint(coat(base.accent, coatAmount * 0.48f), tintAmount * 0.72f)
         },
+        accentSecondary = tint(
+            coat(base.accentSecondary, coatAmount * 0.42f),
+            tintAmount * 0.58f,
+        ),
         reflection = when {
             weather == PixelPetWeather.Drizzle -> lerp(coat(base.reflection, coatAmount * 0.25f), Color(0xFFE7FAFF), 0.55f)
             night -> lerp(coat(base.reflection, coatAmount * 0.25f), Color(0xFFB9C9FF), 0.32f)
             warmLight -> lerp(coat(base.reflection, coatAmount * 0.25f), Color(0xFFFFD9AB), 0.35f)
             else -> tint(coat(base.reflection, coatAmount * 0.25f), tintAmount * 0.56f)
         },
+        detail = tint(coat(base.detail, coatAmount * 0.24f), tintAmount * 0.36f),
         eye = tint(coat(base.eye, coatAmount * 0.18f), if (night) 0.10f else 0.04f),
     )
 }

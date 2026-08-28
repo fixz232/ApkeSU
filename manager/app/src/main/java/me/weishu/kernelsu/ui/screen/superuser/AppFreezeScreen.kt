@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package me.weishu.kernelsu.ui.screen.superuser
 
 import androidx.compose.foundation.background
@@ -5,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,9 +29,11 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
@@ -68,6 +73,15 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
+import me.weishu.kernelsu.ui.component.ApkeEmptyState
+import me.weishu.kernelsu.ui.component.ApkeAppSort
+import me.weishu.kernelsu.ui.component.ApkeAppSortMenu
+import me.weishu.kernelsu.ui.component.ApkeErrorState
+import me.weishu.kernelsu.ui.component.ApkeLoadingState
+import me.weishu.kernelsu.ui.component.ApkeMetricGrid
+import me.weishu.kernelsu.ui.component.ApkeMetricItem
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
+import me.weishu.kernelsu.ui.component.ApkeSelectionToolbar
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.theme.immersivePageColor
 import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
@@ -87,65 +101,99 @@ fun AppFreezeScreen() {
     val navigator = LocalNavigator.current
     val viewModel = viewModel<AppFreezeViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val visibleApps = remember(state) { visibleAppFreezeApps(state) }
+    var sort by rememberSaveable { mutableStateOf(ApkeAppSort.Name) }
+    val visibleApps = remember(state, sort) {
+        val apps = visibleAppFreezeApps(state)
+        when (sort) {
+            ApkeAppSort.Name -> apps.sortedWith(
+                compareBy(String.CASE_INSENSITIVE_ORDER) { it.label },
+            )
+            ApkeAppSort.PackageName -> apps.sortedWith(
+                compareBy(String.CASE_INSENSITIVE_ORDER) { it.packageName },
+            )
+            ApkeAppSort.UserId -> apps.sortedWith(
+                compareBy<FreezableApp> { it.userId }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label },
+            )
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingFreeze by remember { mutableStateOf<FreezableApp?>(null) }
+    var pendingBatchFrozen by remember { mutableStateOf<Boolean?>(null) }
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    var selectedKeys by remember { mutableStateOf(emptySet<String>()) }
     var hasResumed by rememberSaveable { mutableStateOf(false) }
     val onBack = dropUnlessResumed { navigator.pop() }
     val noticeMessage = appFreezeNoticeMessage(state.notice)
+    val selectedApps = remember(visibleApps, selectedKeys) {
+        visibleApps.filter { it.selectionKey() in selectedKeys }
+    }
+
+    LaunchedEffect(state.apps) {
+        val installedKeys = state.apps.mapTo(hashSetOf(), FreezableApp::selectionKey)
+        selectedKeys = selectedKeys.intersect(installedKeys)
+    }
 
     LifecycleResumeEffect(Unit) {
         if (hasResumed) viewModel.refresh() else hasResumed = true
         onPauseOrDispose { }
     }
     LaunchedEffect(state.notice, noticeMessage) {
-        if (state.notice != null && noticeMessage.isNotBlank()) {
+        if (
+            (state.notice is AppFreezeNotice.Changed || state.notice is AppFreezeNotice.BatchChanged) &&
+            noticeMessage.isNotBlank()
+        ) {
             snackbarHostState.showSnackbar(noticeMessage)
             viewModel.consumeNotice()
         }
     }
 
-    Scaffold(
+    ApkeSecondaryScaffold(
+        title = stringResource(R.string.app_freeze_title),
+        onBack = onBack,
         containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_freeze_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
+        snackbarHostState = snackbarHostState,
+        actions = {
+            IconButton(
+                enabled = !state.loading,
+                onClick = {
+                    selectionMode = !selectionMode
+                    if (!selectionMode) selectedKeys = emptySet()
                 },
-                actions = {
-                    IconButton(
-                        enabled = !state.refreshing,
-                        onClick = viewModel::refresh,
-                    ) {
-                        if (state.refreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = stringResource(R.string.refresh_refresh),
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
-                    scrolledContainerColor = immersiveScrolledTopBarColor(
-                        MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SelectAll,
+                    contentDescription = stringResource(R.string.app_list_select_mode),
+                    tint = if (selectionMode) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            ApkeAppSortMenu(
+                selected = sort,
+                onSelected = { sort = it },
+                enabled = !state.loading,
             )
+            IconButton(
+                enabled = !state.refreshing,
+                onClick = viewModel::refresh,
+            ) {
+                if (state.refreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.refresh_refresh),
+                    )
+                }
+            }
         },
-    ) { paddingValues ->
+    ) { paddingValues, _ ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -186,20 +234,68 @@ fun AppFreezeScreen() {
                     onToggleSystem = viewModel::toggleSystemApps,
                 )
             }
-            if (state.loading) {
-                item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
+            if (selectionMode) {
+                item {
+                    ApkeSelectionToolbar(
+                        selectedCount = selectedApps.size,
+                        totalCount = visibleApps.size,
+                        onSelectAll = {
+                            selectedKeys = visibleApps.mapTo(linkedSetOf(), FreezableApp::selectionKey)
+                        },
+                        onClear = { selectedKeys = emptySet() },
+                    ) {
+                        IconButton(
+                            enabled = selectedApps.any { !it.frozen && it.protection == null },
+                            onClick = { pendingBatchFrozen = true },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.AcUnit,
+                                contentDescription = stringResource(R.string.app_freeze_selected),
+                            )
+                        }
+                        IconButton(
+                            enabled = selectedApps.any(FreezableApp::frozen),
+                            onClick = { pendingBatchFrozen = false },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = stringResource(R.string.app_unfreeze_selected),
+                            )
+                        }
+                    }
+                }
+            }
+            val actionFailure = state.notice as? AppFreezeNotice.Failed
+            if (actionFailure != null) {
+                item {
+                    ApkeErrorState(
+                        title = appFreezeNoticeMessage(actionFailure),
+                        supportingText = stringResource(R.string.app_freeze_retry_summary),
+                        onRetry = {
+                            viewModel.consumeNotice()
+                            viewModel.refresh()
+                        },
+                    )
+                }
+            }
+            if (state.loading && state.apps.isEmpty()) {
+                item { ApkeLoadingState() }
             }
             state.loadError?.let { error ->
                 item {
-                    AppFreezeLoadError(
-                        message = appFreezeFailureMessage(error.failure, error.detail),
-                        refreshing = state.refreshing,
+                    ApkeErrorState(
+                        title = appFreezeFailureMessage(error.failure, error.detail),
+                        supportingText = stringResource(R.string.app_freeze_retry_summary),
                         onRetry = viewModel::refresh,
                     )
                 }
             }
             if (!state.loading && state.loadError == null && visibleApps.isEmpty()) {
-                item { AppFreezeEmpty() }
+                item {
+                    ApkeEmptyState(
+                        title = stringResource(R.string.app_freeze_empty),
+                    )
+                }
             }
             items(
                 items = visibleApps,
@@ -209,6 +305,12 @@ fun AppFreezeScreen() {
                 AppFreezeRow(
                     app = app,
                     busy = app.key in state.busyKeys,
+                    selectionMode = selectionMode,
+                    selected = app.selectionKey() in selectedKeys,
+                    onSelectionToggle = {
+                        val key = app.selectionKey()
+                        selectedKeys = if (key in selectedKeys) selectedKeys - key else selectedKeys + key
+                    },
                     onToggle = {
                         if (app.frozen) {
                             viewModel.setFrozen(app, false)
@@ -262,6 +364,53 @@ fun AppFreezeScreen() {
             },
         )
     }
+
+    pendingBatchFrozen?.let { freeze ->
+        val targets = selectedApps.filter { app ->
+            app.frozen != freeze && (!freeze || app.protection == null)
+        }
+        AlertDialog(
+            onDismissRequest = { pendingBatchFrozen = null },
+            icon = {
+                Icon(
+                    imageVector = if (freeze) Icons.Rounded.AcUnit else Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                )
+            },
+            title = {
+                Text(
+                    stringResource(
+                        if (freeze) R.string.app_freeze_selected_title else R.string.app_unfreeze_selected_title,
+                    ),
+                )
+            },
+            text = {
+                Text(stringResource(R.string.app_freeze_selected_message, targets.size))
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingBatchFrozen = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = targets.isNotEmpty(),
+                    onClick = {
+                        pendingBatchFrozen = null
+                        viewModel.setFrozenBatch(targets, freeze)
+                        selectedKeys = emptySet()
+                        selectionMode = false
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (freeze) R.string.app_freeze_action else R.string.app_unfreeze_action,
+                        ),
+                    )
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -296,23 +445,18 @@ private fun AppFreezeSafetyNotice() {
 private fun AppFreezeSummary(state: AppFreezeUiState) {
     val frozen = state.apps.count(FreezableApp::frozen)
     val active = state.apps.size - frozen
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        AppFreezeMetric(
-            value = frozen,
-            label = stringResource(R.string.app_freeze_filter_frozen),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        AppFreezeMetric(
-            value = active,
-            label = stringResource(R.string.app_freeze_filter_active),
-            color = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.weight(1f),
-        )
-    }
+    ApkeMetricGrid(
+        items = listOf(
+            ApkeMetricItem(
+                label = stringResource(R.string.app_freeze_filter_frozen),
+                value = frozen.toString(),
+            ),
+            ApkeMetricItem(
+                label = stringResource(R.string.app_freeze_filter_active),
+                value = active.toString(),
+            ),
+        ),
+    )
 }
 
 @Composable
@@ -350,7 +494,10 @@ private fun AppFreezeFilters(
     onToggleSystem: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             AppFreezeFilter.entries.forEach { filter ->
                 FilterChip(
                     selected = state.filter == filter,
@@ -389,6 +536,9 @@ private fun AppFreezeFilters(
 private fun AppFreezeRow(
     app: FreezableApp,
     busy: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onSelectionToggle: () -> Unit,
     onToggle: () -> Unit,
 ) {
     val canToggle = app.frozen || app.protection == null
@@ -402,10 +552,24 @@ private fun AppFreezeRow(
     ) {
         Column {
             Row(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier
+                    .then(
+                        if (selectionMode) {
+                            Modifier.clickable(onClick = onSelectionToggle)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (selectionMode) {
+                    Checkbox(
+                        checked = selected,
+                        onCheckedChange = { onSelectionToggle() },
+                    )
+                }
                 AppIconImage(
                     packageInfo = app.packageInfo,
                     label = app.label,
@@ -436,6 +600,7 @@ private fun AppFreezeRow(
                     )
                 }
                 when {
+                    selectionMode -> Unit
                     busy -> CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         strokeWidth = 2.dp,
@@ -548,6 +713,11 @@ private fun appFreezeNoticeMessage(notice: AppFreezeNotice?): String {
             if (notice.frozen) R.string.app_freeze_success else R.string.app_unfreeze_success,
             notice.label,
         )
+        is AppFreezeNotice.BatchChanged -> stringResource(
+            if (notice.frozen) R.string.app_freeze_batch_success else R.string.app_unfreeze_batch_success,
+            notice.changedCount,
+            notice.requestedCount,
+        )
         is AppFreezeNotice.Failed -> stringResource(
             R.string.app_freeze_operation_failed,
             notice.label,
@@ -584,3 +754,5 @@ private fun AppFreezeProtection.descriptionResource(): Int = when (this) {
     AppFreezeProtection.CriticalSystem -> R.string.app_freeze_protection_critical
     AppFreezeProtection.CoreUid -> R.string.app_freeze_protection_core_uid
 }
+
+private fun FreezableApp.selectionKey(): String = "$packageName:$userId"

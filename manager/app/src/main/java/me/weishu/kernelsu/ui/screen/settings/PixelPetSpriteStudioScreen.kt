@@ -125,7 +125,7 @@ fun PixelPetSpriteStudioScreen() {
                     title = { Text(stringResource(R.string.pixel_pet_sprite_studio_title)) },
                     navigationIcon = {
                         IconButton(onClick = dropUnlessResumed { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.close))
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -162,7 +162,7 @@ fun PixelPetSpriteStudioScreen() {
                 title = { Text(stringResource(R.string.pixel_pet_sprite_studio_title)) },
                 navigationIcon = {
                     IconButton(onClick = dropUnlessResumed { navigator.pop() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.close))
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back))
                     }
                 },
                 actions = {

@@ -83,6 +83,7 @@ import me.weishu.kernelsu.ui.util.applyStartupAnimationPreset
 import me.weishu.kernelsu.ui.util.deleteStartupAnimationPreset
 import me.weishu.kernelsu.ui.util.isStartupAnimationUriReferencedByPreset
 import me.weishu.kernelsu.ui.util.isCustomStartupAnimationVideo
+import me.weishu.kernelsu.ui.util.prepareStartupAnimationImport
 import me.weishu.kernelsu.ui.util.releasePersistableStartupAnimationReadPermission
 import me.weishu.kernelsu.ui.util.takePersistableStartupAnimationReadPermission
 import me.weishu.kernelsu.ui.viewmodel.SettingsViewModel
@@ -111,13 +112,14 @@ fun StartupAnimationScreen() {
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val info = inspectMediaFile(context, uri)
-            if (!info.decodable) {
+            val imported = prepareStartupAnimationImport(context, uri).getOrElse {
                 Toast.makeText(context, R.string.settings_startup_animation_invalid, Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            takePersistableStartupAnimationReadPermission(context, uri)
-            val uriString = uri.toString()
+            if (imported.requiresPersistablePermission) {
+                takePersistableStartupAnimationReadPermission(context, uri)
+            }
+            val uriString = imported.uri.toString()
             if (uiState.customStartupAnimationUri != uriString) {
                 val previous = uiState.customStartupAnimationUri
                 if (!isStartupAnimationUriReferencedByPreset(context, previous)) {
@@ -127,6 +129,13 @@ fun StartupAnimationScreen() {
             viewModel.setCustomStartupAnimationUri(uriString)
             previewUri.value = uriString
             showPreview.value = true
+            if (imported.extractedFromMotionPhoto) {
+                Toast.makeText(
+                    context,
+                    R.string.settings_startup_animation_motion_photo_imported,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
     }
 
@@ -244,7 +253,7 @@ private fun StartupAnimationScreenMiuix(
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },

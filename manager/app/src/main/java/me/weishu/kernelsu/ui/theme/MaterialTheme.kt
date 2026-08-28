@@ -4,16 +4,23 @@ import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
+import me.weishu.kernelsu.ui.util.AppFontState
+import me.weishu.kernelsu.ui.util.resolveAppFontFamily
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 
 @Composable
 fun MaterialKernelSUTheme(
     appSettings: AppSettings,
+    appFontState: AppFontState,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -39,14 +46,26 @@ fun MaterialKernelSUTheme(
     }
 
     val animatedColorScheme = colorScheme.animateAsState()
+    val appFontFamily = remember(appFontState) {
+        resolveAppFontFamily(context, appFontState)
+    }
+    val materialTypography = remember(appFontFamily) {
+        Typography(fontFamily = appFontFamily)
+    }
 
     MaterialExpressiveTheme(
         colorScheme = animatedColorScheme,
         motionScheme = MotionScheme.expressive(),
-        typography = Typography,
+        typography = materialTypography,
         content = {
-            MonetColorsProvider.UpdateCss()
-            content()
+            CompositionLocalProvider(
+                LocalContentColor provides animatedColorScheme.onBackground.copy(
+                    alpha = appFontState.opacity,
+                ),
+            ) {
+                MonetColorsProvider.UpdateCss()
+                content()
+            }
         }
     )
 }

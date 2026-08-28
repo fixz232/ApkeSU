@@ -214,7 +214,7 @@ private fun LauncherIconScreenMiuix(
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = LauncherIdentityColors.Ink,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },

@@ -382,7 +382,7 @@ private fun SoundEffectsScreenMiuix(
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },

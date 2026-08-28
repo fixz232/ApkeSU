@@ -3,6 +3,8 @@ package me.weishu.kernelsu.ui.component.pixel
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,7 +119,9 @@ fun PixelPetPageBar(
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.outline),
     ) {
         Row(
-            modifier = Modifier.padding(4.dp),
+            modifier = Modifier
+                .padding(4.dp)
+                .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             PixelPetPage.entries.forEach { page ->
@@ -126,7 +130,11 @@ fun PixelPetPageBar(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 50.dp)
-                        .clickable(role = Role.Tab) { onSelected(page) },
+                        .selectable(
+                            selected = active,
+                            role = Role.Tab,
+                            onClick = { onSelected(page) },
+                        ),
                     color = if (active) colors.selected else Color.Transparent,
                     shape = RoundedCornerShape(5.dp),
                     border = if (active) {

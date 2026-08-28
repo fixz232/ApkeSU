@@ -17,65 +17,19 @@ import kotlin.math.roundToInt
 
 class PixelPetSpriteAtlasTest {
 
-    @Test
-    fun `outer outline is filled without removing interior outline`() {
-        val frame = PixelPetSpriteFrame(
-            width = 7,
-            height = 7,
-            cells = listOf(
-                PixelPetSpriteCell(2, 2, 'o'),
-                PixelPetSpriteCell(3, 2, 'o'),
-                PixelPetSpriteCell(4, 2, 'o'),
-                PixelPetSpriteCell(2, 3, 'o'),
-                PixelPetSpriteCell(3, 3, 'b'),
-                PixelPetSpriteCell(4, 3, 'o'),
-                PixelPetSpriteCell(2, 4, 'o'),
-                PixelPetSpriteCell(3, 4, 'o'),
-                PixelPetSpriteCell(4, 4, 'o'),
-            ),
-        )
-
-        val result = pixelPetCellsWithoutOuterOutline(frame)
-
-        assertTrue(result.none { it.value == 'o' })
-        assertEquals(frame.cells.size, result.size)
-        assertEquals('b', result.first { it.x == 2 && it.y == 2 }.value)
-    }
-
-    @Test
-    fun `outline inside a closed transparent pocket is preserved`() {
-        val frame = PixelPetSpriteFrame(
-            width = 7,
-            height = 7,
-            cells = listOf(
-                PixelPetSpriteCell(1, 1, 'o'),
-                PixelPetSpriteCell(2, 1, 'o'),
-                PixelPetSpriteCell(3, 1, 'o'),
-                PixelPetSpriteCell(4, 1, 'o'),
-                PixelPetSpriteCell(5, 1, 'o'),
-                PixelPetSpriteCell(1, 2, 'o'),
-                PixelPetSpriteCell(5, 2, 'o'),
-                PixelPetSpriteCell(1, 3, 'o'),
-                PixelPetSpriteCell(3, 3, 'o'),
-                PixelPetSpriteCell(5, 3, 'o'),
-                PixelPetSpriteCell(1, 4, 'o'),
-                PixelPetSpriteCell(5, 4, 'o'),
-                PixelPetSpriteCell(1, 5, 'o'),
-                PixelPetSpriteCell(2, 5, 'o'),
-                PixelPetSpriteCell(3, 5, 'o'),
-                PixelPetSpriteCell(4, 5, 'o'),
-                PixelPetSpriteCell(5, 5, 'o'),
-                PixelPetSpriteCell(3, 4, 'b'),
-            ),
-        )
-
-        val result = pixelPetCellsWithoutOuterOutline(frame)
-
-        assertEquals(1, result.count { it.value == 'o' })
-    }
     @Before
     fun installVerifiedV5Frames() {
         PixelPetSpriteAtlas.installVerifiedPacksForTest(v5BakedSheets)
+    }
+
+    @Test
+    fun naturalPalettesKeepIndependentOutlineAccentAndDetailRoles() {
+        PixelPetSpecies.entries.forEach { species ->
+            val colors = pixelPetModelColors(species)
+            assertNotEquals("$species outline must remain visible", colors.outline, colors.base)
+            assertNotEquals("$species accents must stay independent", colors.accent, colors.accentSecondary)
+            assertNotEquals("$species detail and eye colors must stay independent", colors.detail, colors.eye)
+        }
     }
 
     @Test
@@ -134,8 +88,8 @@ class PixelPetSpriteAtlasTest {
         val expectedBaselines = mapOf(
             PixelPetGrowthStage.Egg to 14,
             PixelPetGrowthStage.Baby to 14,
-            PixelPetGrowthStage.Young to 29,
-            PixelPetGrowthStage.Adult to 44,
+            PixelPetGrowthStage.Young to 30,
+            PixelPetGrowthStage.Adult to 46,
         )
         PixelPetSpecies.entries.forEach { species ->
             val prefix = species.name.lowercase()
@@ -159,8 +113,8 @@ class PixelPetSpriteAtlasTest {
                             assertEquals(stage.spriteCanvasSize / 2, frame.pivotCellX)
                             assertEquals(expectedBaselines.getValue(stage), frame.baselineCellY)
                             assertTrue(frame.cells.isNotEmpty())
-                            assertTrue(frame.cells.all { it.x in 0 until frame.width })
-                            assertTrue(frame.cells.all { it.y in 0 until frame.height })
+                            assertTrue(frame.cells.all { it.x in 1 until frame.width - 1 })
+                            assertTrue(frame.cells.all { it.y in 1 until frame.height - 1 })
                             val attachments = requireNotNull(frame.attachments)
                             PixelPetAccessorySlot.entries.forEach { slot ->
                                 val attachment = attachments.forSlot(slot)
@@ -268,10 +222,11 @@ class PixelPetSpriteAtlasTest {
     @Test
     fun v5NativeMastersStayNativeCrispAndIndependentFromReferenceBitmaps() {
         val root = File("../tools/pixel-pet-source/v5-masters")
+        val sourceRoot = File("../tools/pixel-pet-source/v5-masters-src")
         val manifest = JSONObject(root.resolve("manifest.json").readText().trimStart('\uFEFF'))
-        assertEquals(1, manifest.getInt("schemaVersion"))
+        assertEquals(2, manifest.getInt("schemaVersion"))
         assertEquals(5, manifest.getInt("sourceVersion"))
-        assertEquals("native-semantic-pixel-masters", manifest.getString("provenance"))
+        assertEquals("editable-semantic-pixel-rows", manifest.getString("provenance"))
         val allowedOpaqueColors = setOf(
             0xFF24212B.toInt(),
             0xFFC8A27C.toInt(),
@@ -289,10 +244,22 @@ class PixelPetSpriteAtlasTest {
             val petSources = species.getJSONObject(pet.name.lowercase())
             PixelPetGrowthStage.entries.forEach { stage ->
                 val source = petSources.getJSONObject(stage.name.lowercase())
+                val sourceFile = sourceRoot.resolve(source.getString("source"))
                 val imageFile = root.resolve(source.getString("image"))
+                assertTrue(sourceFile.isFile)
                 assertTrue(imageFile.isFile)
+                assertEquals(source.getString("sourceSha256"), sourceFile.sha256())
                 assertEquals(stage.spriteCanvasSize, source.getInt("canvasSize"))
                 assertEquals(source.getString("sha256"), imageFile.sha256())
+                val pixelRows = sourceFile.readLines().filterNot { it.startsWith("#") }
+                assertEquals(stage.spriteCanvasSize, pixelRows.size)
+                assertTrue(pixelRows.all { it.length == stage.spriteCanvasSize })
+                assertTrue(pixelRows.flatMap(String::toList).all { it in ".obschamrex" })
+                val paintedX = pixelRows.flatMapIndexed { _, row ->
+                    row.mapIndexedNotNull { x, value -> x.takeIf { value != '.' } }
+                }
+                assertTrue(paintedX.min() >= 1)
+                assertTrue(paintedX.max() <= stage.spriteCanvasSize - 2)
                 val image = ImageIO.read(imageFile)
                 try {
                     assertEquals(stage.spriteCanvasSize, image.width)

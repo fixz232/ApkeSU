@@ -44,6 +44,10 @@ import kotlin.coroutines.resume
  */
 private const val TAG = "KsuCli"
 private const val SHELL_JOB_TIMEOUT_MILLIS = 10_000L
+private const val STATUS_TIMEOUT_MILLIS = 30_000L
+private const val DIAGNOSTIC_TIMEOUT_MILLIS = 60_000L
+private const val LONG_IO_TIMEOUT_MILLIS = 300_000L
+private const val ERROR_PREFIX = "APKESU_ERROR:"
 private const val ANDROID_16_API = 36
 private const val BUSYBOX = "/data/adb/ksu/bin/busybox"
 const val CPU_SPOOF_PROPERTY_VALUE_LIMIT = 91
@@ -225,10 +229,21 @@ data class HiddenPathConfigState(
     val useAppScope: Boolean = true,
     val hideDirents: Boolean = true,
     val hideIsolated: Boolean = true,
+    val autoLoadEnabled: Boolean = true,
     val loaded: Boolean = false,
     val currentKmi: String = "",
+    val phase: String = "unconfigured",
+    val savedCount: Int = 0,
+    val availableCount: Int = 0,
+    val activeCount: Int = 0,
     val resolvedCount: String = "",
     val activeTargetPaths: String = "",
+    val missingTargetPaths: List<String> = emptyList(),
+    val requiresReload: Boolean = false,
+    val requiresReboot: Boolean = false,
+    val hasPendingCandidate: Boolean = false,
+    val lastErrorCode: String = "",
+    val lastErrorMessage: String = "",
     val lastLog: String = "",
     val resolvedAppUids: List<String> = emptyList(),
     val unresolvedAppPackages: List<String> = emptyList(),
@@ -237,6 +252,7 @@ data class HiddenPathConfigState(
 data class HiddenPathConfigReadResult(
     val config: HiddenPathConfigState? = null,
     val error: String = "",
+    val errorCode: String = "",
 )
 
 internal fun HiddenPathConfigState.editableEquals(other: HiddenPathConfigState): Boolean {
@@ -244,8 +260,16 @@ internal fun HiddenPathConfigState.editableEquals(other: HiddenPathConfigState):
         appPackages == other.appPackages &&
         useAppScope == other.useAppScope &&
         hideDirents == other.hideDirents &&
-        hideIsolated == other.hideIsolated
+        hideIsolated == other.hideIsolated &&
+        autoLoadEnabled == other.autoLoadEnabled
 }
+
+data class ToolCommandResult(
+    val success: Boolean = false,
+    val errorCode: String = "",
+    val errorMessage: String = "",
+    val timedOut: Boolean = false,
+)
 
 data class HiddenPathVisibilityResult(
     val uid: Int = -1,
@@ -310,6 +334,40 @@ data class RescueImageState(
     val sizeOk: Boolean = true,
     val otherSlot: Boolean = false,
     val restore: Boolean = true,
+    val dangerous: Boolean = false,
+    val verificationState: String = "unknown",
+)
+
+data class RescueDisabledModule(
+    val id: String = "",
+    val name: String = "",
+    val version: String = "",
+    val installed: Boolean = false,
+    val disabled: Boolean = false,
+)
+
+data class RescueRestoreEntry(
+    val name: String = "",
+    val label: String = "",
+    val imagePath: String = "",
+    val devicePath: String = "",
+    val expectedSha256: String = "",
+    val expectedSize: Long = 0,
+    val status: String = "",
+)
+
+data class RescueRestoreTransaction(
+    val id: String = "",
+    val reason: String = "",
+    val automatic: Boolean = false,
+    val description: String = "",
+    val activateSlot: String = "",
+    val phase: String = "",
+    val errorCode: String = "",
+    val errorMessage: String = "",
+    val startedAt: String = "",
+    val updatedAt: String = "",
+    val entries: List<RescueRestoreEntry> = emptyList(),
 )
 
 data class RescueConfigState(
@@ -322,6 +380,8 @@ data class RescueConfigState(
 
 data class RescueStatus(
     val available: Boolean = false,
+    val phase: String = "unavailable",
+    val statusErrorCode: String = "",
     val statusError: String = "",
     val enabled: Boolean = false,
     val config: RescueConfigState = RescueConfigState(),
@@ -332,10 +392,24 @@ data class RescueStatus(
     val currentSlot: String = "",
     val bootMode: String = "",
     val device: String = "",
+    val deviceFingerprint: String = "",
     val manifestCreatedAt: String = "",
+    val manifestSlot: String = "",
+    val manifestDevice: String = "",
+    val manifestFingerprint: String = "",
+    val manifestTotalSize: Long = 0,
     val lastRestoreDone: Boolean = false,
+    val skipModulesOnce: Boolean = false,
+    val skipModulesThisBoot: Boolean = false,
     val ready: Boolean = false,
     val readyReason: String = "",
+    val verified: Boolean = false,
+    val environmentChecked: Boolean = false,
+    val configChangedProtectionDisabled: Boolean = false,
+    val restoreInterrupted: Boolean = false,
+    val restoreTransactionError: String = "",
+    val restoreTransaction: RescueRestoreTransaction? = null,
+    val rescueDisabledModules: List<RescueDisabledModule> = emptyList(),
     val log: String = "",
 ) {
     val requiredReady: Boolean
@@ -344,8 +418,11 @@ data class RescueStatus(
 
 data class RescueTestReport(
     val ok: Boolean = false,
+    val errorCode: String = "",
     val reason: String = "",
     val text: String = "",
+    val backupReady: Boolean = false,
+    val backupReason: String = "",
 )
 
 fun RescueConfigState.toConfigJson(): String {
@@ -371,6 +448,7 @@ fun HiddenPathConfigState.toConfigJson(): String {
         .put("useAppScope", useAppScope)
         .put("hideDirents", hideDirents)
         .put("hideIsolated", hideIsolated)
+        .put("autoLoadEnabled", autoLoadEnabled)
         .toString(2)
 }
 
@@ -382,6 +460,7 @@ fun parseHiddenPathConfigJson(content: String, current: HiddenPathConfigState = 
         useAppScope = obj.optBoolean("useAppScope", current.useAppScope),
         hideDirents = obj.optBoolean("hideDirents", current.hideDirents),
         hideIsolated = obj.optBoolean("hideIsolated", current.hideIsolated),
+        autoLoadEnabled = obj.optBoolean("autoLoadEnabled", current.autoLoadEnabled),
     )
 }
 
@@ -1345,6 +1424,95 @@ private suspend fun runCpuSpoofCommand(command: String): CpuSpoofCommandResult =
     CpuSpoofCommandResult(true)
 }
 
+private suspend fun runStructuredKsudCommand(
+    area: String,
+    command: String,
+    timeoutMillis: Long = STATUS_TIMEOUT_MILLIS,
+): ToolCommandResult = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext ToolCommandResult(
+            errorCode = "$area.root_unavailable",
+            errorMessage = "root shell unavailable",
+        )
+    }
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(timeoutMillis) {
+            getRootShell().newJob()
+                .add("${shellQuote(getKsuDaemonPath())} $command")
+                .to(stdout, stderr)
+                .exec()
+        }
+        if (result == null) {
+            KsuCli.reset()
+            return@runCatching ToolCommandResult(
+                errorCode = "$area.timeout",
+                errorMessage = "$area command timed out",
+                timedOut = true,
+            )
+        }
+        if (result.isSuccess) {
+            ToolCommandResult(success = true)
+        } else {
+            val raw = stderr.joinToString("\n").trim().ifBlank {
+                stdout.joinToString("\n").trim().ifBlank { "$area command failed" }
+            }
+            val structured = parseStructuredKsudError(raw, "$area.command_failed")
+            Log.w(TAG, "$area command failed: $command, $raw")
+            structured
+        }
+    }.getOrElse { error ->
+        KsuCli.reset()
+        ToolCommandResult(
+            errorCode = "$area.unavailable",
+            errorMessage = error.message.orEmpty().ifBlank { "$area command unavailable" },
+        )
+    }
+}
+
+private suspend fun getKsudTextOutput(
+    command: String,
+    timeoutMillis: Long = STATUS_TIMEOUT_MILLIS,
+): String = withContext(Dispatchers.IO) {
+    if (shouldSkipUnsafeKsudCommand()) {
+        return@withContext ""
+    }
+    runCatching {
+        val stdout = ArrayList<String>()
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(timeoutMillis) {
+            getRootShell().newJob()
+                .add("${shellQuote(getKsuDaemonPath())} $command")
+                .to(stdout, stderr)
+                .exec()
+        }
+        if (result == null) {
+            KsuCli.reset()
+            return@runCatching ""
+        }
+        if (result.isSuccess) {
+            stdout.joinToString("\n")
+        } else {
+            stderr.joinToString("\n").ifBlank { stdout.joinToString("\n") }
+        }
+    }.getOrElse { error ->
+        Log.w(TAG, "ksud text command unavailable: $command", error)
+        KsuCli.reset()
+        ""
+    }
+}
+
+internal fun parseStructuredKsudError(raw: String, fallbackCode: String): ToolCommandResult {
+    val payload = raw.substringAfter(ERROR_PREFIX, "")
+    if (payload.isBlank()) {
+        return ToolCommandResult(errorCode = fallbackCode, errorMessage = raw.trim())
+    }
+    val code = payload.substringBefore(':').trim().ifBlank { fallbackCode }
+    val message = payload.substringAfter(':', "").trim().ifBlank { raw.trim() }
+    return ToolCommandResult(errorCode = code, errorMessage = message)
+}
+
 suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
         return@withContext HiddenPathConfigReadResult(error = "root shell unavailable")
@@ -1353,7 +1521,7 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
     runCatching {
         val stdout = ArrayList<String>()
         val stderr = ArrayList<String>()
-        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        val result = withTimeoutOrNull(STATUS_TIMEOUT_MILLIS) {
             getRootShell().newJob()
                 .add("${getKsuDaemonPath()} pathmask status")
                 .to(stdout, stderr)
@@ -1375,7 +1543,10 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
         val obj = JSONObject(stdout.joinToString("\n"))
         val statusError = obj.optString("error", "").trim()
         if (statusError.isNotBlank()) {
-            return@runCatching HiddenPathConfigReadResult(error = statusError)
+            return@runCatching HiddenPathConfigReadResult(
+                error = statusError,
+                errorCode = obj.optString("errorCode", "pathmask.status_failed"),
+            )
         }
         HiddenPathConfigReadResult(config = HiddenPathConfigState(
             targetPaths = obj.optJSONArray("targetPaths").toStringList(),
@@ -1383,10 +1554,21 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
             useAppScope = obj.optBoolean("useAppScope", true),
             hideDirents = obj.optBoolean("hideDirents", true),
             hideIsolated = obj.optBoolean("hideIsolated", true),
+            autoLoadEnabled = obj.optBoolean("autoLoadEnabled", true),
             loaded = obj.optBoolean("loaded", false),
             currentKmi = obj.optString("currentKmi", ""),
+            phase = obj.optString("phase", "unconfigured"),
+            savedCount = obj.optInt("savedCount", 0),
+            availableCount = obj.optInt("availableCount", 0),
+            activeCount = obj.optInt("activeCount", 0),
             resolvedCount = obj.optString("resolvedCount", ""),
             activeTargetPaths = obj.optString("activeTargetPaths", ""),
+            missingTargetPaths = obj.optJSONArray("missingTargetPaths").toStringList(),
+            requiresReload = obj.optBoolean("requiresReload", false),
+            requiresReboot = obj.optBoolean("requiresReboot", false),
+            hasPendingCandidate = obj.optBoolean("hasPendingCandidate", false),
+            lastErrorCode = obj.optString("lastErrorCode", ""),
+            lastErrorMessage = obj.optString("lastErrorMessage", ""),
             lastLog = obj.optString("lastLog", ""),
             resolvedAppUids = obj.optJSONArray("resolvedAppUids").toStringList(),
             unresolvedAppPackages = obj.optJSONArray("unresolvedAppPackages").toStringList(),
@@ -1394,66 +1576,43 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
     }.getOrElse {
         Log.w(TAG, "pathmask status unavailable", it)
         KsuCli.reset()
-        HiddenPathConfigReadResult(error = it.message ?: "pathmask status unavailable")
+        HiddenPathConfigReadResult(
+            error = it.message ?: "pathmask status unavailable",
+            errorCode = "pathmask.status_unavailable",
+        )
     }
 }
 
 suspend fun getHiddenPathConfig(): HiddenPathConfigState =
     readHiddenPathConfig().config ?: HiddenPathConfigState()
 
-suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): Boolean = withContext(Dispatchers.IO) {
-    if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext false
-    }
-
-    runCatching {
-        val json = JSONObject()
-            .put("targetPaths", JSONArray(config.targetPaths))
-            .put("appPackages", JSONArray(config.appPackages))
-            .put("useAppScope", config.useAppScope)
-            .put("hideDirents", config.hideDirents)
-            .put("hideIsolated", config.hideIsolated)
-        val importDir = "/data/adb/ksu/pathmask"
-        val errFile = "$importDir/import.err"
-        val logFile = "$importDir/pathmask.log"
-        val ksud = shellQuote(getKsuDaemonPath())
-        val stdout = ArrayList<String>()
-        val stderr = ArrayList<String>()
-        val importCmd = "$ksud pathmask import-json ${shellQuote(json.toString())}"
-        val applyCmd = "$ksud pathmask apply"
-        val command = "mkdir -p ${shellQuote(importDir)} && " +
-            "($importCmd && $applyCmd) 2> ${shellQuote(errFile)}; " +
-            "code=${'$'}?; " +
-            "if [ ${'$'}code -ne 0 ]; then " +
-            "printf '[manager] pathmask apply command failed (code=%s)\\n' \"${'$'}code\" >> ${shellQuote(logFile)}; " +
-            "cat ${shellQuote(errFile)} >> ${shellQuote(logFile)}; " +
-            "cat ${shellQuote(errFile)} >&2; " +
-            "fi; " +
-            "rm -f ${shellQuote(errFile)}; " +
-            "[ ${'$'}code -eq 0 ]"
-        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * 6) {
-            getRootShell().newJob()
-                .add(command)
-                .to(stdout, stderr)
-                .exec()
-        }
-
-        if (result == null) {
-            Log.w(TAG, "pathmask apply timed out")
-            KsuCli.reset()
-            return@runCatching false
-        }
-
-        if (!result.isSuccess) {
-            Log.w(TAG, "pathmask apply failed: ${stderr.joinToString("\n")}")
-        }
-        result.isSuccess
-    }.getOrElse {
-        Log.w(TAG, "pathmask apply unavailable", it)
-        KsuCli.reset()
-        false
-    }
+suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): ToolCommandResult {
+    return runStructuredKsudCommand(
+        area = "pathmask",
+        command = "pathmask apply-json ${shellQuote(config.toConfigJson())}",
+        timeoutMillis = LONG_IO_TIMEOUT_MILLIS,
+    )
 }
+
+suspend fun setHiddenPathAutoLoad(enabled: Boolean): ToolCommandResult = runStructuredKsudCommand(
+    area = "pathmask",
+    command = "pathmask set-auto-load $enabled",
+)
+
+suspend fun unloadHiddenPathKernelPaths(): ToolCommandResult = runStructuredKsudCommand(
+    area = "pathmask",
+    command = "pathmask unload",
+)
+
+suspend fun deleteHiddenPathConfig(): ToolCommandResult = runStructuredKsudCommand(
+    area = "pathmask",
+    command = "pathmask delete-config",
+)
+
+suspend fun getHiddenPathDiagnostics(): String = getKsudTextOutput(
+    command = "pathmask diagnostics",
+    timeoutMillis = DIAGNOSTIC_TIMEOUT_MILLIS,
+)
 
 fun normalizeSusfsPath(raw: String): String? {
     val trimmed = raw.trim()
@@ -1679,13 +1838,10 @@ suspend fun getHiddenPathLogs(): String = withContext(Dispatchers.IO) {
     }
 }
 
-fun clearHiddenPathLogs(): Boolean {
-    return execKsud("pathmask clear-logs", true)
-}
-
-fun unloadHiddenPathKernelPaths(): Boolean {
-    return execKsud("pathmask unload", true)
-}
+suspend fun clearHiddenPathLogs(): ToolCommandResult = runStructuredKsudCommand(
+    area = "pathmask",
+    command = "pathmask clear-logs",
+)
 
 suspend fun testHiddenPathVisibility(uid: Int, path: String): HiddenPathVisibilityResult =
     withContext(Dispatchers.IO) {
@@ -1743,13 +1899,16 @@ suspend fun testHiddenPathVisibility(uid: Int, path: String): HiddenPathVisibili
 
 suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext RescueStatus(statusError = "ksud command unavailable")
+        return@withContext RescueStatus(
+            statusErrorCode = "rescue.root_unavailable",
+            statusError = "ksud command unavailable",
+        )
     }
 
     runCatching {
         val stdout = ArrayList<String>()
         val stderr = ArrayList<String>()
-        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS) {
+        val result = withTimeoutOrNull(STATUS_TIMEOUT_MILLIS) {
             getRootShell().newJob()
                 .add("${getKsuDaemonPath()} rescue status")
                 .to(stdout, stderr)
@@ -1759,24 +1918,35 @@ suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
         if (result == null) {
             Log.w(TAG, "rescue status timed out")
             KsuCli.reset()
-            return@runCatching RescueStatus(statusError = "rescue status timed out")
+            return@runCatching RescueStatus(
+                statusErrorCode = "rescue.timeout",
+                statusError = "rescue status timed out",
+            )
         }
 
         if (!result.isSuccess) {
             val error = stderr.joinToString("\n").ifBlank { "rescue status command failed" }
             Log.w(TAG, "rescue status failed: $error")
-            return@runCatching RescueStatus(statusError = error)
+            val structured = parseStructuredKsudError(error, "rescue.status_failed")
+            return@runCatching RescueStatus(
+                statusErrorCode = structured.errorCode,
+                statusError = structured.errorMessage,
+            )
         }
 
         val obj = JSONObject(stdout.joinToString("\n"))
         val manifest = obj.optJSONObject("manifest")
         val device = obj.optJSONObject("device")
+        val manifestDevice = manifest?.optJSONObject("device")
+        val images = obj.optJSONArray("images").toRescueImageList()
         RescueStatus(
             available = obj.optBoolean("statusOk", true),
+            phase = obj.optString("phase", "unavailable"),
+            statusErrorCode = obj.optString("statusErrorCode", ""),
             statusError = obj.optString("statusError", ""),
             enabled = obj.optBoolean("enabled", false),
             config = obj.optJSONObject("config").toRescueConfigState(),
-            images = obj.optJSONArray("images").toRescueImageList(),
+            images = images,
             bootCount = obj.optInt("bootCount", 0),
             autoRestoreAttempts = obj.optInt("autoRestoreAttempts", 0),
             pendingBoot = obj.optBoolean("pendingBoot", false),
@@ -1786,72 +1956,54 @@ suspend fun getRescueStatus(): RescueStatus = withContext(Dispatchers.IO) {
                 device?.optString("brand", "").orEmpty(),
                 device?.optString("model", "").orEmpty(),
             ).filter(String::isNotBlank).joinToString(" "),
+            deviceFingerprint = device?.optString("fingerprint", "").orEmpty(),
             manifestCreatedAt = manifest?.optString("createdAt", "").orEmpty(),
+            manifestSlot = manifest?.optString("slot", "").orEmpty(),
+            manifestDevice = listOf(
+                manifestDevice?.optString("brand", "").orEmpty(),
+                manifestDevice?.optString("model", "").orEmpty(),
+                manifestDevice?.optString("device", "").orEmpty(),
+            ).filter(String::isNotBlank).distinct().joinToString(" "),
+            manifestFingerprint = manifestDevice?.optString("fingerprint", "").orEmpty(),
+            manifestTotalSize = images.filter(RescueImageState::exists).sumOf(RescueImageState::size),
             lastRestoreDone = obj.optBoolean("lastRestoreDone", false),
+            skipModulesOnce = obj.optBoolean("skipModulesOnce", false),
+            skipModulesThisBoot = obj.optBoolean("skipModulesThisBoot", false),
             ready = obj.optBoolean("ready", false),
             readyReason = obj.optString("readyReason", ""),
+            verified = obj.optBoolean("verified", false),
+            environmentChecked = obj.optBoolean("environmentChecked", false),
+            configChangedProtectionDisabled = obj.optBoolean("configChangedProtectionDisabled", false),
+            restoreInterrupted = obj.optBoolean("restoreInterrupted", false),
+            restoreTransactionError = obj.optString("restoreTransactionError", ""),
+            restoreTransaction = obj.optJSONObject("restoreTransaction").toRescueRestoreTransaction(),
+            rescueDisabledModules = obj.optJSONArray("rescueDisabledModules").toRescueDisabledModules(),
             log = obj.optString("log", ""),
         )
     }.getOrElse {
         Log.w(TAG, "rescue status unavailable", it)
         KsuCli.reset()
-        RescueStatus(statusError = it.message.orEmpty().ifBlank { "rescue status unavailable" })
+        RescueStatus(
+            statusErrorCode = "rescue.status_unavailable",
+            statusError = it.message.orEmpty().ifBlank { "rescue status unavailable" },
+        )
     }
 }
 
-suspend fun runRescueCommand(command: String, timeoutMultiplier: Long = 6): Boolean = withContext(Dispatchers.IO) {
-    if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext false
-    }
+suspend fun runRescueCommand(
+    command: String,
+    timeoutMultiplier: Long = 6,
+): ToolCommandResult = runStructuredKsudCommand(
+    area = "rescue",
+    command = "rescue $command",
+    timeoutMillis = SHELL_JOB_TIMEOUT_MILLIS * timeoutMultiplier.coerceAtLeast(1),
+)
 
-    runCatching {
-        val stdout = ArrayList<String>()
-        val stderr = ArrayList<String>()
-        val result = withTimeoutOrNull(SHELL_JOB_TIMEOUT_MILLIS * timeoutMultiplier) {
-            getRootShell().newJob()
-                .add("${getKsuDaemonPath()} rescue $command")
-                .to(stdout, stderr)
-                .exec()
-        }
-
-        if (result == null) {
-            Log.w(TAG, "rescue $command timed out")
-            KsuCli.reset()
-            return@runCatching false
-        }
-
-        if (!result.isSuccess) {
-            Log.w(TAG, "rescue $command failed: ${stderr.joinToString("\n")}")
-        }
-        result.isSuccess
-    }.getOrElse {
-        Log.w(TAG, "rescue $command unavailable", it)
-        KsuCli.reset()
-        false
-    }
-}
-
-suspend fun saveRescueConfig(config: RescueConfigState): Boolean = withContext(Dispatchers.IO) {
-    if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext false
-    }
-
-    runCatching {
-        val stderr = ArrayList<String>()
-        val result = getRootShell().newJob()
-            .add("${getKsuDaemonPath()} rescue import-config-json ${shellQuote(config.toConfigJson())}")
-            .to(null, stderr)
-            .exec()
-        if (!result.isSuccess) {
-            Log.w(TAG, "rescue config save failed: ${stderr.joinToString("\n")}")
-        }
-        result.isSuccess
-    }.getOrElse {
-        Log.w(TAG, "rescue config save unavailable", it)
-        KsuCli.reset()
-        false
-    }
-}
+suspend fun saveRescueConfig(config: RescueConfigState): ToolCommandResult = runStructuredKsudCommand(
+    area = "rescue",
+    command = "rescue import-config-json ${shellQuote(config.toConfigJson())}",
+    timeoutMillis = STATUS_TIMEOUT_MILLIS,
+)
 
 suspend fun importRescueImage(partition: String, sourcePath: String, force: Boolean): Boolean = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
@@ -1894,16 +2046,28 @@ suspend fun testRescueEnvironment(): RescueTestReport = withContext(Dispatchers.
     runCatching {
         val stdout = ArrayList<String>()
         val stderr = ArrayList<String>()
-        val result = getRootShell().newJob()
-            .add("${getKsuDaemonPath()} rescue test")
-            .to(stdout, stderr)
-            .exec()
+        val result = withTimeoutOrNull(STATUS_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${shellQuote(getKsuDaemonPath())} rescue test")
+                .to(stdout, stderr)
+                .exec()
+        }
+        if (result == null) {
+            KsuCli.reset()
+            return@runCatching RescueTestReport(
+                errorCode = "rescue.timeout",
+                reason = "rescue environment check timed out",
+            )
+        }
         val raw = stdout.joinToString("\n")
         val obj = JSONObject(raw)
         RescueTestReport(
             ok = result.isSuccess && obj.optBoolean("ok", false),
+            errorCode = obj.optString("errorCode", ""),
             reason = obj.optString("reason", stderr.joinToString("\n")),
             text = raw,
+            backupReady = obj.optBoolean("backupReady", false),
+            backupReason = obj.optString("backupReason", ""),
         )
     }.getOrElse {
         Log.w(TAG, "rescue test unavailable", it)
@@ -1912,20 +2076,62 @@ suspend fun testRescueEnvironment(): RescueTestReport = withContext(Dispatchers.
     }
 }
 
-suspend fun getRescueLogs(): String = withContext(Dispatchers.IO) {
+suspend fun verifyRescueBackups(): RescueTestReport = withContext(Dispatchers.IO) {
     if (shouldSkipUnsafeKsudCommand()) {
-        return@withContext ""
+        return@withContext RescueTestReport(
+            errorCode = "rescue.root_unavailable",
+            reason = "ksud command unavailable",
+        )
     }
-
     runCatching {
         val stdout = ArrayList<String>()
-        getRootShell().newJob()
-            .add("${getKsuDaemonPath()} rescue logs")
-            .to(stdout, null)
-            .exec()
-        stdout.joinToString("\n")
-    }.getOrDefault("")
+        val stderr = ArrayList<String>()
+        val result = withTimeoutOrNull(LONG_IO_TIMEOUT_MILLIS) {
+            getRootShell().newJob()
+                .add("${shellQuote(getKsuDaemonPath())} rescue verify")
+                .to(stdout, stderr)
+                .exec()
+        }
+        if (result == null) {
+            KsuCli.reset()
+            return@runCatching RescueTestReport(
+                errorCode = "rescue.timeout",
+                reason = "rescue verification timed out",
+            )
+        }
+        val raw = stdout.joinToString("\n")
+        val obj = runCatching { JSONObject(raw) }.getOrNull()
+        RescueTestReport(
+            ok = result.isSuccess && obj?.optBoolean("ok", false) == true,
+            errorCode = obj?.optString("errorCode", "").orEmpty(),
+            reason = obj?.optString("reason", stderr.joinToString("\n")).orEmpty(),
+            text = raw.ifBlank { stderr.joinToString("\n") },
+        )
+    }.getOrElse { error ->
+        Log.w(TAG, "rescue verification unavailable", error)
+        KsuCli.reset()
+        RescueTestReport(
+            errorCode = "rescue.unavailable",
+            reason = error.message.orEmpty(),
+        )
+    }
 }
+
+suspend fun getRescueLogs(): String = getKsudTextOutput(
+    command = "rescue logs",
+    timeoutMillis = DIAGNOSTIC_TIMEOUT_MILLIS,
+)
+
+suspend fun getRescueDiagnostics(): String = getKsudTextOutput(
+    command = "rescue diagnostics",
+    timeoutMillis = DIAGNOSTIC_TIMEOUT_MILLIS,
+)
+
+suspend fun enableRescueModule(id: String): ToolCommandResult = runStructuredKsudCommand(
+    area = "rescue",
+    command = "rescue enable-module ${shellQuote(id)}",
+    timeoutMillis = STATUS_TIMEOUT_MILLIS,
+)
 
 fun isHiddenPathLkmMode(): Boolean {
     return runCatching {
@@ -3115,7 +3321,63 @@ private fun JSONObject?.toRescueImageState(): RescueImageState {
         sizeOk = optBoolean("sizeOk", true),
         otherSlot = optBoolean("otherSlot", false),
         restore = optBoolean("restore", true),
+        dangerous = optBoolean("dangerous", false),
+        verificationState = optString("verificationState", "unknown"),
     )
+}
+
+private fun JSONObject?.toRescueRestoreTransaction(): RescueRestoreTransaction? {
+    if (this == null) return null
+    val entriesJson = optJSONArray("entries")
+    val entries = buildList {
+        if (entriesJson != null) {
+            for (index in 0 until entriesJson.length()) {
+                val entry = entriesJson.optJSONObject(index) ?: continue
+                add(
+                    RescueRestoreEntry(
+                        name = entry.optString("name", ""),
+                        label = entry.optString("label", ""),
+                        imagePath = entry.optString("imagePath", ""),
+                        devicePath = entry.optString("devicePath", ""),
+                        expectedSha256 = entry.optString("expectedSha256", ""),
+                        expectedSize = entry.optLong("expectedSize", 0),
+                        status = entry.optString("status", ""),
+                    )
+                )
+            }
+        }
+    }
+    return RescueRestoreTransaction(
+        id = optString("id", ""),
+        reason = optString("reason", ""),
+        automatic = optBoolean("automatic", false),
+        description = optString("description", ""),
+        activateSlot = optString("activateSlot", ""),
+        phase = optString("phase", ""),
+        errorCode = optString("errorCode", ""),
+        errorMessage = optString("errorMessage", ""),
+        startedAt = optString("startedAt", ""),
+        updatedAt = optString("updatedAt", ""),
+        entries = entries,
+    )
+}
+
+private fun JSONArray?.toRescueDisabledModules(): List<RescueDisabledModule> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            val module = optJSONObject(index) ?: continue
+            add(
+                RescueDisabledModule(
+                    id = module.optString("id", ""),
+                    name = module.optString("name", ""),
+                    version = module.optString("version", ""),
+                    installed = module.optBoolean("installed", false),
+                    disabled = module.optBoolean("disabled", false),
+                )
+            )
+        }
+    }
 }
 
 private fun JSONObject?.toRescueConfigState(): RescueConfigState {

@@ -27,6 +27,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
+import me.weishu.kernelsu.ui.component.ApkeStatus
+import me.weishu.kernelsu.ui.component.ApkeStatusTone
 import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedRadioItem
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
@@ -47,30 +50,14 @@ fun LanguageSettingsScreen() {
     var selectedLanguage by remember(context) {
         mutableStateOf(AppLanguageManager.getSelectedLanguage(context))
     }
+    var saveError by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        popupHost = { },
-        contentWindowInsets = WindowInsets.systemBars
-            .add(WindowInsets.displayCutout)
-            .only(WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = stringResource(R.string.settings_language),
-                color = Color.Transparent,
-                titleColor = MiuixTheme.colorScheme.onSurface,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            tint = MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    ApkeSecondaryScaffold(
+        title = stringResource(R.string.settings_language),
+        onBack = onBack,
+        status = saveError?.let { ApkeStatus(it, ApkeStatusTone.Error) },
+        maxContentWidth = 680.dp,
+    ) { innerPadding, _ ->
         SegmentedColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,13 +75,10 @@ fun LanguageSettingsScreen() {
                         onClick = {
                             if (selected) return@SegmentedRadioItem
                             if (!AppLanguageManager.setSelectedLanguage(context, language.languageTag)) {
-                                Toast.makeText(
-                                    context,
-                                    saveFailedMessage,
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                                saveError = saveFailedMessage
                                 return@SegmentedRadioItem
                             }
+                            saveError = null
                             selectedLanguage = language
                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                                 activity?.recreate()

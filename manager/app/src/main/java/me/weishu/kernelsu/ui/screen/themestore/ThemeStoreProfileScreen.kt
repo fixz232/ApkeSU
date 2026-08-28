@@ -254,7 +254,7 @@ fun ThemeStoreMyScreen(
                         MiuixIconButton(onClick = onBack) {
                             MiuixIcon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.close),
+                                contentDescription = stringResource(R.string.back),
                                 tint = colorScheme.onBackground,
                             )
                         }
@@ -697,7 +697,7 @@ private fun ThemeStoreProfileBackButton(onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = stringResource(R.string.close),
+            contentDescription = stringResource(R.string.back),
             tint = Color.White,
         )
     }

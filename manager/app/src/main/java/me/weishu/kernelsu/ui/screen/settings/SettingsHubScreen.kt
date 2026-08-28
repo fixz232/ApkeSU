@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
@@ -102,8 +103,11 @@ fun SettingsHubScreen(
     onOpenCategory: (SettingsCategory) -> Unit,
     onPageModeChange: (SettingsPageMode) -> Unit,
 ) {
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
@@ -128,6 +132,7 @@ fun SettingsHubScreen(
                         MaterialTheme.colorScheme.surface,
                     ),
                 ),
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { innerPadding ->
@@ -146,6 +151,7 @@ fun SettingsHubScreen(
                 SettingsCategoryCard(
                     category = category,
                     status = categoryStatus(category, uiState),
+                    itemCount = SettingsCatalog.visibleEntryCount(category, uiState),
                     onClick = { onOpenCategory(category) },
                     modifier = Modifier
                         .widthIn(max = 760.dp)
@@ -160,6 +166,7 @@ fun SettingsHubScreen(
 private fun SettingsCategoryCard(
     category: SettingsCategory,
     status: String?,
+    itemCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -176,7 +183,7 @@ private fun SettingsCategoryCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 66.dp)
+                .heightIn(min = 60.dp)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -212,10 +219,16 @@ private fun SettingsCategoryCard(
                         text = status ?: stringResource(category.summaryRes),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Text(
+                    text = stringResource(R.string.settings_section_item_count, itemCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                     contentDescription = null,

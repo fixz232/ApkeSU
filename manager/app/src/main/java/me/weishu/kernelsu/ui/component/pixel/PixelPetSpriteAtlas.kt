@@ -1338,15 +1338,20 @@ internal fun pixelPetIntegerScale(
 ): Int =
     (unit * 10.8f).let { targetWidth ->
         require(sourceWidth > 0)
-        // A native 48x48 cel must not round up to two physical pixels per
-        // source pixel unless the available stage is actually wide enough.
-        // Smaller atlases retain the established readable up-scaling policy.
-        if (sourceWidth >= 48) {
+        if (targetWidth < 48f) {
             floor(targetWidth / sourceWidth).toInt()
-        } else if (targetWidth >= 48f) {
-            kotlin.math.ceil(targetWidth / sourceWidth).toInt()
         } else {
-            floor(targetWidth / sourceWidth).toInt()
+            // Calibrate every growth canvas against the advanced 48px artboard.
+            // This prevents a 32px young pet from rounding up to a larger
+            // on-screen silhouette than its 48px advanced form.
+            val advancedScale = floor(targetWidth / 48f).toInt().coerceAtLeast(1)
+            val advancedVisibleSpan = advancedScale * 46f
+            val authoredVisibleSpan = when {
+                sourceWidth <= 16 -> 14f
+                sourceWidth <= 32 -> 30f
+                else -> 46f
+            }
+            (advancedVisibleSpan / authoredVisibleSpan).roundToInt()
         }
     }.coerceAtLeast(1)
 
@@ -1391,104 +1396,11 @@ private data class PixelPetBitmapKey(
     val cream: Int,
     val highlight: Int,
     val accent: Int,
+    val accentSecondary: Int,
     val reflection: Int,
+    val detail: Int,
     val eye: Int,
 )
-
-private const val PIXEL_PET_OUTLINE = 'o'
-private val PIXEL_PET_NEIGHBOUR_OFFSETS = listOf(
-    -1 to -1,
-    0 to -1,
-    1 to -1,
-    -1 to 0,
-    1 to 0,
-    -1 to 1,
-    0 to 1,
-    1 to 1,
-)
-
-private fun isPixelPetBodyValue(value: Char): Boolean = value in setOf(
-    'b',
-    's',
-    'c',
-    'h',
-    'a',
-    'm',
-    'r',
-)
-
-/**
- * Removes only the outer contour of an authored frame. Interior outline
- * pixels remain intact, while replaced edge pixels borrow the nearest body
- * colour so the silhouette keeps its original footprint without a dark rim.
- */
-internal fun pixelPetCellsWithoutOuterOutline(frame: PixelPetSpriteFrame): List<PixelPetSpriteCell> {
-    val values = Array(frame.height) { CharArray(frame.width) }
-    frame.cells.forEach { cell ->
-        if (cell.x in 0 until frame.width && cell.y in 0 until frame.height) {
-            values[cell.y][cell.x] = cell.value
-        }
-    }
-    val outside = Array(frame.height) { BooleanArray(frame.width) }
-    val queue = ArrayDeque<Pair<Int, Int>>()
-    fun enqueueIfOutside(x: Int, y: Int) {
-        if (x !in 0 until frame.width || y !in 0 until frame.height) return
-        if (values[y][x] == '\u0000' || values[y][x] == ' ') {
-            if (!outside[y][x]) {
-                outside[y][x] = true
-                queue += x to y
-            }
-        }
-    }
-    for (x in 0 until frame.width) {
-        enqueueIfOutside(x, 0)
-        enqueueIfOutside(x, frame.height - 1)
-    }
-    for (y in 0 until frame.height) {
-        enqueueIfOutside(0, y)
-        enqueueIfOutside(frame.width - 1, y)
-    }
-    while (queue.isNotEmpty()) {
-        val (x, y) = queue.removeFirst()
-        PIXEL_PET_NEIGHBOUR_OFFSETS.forEach { (dx, dy) ->
-            enqueueIfOutside(x + dx, y + dy)
-        }
-    }
-
-    fun isOuterOutline(cell: PixelPetSpriteCell): Boolean =
-        cell.value == PIXEL_PET_OUTLINE && PIXEL_PET_NEIGHBOUR_OFFSETS.any { (dx, dy) ->
-            val x = cell.x + dx
-            val y = cell.y + dy
-            x !in 0 until frame.width || y !in 0 until frame.height || outside[y][x]
-        }
-
-    fun nearestBodyValue(cell: PixelPetSpriteCell): Char? {
-        val maxRadius = max(frame.width, frame.height)
-        for (radius in 1..maxRadius) {
-            for (dy in -radius..radius) {
-                for (dx in -radius..radius) {
-                    if (max(abs(dx), abs(dy)) != radius) continue
-                    val x = cell.x + dx
-                    val y = cell.y + dy
-                    if (x !in 0 until frame.width || y !in 0 until frame.height) continue
-                    val value = values[y][x]
-                    if (isPixelPetBodyValue(value)) {
-                        return value
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    return frame.cells.mapNotNull { cell ->
-        if (!isOuterOutline(cell)) {
-            cell
-        } else {
-            nearestBodyValue(cell)?.let { replacement -> cell.copy(value = replacement) }
-        }
-    }
-}
 
 private object PixelPetSpriteBitmapCache {
     private const val MAX_BITMAP_BYTES = 2 * 1024 * 1024
@@ -1508,22 +1420,26 @@ private object PixelPetSpriteBitmapCache {
             cream = colors.cream.toArgb(),
             highlight = colors.highlight.toArgb(),
             accent = colors.accent.toArgb(),
+            accentSecondary = colors.accentSecondary.toArgb(),
             reflection = colors.reflection.toArgb(),
+            detail = colors.detail.toArgb(),
             eye = colors.eye.toArgb(),
         )
         synchronized(cache) {
             cache.get(key)?.let { return it }
             val pixels = IntArray(frame.width * frame.height)
-            pixelPetCellsWithoutOuterOutline(frame).forEach { cell ->
+            frame.cells.forEach { cell ->
                 pixels[cell.y * frame.width + cell.x] = when (cell.value) {
-                    PIXEL_PET_OUTLINE -> key.outline
+                    'o' -> key.outline
                     'b' -> key.base
                     's' -> key.shade
                     'c' -> key.cream
                     'h' -> key.highlight
-                    'a', 'm' -> key.accent
+                    'a' -> key.accent
+                    'm' -> key.accentSecondary
                     'r' -> key.reflection
-                    'e', 'x' -> key.eye
+                    'e' -> key.detail
+                    'x' -> key.eye
                     else -> Color.Transparent.toArgb()
                 }
             }

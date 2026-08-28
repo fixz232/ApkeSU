@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -155,7 +156,7 @@ fun InstallCardWallpaperScreen() {
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },
@@ -197,14 +198,31 @@ private fun InstallCardWallpaperContent(modifier: Modifier) {
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
-        installCardWallpaperSpecs.forEach { spec ->
-            InstallCardWallpaperItem(
-                spec = spec,
-                showCrop = cropTarget == spec.slot.id,
-                onShowCropChange = { show -> cropTarget = spec.slot.id.takeIf { show } },
-                showPreview = previewTarget == spec.slot.id,
-                onShowPreviewChange = { show -> previewTarget = spec.slot.id.takeIf { show } },
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth >= 720.dp) 2 else 1
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                installCardWallpaperSpecs.chunked(columns).forEach { specs ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        specs.forEach { spec ->
+                            InstallCardWallpaperItem(
+                                spec = spec,
+                                showCrop = cropTarget == spec.slot.id,
+                                onShowCropChange = { show -> cropTarget = spec.slot.id.takeIf { show } },
+                                showPreview = previewTarget == spec.slot.id,
+                                onShowPreviewChange = { show -> previewTarget = spec.slot.id.takeIf { show } },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - specs.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
         Spacer(modifier = Modifier.size(12.dp))
     }
@@ -221,6 +239,7 @@ private fun InstallCardWallpaperItem(
     onShowCropChange: (Boolean) -> Unit,
     showPreview: Boolean,
     onShowPreviewChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -300,8 +319,8 @@ private fun InstallCardWallpaperItem(
     }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f),
     ) {
         Column(

@@ -99,7 +99,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
+import me.weishu.kernelsu.ui.component.ApkeUiTokens
 import me.weishu.kernelsu.ui.component.ink.InkStyle
+import me.weishu.kernelsu.ui.component.pixel.PixelStyle
+import me.weishu.kernelsu.ui.component.rain.RainStyle
+import me.weishu.kernelsu.ui.component.snow.SeasonStyle
 import me.weishu.kernelsu.ui.component.ink.inkMiuixCardSurface
 import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
@@ -148,9 +153,16 @@ fun SettingsCategoryScreen(routeValue: String) {
                     viewModel.setUiMode(if (useDelta) InterfaceStyle.Delta.value else InterfaceStyle.Alpha.value)
                 },
                 onSetMiuixClassicHomeLayout = viewModel::setMiuixClassicHomeLayoutEnabled,
+                onSetSeasonStyle = viewModel::setSeasonStyleIndex,
+                onSetSeasonCardMotion = viewModel::setSeasonCardMotionEnabled,
+                onSetRainStyle = viewModel::setRainStyleIndex,
+                onSetRainCardMotion = viewModel::setRainCardMotionEnabled,
                 onSetDayNightMode = viewModel::setDayNightMode,
                 onSetInkStyle = viewModel::setInkStyleIndex,
                 onSetInkFontEnabled = viewModel::setInkFontEnabled,
+                onSetInkCardMotion = viewModel::setInkCardMotionEnabled,
+                onSetPixelStyle = viewModel::setPixelStyleIndex,
+                onSetPixelCardMotion = viewModel::setPixelCardMotionEnabled,
                 onOpen = navigator::push,
             )
             SettingsCategory.HomeAndManager -> HomeManagerSettingsContent(
@@ -169,6 +181,7 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onSetSulog = viewModel::setSulogEnabled,
                 onSetAdbRoot = viewModel::setAdbRootEnabled,
                 onSetAvcSpoof = viewModel::setAvcSpoofEnabled,
+                onSetUseSoftReboot = viewModel::setUseSoftReboot,
                 onOpen = navigator::push,
             )
             SettingsCategory.MountAndHide -> MountHideSettingsContent(
@@ -199,10 +212,9 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onOpen = navigator::push,
             )
             SettingsCategory.Toolbox -> ToolboxSettingsContent(
+                uiState = uiState,
                 onOpen = navigator::push,
-                kpmSupported = uiState.isKPatchNextEnabled &&
-                    !uiState.isKPatchNextPendingRemove &&
-                    !uiState.isLateLoadMode,
+                onSetGraphicsRendererEnabled = viewModel::setGraphicsRendererFeatureEnabled,
             )
             SettingsCategory.AppAndMaintenance -> AppMaintenanceSettingsContent(
                 uiState = uiState,
@@ -211,7 +223,6 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onSetGkiWarning = viewModel::setShowGkiWarning,
                 onSetWebDebugging = viewModel::setEnableWebDebugging,
                 onSetAutoJailbreak = viewModel::setAutoJailbreak,
-                onSetUseSoftReboot = viewModel::setUseSoftReboot,
                 onSendLog = { showSendLogDialog = true },
                 onUninstall = { showUninstallDialog = true },
                 onOpen = navigator::push,
@@ -243,37 +254,11 @@ private fun SettingsCategoryScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(category.titleRes),
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = immersiveScrolledTopBarColor(
-                        MaterialTheme.colorScheme.surface,
-                    ),
-                ),
-            )
-        },
-    ) { innerPadding ->
+    ApkeSecondaryScaffold(
+        title = stringResource(category.titleRes),
+        onBack = onBack,
+        maxContentWidth = 680.dp,
+    ) { innerPadding, _ ->
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopCenter,
@@ -285,71 +270,15 @@ private fun SettingsCategoryScaffold(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(
-                        start = 14.dp,
+                        start = ApkeUiTokens.PageHorizontalPadding,
                         top = innerPadding.calculateTopPadding() + 4.dp,
-                        end = 14.dp,
+                        end = ApkeUiTokens.PageHorizontalPadding,
                         bottom = bottomPadding + 18.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SettingsCategoryHeader(category)
                 content()
             }
-        }
-    }
-}
-
-@Composable
-private fun SettingsCategoryHeader(category: SettingsCategory) {
-    val shape = RoundedCornerShape(8.dp)
-    val accent = categoryAccent(category)
-    val isInk = isInkInterfaceStyle()
-    val containerColor = when {
-        isInk -> Color.Transparent
-        LocalImmersiveBackgroundActive.current -> immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow)
-        else -> accent.copy(alpha = 0.11f)
-    }
-    Surface(
-        color = containerColor,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = shape,
-        modifier = Modifier
-            .fillMaxWidth()
-            .inkMiuixCardSurface(shape = shape),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-                Surface(
-                    color = accent.copy(alpha = 0.18f),
-                    contentColor = accent,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                        Icon(category.icon(), contentDescription = null, modifier = Modifier.size(21.dp))
-                    }
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
-                    Text(
-                        text = stringResource(category.titleRes),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = stringResource(category.summaryRes),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
         }
     }
 }
@@ -360,9 +289,16 @@ private fun AppearanceSettingsContent(
     onSetUiMode: (Int) -> Unit,
     onSetAlphaDeltaMode: (Boolean) -> Unit,
     onSetMiuixClassicHomeLayout: (Boolean) -> Unit,
+    onSetSeasonStyle: (Int) -> Unit,
+    onSetSeasonCardMotion: (Boolean) -> Unit,
+    onSetRainStyle: (Int) -> Unit,
+    onSetRainCardMotion: (Boolean) -> Unit,
     onSetDayNightMode: (Boolean) -> Unit,
     onSetInkStyle: (Int) -> Unit,
     onSetInkFontEnabled: (Boolean) -> Unit,
+    onSetInkCardMotion: (Boolean) -> Unit,
+    onSetPixelStyle: (Int) -> Unit,
+    onSetPixelCardMotion: (Boolean) -> Unit,
     onOpen: (Route) -> Unit,
 ) {
     val styles = InterfaceStyle.selectableEntries
@@ -416,6 +352,74 @@ private fun AppearanceSettingsContent(
                 icon = Icons.Rounded.TextFields,
                 checked = uiState.inkFontEnabled,
                 onCheckedChange = onSetInkFontEnabled,
+            )
+            SettingsDivider()
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_ink_card_motion),
+                summary = stringResource(R.string.settings_ink_card_motion_summary),
+                icon = Icons.Rounded.AutoFixHigh,
+                checked = uiState.inkCardMotionEnabled,
+                onCheckedChange = onSetInkCardMotion,
+            )
+        }
+        if (uiState.uiMode == InterfaceStyle.Snow.value) {
+            SettingsDivider()
+            val selected = SeasonStyle.fromValue(uiState.seasonStyle)
+            SettingsChoiceRow(
+                title = stringResource(R.string.settings_season_style),
+                summary = stringResource(selected.summaryRes),
+                icon = Icons.Rounded.Palette,
+                options = SeasonStyle.entries.map { stringResource(it.labelRes) },
+                selectedIndex = SeasonStyle.selectedIndex(uiState.seasonStyle),
+                onSelected = onSetSeasonStyle,
+            )
+            SettingsDivider()
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_season_card_motion),
+                summary = stringResource(R.string.settings_season_card_motion_summary),
+                icon = Icons.Rounded.AutoFixHigh,
+                checked = uiState.seasonCardMotionEnabled,
+                onCheckedChange = onSetSeasonCardMotion,
+            )
+        }
+        if (uiState.uiMode == InterfaceStyle.Rain.value) {
+            SettingsDivider()
+            val selected = RainStyle.fromValue(uiState.rainStyle)
+            SettingsChoiceRow(
+                title = stringResource(R.string.settings_rain_style),
+                summary = stringResource(selected.summaryRes),
+                icon = Icons.Rounded.Palette,
+                options = RainStyle.entries.map { stringResource(it.labelRes) },
+                selectedIndex = RainStyle.selectedIndex(uiState.rainStyle),
+                onSelected = onSetRainStyle,
+            )
+            SettingsDivider()
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_rain_card_motion),
+                summary = stringResource(R.string.settings_rain_card_motion_summary),
+                icon = Icons.Rounded.AutoFixHigh,
+                checked = uiState.rainCardMotionEnabled,
+                onCheckedChange = onSetRainCardMotion,
+            )
+        }
+        if (uiState.uiMode == InterfaceStyle.Pixel.value) {
+            SettingsDivider()
+            val selected = PixelStyle.fromValue(uiState.pixelStyle)
+            SettingsChoiceRow(
+                title = stringResource(R.string.settings_pixel_style),
+                summary = stringResource(selected.summaryRes),
+                icon = Icons.Rounded.Palette,
+                options = PixelStyle.entries.map { stringResource(it.labelRes) },
+                selectedIndex = PixelStyle.selectedIndex(uiState.pixelStyle),
+                onSelected = onSetPixelStyle,
+            )
+            SettingsDivider()
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_pixel_card_motion),
+                summary = stringResource(R.string.settings_pixel_card_motion_summary),
+                icon = Icons.Rounded.AutoFixHigh,
+                checked = uiState.pixelCardMotionEnabled,
+                onCheckedChange = onSetPixelCardMotion,
             )
         }
         SettingsDivider()
@@ -514,6 +518,7 @@ private fun RootPermissionSettingsContent(
     onSetSulog: (Boolean) -> Unit,
     onSetAdbRoot: (Boolean) -> Unit,
     onSetAvcSpoof: (Boolean) -> Unit,
+    onSetUseSoftReboot: (Boolean) -> Unit,
     onOpen: (Route) -> Unit,
 ) {
     SettingsGroup(stringResource(R.string.settings_group_app_profiles)) {
@@ -600,6 +605,15 @@ private fun RootPermissionSettingsContent(
             checked = uiState.isAvcSpoofEnabled,
             onCheckedChange = onSetAvcSpoof,
         )
+        SettingsDivider()
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_soft_reboot),
+            summary = stringResource(R.string.settings_soft_reboot_summary),
+            icon = Icons.Rounded.ElectricalServices,
+            enabled = !uiState.isLateLoadMode,
+            checked = uiState.isLateLoadMode || uiState.useSoftReboot,
+            onCheckedChange = onSetUseSoftReboot,
+        )
     }
 }
 
@@ -639,22 +653,20 @@ private fun MountHideSettingsContent(
             checked = uiState.isKPatchNextSwitchChecked,
             onCheckedChange = onSetKPatchNext,
         )
-        if (uiState.isKPatchNextEnabled || uiState.canOpenKPatchNextWebUi) {
-            SettingsDivider()
-            SettingsActionRow(
-                title = stringResource(R.string.settings_kpatch_next_webui),
-                summary = stringResource(
-                    if (uiState.canOpenKPatchNextWebUi) {
-                        R.string.settings_kpatch_next_webui_summary
-                    } else {
-                        R.string.settings_kpatch_next_webui_disabled_summary
-                    }
-                ),
-                icon = Icons.Rounded.Apps,
-                enabled = uiState.canOpenKPatchNextWebUi,
-                onClick = onOpenKPatchNextWebUi,
-            )
-        }
+        SettingsDivider()
+        SettingsActionRow(
+            title = stringResource(R.string.settings_kpatch_next_webui),
+            summary = stringResource(
+                if (uiState.canOpenKPatchNextWebUi) {
+                    R.string.settings_kpatch_next_webui_summary
+                } else {
+                    R.string.settings_kpatch_next_webui_disabled_summary
+                }
+            ),
+            icon = Icons.Rounded.Apps,
+            enabled = uiState.canOpenKPatchNextWebUi,
+            onClick = onOpenKPatchNextWebUi,
+        )
     }
     SettingsGroup(stringResource(R.string.settings_group_hiding)) {
         SettingsActionRow(
@@ -677,8 +689,9 @@ private fun MountHideSettingsContent(
 
 @Composable
 private fun ToolboxSettingsContent(
+    uiState: SettingsUiState,
     onOpen: (Route) -> Unit,
-    kpmSupported: Boolean,
+    onSetGraphicsRendererEnabled: (Boolean) -> Unit,
 ) {
     SettingsGroup(stringResource(R.string.settings_toolbox_group_recovery)) {
         SettingsActionRow(
@@ -710,13 +723,23 @@ private fun ToolboxSettingsContent(
             onClick = { onOpen(Route.DeviceIdentity) },
         )
         SettingsDivider()
-        SettingsActionRow(
-            title = stringResource(R.string.settings_graphics_renderer),
-            summary = stringResource(R.string.settings_graphics_renderer_summary),
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_graphics_renderer_tool),
+            summary = stringResource(R.string.settings_graphics_renderer_tool_summary),
             icon = Icons.Rounded.Tune,
-            onClick = { onOpen(Route.GraphicsRenderer) },
+            checked = uiState.graphicsRendererFeatureEnabled,
+            onCheckedChange = onSetGraphicsRendererEnabled,
         )
-        if (kpmSupported) {
+        if (uiState.graphicsRendererFeatureEnabled) {
+            SettingsDivider()
+            SettingsActionRow(
+                title = stringResource(R.string.settings_graphics_renderer),
+                summary = stringResource(R.string.settings_graphics_renderer_summary),
+                icon = Icons.Rounded.Tune,
+                onClick = { onOpen(Route.GraphicsRenderer) },
+            )
+        }
+        if (uiState.isKpmSettingsEntryVisible) {
             SettingsDivider()
             SettingsActionRow(
                 title = stringResource(R.string.kpm_title),
@@ -744,7 +767,6 @@ private fun AppMaintenanceSettingsContent(
     onSetGkiWarning: (Boolean) -> Unit,
     onSetWebDebugging: (Boolean) -> Unit,
     onSetAutoJailbreak: (Boolean) -> Unit,
-    onSetUseSoftReboot: (Boolean) -> Unit,
     onSendLog: () -> Unit,
     onUninstall: () -> Unit,
     onOpen: (Route) -> Unit,
@@ -805,15 +827,6 @@ private fun AppMaintenanceSettingsContent(
             enabled = uiState.isLateLoadMode,
             checked = uiState.autoJailbreak,
             onCheckedChange = onSetAutoJailbreak,
-        )
-        SettingsDivider()
-        SettingsSwitchRow(
-            title = stringResource(R.string.settings_soft_reboot),
-            summary = stringResource(R.string.settings_soft_reboot_summary),
-            icon = Icons.Rounded.ElectricalServices,
-            enabled = !uiState.isLateLoadMode,
-            checked = uiState.useSoftReboot,
-            onCheckedChange = onSetUseSoftReboot,
         )
     }
     SettingsGroup(stringResource(R.string.settings_group_maintenance_about)) {

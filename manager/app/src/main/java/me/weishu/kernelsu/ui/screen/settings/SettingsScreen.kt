@@ -227,6 +227,7 @@ fun SettingPager(
         onOpenCpuSpoof = { navigator.push(Route.CpuSpoof) },
         onOpenDeviceIdentity = { navigator.push(Route.DeviceIdentity) },
         onOpenGraphicsRenderer = { navigator.push(Route.GraphicsRenderer) },
+        onOpenKpm = { navigator.push(Route.Kpm) },
         onOpenImageTool = { navigator.push(Route.ImageTool) },
         onSetEpkesuHideEnabled = viewModel::setEpkesuHideEnabled,
         onSetEnableWebDebugging = viewModel::setEnableWebDebugging,

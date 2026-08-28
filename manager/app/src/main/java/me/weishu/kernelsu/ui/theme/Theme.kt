@@ -158,6 +158,7 @@ fun KernelSUTheme(
 
         UiMode.Material -> MaterialKernelSUTheme(
             appSettings = currentAppSettings,
+            appFontState = currentAppFontState,
             content = content
         )
     }

@@ -625,7 +625,7 @@ fun SwitchStyleCreatorScreen() {
                 },
                 navigationIcon = {
                     IconButton(onClick = { requestAction(SwitchEditorPendingAction.Back) }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.close))
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back))
                     }
                 },
                 actions = {

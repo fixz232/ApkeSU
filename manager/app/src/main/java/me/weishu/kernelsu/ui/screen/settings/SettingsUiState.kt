@@ -283,6 +283,7 @@ data class SettingsScreenActions(
     val onOpenCpuSpoof: () -> Unit,
     val onOpenDeviceIdentity: () -> Unit,
     val onOpenGraphicsRenderer: () -> Unit,
+    val onOpenKpm: () -> Unit,
     val onOpenImageTool: () -> Unit,
     val onSetEpkesuHideEnabled: (Boolean) -> Unit,
     val onSetEnableWebDebugging: (Boolean) -> Unit,

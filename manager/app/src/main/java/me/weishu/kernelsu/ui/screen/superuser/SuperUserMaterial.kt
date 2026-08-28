@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.model.AppInfo
 import me.weishu.kernelsu.ui.component.AppIconImage
+import me.weishu.kernelsu.ui.component.ApkeEmptyState
+import me.weishu.kernelsu.ui.component.ApkeErrorState
+import me.weishu.kernelsu.ui.component.ApkeLoadingState
 import me.weishu.kernelsu.ui.component.ScrollToTopOnChange
 import me.weishu.kernelsu.ui.component.material.ExpressiveScaffold
 import me.weishu.kernelsu.ui.component.material.SearchAppBar
@@ -294,6 +297,13 @@ fun SuperUserPagerMaterial(
                             bottom = 16.dp + bottomPadding
                         ),
                     ) {
+                        if (uiState.hasLoaded && uiState.searchResults.isEmpty()) {
+                            item(key = "search-empty") {
+                                ApkeEmptyState(
+                                    title = stringResource(R.string.superuser_empty),
+                                )
+                            }
+                        }
                         itemsIndexed(uiState.searchResults, key = { _, item -> item.uid }) { index, group ->
                             SegmentedItem(index = index, count = uiState.searchResults.size) {
                                 SearchGroupItem(
@@ -354,6 +364,31 @@ fun SuperUserPagerMaterial(
                     bottom = 16.dp + bottomInnerPadding
                 ),
             ) {
+                when {
+                    !uiState.hasLoaded && uiState.groupedApps.isEmpty() -> {
+                        item(key = "loading") {
+                            ApkeLoadingState()
+                        }
+                    }
+
+                    uiState.error != null -> {
+                        item(key = "error") {
+                            ApkeErrorState(
+                                title = stringResource(R.string.superuser_failed_to_load),
+                                supportingText = uiState.error.localizedMessage,
+                                onRetry = actions.onRefresh,
+                            )
+                        }
+                    }
+
+                    uiState.groupedApps.isEmpty() -> {
+                        item(key = "empty") {
+                            ApkeEmptyState(
+                                title = stringResource(R.string.superuser_empty),
+                            )
+                        }
+                    }
+                }
                 itemsIndexed(uiState.groupedApps, key = { _, item -> item.uid }) { index, group ->
                     val expanded = expandedSearchUids.value.contains(group.uid)
                     val onToggleExpand = {

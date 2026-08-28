@@ -9,7 +9,7 @@ class HiddenPathConfigTest {
     fun editableComparisonIgnoresRuntimeStatus() {
         val saved = HiddenPathConfigState(
             targetPaths = listOf("/data/local/tmp/example"),
-            appPackages = listOf("12345"),
+            appPackages = listOf("com.example.app"),
             loaded = false,
             currentKmi = "android14-6.1",
         )
@@ -27,7 +27,7 @@ class HiddenPathConfigTest {
     fun editableComparisonDetectsPendingPathAndOptionChanges() {
         val saved = HiddenPathConfigState(
             targetPaths = listOf("/data/local/tmp/example"),
-            appPackages = listOf("12345"),
+            appPackages = listOf("com.example.app"),
         )
 
         assertFalse(
@@ -36,7 +36,7 @@ class HiddenPathConfigTest {
             ),
         )
         assertFalse(saved.editableEquals(saved.copy(hideDirents = false)))
-        assertFalse(saved.editableEquals(saved.copy(appPackages = listOf("54321"))))
+        assertFalse(saved.editableEquals(saved.copy(appPackages = listOf("com.example.other"))))
     }
 
     @Test
@@ -50,7 +50,7 @@ class HiddenPathConfigTest {
             """
             {
               "targetPaths": ["/data/local/tmp/example"],
-              "appPackages": ["12345"],
+              "appPackages": ["com.example.app"],
               "useAppScope": true,
               "hideDirents": false,
               "hideIsolated": true

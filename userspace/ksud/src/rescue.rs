@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use chrono::Local;
 use const_format::concatcp;
 use serde_json::{Value, json};
@@ -7,9 +7,10 @@ use std::os::fd::AsRawFd;
 use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Component, Path, PathBuf},
     process::Command,
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use crate::{boot_patch, defs, module, utils};
@@ -23,7 +24,14 @@ const BOOT_COUNT_PATH: &str = concatcp!(RESCUE_DIR, "boot_count");
 const BOOT_OK_PATH: &str = concatcp!(RESCUE_DIR, "boot_ok");
 const PENDING_BOOT_PATH: &str = concatcp!(RESCUE_DIR, "pending_boot");
 const RESTORE_LOCK_PATH: &str = concatcp!(RESCUE_DIR, "restore_done.lock");
+const RESTORE_TRANSACTION_PATH: &str = concatcp!(RESCUE_DIR, "restore_transaction.json");
 const AUTO_RESTORE_ATTEMPTS_PATH: &str = concatcp!(RESCUE_DIR, "auto_restore_attempts");
+const FAILURE_BASELINE_PATH: &str = concatcp!(RESCUE_DIR, "failure_baseline.json");
+const VERIFIED_PATH: &str = concatcp!(RESCUE_DIR, "verified.json");
+const ENVIRONMENT_CHECK_PATH: &str = concatcp!(RESCUE_DIR, "environment_check.json");
+const CONFIG_CHANGED_PATH: &str = concatcp!(RESCUE_DIR, "config_changed");
+const HASH_CACHE_PATH: &str = concatcp!(RESCUE_DIR, "sha256_cache.json");
+const RESCUE_DISABLED_MODULES_PATH: &str = concatcp!(RESCUE_DIR, "disabled_modules.json");
 const RECOVERY_CHECK_GUARD_PATH: &str = "/dev/ksu_rescue_recovery_checked";
 const SKIP_MODULES_ONCE_PATH: &str = concatcp!(RESCUE_DIR, "skip_modules_once");
 const CACHE_SKIP_MODULES_ONCE_PATH: &str = "/cache/ksu_rescue_skip_modules_once";
@@ -35,6 +43,77 @@ const LEGACY_TMP_MODULE_DISABLE_PATH: &str = "/cache/tmp_modules_disable";
 const MAX_AUTO_RESTORE_ATTEMPTS: u32 = 3;
 const PENDING_BOOT_FAILURE_TRIGGER_COUNT: u32 = 2;
 const MODULE_RESCUE_FAILURE_TRIGGER_COUNT: u32 = 2;
+const LOG_MAX_BYTES: u64 = 1024 * 1024;
+const LOG_ROTATION_COUNT: usize = 3;
+const COPY_BUFFER_BYTES: usize = 1024 * 1024;
+const COPY_IDLE_TIMEOUT_SECONDS: u64 = 45;
+const COPY_TOTAL_TIMEOUT_SECONDS: u64 = 10 * 60;
+const FAILURE_ARTIFACT_SCAN_BYTES: u64 = 4 * 1024 * 1024;
+const FAILURE_ARTIFACT_MAX_FILES: usize = 32;
+const ERROR_PREFIX: &str = "APKESU_ERROR";
+
+#[derive(Clone, Debug)]
+struct RestoreTransactionEntry {
+    name: String,
+    label: String,
+    image_path: String,
+    device_path: String,
+    expected_sha256: String,
+    expected_size: u64,
+    status: String,
+}
+
+#[derive(Clone, Debug)]
+struct RestoreTransaction {
+    id: String,
+    reason: String,
+    automatic: bool,
+    description: String,
+    activate_slot: Option<String>,
+    phase: String,
+    error_code: String,
+    error_message: String,
+    started_at: String,
+    updated_at: String,
+    entries: Vec<RestoreTransactionEntry>,
+}
+
+fn coded_error(code: &str, message: impl AsRef<str>) -> anyhow::Error {
+    anyhow!("{ERROR_PREFIX}:{code}:{}", message.as_ref())
+}
+
+pub fn structured_error(error: anyhow::Error) -> anyhow::Error {
+    if format!("{error:#}").contains(ERROR_PREFIX) {
+        return error;
+    }
+    let message = format!("{error:#}");
+    let lower = message.to_ascii_lowercase();
+    let code = if lower.contains("sha256") || lower.contains("checksum") {
+        "rescue.checksum_mismatch"
+    } else if lower.contains("partition") && lower.contains("missing") {
+        "rescue.partition_missing"
+    } else if lower.contains("manifest") || lower.contains("backup") {
+        "rescue.backup_invalid"
+    } else if lower.contains("fingerprint") || lower.contains("identity") {
+        "rescue.device_mismatch"
+    } else if lower.contains("restore") {
+        "rescue.restore_failed"
+    } else if lower.contains("config") {
+        "rescue.config_invalid"
+    } else {
+        "rescue.operation_failed"
+    };
+    coded_error(code, message)
+}
+
+fn error_code(error: &anyhow::Error) -> String {
+    let rendered = format!("{error:#}");
+    rendered
+        .split_once(&format!("{ERROR_PREFIX}:"))
+        .and_then(|(_, suffix)| suffix.split_once(':').map(|(code, _)| code))
+        .unwrap_or("rescue.operation_failed")
+        .to_owned()
+}
 
 #[derive(Clone, Debug, Default)]
 struct RescueConfig {
@@ -105,8 +184,12 @@ const fn post_fs_data_rescue_action(
     }
 }
 
-const fn recovery_boot_rescue_action(pending_boot: bool, failure_hint: bool) -> BootRescueAction {
-    if pending_boot {
+const fn recovery_boot_rescue_action(
+    pending_boot: bool,
+    failure_hint: bool,
+    boot_count: u32,
+) -> BootRescueAction {
+    if pending_boot && (failure_hint || boot_count >= PENDING_BOOT_FAILURE_TRIGGER_COUNT) {
         BootRescueAction::RestoreBackups
     } else if failure_hint {
         BootRescueAction::DisableModules
@@ -125,18 +208,41 @@ pub fn print_status() {
     let config = config_result.unwrap_or_default();
     let specs = partition_specs(&config);
     let manifest = read_manifest().unwrap_or_else(|_| json!({}));
-    let validation = validate_backups(&config);
+    let validation = validate_backups_quick(&config);
     let ready = validation.is_ok();
     let ready_reason = validation
         .err()
         .map(|err| err.to_string())
         .unwrap_or_default();
+    let transaction_result = read_restore_transaction();
+    let transaction_error = transaction_result
+        .as_ref()
+        .err()
+        .map(|error| format!("{error:#}"))
+        .unwrap_or_default();
+    let transaction = transaction_result.ok().flatten();
+    let restore_interrupted = !transaction_error.is_empty()
+        || transaction
+            .as_ref()
+            .is_some_and(|transaction| !matches!(transaction.phase.as_str(), "completed" | "idle"));
+    let verification_current = verification_marker_is_current(&specs, &manifest);
+    let config_changed = Path::new(CONFIG_CHANGED_PATH).exists();
+    let phase = rescue_phase(
+        status_error.is_empty(),
+        is_enabled(),
+        ready,
+        verification_current,
+        config_changed,
+        restore_interrupted,
+    );
     let status = json!({
         "statusOk": status_error.is_empty(),
+        "statusErrorCode": if status_error.is_empty() { "" } else { "rescue.config_invalid" },
         "statusError": status_error,
+        "phase": phase,
         "enabled": is_enabled(),
         "config": config_json(&config),
-        "images": specs.iter().map(image_status).collect::<Vec<_>>(),
+        "images": specs.iter().map(|spec| image_status(spec, &manifest, false)).collect::<Vec<_>>(),
         "bootCount": read_boot_count(),
         "autoRestoreAttempts": read_auto_restore_attempts(),
         "pendingBoot": Path::new(PENDING_BOOT_PATH).exists(),
@@ -149,6 +255,13 @@ pub fn print_status() {
         "manifest": manifest,
         "ready": ready,
         "readyReason": ready_reason,
+        "verified": verification_current,
+        "environmentChecked": environment_check_is_current(&config),
+        "configChangedProtectionDisabled": config_changed,
+        "restoreInterrupted": restore_interrupted,
+        "restoreTransactionError": transaction_error,
+        "restoreTransaction": transaction.as_ref().map(restore_transaction_json),
+        "rescueDisabledModules": read_rescue_disabled_modules(),
         "log": tail_file(LOG_PATH, 80).unwrap_or_default(),
     });
     println!("{status}");
@@ -164,7 +277,7 @@ pub fn print_test_report() {
     let config = config_result.unwrap_or_default();
     let specs = partition_specs(&config);
     let environment = validate_environment(&specs);
-    let backup_validation = validate_backups(&config);
+    let backup_validation = validate_backups_quick(&config);
     let ok = config_error.is_empty() && environment.is_ok();
     let reason = if config_error.is_empty() {
         environment
@@ -183,15 +296,20 @@ pub fn print_test_report() {
     } else {
         config_error
     };
+    if ok && let Err(error) = write_environment_check(&config) {
+        append_log(format!("failed to persist environment check: {error:#}"));
+    }
+    let manifest = read_manifest().unwrap_or_else(|_| json!({}));
     let report = json!({
         "ok": ok,
+        "errorCode": if ok { "" } else { "rescue.environment_invalid" },
         "reason": reason,
         "backupReady": backup_ready,
         "backupReason": backup_reason,
         "currentSlot": current_slot(),
         "device": device_summary(),
-        "images": specs.iter().map(image_status).collect::<Vec<_>>(),
-        "manifest": read_manifest().unwrap_or_else(|_| json!({})),
+        "images": specs.iter().map(|spec| image_status(spec, &manifest, false)).collect::<Vec<_>>(),
+        "manifest": manifest,
         "checks": {
             "bootPartitionFound": find_partition(&specs[0]).is_ok_and(|partition| partition.is_some()),
             "bootBackupReady": Path::new(&specs[0].image_path).is_file(),
@@ -201,17 +319,75 @@ pub fn print_test_report() {
     println!("{report}");
 }
 
+pub fn print_verify_report() {
+    let result = (|| -> Result<Value> {
+        let config = read_config()?;
+        let specs = partition_specs(&config);
+        validate_backups_full(&config, true)?;
+        let manifest = read_manifest()?;
+        write_verification_marker(&specs, &manifest)?;
+        remove_file_if_exists(Path::new(CONFIG_CHANGED_PATH))?;
+        Ok(json!({
+            "ok": true,
+            "errorCode": "",
+            "reason": "",
+            "verifiedAt": Local::now().to_rfc3339(),
+            "images": specs.iter().map(|spec| image_status(spec, &manifest, true)).collect::<Vec<_>>(),
+        }))
+    })();
+
+    match result {
+        Ok(report) => println!("{report}"),
+        Err(error) => {
+            let error = structured_error(error);
+            println!(
+                "{}",
+                json!({
+                    "ok": false,
+                    "errorCode": error_code(&error),
+                    "reason": format!("{error:#}"),
+                })
+            );
+        }
+    }
+}
+
+pub fn refresh_and_enable() -> Result<()> {
+    let config = read_config()?;
+    let specs = partition_specs(&config);
+    validate_environment(&specs).map_err(structured_error)?;
+    write_environment_check(&config)?;
+    backup(true).map_err(structured_error)?;
+    validate_backups_full(&config, true).map_err(structured_error)?;
+    let manifest = read_manifest()?;
+    write_verification_marker(&specs, &manifest)?;
+    enable().map_err(structured_error)
+}
+
+pub fn print_diagnostics() {
+    println!("=== ApkeSU rescue diagnostic ===");
+    println!("generatedAt={}", Local::now().to_rfc3339());
+    println!("=== status ===");
+    print_status();
+    println!("=== logs ===");
+    print_logs();
+}
+
 pub fn import_config_text(content: &str) -> Result<()> {
     let config = parse_config(content)?;
     let changed = read_config().map_or(true, |current| {
         config_json(&current) != config_json(&config)
     });
+    if changed {
+        ensure_no_active_restore_transaction()?;
+        pause_protection_for_backup_change(
+            "partition configuration changed; recheck, backup, verify, and enable again",
+        )?;
+        remove_file_if_exists(Path::new(ENVIRONMENT_CHECK_PATH))?;
+    }
     write_config(&config)?;
-    if changed && is_enabled() {
-        remove_file_if_exists(Path::new(ENABLED_PATH))
-            .context("configuration changed but rescue protection could not be disabled")?;
-        clear_runtime_markers();
-        append_log("rescue protection disabled because its configuration changed");
+    if changed {
+        atomic_write(Path::new(CONFIG_CHANGED_PATH), b"1")?;
     }
     append_log("rescue config updated by manager");
     Ok(())
@@ -248,9 +424,16 @@ fn import_image_inner(partition: &str, source: &Path, force: bool) -> Result<()>
         );
     }
 
+    ensure_no_active_restore_transaction()?;
     utils::ensure_dir_exists(RESCUE_DIR)?;
     let protected_files = vec![spec.image_path.clone(), MANIFEST_PATH.to_string()];
     preserve_files(&protected_files)?;
+    if let Err(error) = pause_protection_for_backup_change(
+        "a rescue image is being replaced; run full verification before enabling again",
+    ) {
+        cleanup_preserved_files(&protected_files);
+        return Err(error);
+    }
     let import_result = (|| -> Result<()> {
         atomic_copy(&source, Path::new(&spec.image_path)).with_context(|| {
             format!(
@@ -289,9 +472,16 @@ pub fn backup(force: bool) -> Result<()> {
     if backup_exists && !force {
         bail!("backup already exists; pass --force to overwrite it");
     }
+    ensure_no_active_restore_transaction()?;
     append_log("backup requested by manager");
     let protected_files = rescue_file_paths(&specs);
     preserve_files(&protected_files)?;
+    if let Err(error) = pause_protection_for_backup_change(
+        "rescue backups are being refreshed; run full verification before enabling again",
+    ) {
+        cleanup_preserved_files(&protected_files);
+        return Err(error);
+    }
     let backup_result = (|| -> Result<()> {
         for spec in &specs {
             let Some(device) = find_partition(spec)? else {
@@ -317,14 +507,24 @@ pub fn backup(force: bool) -> Result<()> {
     }
 
     cleanup_preserved_files(&protected_files);
+    remove_file_if_exists(Path::new(CONFIG_CHANGED_PATH))?;
     Ok(())
 }
 
 pub fn enable() -> Result<()> {
     let config = read_config()?;
-    validate_backups(&config)?;
+    let specs = partition_specs(&config);
+    validate_backups_quick(&config)?;
+    let manifest = read_manifest()?;
+    if !verification_marker_is_current(&specs, &manifest) {
+        return Err(coded_error(
+            "rescue.full_verification_required",
+            "run a full backup verification before enabling rescue protection",
+        ));
+    }
     utils::ensure_dir_exists(RESCUE_DIR)?;
     clear_runtime_markers();
+    write_failure_baseline()?;
     atomic_write(Path::new(ENABLED_PATH), b"1").context("failed to enable rescue protection")?;
     let initialize_result = (|| -> Result<()> {
         atomic_write(Path::new(BOOT_OK_PATH), b"1")
@@ -349,9 +549,53 @@ pub fn disable() -> Result<()> {
     remove_file_if_exists(Path::new(BOOT_COUNT_PATH))?;
     remove_file_if_exists(Path::new(AUTO_RESTORE_ATTEMPTS_PATH))?;
     remove_file_if_exists(Path::new(BOOT_OK_PATH))?;
+    remove_file_if_exists(Path::new(FAILURE_BASELINE_PATH))?;
     clear_runtime_markers();
     append_log("rescue protection disabled");
     Ok(())
+}
+
+fn ensure_no_active_restore_transaction() -> Result<()> {
+    if let Some(transaction) = read_restore_transaction()?
+        && !matches!(transaction.phase.as_str(), "completed" | "idle")
+    {
+        return Err(coded_error(
+            "rescue.restore_in_progress",
+            format!(
+                "restore transaction {} is still in phase {}; finish or recover it before changing rescue backups",
+                transaction.id, transaction.phase
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn pause_protection_for_backup_change(reason: &str) -> Result<()> {
+    utils::ensure_dir_exists(RESCUE_DIR)?;
+    let was_enabled =
+        invalidate_protection_markers_at(Path::new(ENABLED_PATH), Path::new(VERIFIED_PATH))?;
+    for path in [
+        BOOT_COUNT_PATH,
+        AUTO_RESTORE_ATTEMPTS_PATH,
+        BOOT_OK_PATH,
+        FAILURE_BASELINE_PATH,
+    ] {
+        remove_file_if_exists(Path::new(path))?;
+    }
+    clear_runtime_markers();
+    if was_enabled {
+        append_log(format!("rescue protection paused because {reason}"));
+    } else {
+        append_log(format!("rescue verification invalidated because {reason}"));
+    }
+    Ok(())
+}
+
+fn invalidate_protection_markers_at(enabled: &Path, verified: &Path) -> Result<bool> {
+    let was_enabled = enabled.exists();
+    remove_file_if_exists(enabled)?;
+    remove_file_if_exists(verified)?;
+    Ok(was_enabled)
 }
 
 pub fn restore_now() -> Result<()> {
@@ -369,7 +613,13 @@ pub fn mark_next_boot_pending(reason: &str) -> Result<()> {
     }
 
     utils::ensure_dir_exists(RESCUE_DIR).context("failed to prepare pending boot marker")?;
-    atomic_write(Path::new(PENDING_BOOT_PATH), reason.as_bytes())
+    write_failure_baseline()?;
+    let pending = json!({
+        "reason": reason,
+        "armedAt": Local::now().to_rfc3339(),
+        "bootId": current_boot_id().unwrap_or_default(),
+    });
+    atomic_write(Path::new(PENDING_BOOT_PATH), pending.to_string().as_bytes())
         .context("failed to write pending boot marker")?;
     let _ = fs::remove_file(BOOT_OK_PATH);
     write_boot_count(0);
@@ -390,6 +640,9 @@ pub fn print_logs() {
 pub fn clear_logs() -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
     atomic_write(Path::new(LOG_PATH), b"").context("failed to clear rescue log")?;
+    for index in 1..=LOG_ROTATION_COUNT {
+        remove_file_if_exists(Path::new(&format!("{LOG_PATH}.{index}")))?;
+    }
     append_log("rescue log cleared");
     Ok(())
 }
@@ -520,7 +773,7 @@ pub fn check_on_recovery_boot() {
         boot_mode()
     ));
 
-    match recovery_boot_rescue_action(pending_boot, failure_hint) {
+    match recovery_boot_rescue_action(pending_boot, failure_hint, next_count) {
         BootRescueAction::RestoreBackups => {
             if let Err(err) = auto_restore_backups() {
                 append_log(format!("auto image rollback failed in recovery: {err:#}"));
@@ -552,6 +805,11 @@ pub fn mark_boot_completed() {
     let _ = fs::write(AUTO_RESTORE_ATTEMPTS_PATH, b"0");
     clear_runtime_markers();
     cleanup_legacy_rescue_flags();
+    if let Err(error) = write_failure_baseline() {
+        append_log(format!(
+            "failed to refresh boot failure baseline: {error:#}"
+        ));
+    }
     append_log("boot completed; rescue counter reset");
 }
 
@@ -617,11 +875,23 @@ fn validate_environment(specs: &[PartitionSpec]) -> Result<()> {
     Ok(())
 }
 
-fn validate_backups(config: &RescueConfig) -> Result<()> {
+fn validate_backups_quick(config: &RescueConfig) -> Result<()> {
+    validate_backups_with_mode(config, false, false)
+}
+
+fn validate_backups_full(config: &RescueConfig, refresh_hashes: bool) -> Result<()> {
+    validate_backups_with_mode(config, true, refresh_hashes)
+}
+
+fn validate_backups_with_mode(
+    config: &RescueConfig,
+    verify_sha256: bool,
+    refresh_hashes: bool,
+) -> Result<()> {
     let plans = restore_plans(config)?;
     let mut last_error = None;
     for plan in plans {
-        match validate_restore_backups(&plan.specs, config, false) {
+        match validate_restore_backups(&plan.specs, config, false, verify_sha256, refresh_hashes) {
             Ok(()) => return Ok(()),
             Err(err) => last_error = Some(err),
         }
@@ -636,7 +906,10 @@ fn validate_restore_backups(
     specs: &[PartitionSpec],
     config: &RescueConfig,
     automatic: bool,
+    verify_sha256: bool,
+    refresh_hashes: bool,
 ) -> Result<()> {
+    let manifest = validate_manifest_context_for_restore()?;
     let mut available_count = 0usize;
     for spec in specs {
         if !should_restore_spec(spec, config, automatic) {
@@ -666,7 +939,7 @@ fn validate_restore_backups(
             continue;
         }
 
-        validate_image_against_partition(spec, &device)?;
+        validate_image_against_partition(spec, &device, &manifest, verify_sha256, refresh_hashes)?;
         available_count += 1;
     }
 
@@ -694,7 +967,13 @@ fn should_restore_spec(spec: &PartitionSpec, config: &RescueConfig, automatic: b
     true
 }
 
-fn validate_image_against_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
+fn validate_image_against_partition(
+    spec: &PartitionSpec,
+    device: &str,
+    manifest: &Value,
+    verify_sha256: bool,
+    refresh_hash: bool,
+) -> Result<()> {
     let image_size = fs::metadata(&spec.image_path)
         .with_context(|| format!("failed to read {} backup metadata", spec.name))?
         .len();
@@ -712,8 +991,8 @@ fn validate_image_against_partition(spec: &PartitionSpec, device: &str) -> Resul
         );
     }
 
-    if let Some(expected) = manifest_sha256(&spec.label) {
-        let actual = sha256_of(&spec.image_path);
+    if verify_sha256 && let Some(expected) = manifest_sha256_from(manifest, &spec.label) {
+        let actual = cached_sha256(&spec.image_path, refresh_hash);
         if !expected.is_empty() && expected != actual {
             bail!("{} backup sha256 mismatch", spec.name);
         }
@@ -830,7 +1109,7 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     let mut selected_plan = None;
     let mut last_error = None;
     for plan in plans {
-        match validate_restore_backups(&plan.specs, &config, automatic) {
+        match validate_restore_backups(&plan.specs, &config, automatic, true, false) {
             Ok(()) => {
                 selected_plan = Some(plan);
                 break;
@@ -855,24 +1134,25 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     append_log(format!("restore started: {reason}"));
     append_log(format!("restore plan: {}", plan.description));
     append_log("restore mode: keep /data untouched; only configured boot images are restored");
-    let mut restored_count = 0usize;
-    for spec in &plan.specs {
-        if !should_restore_spec(spec, &config, automatic) || !Path::new(&spec.image_path).is_file()
-        {
-            continue;
+    let mut transaction = prepare_restore_transaction(reason, automatic, &plan, &config)?;
+    write_restore_transaction(&transaction)?;
+    if let Err(error) = execute_restore_transaction(&mut transaction) {
+        "failed".clone_into(&mut transaction.phase);
+        transaction.error_code = error_code(&structured_error(anyhow!(format!("{error:#}"))));
+        transaction.error_message = format!("{error:#}");
+        transaction.updated_at = Local::now().to_rfc3339();
+        if let Err(write_error) = write_restore_transaction(&transaction) {
+            append_log(format!(
+                "restore failed and transaction update also failed: {write_error:#}"
+            ));
         }
-        let Some(device) = find_partition(spec)? else {
-            append_log(format!("skip restore: {} partition not found", spec.name));
-            continue;
-        };
-        restore_partition(spec, &device)?;
-        restored_count += 1;
-    }
-    if restored_count == 0 {
-        bail!("no rescue backup was restored");
-    }
-    if let Some(slot) = plan.activate_slot.as_deref() {
-        set_active_slot(slot)?;
+        return Err(coded_error(
+            "rescue.restore_interrupted",
+            format!(
+                "restore transaction {} stopped after a partial write: {error:#}",
+                transaction.id
+            ),
+        ));
     }
     mark_skip_modules_once();
     mark_legacy_tmp_module_disable();
@@ -886,6 +1166,314 @@ fn restore_backups(reason: &str, automatic: bool) -> Result<()> {
     let _ = Command::new("sync").status();
     request_reboot().context("restore completed but reboot request failed")?;
     Ok(())
+}
+
+fn prepare_restore_transaction(
+    reason: &str,
+    automatic: bool,
+    plan: &RestorePlan,
+    config: &RescueConfig,
+) -> Result<RestoreTransaction> {
+    let manifest = read_manifest()?;
+    let mut entries = Vec::new();
+    for spec in &plan.specs {
+        if !should_restore_spec(spec, config, automatic) || !Path::new(&spec.image_path).is_file() {
+            continue;
+        }
+        let Some(device_path) = find_partition(spec)? else {
+            if spec.required {
+                return Err(coded_error(
+                    "rescue.partition_missing",
+                    format!(
+                        "{} partition disappeared after restore preflight",
+                        spec.name
+                    ),
+                ));
+            }
+            continue;
+        };
+        let expected_sha256 = manifest_sha256_from(&manifest, &spec.label).unwrap_or_default();
+        if expected_sha256.is_empty() {
+            return Err(coded_error(
+                "rescue.manifest_digest_missing",
+                format!("{} has no SHA256 in the rescue manifest", spec.label),
+            ));
+        }
+        entries.push(RestoreTransactionEntry {
+            name: spec.name.clone(),
+            label: spec.label.clone(),
+            image_path: spec.image_path.clone(),
+            device_path,
+            expected_sha256,
+            expected_size: fs::metadata(&spec.image_path)?.len(),
+            status: "pending".to_owned(),
+        });
+    }
+    if entries.is_empty() {
+        return Err(coded_error(
+            "rescue.no_restore_entries",
+            "no rescue backup was selected for restore",
+        ));
+    }
+
+    if let Some(existing) = read_restore_transaction()?
+        && let Some(resumable) =
+            select_resumable_restore_transaction(existing, &entries, plan.activate_slot.as_deref())?
+    {
+        append_log(format!(
+            "resuming interrupted restore transaction {} in phase {}",
+            resumable.id, resumable.phase
+        ));
+        return Ok(resumable);
+    }
+
+    let now = Local::now();
+    Ok(RestoreTransaction {
+        id: format!("{}-{}", now.format("%Y%m%d%H%M%S"), std::process::id()),
+        reason: reason.to_owned(),
+        automatic,
+        description: plan.description.clone(),
+        activate_slot: plan.activate_slot.clone(),
+        phase: "prepared".to_owned(),
+        error_code: String::new(),
+        error_message: String::new(),
+        started_at: now.to_rfc3339(),
+        updated_at: now.to_rfc3339(),
+        entries,
+    })
+}
+
+fn execute_restore_transaction(transaction: &mut RestoreTransaction) -> Result<()> {
+    "writing".clone_into(&mut transaction.phase);
+    transaction.error_code.clear();
+    transaction.error_message.clear();
+    transaction.updated_at = Local::now().to_rfc3339();
+    write_restore_transaction(transaction)?;
+
+    for index in 0..transaction.entries.len() {
+        let entry = transaction.entries[index].clone();
+        if entry.status == "verified"
+            && cached_sha256(&entry.device_path, true) == entry.expected_sha256
+        {
+            append_log(format!(
+                "restore transaction {}: {} remains verified; skip rewrite",
+                transaction.id, entry.label
+            ));
+            continue;
+        }
+
+        "writing".clone_into(&mut transaction.entries[index].status);
+        transaction.updated_at = Local::now().to_rfc3339();
+        write_restore_transaction(transaction)?;
+        append_log(format!(
+            "restore transaction {}: writing {}",
+            transaction.id, entry.label
+        ));
+
+        if let Err(error) = restore_transaction_entry(&entry) {
+            "failed".clone_into(&mut transaction.entries[index].status);
+            transaction.updated_at = Local::now().to_rfc3339();
+            let _ = write_restore_transaction(transaction);
+            return Err(error);
+        }
+        "verified".clone_into(&mut transaction.entries[index].status);
+        transaction.updated_at = Local::now().to_rfc3339();
+        write_restore_transaction(transaction)?;
+    }
+
+    if let Some(slot) = transaction.activate_slot.as_deref() {
+        set_active_slot(slot)?;
+    }
+    "completed".clone_into(&mut transaction.phase);
+    transaction.updated_at = Local::now().to_rfc3339();
+    write_restore_transaction(transaction)
+}
+
+fn restore_transaction_entry(entry: &RestoreTransactionEntry) -> Result<()> {
+    let metadata = fs::metadata(&entry.image_path)
+        .with_context(|| format!("failed to read {} backup metadata", entry.label))?;
+    if metadata.len() != entry.expected_size {
+        return Err(coded_error(
+            "rescue.backup_size_changed",
+            format!("{} backup size changed after preflight", entry.label),
+        ));
+    }
+    let actual_backup_sha256 = cached_sha256(&entry.image_path, true);
+    if actual_backup_sha256 != entry.expected_sha256 {
+        return Err(coded_error(
+            "rescue.backup_changed",
+            format!("{} backup SHA256 changed after preflight", entry.label),
+        ));
+    }
+    run_dd(&entry.image_path, &entry.device_path)
+        .with_context(|| format!("failed to restore {}", entry.name))?;
+    let actual_partition_sha256 = cached_sha256(&entry.device_path, true);
+    if actual_partition_sha256 != entry.expected_sha256 {
+        return Err(coded_error(
+            "rescue.restore_verification_failed",
+            format!(
+                "{} restore verification failed: SHA256 mismatch",
+                entry.label
+            ),
+        ));
+    }
+    append_log(format!("restore {} verified", entry.label));
+    Ok(())
+}
+
+fn restore_transactions_match(
+    existing: &RestoreTransaction,
+    entries: &[RestoreTransactionEntry],
+    activate_slot: Option<&str>,
+) -> bool {
+    existing.activate_slot.as_deref() == activate_slot
+        && existing.entries.len() == entries.len()
+        && existing.entries.iter().zip(entries).all(|(left, right)| {
+            left.label == right.label
+                && left.image_path == right.image_path
+                && left.device_path == right.device_path
+                && left.expected_sha256 == right.expected_sha256
+                && left.expected_size == right.expected_size
+        })
+}
+
+fn select_resumable_restore_transaction(
+    existing: RestoreTransaction,
+    entries: &[RestoreTransactionEntry],
+    activate_slot: Option<&str>,
+) -> Result<Option<RestoreTransaction>> {
+    if matches!(existing.phase.as_str(), "completed" | "idle") {
+        return Ok(None);
+    }
+    if restore_transactions_match(&existing, entries, activate_slot) {
+        return Ok(Some(existing));
+    }
+    Err(coded_error(
+        "rescue.restore_transaction_conflict",
+        format!(
+            "unfinished restore transaction {} does not match the current restore plan",
+            existing.id
+        ),
+    ))
+}
+
+fn restore_transaction_json(transaction: &RestoreTransaction) -> Value {
+    json!({
+        "schemaVersion": 1,
+        "id": transaction.id,
+        "reason": transaction.reason,
+        "automatic": transaction.automatic,
+        "description": transaction.description,
+        "activateSlot": transaction.activate_slot,
+        "phase": transaction.phase,
+        "errorCode": transaction.error_code,
+        "errorMessage": transaction.error_message,
+        "startedAt": transaction.started_at,
+        "updatedAt": transaction.updated_at,
+        "entries": transaction.entries.iter().map(|entry| json!({
+            "name": entry.name,
+            "label": entry.label,
+            "imagePath": entry.image_path,
+            "devicePath": entry.device_path,
+            "expectedSha256": entry.expected_sha256,
+            "expectedSize": entry.expected_size,
+            "status": entry.status,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn write_restore_transaction(transaction: &RestoreTransaction) -> Result<()> {
+    atomic_write(
+        Path::new(RESTORE_TRANSACTION_PATH),
+        restore_transaction_json(transaction).to_string().as_bytes(),
+    )
+    .context("failed to persist rescue restore transaction")
+}
+
+fn read_restore_transaction() -> Result<Option<RestoreTransaction>> {
+    read_restore_transaction_from(Path::new(RESTORE_TRANSACTION_PATH))
+}
+
+fn read_restore_transaction_from(path: &Path) -> Result<Option<RestoreTransaction>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(path).with_context(|| {
+        format!(
+            "failed to read rescue restore transaction {}",
+            path.display()
+        )
+    })?;
+    parse_restore_transaction(&content).map(Some)
+}
+
+fn parse_restore_transaction(content: &str) -> Result<RestoreTransaction> {
+    let value: Value =
+        serde_json::from_str(content).context("invalid rescue restore transaction JSON")?;
+    let required_string = |key: &str| -> Result<String> {
+        value
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|text| !text.is_empty())
+            .map(ToOwned::to_owned)
+            .with_context(|| format!("restore transaction is missing {key}"))
+    };
+    let entries = value
+        .get("entries")
+        .and_then(Value::as_array)
+        .context("restore transaction is missing entries")?
+        .iter()
+        .map(|entry| {
+            let string = |key: &str| -> Result<String> {
+                entry
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .filter(|text| !text.is_empty())
+                    .map(ToOwned::to_owned)
+                    .with_context(|| format!("restore transaction entry is missing {key}"))
+            };
+            Ok(RestoreTransactionEntry {
+                name: string("name")?,
+                label: string("label")?,
+                image_path: string("imagePath")?,
+                device_path: string("devicePath")?,
+                expected_sha256: string("expectedSha256")?,
+                expected_size: entry
+                    .get("expectedSize")
+                    .and_then(Value::as_u64)
+                    .context("restore transaction entry is missing expectedSize")?,
+                status: string("status")?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(RestoreTransaction {
+        id: required_string("id")?,
+        reason: required_string("reason")?,
+        automatic: value
+            .get("automatic")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        description: required_string("description")?,
+        activate_slot: value
+            .get("activateSlot")
+            .and_then(Value::as_str)
+            .filter(|slot| !slot.is_empty())
+            .map(ToOwned::to_owned),
+        phase: required_string("phase")?,
+        error_code: value
+            .get("errorCode")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        error_message: value
+            .get("errorMessage")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        started_at: required_string("startedAt")?,
+        updated_at: required_string("updatedAt")?,
+        entries,
+    })
 }
 
 fn backup_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
@@ -908,27 +1496,6 @@ fn backup_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
     Ok(())
 }
 
-fn restore_partition(spec: &PartitionSpec, device: &str) -> Result<()> {
-    let expected_sha256 = sha256_of(&spec.image_path);
-    if expected_sha256.is_empty() {
-        bail!("failed to calculate {} backup sha256", spec.name);
-    }
-    append_log(format!(
-        "restore {}: {} -> {}, sha256={}",
-        spec.name, spec.image_path, device, expected_sha256
-    ));
-    run_dd(&spec.image_path, device).with_context(|| format!("failed to restore {}", spec.name))?;
-    let actual_sha256 = sha256_of(device);
-    if actual_sha256.is_empty() {
-        bail!("failed to verify restored {} partition", spec.name);
-    }
-    if actual_sha256 != expected_sha256 {
-        bail!("{} restore verification failed: sha256 mismatch", spec.name);
-    }
-    append_log(format!("restore {} verified", spec.name));
-    Ok(())
-}
-
 fn run_dd(input: &str, output: &str) -> Result<()> {
     let mut input_file = OpenOptions::new()
         .read(true)
@@ -936,22 +1503,108 @@ fn run_dd(input: &str, output: &str) -> Result<()> {
         .with_context(|| format!("open input {input}"))?;
 
     let output_is_block = output.starts_with("/dev/block/");
-    let mut output_options = OpenOptions::new();
-    output_options.write(true);
-    if !output_is_block {
-        output_options.create(true).truncate(true);
+    if output_is_block {
+        let mut output_file = OpenOptions::new()
+            .write(true)
+            .open(output)
+            .with_context(|| format!("open output {output}"))?;
+        set_block_writable(&output_file, output)?;
+        copy_with_timeout(&mut input_file, &mut output_file)
+            .with_context(|| format!("copy {input} to {output}"))?;
+        output_file
+            .sync_all()
+            .with_context(|| format!("sync output {output}"))?;
+    } else {
+        let output_path = Path::new(output);
+        let parent = output_path
+            .parent()
+            .with_context(|| format!("{output} has no parent directory"))?;
+        utils::ensure_dir_exists(parent)?;
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)
+            .with_context(|| format!("create temporary backup in {}", parent.display()))?;
+        copy_with_timeout(&mut input_file, &mut temporary)
+            .with_context(|| format!("copy {input} to temporary backup for {output}"))?;
+        temporary
+            .as_file()
+            .sync_all()
+            .with_context(|| format!("sync temporary backup for {output}"))?;
+        temporary
+            .persist(output_path)
+            .map_err(|error| error.error)
+            .with_context(|| format!("atomically replace {output}"))?;
+        sync_parent_directory(parent);
     }
-    let mut output_file = output_options
-        .open(output)
-        .with_context(|| format!("open output {output}"))?;
-
-    set_block_writable(&output_file, output)?;
-    io::copy(&mut input_file, &mut output_file)
-        .with_context(|| format!("copy {input} to {output}"))?;
-    output_file
-        .sync_all()
-        .with_context(|| format!("sync output {output}"))?;
     let _ = Command::new("sync").status();
+    Ok(())
+}
+
+fn copy_with_timeout<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<u64> {
+    let started = Instant::now();
+    copy_with_clock(
+        input,
+        output,
+        Duration::from_secs(COPY_IDLE_TIMEOUT_SECONDS),
+        Duration::from_secs(COPY_TOTAL_TIMEOUT_SECONDS),
+        || started.elapsed(),
+    )
+}
+
+fn copy_with_clock<R, W, F>(
+    input: &mut R,
+    output: &mut W,
+    idle_timeout: Duration,
+    total_timeout: Duration,
+    mut elapsed: F,
+) -> Result<u64>
+where
+    R: Read,
+    W: Write,
+    F: FnMut() -> Duration,
+{
+    let mut buffer = vec![0_u8; COPY_BUFFER_BYTES];
+    let mut copied = 0_u64;
+    let mut last_progress = Duration::ZERO;
+    loop {
+        ensure_copy_deadline(elapsed(), last_progress, idle_timeout, total_timeout)?;
+        let count = input.read(&mut buffer).context("read copy source")?;
+        if count == 0 {
+            return Ok(copied);
+        }
+        ensure_copy_deadline(elapsed(), last_progress, idle_timeout, total_timeout)?;
+        output
+            .write_all(&buffer[..count])
+            .context("write copy destination")?;
+        let now = elapsed();
+        ensure_copy_deadline(now, last_progress, idle_timeout, total_timeout)?;
+        copied = copied.saturating_add(count as u64);
+        last_progress = now;
+    }
+}
+
+fn ensure_copy_deadline(
+    elapsed: Duration,
+    last_progress: Duration,
+    idle_timeout: Duration,
+    total_timeout: Duration,
+) -> Result<()> {
+    if elapsed > total_timeout {
+        return Err(coded_error(
+            "rescue.io_timeout",
+            format!(
+                "rescue image copy exceeded the {} second total timeout",
+                total_timeout.as_secs()
+            ),
+        ));
+    }
+    if elapsed.saturating_sub(last_progress) > idle_timeout {
+        return Err(coded_error(
+            "rescue.io_timeout",
+            format!(
+                "rescue image copy made no progress for more than {} seconds",
+                idle_timeout.as_secs()
+            ),
+        ));
+    }
     Ok(())
 }
 
@@ -1139,10 +1792,88 @@ fn rescue_modules_for_failed_boot(reason: impl AsRef<str>) {
 }
 
 fn disable_all_modules_for_rescue() {
+    let active_modules = active_module_ids();
+    if let Err(error) = write_rescue_disabled_module_ids(&active_modules) {
+        append_log(format!(
+            "failed to record modules disabled by rescue: {error:#}"
+        ));
+    }
     match module::disable_all_modules() {
-        Ok(()) => append_log("all modules disabled for rescue"),
+        Ok(()) => append_log(format!(
+            "{} active modules were persistently disabled for rescue; re-enable them individually after confirming a stable boot",
+            active_modules.len()
+        )),
         Err(err) => append_log(format!("failed to disable all modules for rescue: {err:#}")),
     }
+}
+
+fn active_module_ids() -> Vec<String> {
+    let mut ids = Vec::new();
+    if let Err(error) = module::foreach_module(module::ModuleType::Active, |path| {
+        if let Some(id) = path.file_name().and_then(|name| name.to_str()) {
+            ids.push(id.to_owned());
+        }
+        Ok(())
+    }) {
+        append_log(format!("failed to enumerate active modules: {error:#}"));
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn write_rescue_disabled_module_ids(ids: &[String]) -> Result<()> {
+    let value = json!({
+        "updatedAt": Local::now().to_rfc3339(),
+        "moduleIds": ids,
+    });
+    atomic_write(
+        Path::new(RESCUE_DISABLED_MODULES_PATH),
+        value.to_string().as_bytes(),
+    )
+    .context("failed to persist rescue-disabled modules")
+}
+
+fn rescue_disabled_module_ids() -> Vec<String> {
+    read_json_file(RESCUE_DISABLED_MODULES_PATH)
+        .and_then(|value| value.get("moduleIds").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn read_rescue_disabled_modules() -> Vec<Value> {
+    rescue_disabled_module_ids()
+        .into_iter()
+        .map(|id| {
+            let path = Path::new(defs::MODULE_DIR).join(&id);
+            let properties = module::read_module_prop(&path).unwrap_or_default();
+            json!({
+                "id": id,
+                "name": properties.get("name").cloned().unwrap_or_default(),
+                "version": properties.get("version").cloned().unwrap_or_default(),
+                "installed": path.is_dir(),
+                "disabled": path.join(defs::DISABLE_FILE_NAME).exists(),
+            })
+        })
+        .collect()
+}
+
+pub fn enable_rescue_module(id: &str) -> Result<()> {
+    let mut ids = rescue_disabled_module_ids();
+    if !ids.iter().any(|saved| saved == id) {
+        return Err(coded_error(
+            "rescue.module_not_recorded",
+            format!("module {id} was not disabled by rescue protection"),
+        ));
+    }
+    module::enable_module(id).map_err(structured_error)?;
+    ids.retain(|saved| saved != id);
+    write_rescue_disabled_module_ids(&ids)?;
+    append_log(format!("module {id} re-enabled after rescue"));
+    Ok(())
 }
 
 fn mark_legacy_fix_done_lock() {
@@ -1194,16 +1925,21 @@ fn find_partition(spec: &PartitionSpec) -> Result<Option<String>> {
     )
 }
 
-fn image_status(spec: &PartitionSpec) -> serde_json::Value {
+fn image_status(spec: &PartitionSpec, manifest: &Value, deep: bool) -> serde_json::Value {
     let device = find_partition(spec).ok().flatten().unwrap_or_default();
     let size = fs::metadata(&spec.image_path).map_or(0, |metadata| metadata.len());
     let partition_size = partition_size(&device);
-    let sha256 = if size > 0 {
-        sha256_of(&spec.image_path)
+    let manifest_sha256 = manifest_sha256_from(manifest, &spec.label).unwrap_or_default();
+    let actual_sha256 = if deep && size > 0 {
+        cached_sha256(&spec.image_path, false)
     } else {
         String::new()
     };
-    let manifest_sha256 = manifest_sha256(&spec.label).unwrap_or_default();
+    let sha256 = if actual_sha256.is_empty() {
+        manifest_sha256.clone()
+    } else {
+        actual_sha256.clone()
+    };
     json!({
         "name": spec.name,
         "label": spec.label,
@@ -1218,13 +1954,43 @@ fn image_status(spec: &PartitionSpec) -> serde_json::Value {
         "size": size,
         "partitionSize": partition_size,
         "sha256": sha256,
-        "sha256Ok": manifest_sha256.is_empty() || manifest_sha256 == sha256,
+        "sha256Ok": !deep || manifest_sha256.is_empty() || manifest_sha256 == actual_sha256,
+        "verificationState": if deep { "verified" } else if manifest_sha256.is_empty() { "unknown" } else { "cached" },
         "sizeOk": partition_size == 0 || size == 0 || partition_size == size,
     })
 }
 
 fn write_manifest(specs: &[PartitionSpec]) -> Result<()> {
-    let images = specs.iter().map(image_status).collect::<Vec<_>>();
+    let images = specs
+        .iter()
+        .map(|spec| {
+            let device = find_partition(spec).ok().flatten().unwrap_or_default();
+            let size = fs::metadata(&spec.image_path).map_or(0, |metadata| metadata.len());
+            let partition_size = partition_size(&device);
+            let sha256 = if size > 0 {
+                cached_sha256(&spec.image_path, true)
+            } else {
+                String::new()
+            };
+            json!({
+                "name": spec.name,
+                "label": spec.label,
+                "partition": device,
+                "image": spec.image_path,
+                "required": spec.required,
+                "custom": spec.custom_path.is_some(),
+                "otherSlot": spec.ota,
+                "restore": spec.restore,
+                "dangerous": is_dangerous_partition(&spec.name),
+                "exists": size > 0,
+                "size": size,
+                "partitionSize": partition_size,
+                "sha256": sha256,
+                "sha256Ok": true,
+                "sizeOk": partition_size == 0 || size == 0 || partition_size == size,
+            })
+        })
+        .collect::<Vec<_>>();
     let manifest = json!({
         "createdAt": Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         "slot": current_slot(),
@@ -1293,8 +2059,7 @@ fn manifest_slot(manifest: &Value) -> String {
         .to_string()
 }
 
-fn manifest_sha256(name: &str) -> Option<String> {
-    let manifest = read_manifest().ok()?;
+fn manifest_sha256_from(manifest: &Value, name: &str) -> Option<String> {
     let images = manifest.get("images")?.as_array()?;
     images.iter().find_map(|image| {
         let image_name = image.get("label").or_else(|| image.get("name"))?.as_str()?;
@@ -1304,6 +2069,177 @@ fn manifest_sha256(name: &str) -> Option<String> {
             None
         }
     })
+}
+
+fn cached_sha256(path: &str, refresh: bool) -> String {
+    let Some(signature) = file_signature(Path::new(path)) else {
+        return String::new();
+    };
+    let mut cache = read_json_file(HASH_CACHE_PATH).unwrap_or_else(|| json!({}));
+    if !refresh
+        && let Some(entry) = cache.get(path)
+        && entry.get("size").and_then(Value::as_u64) == Some(signature.0)
+        && entry.get("modifiedNanos").and_then(Value::as_u64) == Some(signature.1)
+        && let Some(digest) = entry.get("sha256").and_then(Value::as_str)
+        && !digest.is_empty()
+    {
+        return digest.to_owned();
+    }
+
+    let digest = sha256_of(path);
+    if digest.is_empty() {
+        return digest;
+    }
+    if !cache.is_object() {
+        cache = json!({});
+    }
+    if let Some(entries) = cache.as_object_mut() {
+        entries.insert(
+            path.to_owned(),
+            json!({
+                "size": signature.0,
+                "modifiedNanos": signature.1,
+                "sha256": digest,
+            }),
+        );
+        if let Err(error) = atomic_write(Path::new(HASH_CACHE_PATH), cache.to_string().as_bytes()) {
+            append_log(format!("failed to persist SHA256 cache: {error:#}"));
+        }
+    }
+    digest
+}
+
+fn file_signature(path: &Path) -> Option<(u64, u64)> {
+    let metadata = fs::metadata(path).ok()?;
+    let modified = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+    let modified_nanos = modified
+        .as_secs()
+        .saturating_mul(1_000_000_000)
+        .saturating_add(u64::from(modified.subsec_nanos()));
+    Some((metadata.len(), modified_nanos))
+}
+
+fn file_signature_json(path: &Path) -> Value {
+    file_signature(path).map_or_else(
+        || json!({}),
+        |(size, modified_nanos)| {
+            json!({
+                "path": path.display().to_string(),
+                "size": size,
+                "modifiedNanos": modified_nanos,
+            })
+        },
+    )
+}
+
+fn read_json_file(path: &str) -> Option<Value> {
+    let content = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn write_verification_marker(specs: &[PartitionSpec], manifest: &Value) -> Result<()> {
+    let files = specs
+        .iter()
+        .filter(|spec| Path::new(&spec.image_path).is_file())
+        .map(|spec| file_signature_json(Path::new(&spec.image_path)))
+        .collect::<Vec<_>>();
+    let marker = json!({
+        "verifiedAt": Local::now().to_rfc3339(),
+        "manifestSha256": sha256_of(MANIFEST_PATH),
+        "manifestCreatedAt": manifest.get("createdAt").and_then(Value::as_str).unwrap_or_default(),
+        "files": files,
+    });
+    atomic_write(Path::new(VERIFIED_PATH), marker.to_string().as_bytes())
+        .context("failed to persist rescue verification marker")
+}
+
+fn verification_marker_is_current(specs: &[PartitionSpec], manifest: &Value) -> bool {
+    let Some(marker) = read_json_file(VERIFIED_PATH) else {
+        return false;
+    };
+    let manifest_sha256 = marker
+        .get("manifestSha256")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if manifest_sha256.is_empty() || manifest_sha256 != sha256_of(MANIFEST_PATH) {
+        return false;
+    }
+    let Some(files) = marker.get("files").and_then(Value::as_array) else {
+        return false;
+    };
+    let expected = files
+        .iter()
+        .filter_map(|entry| {
+            Some((
+                entry.get("path")?.as_str()?.to_owned(),
+                (
+                    entry.get("size")?.as_u64()?,
+                    entry.get("modifiedNanos")?.as_u64()?,
+                ),
+            ))
+        })
+        .collect::<BTreeMap<_, _>>();
+    specs
+        .iter()
+        .filter(|spec| Path::new(&spec.image_path).is_file())
+        .all(|spec| {
+            file_signature(Path::new(&spec.image_path))
+                .is_some_and(|signature| expected.get(&spec.image_path) == Some(&signature))
+        })
+        && !expected.is_empty()
+        && manifest.get("createdAt").and_then(Value::as_str)
+            == marker.get("manifestCreatedAt").and_then(Value::as_str)
+}
+
+fn write_environment_check(config: &RescueConfig) -> Result<()> {
+    let marker = json!({
+        "checkedAt": Local::now().to_rfc3339(),
+        "config": config_json(config),
+        "device": device_summary(),
+    });
+    atomic_write(
+        Path::new(ENVIRONMENT_CHECK_PATH),
+        marker.to_string().as_bytes(),
+    )
+    .context("failed to persist rescue environment check")
+}
+
+fn environment_check_is_current(config: &RescueConfig) -> bool {
+    let Some(marker) = read_json_file(ENVIRONMENT_CHECK_PATH) else {
+        return false;
+    };
+    marker.get("config") == Some(&config_json(config))
+        && marker
+            .get("device")
+            .and_then(|device| device.get("device"))
+            .and_then(Value::as_str)
+            == device_summary().get("device").and_then(Value::as_str)
+}
+
+#[allow(clippy::fn_params_excessive_bools)]
+const fn rescue_phase(
+    status_ok: bool,
+    enabled: bool,
+    backup_ready: bool,
+    verified: bool,
+    config_changed: bool,
+    restore_interrupted: bool,
+) -> &'static str {
+    if !status_ok {
+        "unavailable"
+    } else if restore_interrupted {
+        "restore_error"
+    } else if config_changed {
+        "config_changed"
+    } else if !backup_ready {
+        "needs_backup"
+    } else if !verified {
+        "needs_verification"
+    } else if enabled {
+        "protected"
+    } else {
+        "ready_to_enable"
+    }
 }
 
 fn read_config() -> Result<RescueConfig> {
@@ -1589,6 +2525,16 @@ fn current_slot() -> String {
     boot_patch::get_slot_suffix(false).unwrap_or_default()
 }
 
+fn current_boot_id() -> Result<String> {
+    let value = fs::read_to_string("/proc/sys/kernel/random/boot_id")
+        .context("failed to read current boot ID")?;
+    let value = value.trim().to_owned();
+    if value.is_empty() {
+        bail!("current boot ID is empty");
+    }
+    Ok(value)
+}
+
 fn boot_mode() -> String {
     boot_mode_values().into_iter().next().unwrap_or_default()
 }
@@ -1611,8 +2557,14 @@ fn boot_mode_values() -> Vec<String> {
 fn is_recovery_boot() -> bool {
     boot_mode_values()
         .iter()
-        .any(|mode| mode == "1" || mode == "recovery" || mode == "rec" || mode.contains("recovery"))
-        || boot_reason_text().contains("recovery")
+        .any(|mode| is_recovery_mode_value(mode))
+}
+
+fn is_recovery_mode_value(mode: &str) -> bool {
+    matches!(
+        mode.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "recovery" | "rec"
+    )
 }
 
 fn device_summary() -> Value {
@@ -1656,10 +2608,7 @@ fn write_boot_count(value: u32) {
 }
 
 fn has_boot_failure_hint() -> bool {
-    has_legacy_failure_hint()
-        || has_kernel_panic_hint()
-        || has_boot_reason_failure_hint()
-        || has_pstore_failure_hint()
+    has_legacy_failure_hint() || has_boot_reason_failure_hint() || has_fresh_failure_artifact_hint()
 }
 
 fn has_legacy_failure_hint() -> bool {
@@ -1669,17 +2618,6 @@ fn has_legacy_failure_hint() -> bool {
             append_log(format!("legacy rescue failure hint found: {path}"));
             found = true;
         }
-    }
-    found
-}
-
-fn has_kernel_panic_hint() -> bool {
-    let Ok(text) = fs::read_to_string("/proc/last_kmsg") else {
-        return false;
-    };
-    let found = has_failure_text(&text);
-    if found {
-        append_log("kernel panic hint found in /proc/last_kmsg");
     }
     found
 }
@@ -1707,29 +2645,127 @@ fn boot_reason_text() -> String {
     .join("\n")
 }
 
-fn has_pstore_failure_hint() -> bool {
-    let Ok(entries) = fs::read_dir("/sys/fs/pstore") else {
+fn has_fresh_failure_artifact_hint() -> bool {
+    let current = failure_artifacts();
+    let Some(baseline_value) = read_json_file(FAILURE_BASELINE_PATH) else {
+        append_log(
+            "failure evidence baseline is missing; record current artifacts without triggering rollback",
+        );
+        if let Err(error) = write_failure_baseline() {
+            append_log(format!(
+                "failed to initialize failure evidence baseline: {error:#}"
+            ));
+        }
         return false;
     };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
-            continue;
-        };
-        if !name.contains("ramoops") && !name.contains("console") && !name.contains("dmesg") {
-            continue;
-        }
-        if let Ok(text) = fs::read_to_string(&path)
-            && has_failure_text(&text)
-        {
-            append_log(format!(
-                "boot failure hint found in pstore: {}",
-                path.display()
-            ));
-            return true;
-        }
+    let baseline = baseline_value
+        .get("artifacts")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    if let Some(path) = fresh_failure_artifact_path(&baseline, &current) {
+        append_log(format!("fresh boot failure evidence found in {path}"));
+        return true;
     }
     false
+}
+
+fn fresh_failure_artifact_path(
+    baseline: &serde_json::Map<String, Value>,
+    current: &BTreeMap<String, Value>,
+) -> Option<String> {
+    for (path, artifact) in current {
+        let digest = artifact
+            .get("sha256")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let has_failure = artifact
+            .get("hasFailure")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let baseline_digest = baseline
+            .get(path.as_str())
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if has_failure && !digest.is_empty() && digest != baseline_digest {
+            return Some(path.clone());
+        }
+    }
+    None
+}
+
+fn write_failure_baseline() -> Result<()> {
+    let artifacts = failure_artifacts()
+        .into_iter()
+        .map(|(path, value)| {
+            (
+                path,
+                Value::String(
+                    value
+                        .get("sha256")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned(),
+                ),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    let baseline = json!({
+        "createdAt": Local::now().to_rfc3339(),
+        "bootId": current_boot_id().unwrap_or_default(),
+        "artifacts": artifacts,
+    });
+    atomic_write(
+        Path::new(FAILURE_BASELINE_PATH),
+        baseline.to_string().as_bytes(),
+    )
+    .context("failed to persist failure evidence baseline")
+}
+
+fn failure_artifacts() -> BTreeMap<String, Value> {
+    let mut paths = vec![PathBuf::from("/proc/last_kmsg")];
+    if let Ok(entries) = fs::read_dir("/sys/fs/pstore") {
+        let mut pstore_paths = entries
+            .flatten()
+            .filter_map(|entry| {
+                let path = entry.path();
+                let name = path.file_name()?.to_str()?;
+                (name.contains("ramoops") || name.contains("console") || name.contains("dmesg"))
+                    .then_some(path)
+            })
+            .collect::<Vec<_>>();
+        pstore_paths.sort();
+        pstore_paths.truncate(FAILURE_ARTIFACT_MAX_FILES);
+        paths.extend(pstore_paths);
+    }
+
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            failure_artifact_from_path(&path, FAILURE_ARTIFACT_SCAN_BYTES)
+                .map(|artifact| (path.display().to_string(), artifact))
+        })
+        .collect()
+}
+
+fn failure_artifact_from_path(path: &Path, max_scan_bytes: u64) -> Option<Value> {
+    let digest = sha256::try_digest(path).ok()?;
+    let mut sample = Vec::new();
+    fs::File::open(path)
+        .ok()?
+        .take(max_scan_bytes.saturating_add(1))
+        .read_to_end(&mut sample)
+        .ok()?;
+    let truncated = sample.len() as u64 > max_scan_bytes;
+    sample.truncate(max_scan_bytes.min(usize::MAX as u64) as usize);
+    let text = String::from_utf8_lossy(&sample);
+    Some(json!({
+        "sha256": digest,
+        "hasFailure": has_failure_text(&text),
+        "scannedBytes": sample.len(),
+        "scanTruncated": truncated,
+    }))
 }
 
 fn has_failure_text(text: &str) -> bool {
@@ -1815,6 +2851,7 @@ fn append_log(message: impl AsRef<str>) {
 
 fn append_log_inner(message: &str) -> Result<()> {
     utils::ensure_dir_exists(RESCUE_DIR)?;
+    rotate_log_if_needed()?;
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -1822,6 +2859,27 @@ fn append_log_inner(message: &str) -> Result<()> {
         .with_context(|| format!("failed to open {LOG_PATH}"))?;
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
     writeln!(file, "[{timestamp}] {message}").context("failed to write rescue log")
+}
+
+fn rotate_log_if_needed() -> Result<()> {
+    let Ok(metadata) = fs::metadata(LOG_PATH) else {
+        return Ok(());
+    };
+    if metadata.len() < LOG_MAX_BYTES {
+        return Ok(());
+    }
+
+    remove_file_if_exists(Path::new(&format!("{LOG_PATH}.{LOG_ROTATION_COUNT}")))?;
+    for index in (1..LOG_ROTATION_COUNT).rev() {
+        let source = format!("{LOG_PATH}.{index}");
+        let destination = format!("{LOG_PATH}.{}", index + 1);
+        if Path::new(&source).exists() {
+            fs::rename(&source, &destination).with_context(|| {
+                format!("failed to rotate rescue log {source} to {destination}")
+            })?;
+        }
+    }
+    fs::rename(LOG_PATH, format!("{LOG_PATH}.1")).context("failed to rotate rescue log")
 }
 
 fn tail_file(path: &str, max_lines: usize) -> Result<String> {
@@ -1838,11 +2896,16 @@ fn tail_file(path: &str, max_lines: usize) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        BootRescueAction, PartitionSpec, backup_path, normalize_partition_name, parse_config,
-        post_fs_data_rescue_action, preserve_file, recovery_boot_rescue_action,
-        restore_preserved_file, validate_import_source_against_partition,
+        BootRescueAction, COPY_TOTAL_TIMEOUT_SECONDS, PartitionSpec, RestoreTransaction,
+        RestoreTransactionEntry, backup_path, copy_with_clock, error_code,
+        failure_artifact_from_path, fresh_failure_artifact_path, invalidate_protection_markers_at,
+        is_recovery_mode_value, normalize_partition_name, parse_config, post_fs_data_rescue_action,
+        preserve_file, read_restore_transaction_from, recovery_boot_rescue_action,
+        restore_preserved_file, restore_transaction_json, restore_transactions_match,
+        select_resumable_restore_transaction, validate_import_source_against_partition,
     };
-    use std::fs;
+    use serde_json::{Map, Value, json};
+    use std::{collections::BTreeMap, fs, io::Cursor, time::Duration};
 
     #[test]
     fn normalizes_supported_partition_aliases() {
@@ -1922,14 +2985,239 @@ mod tests {
     }
 
     #[test]
-    fn recovery_only_rolls_back_images_when_a_flash_is_pending() {
+    fn recovery_requires_failure_evidence_or_repeated_pending_boots() {
         assert_eq!(
-            recovery_boot_rescue_action(true, false),
+            recovery_boot_rescue_action(true, false, 1),
+            BootRescueAction::None,
+        );
+        assert_eq!(
+            recovery_boot_rescue_action(true, true, 1),
             BootRescueAction::RestoreBackups,
         );
         assert_eq!(
-            recovery_boot_rescue_action(false, true),
+            recovery_boot_rescue_action(true, false, 2),
+            BootRescueAction::RestoreBackups,
+        );
+        assert_eq!(
+            recovery_boot_rescue_action(false, true, 1),
             BootRescueAction::DisableModules,
         );
+    }
+
+    #[test]
+    fn recovery_detection_accepts_only_explicit_current_modes() {
+        for mode in ["1", "true", "yes", "recovery", "REC"] {
+            assert!(
+                is_recovery_mode_value(mode),
+                "expected recovery mode: {mode}"
+            );
+        }
+        for mode in [
+            "normal",
+            "reboot,recovery",
+            "recovery-requested",
+            "kernel_panic_recovery",
+        ] {
+            assert!(
+                !is_recovery_mode_value(mode),
+                "ambiguous value must not trigger recovery restore: {mode}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalidating_verification_pauses_enabled_protection() {
+        let directory = tempfile::tempdir().unwrap();
+        let enabled = directory.path().join("enabled");
+        let verified = directory.path().join("verified.json");
+        fs::write(&enabled, b"1").unwrap();
+        fs::write(&verified, b"verified").unwrap();
+
+        assert!(invalidate_protection_markers_at(&enabled, &verified).unwrap());
+        assert!(!enabled.exists());
+        assert!(!verified.exists());
+
+        fs::write(&verified, b"verified-again").unwrap();
+        assert!(!invalidate_protection_markers_at(&enabled, &verified).unwrap());
+        assert!(!verified.exists());
+    }
+
+    #[test]
+    fn failure_artifact_sampling_is_bounded_but_digest_is_complete() {
+        let directory = tempfile::tempdir().unwrap();
+        let artifact = directory.path().join("console-ramoops");
+        let content = b"kernel panic\n0123456789abcdefghijklmnopqrstuvwxyz";
+        fs::write(&artifact, content).unwrap();
+
+        let report = failure_artifact_from_path(&artifact, 16).unwrap();
+        assert_eq!(report["sha256"], sha256::digest(content));
+        assert_eq!(report["hasFailure"], true);
+        assert_eq!(report["scannedBytes"], 16);
+        assert_eq!(report["scanTruncated"], true);
+    }
+
+    #[test]
+    fn stale_pstore_evidence_does_not_trigger_again() {
+        let mut baseline = Map::new();
+        baseline.insert("/sys/fs/pstore/console-ramoops".to_owned(), json!("old"));
+        let current = BTreeMap::from([(
+            "/sys/fs/pstore/console-ramoops".to_owned(),
+            json!({"sha256":"old","hasFailure":true}),
+        )]);
+
+        assert!(fresh_failure_artifact_path(&baseline, &current).is_none());
+    }
+
+    #[test]
+    fn fresh_pstore_evidence_is_detected_against_baseline() {
+        let mut baseline = Map::new();
+        baseline.insert("/sys/fs/pstore/console-ramoops".to_owned(), json!("old"));
+        let current = BTreeMap::from([(
+            "/sys/fs/pstore/console-ramoops".to_owned(),
+            json!({"sha256":"new","hasFailure":true}),
+        )]);
+
+        assert_eq!(
+            fresh_failure_artifact_path(&baseline, &current),
+            Some("/sys/fs/pstore/console-ramoops".to_owned()),
+        );
+    }
+
+    #[test]
+    fn restore_transaction_round_trip_preserves_verified_progress() {
+        let entries = vec![RestoreTransactionEntry {
+            name: "boot".to_owned(),
+            label: "boot".to_owned(),
+            image_path: "/data/adb/ksu/rescue/boot.img".to_owned(),
+            device_path: "/dev/block/by-name/boot_a".to_owned(),
+            expected_sha256: "abc".to_owned(),
+            expected_size: 4096,
+            status: "verified".to_owned(),
+        }];
+        let transaction = RestoreTransaction {
+            id: "test".to_owned(),
+            reason: "unit test".to_owned(),
+            automatic: false,
+            description: "restore current slot".to_owned(),
+            activate_slot: None,
+            phase: "writing".to_owned(),
+            error_code: String::new(),
+            error_message: String::new(),
+            started_at: "start".to_owned(),
+            updated_at: "update".to_owned(),
+            entries: entries.clone(),
+        };
+
+        let value = restore_transaction_json(&transaction);
+        assert_eq!(value["phase"], Value::String("writing".to_owned()));
+        assert_eq!(value["entries"][0]["status"], "verified");
+        assert!(restore_transactions_match(&transaction, &entries, None));
+    }
+
+    #[test]
+    fn interrupted_restore_resumes_verified_progress_after_process_restart() {
+        let entries = vec![
+            RestoreTransactionEntry {
+                name: "boot".to_owned(),
+                label: "boot".to_owned(),
+                image_path: "/data/adb/ksu/rescue/boot.img".to_owned(),
+                device_path: "/dev/block/by-name/boot_a".to_owned(),
+                expected_sha256: "boot-digest".to_owned(),
+                expected_size: 4096,
+                status: "verified".to_owned(),
+            },
+            RestoreTransactionEntry {
+                name: "init_boot".to_owned(),
+                label: "init_boot".to_owned(),
+                image_path: "/data/adb/ksu/rescue/init_boot.img".to_owned(),
+                device_path: "/dev/block/by-name/init_boot_a".to_owned(),
+                expected_sha256: "init-boot-digest".to_owned(),
+                expected_size: 2048,
+                status: "failed".to_owned(),
+            },
+        ];
+        let transaction = RestoreTransaction {
+            id: "interrupted".to_owned(),
+            reason: "unit test".to_owned(),
+            automatic: false,
+            description: "restore current slot".to_owned(),
+            activate_slot: None,
+            phase: "failed".to_owned(),
+            error_code: "rescue.io_timeout".to_owned(),
+            error_message: "copy timed out".to_owned(),
+            started_at: "start".to_owned(),
+            updated_at: "update".to_owned(),
+            entries: entries.clone(),
+        };
+        let temp = tempfile::tempdir().expect("create temp directory");
+        let state_path = temp.path().join("restore_transaction.json");
+        fs::write(
+            &state_path,
+            restore_transaction_json(&transaction).to_string(),
+        )
+        .expect("persist transaction");
+
+        let restarted = read_restore_transaction_from(&state_path)
+            .expect("read persisted transaction")
+            .expect("transaction must exist");
+        let resumed = select_resumable_restore_transaction(restarted, &entries, None)
+            .expect("matching interrupted transaction should resume")
+            .expect("transaction should be resumable");
+
+        assert_eq!(resumed.id, "interrupted");
+        assert_eq!(resumed.entries[0].status, "verified");
+        assert_eq!(resumed.entries[1].status, "failed");
+    }
+
+    #[test]
+    fn conflicting_restore_transaction_is_rejected() {
+        let entries = vec![RestoreTransactionEntry {
+            name: "boot".to_owned(),
+            label: "boot".to_owned(),
+            image_path: "/data/adb/ksu/rescue/boot.img".to_owned(),
+            device_path: "/dev/block/by-name/boot_a".to_owned(),
+            expected_sha256: "new-digest".to_owned(),
+            expected_size: 4096,
+            status: "pending".to_owned(),
+        }];
+        let existing = RestoreTransaction {
+            id: "old-transaction".to_owned(),
+            reason: "unit test".to_owned(),
+            automatic: false,
+            description: "restore current slot".to_owned(),
+            activate_slot: None,
+            phase: "writing".to_owned(),
+            error_code: String::new(),
+            error_message: String::new(),
+            started_at: "start".to_owned(),
+            updated_at: "update".to_owned(),
+            entries: vec![RestoreTransactionEntry {
+                expected_sha256: "old-digest".to_owned(),
+                ..entries[0].clone()
+            }],
+        };
+
+        let error = select_resumable_restore_transaction(existing, &entries, None)
+            .expect_err("mismatched unfinished transaction must be rejected");
+        assert_eq!(error_code(&error), "rescue.restore_transaction_conflict");
+    }
+
+    #[test]
+    fn slow_storage_copy_returns_structured_timeout() {
+        let mut input = Cursor::new(vec![1_u8; 32]);
+        let mut output = Vec::new();
+        let mut ticks = [Duration::ZERO, Duration::from_secs(46)].into_iter();
+
+        let error = copy_with_clock(
+            &mut input,
+            &mut output,
+            Duration::from_secs(45),
+            Duration::from_secs(COPY_TOTAL_TIMEOUT_SECONDS),
+            || ticks.next().unwrap_or(Duration::from_secs(46)),
+        )
+        .expect_err("stalled copy must time out");
+
+        assert_eq!(error_code(&error), "rescue.io_timeout");
+        assert!(output.is_empty());
     }
 }

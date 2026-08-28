@@ -155,7 +155,7 @@ private fun HomeCardWallpaperScreenMiuix(
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },
@@ -326,7 +326,7 @@ private fun HomeCardWallpaperItem(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f),
     ) {
         Column(
@@ -357,7 +357,7 @@ private fun HomeCardWallpaperItem(
                 }
                 IconButton(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                     onClick = state.onPickWallpaper,
                 ) {
@@ -485,7 +485,7 @@ private fun HomeCardWallpaperOverflowMenu(
     Box {
         IconButton(
             modifier = Modifier
-                .size(36.dp)
+                .size(48.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), CircleShape),
             onClick = { expanded = true },
         ) {

@@ -39,10 +39,11 @@ data class AppIdAppGroup(
         }
 }
 
-enum class AppIdNotice {
-    Staged,
-    Restored,
-    PendingCanceled,
+sealed interface AppIdNotice {
+    data object Staged : AppIdNotice
+    data object Restored : AppIdNotice
+    data object PendingCanceled : AppIdNotice
+    data class BatchStaged(val changedCount: Int, val requestedCount: Int) : AppIdNotice
 }
 
 @Immutable
@@ -247,6 +248,56 @@ class AppIdManagerViewModel(
                         selectedError = if (it.selected?.uid == group.uid) failure else it.selectedError,
                     )
                 }
+            }
+        }
+    }
+
+    fun randomResetBatch(groups: List<AppIdAppGroup>) {
+        val targets = groups.distinctBy(AppIdAppGroup::uid)
+        if (targets.isEmpty() || _uiState.value.busy) return
+        selectionJob?.cancel()
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    busy = true,
+                    actionUid = null,
+                    actionErrors = it.actionErrors - targets.map(AppIdAppGroup::uid).toSet(),
+                    notice = null,
+                )
+            }
+            var changed = 0
+            var snapshots = _uiState.value.snapshots
+            var errors = _uiState.value.actionErrors
+            targets.forEach { group ->
+                try {
+                    val snapshot = idRepository.randomReset(
+                        uid = group.uid,
+                        packageName = group.primary.packageName,
+                        knownPackages = group.packageNames,
+                    )
+                    snapshots = snapshots + (group.uid to snapshot)
+                    errors = errors - group.uid
+                    changed++
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    errors = errors + (group.uid to error.toAppIdFailure())
+                }
+                _uiState.update {
+                    it.copy(snapshots = snapshots, actionErrors = errors)
+                }
+            }
+            _uiState.update {
+                val selectedSnapshot = it.selected?.let { group -> snapshots[group.uid] }
+                it.copy(
+                    busy = false,
+                    actionUid = null,
+                    snapshots = snapshots,
+                    actionErrors = errors,
+                    selectedSnapshot = selectedSnapshot ?: it.selectedSnapshot,
+                    draft = selectedSnapshot?.pendingId ?: selectedSnapshot?.currentId ?: it.draft,
+                    notice = AppIdNotice.BatchStaged(changed, targets.size),
+                )
             }
         }
     }

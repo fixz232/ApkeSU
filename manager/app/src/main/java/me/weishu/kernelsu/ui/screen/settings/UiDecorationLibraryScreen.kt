@@ -403,7 +403,7 @@ fun UiDecorationLibraryScreen() {
                             tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onBackground,
                             contentDescription = activeCategory?.let {
                                 stringResource(R.string.ui_decoration_back_to_categories)
-                            } ?: stringResource(R.string.close),
+                            } ?: stringResource(R.string.back),
                         )
                     }
                 },

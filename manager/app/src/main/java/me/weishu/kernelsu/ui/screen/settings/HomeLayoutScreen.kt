@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -115,6 +116,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
+import me.weishu.kernelsu.ui.component.ApkeFixedActionBar
 import me.weishu.kernelsu.ui.component.CustomWallpaperRoot
 import me.weishu.kernelsu.ui.component.HomeLayoutCanvas
 import me.weishu.kernelsu.ui.component.HomeLayoutEditor
@@ -207,7 +209,7 @@ fun HomeLayoutScreen() {
     var saving by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var fullscreenEditor by remember { mutableStateOf(false) }
-    var showPreciseControls by remember { mutableStateOf(false) }
+    var showPreciseControls by remember { mutableStateOf(true) }
     var showLayerPanel by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var overlappingCards by remember { mutableStateOf(emptySet<HomeLayoutCard>()) }
@@ -472,11 +474,43 @@ fun HomeLayoutScreen() {
                         MiuixIcon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             tint = MiuixTheme.colorScheme.onBackground,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },
             )
+        },
+        bottomBar = {
+            ApkeFixedActionBar {
+                FilledTonalButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !saving,
+                    onClick = {
+                        applyState(HomeLayoutState(enabled = state.enabled))
+                        message = resetSuccess
+                    },
+                ) {
+                    Icon(Icons.Rounded.RestartAlt, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.home_layout_restore_default),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = !saving && dirty,
+                    onClick = { save() },
+                ) {
+                    Icon(Icons.Rounded.Save, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.home_layout_save),
+                        maxLines = 1,
+                    )
+                }
+            }
         },
     ) { innerPadding ->
         Column(
@@ -594,44 +628,52 @@ fun HomeLayoutScreen() {
                 },
             )
 
-            HomeLayoutPreview(
-                state = state,
-                homeUiState = homeUiState,
-                isLandscape = editingLandscape,
-                onOpenFullscreen = { fullscreenEditor = true },
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilledTonalButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = { showPreciseControls = !showPreciseControls },
-                ) {
-                    Icon(
-                        imageVector = if (showPreciseControls) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        contentDescription = null,
+            HomeLayoutResponsiveWorkspace(
+                showInspector = showPreciseControls,
+                preview = {
+                    HomeLayoutPreview(
+                        state = state,
+                        homeUiState = homeUiState,
+                        isLandscape = editingLandscape,
+                        onOpenFullscreen = { fullscreenEditor = true },
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_layout_precise_controls))
-                }
-                IconButton(onClick = ::undo, enabled = undoStack.isNotEmpty()) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.Undo,
-                        contentDescription = stringResource(R.string.home_layout_undo),
-                    )
-                }
-                IconButton(onClick = ::redo, enabled = redoStack.isNotEmpty()) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.Redo,
-                        contentDescription = stringResource(R.string.home_layout_redo),
-                    )
-                }
-            }
-
-            AnimatedVisibility(visible = showPreciseControls) {
+                },
+                toolbar = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FilledTonalButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = { showPreciseControls = !showPreciseControls },
+                        ) {
+                            Icon(
+                                imageVector = if (showPreciseControls) {
+                                    Icons.Rounded.ExpandLess
+                                } else {
+                                    Icons.Rounded.ExpandMore
+                                },
+                                contentDescription = null,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_layout_precise_controls))
+                        }
+                        IconButton(onClick = ::undo, enabled = undoStack.isNotEmpty()) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.Undo,
+                                contentDescription = stringResource(R.string.home_layout_undo),
+                            )
+                        }
+                        IconButton(onClick = ::redo, enabled = redoStack.isNotEmpty()) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.Redo,
+                                contentDescription = stringResource(R.string.home_layout_redo),
+                            )
+                        }
+                    }
+                },
+                inspector = {
                 HomeLayoutInspector(
                     item = activeItems().first { it.card == selectedCard },
                     selectedStickerId = selectedStickerId,
@@ -704,34 +746,9 @@ fun HomeLayoutScreen() {
                         selectedStickerId = null
                     },
                 )
-            }
+                },
+            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FilledTonalButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = !saving,
-                    onClick = {
-                        applyState(HomeLayoutState(enabled = state.enabled))
-                        message = resetSuccess
-                    },
-                ) {
-                    Icon(Icons.Rounded.RestartAlt, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_layout_restore_default))
-                }
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = !saving && dirty,
-                    onClick = { save() },
-                ) {
-                    Icon(Icons.Rounded.Save, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_layout_save))
-                }
-            }
         }
     }
 
@@ -950,6 +967,51 @@ private fun HomeLayoutFullscreenBackground(
             }
             UiDecorationBackdrop(modifier = Modifier.fillMaxSize())
             content()
+        }
+    }
+}
+
+@Composable
+private fun HomeLayoutResponsiveWorkspace(
+    showInspector: Boolean,
+    preview: @Composable () -> Unit,
+    toolbar: @Composable () -> Unit,
+    inspector: @Composable () -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 840.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1.15f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    preview()
+                }
+                Column(
+                    modifier = Modifier.weight(0.85f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    toolbar()
+                    AnimatedVisibility(visible = showInspector) {
+                        inspector()
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                preview()
+                toolbar()
+                AnimatedVisibility(visible = showInspector) {
+                    inspector()
+                }
+            }
         }
     }
 }

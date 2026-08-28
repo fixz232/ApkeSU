@@ -36,9 +36,11 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,6 +79,13 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.AppIconImage
+import me.weishu.kernelsu.ui.component.ApkeAppSort
+import me.weishu.kernelsu.ui.component.ApkeAppSortMenu
+import me.weishu.kernelsu.ui.component.ApkeEmptyState
+import me.weishu.kernelsu.ui.component.ApkeErrorState
+import me.weishu.kernelsu.ui.component.ApkeLoadingState
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
+import me.weishu.kernelsu.ui.component.ApkeSelectionToolbar
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.theme.immersivePageColor
@@ -97,6 +107,7 @@ private enum class AppIdConfirmation {
     Apply,
     Restore,
     RandomReset,
+    BatchRandomReset,
 }
 
 @Composable
@@ -106,58 +117,91 @@ fun AppIdManagerScreen() {
     val viewModel = viewModel<AppIdManagerViewModel>()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val onBack = dropUnlessResumed { navigator.pop() }
+    val snackbarHostState = remember { SnackbarHostState() }
     var confirmation by rememberSaveable { mutableStateOf<AppIdConfirmation?>(null) }
     var randomResetUid by rememberSaveable { mutableStateOf<Int?>(null) }
-    val visibleGroups = remember(state.groups, state.query, state.showSystemApps) {
-        filterAppIdGroups(state.groups, state.query, state.showSystemApps)
-    }
-
-    LaunchedEffect(state.notice) {
-        val message = when (state.notice) {
-            AppIdNotice.Staged -> R.string.app_id_manager_staged
-            AppIdNotice.Restored -> R.string.app_id_manager_restore_staged
-            AppIdNotice.PendingCanceled -> R.string.app_id_manager_pending_canceled
-            null -> return@LaunchedEffect
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    var selectedUids by remember { mutableStateOf(emptySet<Int>()) }
+    var sort by rememberSaveable { mutableStateOf(ApkeAppSort.Name) }
+    val visibleGroups = remember(state.groups, state.query, state.showSystemApps, sort) {
+        val groups = filterAppIdGroups(state.groups, state.query, state.showSystemApps)
+        when (sort) {
+            ApkeAppSort.Name -> groups.sortedWith(
+                compareBy(String.CASE_INSENSITIVE_ORDER) { it.primary.label },
+            )
+            ApkeAppSort.PackageName -> groups.sortedWith(
+                compareBy(String.CASE_INSENSITIVE_ORDER) { it.primary.packageName },
+            )
+            ApkeAppSort.UserId -> groups.sortedBy(AppIdAppGroup::uid)
         }
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        viewModel.clearNotice()
+    }
+    val selectedGroups = remember(visibleGroups, selectedUids) {
+        visibleGroups.filter { it.uid in selectedUids }
     }
 
-    Scaffold(
+    LaunchedEffect(state.groups) {
+        selectedUids = selectedUids.intersect(state.groups.mapTo(hashSetOf(), AppIdAppGroup::uid))
+    }
+
+    val notice = state.notice
+    val noticeMessage = when (notice) {
+        AppIdNotice.Staged -> stringResource(R.string.app_id_manager_staged)
+        AppIdNotice.Restored -> stringResource(R.string.app_id_manager_restore_staged)
+        AppIdNotice.PendingCanceled -> stringResource(R.string.app_id_manager_pending_canceled)
+        is AppIdNotice.BatchStaged -> stringResource(
+            R.string.app_id_manager_batch_staged,
+            notice.changedCount,
+            notice.requestedCount,
+        )
+        null -> null
+    }
+    LaunchedEffect(notice, noticeMessage) {
+        if (notice != null && noticeMessage != null) {
+            snackbarHostState.showSnackbar(noticeMessage)
+            viewModel.clearNotice()
+        }
+    }
+
+    ApkeSecondaryScaffold(
+        title = stringResource(R.string.app_id_manager_title),
+        onBack = onBack,
         modifier = Modifier.imePadding(),
         containerColor = immersivePageColor(MaterialTheme.colorScheme.background),
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_id_manager_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
-                        )
-                    }
+        snackbarHostState = snackbarHostState,
+        actions = {
+            IconButton(
+                onClick = {
+                    selectionMode = !selectionMode
+                    if (!selectionMode) selectedUids = emptySet()
                 },
-                actions = {
-                    IconButton(
-                        onClick = viewModel::refreshApps,
-                        enabled = !state.loadingApps && !state.busy,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.app_id_manager_refresh),
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = immersiveTopBarColor(MaterialTheme.colorScheme.background),
-                    scrolledContainerColor = immersiveScrolledTopBarColor(
-                        MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                ),
+                enabled = !state.loadingApps && !state.busy,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SelectAll,
+                    contentDescription = stringResource(R.string.app_list_select_mode),
+                    tint = if (selectionMode) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            ApkeAppSortMenu(
+                selected = sort,
+                onSelected = { sort = it },
+                enabled = !state.loadingApps && !state.busy,
             )
+            IconButton(
+                onClick = viewModel::refreshApps,
+                enabled = !state.loadingApps && !state.busy,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = stringResource(R.string.app_id_manager_refresh),
+                )
+            }
         },
-    ) { contentPadding ->
+    ) { contentPadding, _ ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -179,7 +223,32 @@ fun AppIdManagerScreen() {
                     onShowSystemAppsChange = viewModel::setShowSystemApps,
                 )
             }
-            state.selected?.let { selected ->
+            if (selectionMode) {
+                item {
+                    ApkeSelectionToolbar(
+                        selectedCount = selectedGroups.size,
+                        totalCount = visibleGroups.size,
+                        onSelectAll = {
+                            selectedUids = visibleGroups.mapTo(linkedSetOf(), AppIdAppGroup::uid)
+                        },
+                        onClear = { selectedUids = emptySet() },
+                    ) {
+                        FilledTonalButton(
+                            enabled = selectedGroups.isNotEmpty() && !state.busy,
+                            onClick = { confirmation = AppIdConfirmation.BatchRandomReset },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.AutoFixHigh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.app_id_manager_random_reset), maxLines = 1)
+                        }
+                    }
+                }
+            }
+            if (!selectionMode) state.selected?.let { selected ->
                 item(key = "editor-${selected.uid}") {
                     AppIdEditor(
                         state = state,
@@ -204,17 +273,23 @@ fun AppIdManagerScreen() {
             }
             if (state.loadingApps) {
                 item {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    ApkeLoadingState()
                 }
             }
             state.listError?.let { failure ->
                 item {
-                    AppIdErrorCard(failure = failure, onRetry = viewModel::refreshApps)
+                    ApkeErrorState(
+                        title = appIdFailureLabel(failure),
+                        supportingText = stringResource(R.string.app_id_manager_error_retry_summary),
+                        onRetry = viewModel::refreshApps,
+                    )
                 }
             }
             if (!state.loadingApps && state.listError == null && visibleGroups.isEmpty()) {
                 item {
-                    AppIdEmptyCard()
+                    ApkeEmptyState(
+                        title = stringResource(R.string.app_id_manager_empty),
+                    )
                 }
             }
             items(visibleGroups, key = { it.uid }) { group ->
@@ -226,7 +301,19 @@ fun AppIdManagerScreen() {
                     enabled = !state.busy && !state.loadingApps,
                     loading = state.loadingApps && state.snapshots[group.uid] == null,
                     busy = state.actionUid == group.uid,
-                    onClick = { viewModel.select(group) },
+                    selectionMode = selectionMode,
+                    selectionSelected = group.uid in selectedUids,
+                    onClick = {
+                        if (selectionMode) {
+                            selectedUids = if (group.uid in selectedUids) {
+                                selectedUids - group.uid
+                            } else {
+                                selectedUids + group.uid
+                            }
+                        } else {
+                            viewModel.select(group)
+                        }
+                    },
                     onCopy = { value -> copyAppId(context, value) },
                     onRandomReset = {
                         randomResetUid = group.uid
@@ -354,6 +441,41 @@ fun AppIdManagerScreen() {
                     },
                 )
             }
+        }
+
+        AppIdConfirmation.BatchRandomReset -> {
+            AlertDialog(
+                onDismissRequest = { if (!state.busy) confirmation = null },
+                icon = { Icon(Icons.Rounded.AutoFixHigh, contentDescription = null) },
+                title = { Text(stringResource(R.string.app_id_manager_batch_reset_title)) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.app_id_manager_batch_reset_message,
+                            selectedGroups.size,
+                        ),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = selectedGroups.isNotEmpty() && !state.busy,
+                        onClick = {
+                            val targets = selectedGroups
+                            confirmation = null
+                            selectionMode = false
+                            selectedUids = emptySet()
+                            viewModel.randomResetBatch(targets)
+                        },
+                    ) {
+                        Text(stringResource(R.string.app_id_manager_random_reset))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmation = null }, enabled = !state.busy) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                },
+            )
         }
 
         null -> Unit
@@ -698,6 +820,8 @@ private fun AppIdAppRow(
     enabled: Boolean,
     loading: Boolean,
     busy: Boolean,
+    selectionMode: Boolean,
+    selectionSelected: Boolean,
     onClick: () -> Unit,
     onCopy: (String) -> Unit,
     onRandomReset: () -> Unit,
@@ -718,6 +842,12 @@ private fun AppIdAppRow(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selectionMode) {
+                    Checkbox(
+                        checked = selectionSelected,
+                        onCheckedChange = { onClick() },
+                    )
+                }
                 AppIconImage(
                     packageInfo = group.primary.packageInfo,
                     label = group.primary.label,
@@ -839,7 +969,7 @@ private fun AppIdAppRow(
                 AppIdFailureText(failure = it, color = MaterialTheme.colorScheme.error)
             }
 
-            Row(
+            if (!selectionMode) Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
@@ -927,25 +1057,28 @@ private fun AppIdInlineError(failure: AppIdFailure, onRetry: () -> Unit) {
 @Composable
 private fun AppIdFailureText(failure: AppIdFailure, color: Color) {
     Text(
-        text = stringResource(
-            when (failure) {
-                AppIdFailure.RootUnavailable -> R.string.app_id_manager_error_root
-                AppIdFailure.SettingsFileMissing -> R.string.app_id_manager_error_file_missing
-                AppIdFailure.InvalidSettingsFile -> R.string.app_id_manager_error_invalid_xml
-                AppIdFailure.InvalidAppId -> R.string.app_id_manager_invalid_value
-                AppIdFailure.BackupMissing -> R.string.app_id_manager_error_backup_missing
-                AppIdFailure.CommandTimeout -> R.string.app_id_manager_error_timeout
-                AppIdFailure.CommandFailed -> R.string.app_id_manager_error_command
-                AppIdFailure.StagingPreparationFailed -> R.string.app_id_manager_error_stage_prepare
-                AppIdFailure.BootScriptStagingFailed -> R.string.app_id_manager_error_stage_script
-                AppIdFailure.PendingXmlStagingFailed -> R.string.app_id_manager_error_stage_xml
-                AppIdFailure.StagingVerificationFailed -> R.string.app_id_manager_error_stage_verify
-            }
-        ),
+        text = appIdFailureLabel(failure),
         style = MaterialTheme.typography.bodyMedium,
         color = color,
     )
 }
+
+@Composable
+private fun appIdFailureLabel(failure: AppIdFailure): String = stringResource(
+    when (failure) {
+        AppIdFailure.RootUnavailable -> R.string.app_id_manager_error_root
+        AppIdFailure.SettingsFileMissing -> R.string.app_id_manager_error_file_missing
+        AppIdFailure.InvalidSettingsFile -> R.string.app_id_manager_error_invalid_xml
+        AppIdFailure.InvalidAppId -> R.string.app_id_manager_invalid_value
+        AppIdFailure.BackupMissing -> R.string.app_id_manager_error_backup_missing
+        AppIdFailure.CommandTimeout -> R.string.app_id_manager_error_timeout
+        AppIdFailure.CommandFailed -> R.string.app_id_manager_error_command
+        AppIdFailure.StagingPreparationFailed -> R.string.app_id_manager_error_stage_prepare
+        AppIdFailure.BootScriptStagingFailed -> R.string.app_id_manager_error_stage_script
+        AppIdFailure.PendingXmlStagingFailed -> R.string.app_id_manager_error_stage_xml
+        AppIdFailure.StagingVerificationFailed -> R.string.app_id_manager_error_stage_verify
+    },
+)
 
 @Composable
 private fun AppIdEmptyCard() {

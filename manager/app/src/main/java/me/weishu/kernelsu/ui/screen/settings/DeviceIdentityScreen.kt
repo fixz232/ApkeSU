@@ -154,7 +154,7 @@ fun DeviceIdentityScreen() {
                     IconButton(onClick = dropUnlessResumed { navigator.pop() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
                 },

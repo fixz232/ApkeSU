@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -75,6 +78,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -330,7 +334,7 @@ fun ThemeStoreScreen(
                         MiuixIconButton(onClick = actions.onBack) {
                             MiuixIcon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.close),
+                                contentDescription = stringResource(R.string.back),
                                 tint = themeStoreTextColor(),
                             )
                         }
@@ -418,7 +422,12 @@ private fun ThemeStoreNavigationBar(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onSelected(destination) }
+                    .heightIn(min = 48.dp)
+                    .selectable(
+                        selected = selected,
+                        role = Role.Tab,
+                        onClick = { onSelected(destination) },
+                    )
                     .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -475,6 +484,7 @@ private fun ThemeStoreCustomizeContent(
         mutableStateOf(initialSection)
     }
     ThemeStorePageColumn(modifier) {
+        ThemeStoreCurrentThemeStatus(summary)
         ThemeStoreCustomizeSelector(
             selected = selectedSection,
             onSelected = { selectedSection = it },
@@ -493,22 +503,89 @@ private fun ThemeStoreCustomizeSelector(
     onSelected: (ThemeStoreCustomizeSection) -> Unit,
 ) {
     val palette = themeStorePalette()
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(end = 8.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(palette.surface.copy(alpha = 0.68f))
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(ThemeStoreCustomizeSection.entries, key = { it.name }) { section ->
-            FilterChip(
-                selected = selected == section,
-                onClick = { onSelected(section) },
-                label = { Text(stringResource(section.titleRes)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = palette.surface.copy(alpha = 0.58f),
-                    labelColor = palette.mutedText,
-                    selectedContainerColor = palette.accentContainer,
-                    selectedLabelColor = palette.text,
-                ),
+        ThemeStoreCustomizeSection.entries.forEach { section ->
+            val isSelected = selected == section
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .selectable(
+                        selected = isSelected,
+                        role = Role.Tab,
+                        onClick = { onSelected(section) },
+                    )
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) palette.accentContainer else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(section.titleRes),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) palette.text else palette.mutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeStoreCurrentThemeStatus(summary: ThemeStoreSummary) {
+    val palette = themeStorePalette()
+    val previewColor = if (summary.appearance.keyColor != 0) {
+        Color(summary.appearance.keyColor)
+    } else {
+        palette.accent
+    }
+    ThemeStoreSurface {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(previewColor),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.theme_store_current_theme),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = themeStoreTextColor(),
+                )
+                Text(
+                    text = summary.appearance.colorStyle.replace('_', ' '),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = themeStoreMutedColor(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = stringResource(R.string.theme_store_applied),
+                style = MaterialTheme.typography.labelMedium,
+                color = palette.accent,
             )
         }
     }
@@ -938,7 +1015,7 @@ private fun ThemeStoreBackButton(onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = stringResource(R.string.close),
+            contentDescription = stringResource(R.string.back),
             tint = Color.White,
         )
     }

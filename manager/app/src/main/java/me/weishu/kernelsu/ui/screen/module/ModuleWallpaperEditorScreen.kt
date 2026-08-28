@@ -218,7 +218,7 @@ fun ModuleWallpaperEditorScreen(
                 title = { Text(stringResource(R.string.module_wallpaper_editor_title)) },
                 navigationIcon = {
                     IconButton(onClick = navigator::pop) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.close))
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back))
                     }
                 },
             )

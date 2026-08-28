@@ -814,7 +814,7 @@ fun setThemeStoreStartupSound(context: Context, uriString: String?) {
 fun setThemeStoreStartupAnimation(context: Context, uriString: String?) {
     val prefs = themeStorePrefs(context)
     val previous = prefs.getString(CUSTOM_STARTUP_ANIMATION_URI_KEY, null)
-    if (previous != uriString) {
+    if (previous != uriString && !isStartupAnimationUriReferencedByPreset(context, previous)) {
         releasePersistableStartupAnimationReadPermission(context, previous)
     }
     prefs.edit {

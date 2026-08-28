@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
@@ -65,6 +66,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.dropUnlessResumed
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.component.ApkeMetricGrid
+import me.weishu.kernelsu.ui.component.ApkeMetricItem
+import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
+import me.weishu.kernelsu.ui.component.ApkeUiTokens
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.pixel.PixelPetAccessory
 import me.weishu.kernelsu.ui.component.pixel.PixelPetAccessorySlot
@@ -170,30 +175,11 @@ fun PixelPetScreen() {
     }
     val onBack = dropUnlessResumed { navigator.pop() }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
+    ApkeSecondaryScaffold(
+        title = stringResource(R.string.pixel_pet_title),
+        onBack = onBack,
         containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.pixel_pet_title),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.close))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = immersiveScrolledTopBarColor(MaterialTheme.colorScheme.surface),
-                ),
-            )
-        },
-    ) { innerPadding ->
+    ) { innerPadding, _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             PixelPetScreenBackdrop()
             Column(
@@ -202,9 +188,9 @@ fun PixelPetScreen() {
                     .verticalScroll(activeScrollState)
                     .navigationBarsPadding()
                     .padding(
-                        start = 14.dp,
+                        start = ApkeUiTokens.PageHorizontalPadding,
                         top = innerPadding.calculateTopPadding() + 8.dp,
-                        end = 14.dp,
+                        end = ApkeUiTokens.PageHorizontalPadding,
                         bottom = innerPadding.calculateBottomPadding() + 18.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -221,11 +207,15 @@ fun PixelPetScreen() {
                 selected = selectedPage,
                 onSelected = { selectedPage = it },
             )
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { navigator.push(Route.PixelPetSpriteStudio) },
-            ) {
-                Text(stringResource(R.string.pixel_pet_sprite_studio_entry))
+            if (selectedPage == PixelPetPage.Growth) {
+                OutlinedButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = ApkeUiTokens.MinTouchTarget),
+                    onClick = { navigator.push(Route.PixelPetSpriteStudio) },
+                ) {
+                    Text(stringResource(R.string.pixel_pet_sprite_studio_entry))
+                }
             }
             if (shopMessage.isNotBlank()) {
                 Text(
@@ -236,6 +226,41 @@ fun PixelPetScreen() {
                 )
             }
             if (selectedPage == PixelPetPage.Companion) {
+                PetSection(title = stringResource(R.string.pixel_pet_progress_title)) {
+                    ApkeMetricGrid(
+                        items = listOf(
+                            ApkeMetricItem(
+                                label = stringResource(R.string.pixel_pet_hunger),
+                                value = "${petState.value.hunger}%",
+                            ),
+                            ApkeMetricItem(
+                                label = stringResource(R.string.pixel_pet_energy),
+                                value = "${petState.value.energy}%",
+                            ),
+                            ApkeMetricItem(
+                                label = stringResource(R.string.pixel_pet_mood),
+                                value = "${petState.value.moodValue}%",
+                            ),
+                        ),
+                    )
+                }
+                PetPrimaryActions(
+                    state = petState.value,
+                    onInteract = {
+                        val now = System.currentTimeMillis()
+                        if (now - petState.value.lastInteractionAt < 750L) {
+                            shopMessage = interactionCooldownMessage
+                        } else {
+                            val previousInteractions = petState.value.dailyInteractions
+                            petState.value = PixelPetStore.interact(context, now)
+                            shopMessage = if (previousInteractions >= 30) rewardCappedMessage else ""
+                        }
+                    },
+                    onFeed = { petState.value = PixelPetStore.feed(context) },
+                    onCheckIn = { petState.value = PixelPetStore.checkIn(context) },
+                )
+            }
+            if (selectedPage == PixelPetPage.Growth) {
                 PetSection(title = stringResource(R.string.pixel_pet_species_title)) {
                 when {
                     petState.value.hatched -> {
@@ -935,6 +960,56 @@ private fun formatPixelPetIncubation(remainingMillis: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
+}
+
+@Composable
+private fun PetPrimaryActions(
+    state: PixelPetState,
+    onInteract: () -> Unit,
+    onFeed: () -> Unit,
+    onCheckIn: () -> Unit,
+) {
+    val ready = state.enabled && state.hatched
+    PetSection(title = stringResource(R.string.pixel_pet_interaction_title)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilledTonalButton(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = ApkeUiTokens.MinTouchTarget),
+                enabled = ready,
+                onClick = onInteract,
+            ) {
+                Icon(Icons.Rounded.Favorite, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.pixel_pet_interact), maxLines = 1)
+            }
+            FilledTonalButton(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = ApkeUiTokens.MinTouchTarget),
+                enabled = ready && state.coins >= 5,
+                onClick = onFeed,
+            ) {
+                Icon(Icons.Rounded.Restaurant, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.pixel_pet_feed), maxLines = 1)
+            }
+        }
+        OutlinedButton(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = ApkeUiTokens.MinTouchTarget),
+            enabled = ready && state.canCheckIn,
+            onClick = onCheckIn,
+        ) {
+            Icon(Icons.Rounded.CheckCircle, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.pixel_pet_check_in))
+        }
+    }
 }
 
 @Composable

@@ -183,7 +183,7 @@ fun CloudThemeRankingScreen() {
                         MiuixIconButton(onClick = onBack) {
                             MiuixIcon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.close),
+                                contentDescription = stringResource(R.string.back),
                                 tint = colorScheme.onBackground,
                             )
                         }
@@ -606,7 +606,7 @@ private fun CloudThemeRankingBackButton(onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = stringResource(R.string.close),
+            contentDescription = stringResource(R.string.back),
             tint = Color.White,
         )
     }

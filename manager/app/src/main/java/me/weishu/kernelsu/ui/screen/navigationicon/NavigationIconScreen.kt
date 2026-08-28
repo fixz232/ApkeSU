@@ -266,7 +266,7 @@ private fun NavigationIconScreenMiuix(
                             MiuixIcon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                 tint = topBarColors.content,
-                                contentDescription = stringResource(R.string.close),
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     },
