@@ -1,5 +1,7 @@
 package me.weishu.kernelsu.ui.util
 
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,6 +39,7 @@ class HiddenPathConfigTest {
         )
         assertFalse(saved.editableEquals(saved.copy(hideDirents = false)))
         assertFalse(saved.editableEquals(saved.copy(appPackages = listOf("com.example.other"))))
+        assertFalse(saved.editableEquals(saved.copy(autoLoadDelaySeconds = 15)))
     }
 
     @Test
@@ -45,6 +48,7 @@ class HiddenPathConfigTest {
             loaded = true,
             currentKmi = "android14-6.1",
             resolvedCount = "1",
+            autoLoadDelaySeconds = 45,
         )
         val imported = parseHiddenPathConfigJson(
             """
@@ -63,5 +67,79 @@ class HiddenPathConfigTest {
         assertTrue(imported.currentKmi == "android14-6.1")
         assertTrue(imported.targetPaths == listOf("/data/local/tmp/example"))
         assertFalse(imported.hideDirents)
+        assertEquals(0, imported.autoLoadDelaySeconds)
+    }
+
+    @Test
+    fun autoLoadDelayRoundTripsThroughExportAndImport() {
+        val original = HiddenPathConfigState(
+            targetPaths = listOf("/data/local/tmp/example"),
+            appPackages = listOf("com.example.app"),
+            autoLoadDelaySeconds = 45,
+        )
+
+        val exported = original.toConfigJson()
+        val imported = parseHiddenPathConfigJson(exported)
+
+        assertEquals(3, JSONObject(exported).getInt("schemaVersion"))
+        assertEquals(45, imported.autoLoadDelaySeconds)
+    }
+
+    @Test
+    fun autoLoadDelayOutsideSupportedRangeIsRejected() {
+        val result = runCatching {
+            parseHiddenPathConfigJson(
+                """
+                {
+                  "targetPaths": ["/data/local/tmp/example"],
+                  "appPackages": ["com.example.app"],
+                  "autoLoadDelaySeconds": ${HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS + 1}
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertTrue(result.isFailure)
+
+        assertTrue(
+            runCatching {
+                parseHiddenPathConfigJson(
+                    """
+                    {
+                      "targetPaths": ["/data/local/tmp/example"],
+                      "appPackages": ["com.example.app"],
+                      "autoLoadDelaySeconds": -1
+                    }
+                    """.trimIndent(),
+                )
+            }.isFailure,
+        )
+    }
+
+    @Test
+    fun partialRuntimeCountsMissingAndUnresolvedTargets() {
+        val partial = HiddenPathConfigState(
+            loaded = true,
+            phase = "partial",
+            missingTargetPaths = listOf("/system/bin/su", "/vendor/bin/su"),
+            unresolvedTargetCount = 1,
+        )
+
+        assertTrue(partial.isPartial)
+        assertEquals(3, partial.notEffectiveTargetCount)
+    }
+
+    @Test
+    fun unloadedRuntimeCountsEverySavedTargetAsNotEffective() {
+        val unloaded = HiddenPathConfigState(
+            loaded = false,
+            savedCount = 12,
+            availableCount = 5,
+            activeCount = 0,
+            missingTargetPaths = List(7) { "/missing/$it" },
+            unresolvedTargetCount = 5,
+        )
+
+        assertEquals(12, unloaded.notEffectiveTargetCount)
     }
 }

@@ -65,9 +65,6 @@ interface SettingsRepository {
     var seasonCardMotionEnabled: Boolean
     var rainStyle: String
     var rainCardMotionEnabled: Boolean
-    var inkStyle: String
-    var inkFontEnabled: Boolean
-    var inkCardMotionEnabled: Boolean
     var pixelStyle: String
     var pixelCardMotionEnabled: Boolean
     var pixelPetEnabled: Boolean

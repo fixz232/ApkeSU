@@ -43,7 +43,6 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContactPage
@@ -109,8 +108,6 @@ import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
 import me.weishu.kernelsu.ui.component.pixel.pixelPalette
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.rain.rainPalette
-import me.weishu.kernelsu.ui.component.ink.InkStyle
-import me.weishu.kernelsu.ui.component.ink.inkPalette
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
@@ -350,16 +347,6 @@ fun SettingPagerMiuix(
                                 cardMotionEnabled = uiState.rainCardMotionEnabled,
                                 onSelectedIndexChange = actions.onSetRainStyleIndex,
                                 onCardMotionEnabledChange = actions.onSetRainCardMotionEnabled,
-                            )
-                        }
-                        if (uiState.uiMode == InterfaceStyle.Ink.value) {
-                            InkMiuixPreference(
-                                selectedValue = uiState.inkStyle,
-                                fontEnabled = uiState.inkFontEnabled,
-                                cardMotionEnabled = uiState.inkCardMotionEnabled,
-                                onSelectedIndexChange = actions.onSetInkStyleIndex,
-                                onFontEnabledChange = actions.onSetInkFontEnabled,
-                                onCardMotionEnabledChange = actions.onSetInkCardMotionEnabled,
                             )
                         }
                         if (uiState.uiMode == InterfaceStyle.Pixel.value) {
@@ -1338,165 +1325,6 @@ private fun RainMiuixPreference(
                 Icons.Rounded.AutoFixHigh,
                 modifier = Modifier.padding(end = 6.dp),
                 contentDescription = stringResource(R.string.settings_rain_card_motion),
-                tint = colorScheme.onBackground,
-            )
-        },
-        checked = cardMotionEnabled,
-        onCheckedChange = onCardMotionEnabledChange,
-    )
-}
-
-@Composable
-private fun InkMiuixPreference(
-    selectedValue: String,
-    fontEnabled: Boolean,
-    cardMotionEnabled: Boolean,
-    onSelectedIndexChange: (Int) -> Unit,
-    onFontEnabledChange: (Boolean) -> Unit,
-    onCardMotionEnabledChange: (Boolean) -> Unit,
-) {
-    val selectedStyle = InkStyle.fromValue(selectedValue)
-    val dark = isInDarkTheme()
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            Icons.Rounded.Brush,
-            modifier = Modifier.padding(end = 12.dp).size(24.dp),
-            contentDescription = null,
-            tint = colorScheme.onBackground,
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.settings_ink_style),
-                color = colorScheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = stringResource(selectedStyle.summaryRes),
-                color = colorScheme.onSurfaceVariantSummary,
-                fontSize = 13.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 60.dp, end = 24.dp, top = 10.dp, bottom = 12.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(colorScheme.surfaceContainerHigh.copy(alpha = 0.66f))
-            .selectableGroup()
-            .padding(5.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        InkStyle.entries.toList().chunked(2).forEach { styleRow ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                styleRow.forEach { inkStyle ->
-                    val index = InkStyle.entries.indexOf(inkStyle)
-                    val selected = inkStyle == selectedStyle
-                    val preview = inkPalette(inkStyle, dark)
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (selected) {
-                                    colorScheme.primaryContainer.copy(alpha = 0.92f)
-                                } else {
-                                    Color.Transparent
-                                },
-                            )
-                            .selectable(
-                                selected = selected,
-                                role = Role.RadioButton,
-                                onClick = { onSelectedIndexChange(index) },
-                            )
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Canvas(
-                            modifier = Modifier
-                                .size(width = 34.dp, height = 22.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(preview.backgroundTop, preview.backgroundBottom),
-                                    ),
-                                )
-                                .border(1.dp, preview.outline.copy(alpha = 0.72f), RoundedCornerShape(5.dp)),
-                        ) {
-                            drawLine(
-                                color = preview.farMountain.copy(alpha = 0.72f),
-                                start = androidx.compose.ui.geometry.Offset(0f, size.height * 0.72f),
-                                end = androidx.compose.ui.geometry.Offset(size.width * 0.46f, size.height * 0.40f),
-                                strokeWidth = 1.dp.toPx(),
-                            )
-                            drawLine(
-                                color = preview.nearMountain.copy(alpha = 0.78f),
-                                start = androidx.compose.ui.geometry.Offset(size.width * 0.34f, size.height * 0.76f),
-                                end = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.46f),
-                                strokeWidth = 1.dp.toPx(),
-                            )
-                            drawLine(
-                                color = preview.water.copy(alpha = 0.74f),
-                                start = androidx.compose.ui.geometry.Offset(size.width * 0.20f, size.height * 0.84f),
-                                end = androidx.compose.ui.geometry.Offset(size.width * 0.82f, size.height * 0.84f),
-                                strokeWidth = 0.7.dp.toPx(),
-                            )
-                            drawCircle(
-                                color = preview.seal.copy(alpha = 0.82f),
-                                radius = 1.5.dp.toPx(),
-                                center = androidx.compose.ui.geometry.Offset(size.width * 0.82f, size.height * 0.23f),
-                            )
-                        }
-                        Spacer(Modifier.width(7.dp))
-                        Text(
-                            text = stringResource(inkStyle.labelRes),
-                            color = if (selected) {
-                                colorScheme.onPrimaryContainer
-                            } else {
-                                colorScheme.onSurfaceVariantSummary
-                            },
-                            fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-    SwitchPreference(
-        title = stringResource(R.string.settings_ink_font),
-        summary = stringResource(R.string.settings_ink_font_summary),
-        startAction = {
-            Icon(
-                Icons.Rounded.EditNote,
-                modifier = Modifier.padding(end = 6.dp),
-                contentDescription = stringResource(R.string.settings_ink_font),
-                tint = colorScheme.onBackground,
-            )
-        },
-        checked = fontEnabled,
-        onCheckedChange = onFontEnabledChange,
-    )
-    SwitchPreference(
-        title = stringResource(R.string.settings_ink_card_motion),
-        summary = stringResource(R.string.settings_ink_card_motion_summary),
-        startAction = {
-            Icon(
-                Icons.Rounded.AutoFixHigh,
-                modifier = Modifier.padding(end = 6.dp),
-                contentDescription = stringResource(R.string.settings_ink_card_motion),
                 tint = colorScheme.onBackground,
             )
         },

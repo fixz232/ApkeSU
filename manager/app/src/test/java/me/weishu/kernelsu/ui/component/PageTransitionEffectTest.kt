@@ -34,8 +34,8 @@ class PageTransitionEffectTest {
             resolvePageTransitionVisual(PageTransitionEffect.StyleLinked, InterfaceStyle.Rain.value),
         )
         assertEquals(
-            PageTransitionVisual.Ink,
-            resolvePageTransitionVisual(PageTransitionEffect.StyleLinked, InterfaceStyle.Ink.value),
+            PageTransitionVisual.Depth,
+            resolvePageTransitionVisual(PageTransitionEffect.StyleLinked, "ink"),
         )
         assertEquals(
             PageTransitionVisual.Glass,

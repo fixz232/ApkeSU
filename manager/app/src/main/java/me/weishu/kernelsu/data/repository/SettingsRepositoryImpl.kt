@@ -39,12 +39,6 @@ import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
 import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.rain.RainStyle
-import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_FONT_ENABLED
-import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_CARD_MOTION_ENABLED
-import me.weishu.kernelsu.ui.component.ink.INK_CARD_MOTION_ENABLED_KEY
-import me.weishu.kernelsu.ui.component.ink.INK_FONT_ENABLED_KEY
-import me.weishu.kernelsu.ui.component.ink.INK_STYLE_KEY
-import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
@@ -386,25 +380,6 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var rainCardMotionEnabled: Boolean
         get() = prefs.getBoolean(RAIN_CARD_MOTION_ENABLED_KEY, DEFAULT_RAIN_CARD_MOTION_ENABLED)
         set(value) = prefs.edit { putBoolean(RAIN_CARD_MOTION_ENABLED_KEY, value) }
-
-    override var inkStyle: String
-        get() = InkStyle.fromValue(prefs.getString(INK_STYLE_KEY, InkStyle.DEFAULT_VALUE)).value
-        set(value) {
-            val inkStyle = InkStyle.fromValue(value)
-            prefs.edit {
-                putString(INK_STYLE_KEY, inkStyle.value)
-                putInt(themeKey("key_color"), inkStyle.keyColor)
-                putString(themeKey("theme_preset"), ThemePreset.INK.value)
-            }
-        }
-
-    override var inkFontEnabled: Boolean
-        get() = prefs.getBoolean(INK_FONT_ENABLED_KEY, DEFAULT_INK_FONT_ENABLED)
-        set(value) = prefs.edit { putBoolean(INK_FONT_ENABLED_KEY, value) }
-
-    override var inkCardMotionEnabled: Boolean
-        get() = prefs.getBoolean(INK_CARD_MOTION_ENABLED_KEY, DEFAULT_INK_CARD_MOTION_ENABLED)
-        set(value) = prefs.edit { putBoolean(INK_CARD_MOTION_ENABLED_KEY, value) }
 
     override var pixelStyle: String
         get() = PixelStyle.fromValue(prefs.getString(PIXEL_STYLE_KEY, PixelStyle.DEFAULT_VALUE)).value

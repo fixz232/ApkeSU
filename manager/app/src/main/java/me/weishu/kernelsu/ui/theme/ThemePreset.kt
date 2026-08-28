@@ -124,21 +124,6 @@ enum class ThemePreset(
         pageScale = 1.0f,
     ),
 
-    INK(
-        value = "ink",
-        titleRes = me.weishu.kernelsu.R.string.theme_preset_ink,
-        summaryRes = me.weishu.kernelsu.R.string.theme_preset_ink_summary,
-        colorMode = ColorMode.SYSTEM,
-        keyColor = 0xFF52746B.toInt(),
-        paletteStyle = PaletteStyle.Fidelity,
-        colorSpec = ColorSpec.SpecVersion.SPEC_2025,
-        miuixMonet = false,
-        enableBlur = false,
-        enableFloatingBottomBar = true,
-        enableFloatingBottomBarBlur = false,
-        pageScale = 1.0f,
-    ),
-
     PIXEL(
         value = "pixel",
         titleRes = me.weishu.kernelsu.R.string.theme_preset_pixel,
@@ -230,7 +215,6 @@ enum class ThemePreset(
             LIQUID_GLASS -> InterfaceStyle.LiquidGlass.value
             SNOW -> InterfaceStyle.Snow.value
             RAIN -> InterfaceStyle.Rain.value
-            INK -> InterfaceStyle.Ink.value
             PIXEL -> InterfaceStyle.Pixel.value
             PREMIUM_GLOSS -> InterfaceStyle.Miuix.value
             GEEK_DARK, CLEAN_TOOL, DYNAMIC_COLOR -> InterfaceStyle.Miuix.value

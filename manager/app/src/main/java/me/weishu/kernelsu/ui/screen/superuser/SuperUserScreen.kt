@@ -110,7 +110,6 @@ fun SuperUserPager(
 
         InterfaceStyle.Snow.value,
         InterfaceStyle.Rain.value,
-        InterfaceStyle.Ink.value,
         InterfaceStyle.Pixel.value -> {
             SuperUserPagerMiuix(
                 uiState = uiState,

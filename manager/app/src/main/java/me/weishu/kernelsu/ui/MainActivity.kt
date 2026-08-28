@@ -145,14 +145,6 @@ import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.rememberPixelCardMotionProgress
 import me.weishu.kernelsu.ui.component.pixel.rememberPixelPetState
-import me.weishu.kernelsu.ui.component.ink.InkBackdrop
-import me.weishu.kernelsu.ui.component.ink.InkChromeOverlay
-import me.weishu.kernelsu.ui.component.ink.InkStyle
-import me.weishu.kernelsu.ui.component.ink.LocalInkCardMotionEnabled
-import me.weishu.kernelsu.ui.component.ink.LocalInkCardMotionProgress
-import me.weishu.kernelsu.ui.component.ink.LocalInkFontEnabled
-import me.weishu.kernelsu.ui.component.ink.LocalInkStyle
-import me.weishu.kernelsu.ui.component.ink.rememberInkCardMotionProgress
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionEnabled
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionProgress
@@ -398,10 +390,8 @@ class MainActivity : ComponentActivity() {
                 requested = uiState.enableFloatingBottomBarBlur,
             )
             val selectedRainStyle = RainStyle.fromValue(uiState.rainStyle)
-            val selectedInkStyle = InkStyle.fromValue(uiState.inkStyle)
             val rainInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Rain.value
             val seasonInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Snow.value
-            val inkInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Ink.value
             val pixelInterfaceActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
             val seasonCardMotionProgress = rememberSeasonCardMotionProgress(
                 enabled = seasonInterfaceActive && uiState.seasonCardMotionEnabled,
@@ -412,9 +402,6 @@ class MainActivity : ComponentActivity() {
             val rainSceneProgress = rememberRainSceneProgress(
                 enabled = rainInterfaceActive,
                 style = selectedRainStyle,
-            )
-            val inkCardMotionProgress = rememberInkCardMotionProgress(
-                enabled = inkInterfaceActive && uiState.inkCardMotionEnabled,
             )
             val pixelCardMotionProgress = rememberPixelCardMotionProgress(
                 enabled = pixelInterfaceActive && uiState.pixelCardMotionEnabled,
@@ -506,12 +493,6 @@ class MainActivity : ComponentActivity() {
                     ),
                 LocalRainCardMotionProgress provides rainCardMotionProgress,
                 LocalRainSceneProgress provides rainSceneProgress,
-                LocalInkStyle provides selectedInkStyle,
-                LocalInkFontEnabled provides (inkInterfaceActive && uiState.inkFontEnabled),
-                LocalInkCardMotionEnabled provides (
-                    inkInterfaceActive && uiState.inkCardMotionEnabled
-                    ),
-                LocalInkCardMotionProgress provides inkCardMotionProgress,
                 LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
                 LocalPixelPetState provides pixelPetState.value,
                 LocalPixelCardMotionEnabled provides (
@@ -718,7 +699,6 @@ class MainActivity : ComponentActivity() {
                     }
                     val seasonalStyleActive = seasonInterfaceActive
                     val rainStyleActive = rainInterfaceActive
-                    val inkStyleActive = inkInterfaceActive
                     val pixelStyleActive = uiState.interfaceStyle == InterfaceStyle.Pixel.value
                     val hasCustomBackground =
                         !effectiveBackground.wallpaperUriString.isNullOrBlank() ||
@@ -726,7 +706,6 @@ class MainActivity : ComponentActivity() {
                     val immersiveBackgroundActive =
                         seasonalStyleActive ||
                             rainStyleActive ||
-                            inkStyleActive ||
                             pixelStyleActive ||
                             hasCustomBackground ||
                             (
@@ -784,9 +763,6 @@ class MainActivity : ComponentActivity() {
                                     if (rainStyleActive && !hasCustomBackground) {
                                         RainBackdrop(modifier = Modifier.fillMaxSize())
                                     }
-                                    if (inkStyleActive && !hasCustomBackground) {
-                                        InkBackdrop(modifier = Modifier.fillMaxSize())
-                                    }
                                     if (!uiState.nightBackgroundPassthrough) {
                                         NightBackgroundEffectOverlay(
                                             enabled = darkMode,
@@ -822,7 +798,6 @@ class MainActivity : ComponentActivity() {
                         UiDecorationChromeOverlay(modifier = Modifier.fillMaxSize())
                         SeasonChromeOverlay(modifier = Modifier.fillMaxSize())
                         RainChromeOverlay(modifier = Modifier.fillMaxSize())
-                        InkChromeOverlay(modifier = Modifier.fillMaxSize())
                         PixelChromeOverlay(modifier = Modifier.fillMaxSize())
 
                         if (uiState.nightBackgroundPassthrough) {
@@ -1169,7 +1144,6 @@ fun MainScreen(
     val interfaceStyle = LocalInterfaceStyle.current
     val seasonStyle = LocalSeasonStyle.current
     val rainStyle = LocalRainStyle.current
-    val inkStyle = LocalInkStyle.current
     val pixelStyle = LocalPixelStyle.current
     val systemAnimationsEnabled = rememberSystemAnimationsEnabled()
     val refreshTick by KernelStatusEvents.refreshTick.collectAsStateWithLifecycle()
@@ -1333,7 +1307,6 @@ fun MainScreen(
                                 interfaceStyle = interfaceStyle,
                                 seasonStyle = seasonStyle,
                                 rainStyle = rainStyle,
-                                inkStyle = inkStyle,
                                 pixelStyle = pixelStyle,
                                 animationsEnabled = systemAnimationsEnabled,
                                 containsEmbeddedAndroidView = containsKpmWebView,

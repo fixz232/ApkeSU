@@ -111,8 +111,6 @@ internal fun embeddedKpmThemeScript(theme: String, dark: Boolean): String {
         else EmbeddedKpmPalette("#6A3BC2", "#F4F1F8", "#211B2A", "#E9E3F0", "#665F70", "#C9C0D1", "#E5D9FF", "#FFFFFF", "#E9E2F0", "#35264A")
         "rain" -> if (dark) EmbeddedKpmPalette("#8FB9D6", "#19232D", "#E2ECF2", "#263640", "#B6C5CD", "#5E7482", "#274E69", "#10212D", "#293A46", "#DDECF4")
         else EmbeddedKpmPalette("#4F708D", "#DDE8F1", "#1D2A35", "#CBD9E4", "#5C6E7D", "#99AFBF", "#C6DDF0", "#FFFFFF", "#D0DEE8", "#263B4C")
-        "ink" -> if (dark) EmbeddedKpmPalette("#C8A9D8", "#171517", "#F0E8F1", "#29242A", "#C4B9C5", "#746B75", "#513B58", "#28192F", "#392C3E", "#F7ECF9")
-        else EmbeddedKpmPalette("#765D7B", "#EEE9E8", "#29232A", "#E1D8DF", "#70646F", "#B5A8B1", "#E1D0E3", "#FFFFFF", "#E6DDE3", "#3B2C3F")
         "snow" -> if (dark) EmbeddedKpmPalette("#A8D8E8", "#15252D", "#E7F3F7", "#223841", "#B8CCD3", "#607A86", "#2B6070", "#12303A", "#2A434C", "#E5F7FC")
         else EmbeddedKpmPalette("#477B91", "#E8F2F5", "#1A2A31", "#D7E6EB", "#5D7179", "#A9C2CB", "#C6E4ED", "#FFFFFF", "#DDECEF", "#233A45")
         "liquid_glass" -> if (dark) EmbeddedKpmPalette("#B8D9EA", "#182127", "#EDF7FB", "#27343B", "#B9CBD3", "#647982", "#31576A", "#102B37", "#2D3D45", "#E9F8FE")

@@ -65,6 +65,7 @@ const val BUILTIN_MOUNT_VARIANT_LITE = "lite"
 const val BUILTIN_MOUNT_VARIANT_FULL = "full"
 const val HIDDEN_PATH_CONFIG_FILE_NAME = "apkesu_hidden_path_config.json"
 const val HIDDEN_PATH_CONFIG_MIME_TYPE = "application/json"
+const val HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS = 300
 private const val SUSFS_PATH_CONFIG_DIR = "/data/adb/ksu/susfs"
 private const val SUSFS_PATH_CONFIG_FILE = "$SUSFS_PATH_CONFIG_DIR/paths.txt"
 private const val SUSFS_PATH_SERVICE_FILE = "/data/adb/service.d/98-apkesu-susfs-paths.sh"
@@ -230,6 +231,8 @@ data class HiddenPathConfigState(
     val hideDirents: Boolean = true,
     val hideIsolated: Boolean = true,
     val autoLoadEnabled: Boolean = true,
+    val autoLoadDelaySeconds: Int = 0,
+    val autoLoadRemainingSeconds: Int = 0,
     val loaded: Boolean = false,
     val currentKmi: String = "",
     val phase: String = "unconfigured",
@@ -239,6 +242,8 @@ data class HiddenPathConfigState(
     val resolvedCount: String = "",
     val activeTargetPaths: String = "",
     val missingTargetPaths: List<String> = emptyList(),
+    val unresolvedTargetCount: Int = 0,
+    val unresolvedTargetPaths: List<String> = emptyList(),
     val requiresReload: Boolean = false,
     val requiresReboot: Boolean = false,
     val hasPendingCandidate: Boolean = false,
@@ -247,7 +252,14 @@ data class HiddenPathConfigState(
     val lastLog: String = "",
     val resolvedAppUids: List<String> = emptyList(),
     val unresolvedAppPackages: List<String> = emptyList(),
-)
+) {
+    val notEffectiveTargetCount: Int
+        get() = (missingTargetPaths.size + unresolvedTargetCount)
+            .coerceAtLeast((savedCount - activeCount).coerceAtLeast(0))
+
+    val isPartial: Boolean
+        get() = loaded && phase == "partial"
+}
 
 data class HiddenPathConfigReadResult(
     val config: HiddenPathConfigState? = null,
@@ -261,7 +273,8 @@ internal fun HiddenPathConfigState.editableEquals(other: HiddenPathConfigState):
         useAppScope == other.useAppScope &&
         hideDirents == other.hideDirents &&
         hideIsolated == other.hideIsolated &&
-        autoLoadEnabled == other.autoLoadEnabled
+        autoLoadEnabled == other.autoLoadEnabled &&
+        autoLoadDelaySeconds == other.autoLoadDelaySeconds
 }
 
 data class ToolCommandResult(
@@ -442,13 +455,18 @@ fun RescueConfigState.toConfigJson(): String {
 }
 
 fun HiddenPathConfigState.toConfigJson(): String {
+    require(autoLoadDelaySeconds in 0..HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS) {
+        "Pathmask auto-load delay is out of range"
+    }
     return JSONObject()
+        .put("schemaVersion", 3)
         .put("targetPaths", JSONArray(targetPaths.cleanConfigList()))
         .put("appPackages", JSONArray(appPackages.cleanConfigList()))
         .put("useAppScope", useAppScope)
         .put("hideDirents", hideDirents)
         .put("hideIsolated", hideIsolated)
         .put("autoLoadEnabled", autoLoadEnabled)
+        .put("autoLoadDelaySeconds", autoLoadDelaySeconds)
         .toString(2)
 }
 
@@ -461,7 +479,22 @@ fun parseHiddenPathConfigJson(content: String, current: HiddenPathConfigState = 
         hideDirents = obj.optBoolean("hideDirents", current.hideDirents),
         hideIsolated = obj.optBoolean("hideIsolated", current.hideIsolated),
         autoLoadEnabled = obj.optBoolean("autoLoadEnabled", current.autoLoadEnabled),
+        // Older exports had no delay field and therefore always loaded immediately.
+        autoLoadDelaySeconds = obj.readAutoLoadDelaySeconds(0),
     )
+}
+
+private fun JSONObject.readAutoLoadDelaySeconds(defaultValue: Int): Int {
+    if (!has("autoLoadDelaySeconds")) return defaultValue
+    val numeric = (opt("autoLoadDelaySeconds") as? Number)?.toDouble()
+    require(numeric != null && numeric.isFinite() && numeric % 1.0 == 0.0) {
+        "Pathmask auto-load delay must be an integer"
+    }
+    val seconds = numeric.toInt()
+    require(seconds in 0..HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS) {
+        "Pathmask auto-load delay must be between 0 and $HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS seconds"
+    }
+    return seconds
 }
 
 object KsuCli {
@@ -1555,6 +1588,10 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
             hideDirents = obj.optBoolean("hideDirents", true),
             hideIsolated = obj.optBoolean("hideIsolated", true),
             autoLoadEnabled = obj.optBoolean("autoLoadEnabled", true),
+            autoLoadDelaySeconds = obj.optInt("autoLoadDelaySeconds", 0)
+                .coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS),
+            autoLoadRemainingSeconds = obj.optInt("autoLoadRemainingSeconds", 0)
+                .coerceAtLeast(0),
             loaded = obj.optBoolean("loaded", false),
             currentKmi = obj.optString("currentKmi", ""),
             phase = obj.optString("phase", "unconfigured"),
@@ -1564,6 +1601,8 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
             resolvedCount = obj.optString("resolvedCount", ""),
             activeTargetPaths = obj.optString("activeTargetPaths", ""),
             missingTargetPaths = obj.optJSONArray("missingTargetPaths").toStringList(),
+            unresolvedTargetCount = obj.optInt("unresolvedTargetCount", 0).coerceAtLeast(0),
+            unresolvedTargetPaths = obj.optJSONArray("unresolvedTargetPaths").toStringList(),
             requiresReload = obj.optBoolean("requiresReload", false),
             requiresReboot = obj.optBoolean("requiresReboot", false),
             hasPendingCandidate = obj.optBoolean("hasPendingCandidate", false),
@@ -1594,10 +1633,17 @@ suspend fun saveAndApplyHiddenPathConfig(config: HiddenPathConfigState): ToolCom
     )
 }
 
-suspend fun setHiddenPathAutoLoad(enabled: Boolean): ToolCommandResult = runStructuredKsudCommand(
-    area = "pathmask",
-    command = "pathmask set-auto-load $enabled",
-)
+suspend fun setHiddenPathAutoLoad(
+    enabled: Boolean,
+    delaySeconds: Int? = null,
+): ToolCommandResult {
+    val safeDelay = delaySeconds?.coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS)
+    val delayArgument = safeDelay?.let { " --delay-seconds $it" }.orEmpty()
+    return runStructuredKsudCommand(
+        area = "pathmask",
+        command = "pathmask set-auto-load $enabled$delayArgument",
+    )
+}
 
 suspend fun unloadHiddenPathKernelPaths(): ToolCommandResult = runStructuredKsudCommand(
     area = "pathmask",

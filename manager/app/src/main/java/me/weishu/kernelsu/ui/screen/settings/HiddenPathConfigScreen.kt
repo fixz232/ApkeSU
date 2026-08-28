@@ -67,6 +67,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -120,6 +121,7 @@ import me.weishu.kernelsu.ui.theme.immersiveScrolledTopBarColor
 import me.weishu.kernelsu.ui.theme.immersiveTopBarColor
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_FILE_NAME
 import me.weishu.kernelsu.ui.util.HIDDEN_PATH_CONFIG_MIME_TYPE
+import me.weishu.kernelsu.ui.util.HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS
 import me.weishu.kernelsu.ui.util.HiddenPathConfigState
 import me.weishu.kernelsu.ui.util.HiddenPathVisibilityResult
 import me.weishu.kernelsu.ui.util.clearHiddenPathLogs
@@ -136,6 +138,7 @@ import me.weishu.kernelsu.ui.util.unloadHiddenPathKernelPaths
 import me.weishu.kernelsu.ui.util.editableEquals
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 private fun hiddenPathText(@StringRes id: Int, vararg args: Any): String = ksuApp.getString(id, *args)
 
@@ -193,7 +196,10 @@ private val TEXT_NO_APP get() = hiddenPathText(R.string.hidden_path_no_app)
 private val TEXT_MANAGED_PATH_GLOBAL_BLOCK get() = hiddenPathText(R.string.hidden_path_managed_global_block)
 private val TEXT_WAITING_CONFIG get() = hiddenPathText(R.string.hidden_path_waiting_config)
 private val TEXT_WAITING_LOAD get() = hiddenPathText(R.string.hidden_path_waiting_load)
+private val TEXT_WAITING_DELAY get() = hiddenPathText(R.string.hidden_path_waiting_delay)
+private val TEXT_UNLOADED_THIS_BOOT get() = hiddenPathText(R.string.hidden_path_unloaded_this_boot)
 private val TEXT_RUNNING get() = hiddenPathText(R.string.hidden_path_running)
+private val TEXT_PARTIAL get() = hiddenPathText(R.string.hidden_path_partial)
 private val TEXT_VISIBILITY_TEST get() = hiddenPathText(R.string.hidden_path_visibility_test)
 private val TEXT_VISIBILITY_TEST_SUMMARY get() = hiddenPathText(R.string.hidden_path_visibility_test_summary)
 private val TEXT_VISIBILITY_TEST_ACTION get() = hiddenPathText(R.string.hidden_path_visibility_test_action)
@@ -526,10 +532,13 @@ fun HiddenPathConfigScreen() {
         autoLoadChanging = true
         scope.launch {
             try {
-                val result = setHiddenPathAutoLoad(enabled)
+                val result = setHiddenPathAutoLoad(enabled, config.autoLoadDelaySeconds)
                 if (result.success) {
                     config = config.copy(autoLoadEnabled = enabled)
-                    lastAppliedConfig = lastAppliedConfig?.copy(autoLoadEnabled = enabled)
+                    lastAppliedConfig = lastAppliedConfig?.copy(
+                        autoLoadEnabled = enabled,
+                        autoLoadDelaySeconds = config.autoLoadDelaySeconds,
+                    )
                 }
                 Toast.makeText(
                     context,
@@ -886,8 +895,11 @@ private fun HiddenPathConfigTab(
             config = config,
             pendingChanges = pendingChanges,
             statusError = statusError,
-            autoLoadChanging = autoLoadChanging,
+            controlsEnabled = !busy,
             onAutoLoadChange = onAutoLoadChange,
+            onAutoLoadDelayChange = { seconds ->
+                onConfigChange(config.copy(autoLoadDelaySeconds = seconds))
+            },
         )
 
         if (section == 0) {
@@ -1334,13 +1346,18 @@ private fun HiddenPathStatusPanel(
     config: HiddenPathConfigState,
     pendingChanges: Boolean,
     statusError: String,
-    autoLoadChanging: Boolean,
+    controlsEnabled: Boolean,
     onAutoLoadChange: (Boolean) -> Unit,
+    onAutoLoadDelayChange: (Int) -> Unit,
 ) {
+    val partial = config.isPartial || (config.loaded && config.unresolvedTargetCount > 0)
     val statusText = when {
         statusError.isNotBlank() -> TEXT_STATUS_UNAVAILABLE
+        partial -> TEXT_PARTIAL
         config.loaded -> TEXT_RUNNING
         config.targetPaths.isEmpty() -> TEXT_WAITING_CONFIG
+        config.phase == "unloaded_this_boot" -> TEXT_UNLOADED_THIS_BOOT
+        config.phase == "waiting_delay" -> TEXT_WAITING_DELAY
         else -> TEXT_WAITING_LOAD
     }
     ConfigSection(title = hiddenPathText(R.string.hidden_path_current_status)) {
@@ -1362,13 +1379,16 @@ private fun HiddenPathStatusPanel(
                 )
             }
             StatusBadge(
-                text = if (config.loaded) {
+                text = when {
+                    partial -> TEXT_PARTIAL
+                    config.loaded -> {
                     hiddenPathText(R.string.hidden_path_loaded)
-                } else {
-                    hiddenPathText(R.string.hidden_path_not_loaded)
+                    }
+                    else -> hiddenPathText(R.string.hidden_path_not_loaded)
                 },
                 positive = when {
                     statusError.isNotBlank() -> false
+                    partial -> null
                     config.loaded -> true
                     else -> null
                 },
@@ -1387,7 +1407,7 @@ private fun HiddenPathStatusPanel(
                 ),
                 ApkeMetricItem(
                     label = hiddenPathText(R.string.hidden_path_missing_count),
-                    value = config.missingTargetPaths.size.toString(),
+                    value = config.notEffectiveTargetCount.toString(),
                 ),
                 ApkeMetricItem(
                     label = hiddenPathText(R.string.hidden_path_auto_load),
@@ -1405,12 +1425,32 @@ private fun HiddenPathStatusPanel(
                 ),
             ),
         )
+        if (partial) {
+            Text(
+                text = hiddenPathText(
+                    R.string.hidden_path_partial_summary,
+                    config.activeCount,
+                    config.availableCount,
+                    config.notEffectiveTargetCount,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+        }
         ToggleRow(
             title = hiddenPathText(R.string.hidden_path_auto_load),
             summary = hiddenPathText(R.string.hidden_path_auto_load_summary),
             checked = config.autoLoadEnabled,
-            enabled = !autoLoadChanging,
+            enabled = controlsEnabled,
             onCheckedChange = onAutoLoadChange,
+        )
+        AutoLoadDelayControl(
+            value = config.autoLoadDelaySeconds,
+            remainingSeconds = config.autoLoadRemainingSeconds.takeIf {
+                config.autoLoadEnabled && !pendingChanges
+            } ?: 0,
+            enabled = controlsEnabled,
+            onValueChange = onAutoLoadDelayChange,
         )
         if (statusError.isNotBlank()) {
             Text(
@@ -1437,6 +1477,64 @@ private fun HiddenPathStatusPanel(
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.tertiary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutoLoadDelayControl(
+    value: Int,
+    remainingSeconds: Int,
+    enabled: Boolean,
+    onValueChange: (Int) -> Unit,
+) {
+    val safeValue = value.coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = hiddenPathText(R.string.hidden_path_auto_load_delay),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = hiddenPathText(R.string.hidden_path_auto_load_delay_value, safeValue),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Slider(
+            value = safeValue.toFloat(),
+            onValueChange = { raw ->
+                onValueChange(
+                    raw.roundToInt().coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS)
+                )
+            },
+            enabled = enabled,
+            valueRange = 0f..HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS.toFloat(),
+            steps = HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS - 1,
+        )
+        Text(
+            text = hiddenPathText(
+                R.string.hidden_path_auto_load_delay_summary,
+                HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS,
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (remainingSeconds > 0) {
+            Text(
+                text = hiddenPathText(
+                    R.string.hidden_path_auto_load_delay_remaining,
+                    remainingSeconds,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
@@ -1487,6 +1585,11 @@ private fun HiddenPathConfigState.blockReason(): String? {
         appPackages.size > MAX_HIDDEN_APPS ->
             hiddenPathText(R.string.hidden_path_too_many_apps, MAX_HIDDEN_APPS)
         useAppScope && appPackages.any { normalizeAppEntry(it) == null } -> TEXT_INVALID_APP
+        autoLoadDelaySeconds !in 0..HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS ->
+            hiddenPathText(
+                R.string.hidden_path_auto_load_delay_invalid,
+                HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS,
+            )
         else -> null
     }
 }
@@ -1845,14 +1948,38 @@ private fun StatusLine(label: String, value: String) {
             text = label,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.weight(0.36f),
+            modifier = Modifier
+                .weight(0.34f)
+                .heightIn(min = 20.dp),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.64f),
+            modifier = Modifier
+                .weight(0.66f)
+                .heightIn(min = 20.dp),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = true,
         )
     }
+}
+
+private fun compactPathSummary(paths: List<String>, maxItems: Int = 3): String {
+    if (paths.isEmpty()) return "-"
+    val visible = paths.take(maxItems).joinToString(", ")
+    return if (paths.size > maxItems) {
+        "$visible (+${paths.size - maxItems})"
+    } else {
+        visible
+    }
+}
+
+private fun compactPathParameter(value: String, maxItems: Int = 3): String {
+    if (value.isBlank()) return "-"
+    return compactPathSummary(value.split(','), maxItems)
 }
 
 @Composable
@@ -1886,12 +2013,15 @@ private fun HiddenPathDiagnosticsTab(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ConfigSection(title = hiddenPathText(R.string.hidden_path_runtime_diagnostics)) {
+            val partial = config.isPartial || (config.loaded && config.unresolvedTargetCount > 0)
             StatusLine(
                 hiddenPathText(R.string.hidden_path_load_status),
-                if (config.loaded) {
+                when {
+                    partial -> TEXT_PARTIAL
+                    config.loaded -> {
                     hiddenPathText(R.string.hidden_path_loaded)
-                } else {
-                    hiddenPathText(R.string.hidden_path_not_loaded)
+                    }
+                    else -> hiddenPathText(R.string.hidden_path_not_loaded)
                 },
             )
             StatusLine("KMI", config.currentKmi.ifBlank { "-" })
@@ -1910,13 +2040,26 @@ private fun HiddenPathDiagnosticsTab(
             if (config.missingTargetPaths.isNotEmpty()) {
                 StatusLine(
                     hiddenPathText(R.string.hidden_path_missing_paths),
-                    config.missingTargetPaths.joinToString(),
+                    compactPathSummary(config.missingTargetPaths),
+                )
+            }
+            if (config.unresolvedTargetCount > 0) {
+                StatusLine(
+                    hiddenPathText(R.string.hidden_path_unresolved_paths),
+                    if (config.unresolvedTargetPaths.isNotEmpty()) {
+                        compactPathSummary(config.unresolvedTargetPaths)
+                    } else {
+                        hiddenPathText(
+                            R.string.hidden_path_unresolved_count,
+                            config.unresolvedTargetCount,
+                        )
+                    },
                 )
             }
             if (config.activeTargetPaths.isNotBlank()) {
                 StatusLine(
                     hiddenPathText(R.string.hidden_path_kernel_active_paths),
-                    config.activeTargetPaths,
+                    compactPathParameter(config.activeTargetPaths),
                 )
             }
             if (config.useAppScope) {
@@ -1932,7 +2075,11 @@ private fun HiddenPathDiagnosticsTab(
                         .filter(String::isNotBlank)
                         .joinToString(": "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = if (config.lastErrorCode == "pathmask.partial_resolution") {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                 )
             }
         }

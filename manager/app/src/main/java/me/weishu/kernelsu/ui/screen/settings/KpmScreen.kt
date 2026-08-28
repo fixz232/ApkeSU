@@ -109,7 +109,6 @@ import me.weishu.kernelsu.ui.component.liquid.isLiquidGlassTheme
 import me.weishu.kernelsu.ui.component.snow.snowMiuixCardSurface
 import me.weishu.kernelsu.ui.component.pixel.pixelMiuixCardSurface
 import me.weishu.kernelsu.ui.component.rain.rainMiuixCardSurface
-import me.weishu.kernelsu.ui.component.ink.inkMiuixCardSurface
 import me.weishu.kernelsu.ui.component.custom.CustomCardTarget
 import me.weishu.kernelsu.ui.component.decoration.uiDecoratedCard
 import me.weishu.kernelsu.ui.component.liquid.FrostedGlassCardStyle
@@ -1293,8 +1292,7 @@ private fun KpmEntryCard(
             when (style) {
                 InterfaceStyle.Pixel.value -> Modifier.pixelMiuixCardSurface(shape = cardShape)
                 InterfaceStyle.Snow.value,
-                InterfaceStyle.Rain.value,
-                InterfaceStyle.Ink.value -> Modifier.snowMiuixCardSurface(shape = cardShape)
+                InterfaceStyle.Rain.value -> Modifier.snowMiuixCardSurface(shape = cardShape)
                 InterfaceStyle.LiquidGlass.value -> Modifier.globalLiquidGlassSurface(
                     shape = cardShape,
                     surfaceAlpha = 0.56f,

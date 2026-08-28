@@ -26,12 +26,17 @@ class InterfaceStyleTest {
     }
 
     @Test
-    fun inkIsSelectableAndUsesItsDedicatedPreset() {
-        assertTrue(InterfaceStyle.Ink in InterfaceStyle.selectableEntries)
-        val index = InterfaceStyle.selectedIndex(InterfaceStyle.Ink.value)
-        assertEquals(InterfaceStyle.Ink, InterfaceStyle.fromIndex(index))
-        assertEquals(InterfaceStyle.Ink.value, InterfaceStyle.normalizeValue(InterfaceStyle.Ink.value))
-        assertEquals(ThemePreset.INK, defaultThemePresetForUiMode(InterfaceStyle.Ink.value))
+    fun inkIsRemovedAndLegacyValuesMigrateToMiuix() {
+        val legacyInkValue = "ink"
+        assertFalse(InterfaceStyle.entries.any { it.value == legacyInkValue })
+        assertFalse(InterfaceStyle.selectableEntries.any { it.value == legacyInkValue })
+        assertEquals(InterfaceStyle.Miuix.value, InterfaceStyle.normalizeValue(legacyInkValue))
+        assertEquals(
+            InterfaceStyle.selectedIndex(InterfaceStyle.Miuix.value),
+            InterfaceStyle.selectedIndex(legacyInkValue),
+        )
+        assertEquals(ThemePreset.CLEAN_TOOL, ThemePreset.fromValue(legacyInkValue))
+        assertEquals(ThemePreset.CLEAN_TOOL, defaultThemePresetForUiMode(legacyInkValue))
     }
 
     @Test

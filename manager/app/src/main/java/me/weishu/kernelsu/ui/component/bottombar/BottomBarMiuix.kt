@@ -51,10 +51,6 @@ import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
 import me.weishu.kernelsu.ui.component.rain.rainNavigationContainerColor
 import me.weishu.kernelsu.ui.component.rain.rainNavigationIndicator
 import me.weishu.kernelsu.ui.component.rain.rainNavigationSurface
-import me.weishu.kernelsu.ui.component.ink.inkNavigationContainerColor
-import me.weishu.kernelsu.ui.component.ink.inkNavigationIndicator
-import me.weishu.kernelsu.ui.component.ink.inkNavigationSurface
-import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
@@ -91,7 +87,6 @@ fun BottomBarMiuix(
     val isLiquidGlass = isLiquidGlassTheme()
     val isSnowStyle = isSnowInterfaceStyle()
     val isRainStyle = isRainInterfaceStyle()
-    val isInkStyle = isInkInterfaceStyle()
     val isPixelStyle = isPixelInterfaceStyle()
 
     val customIcons = LocalCustomNavigationIcons.current
@@ -99,8 +94,6 @@ fun BottomBarMiuix(
         pixelNavigationContainerColor()
     } else if (isRainStyle) {
         rainNavigationContainerColor()
-    } else if (isInkStyle) {
-        inkNavigationContainerColor()
     } else if (blurBackdrop != null) {
         Color.Transparent
     } else if (isLiquidGlass) {
@@ -116,12 +109,11 @@ fun BottomBarMiuix(
             when {
                 isPixelStyle -> Modifier.pixelNavigationSurface(navigationShape)
                 isRainStyle -> Modifier.rainNavigationSurface(navigationShape, paintBackground = false)
-                isInkStyle -> Modifier.inkNavigationSurface(navigationShape, paintBackground = false)
                 isSnowStyle -> Modifier.seasonNavigationSurface(navigationShape, paintBackground = false)
                 else -> Modifier
             },
         )
-        BlurredBar(blurBackdrop, blurActive = !isPixelStyle && !isInkStyle) {
+        BlurredBar(blurBackdrop, blurActive = !isPixelStyle) {
             if (customIcons.hasCustomization) {
                 MiuixCustomNavigationBar(
                     modifier = navigationModifier,
@@ -265,8 +257,7 @@ private fun RowScope.MiuixCustomNavigationBarItem(
     val label = state.displayLabel(stringResource(destination.label))
     val isSnowStyle = isSnowInterfaceStyle()
     val isRainStyle = isRainInterfaceStyle()
-    val isInkStyle = isInkInterfaceStyle()
-    val itemShape = if (isSnowStyle || isRainStyle || isInkStyle) RoundedCornerShape(10.dp) else CircleShape
+    val itemShape = if (isSnowStyle || isRainStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -293,11 +284,6 @@ private fun RowScope.MiuixCustomNavigationBarItem(
                         Modifier.seasonNavigationIndicator(itemShape)
                     } else if (selected && isRainStyle) {
                         Modifier.rainNavigationIndicator(
-                            shape = itemShape,
-                            interactionKey = destination,
-                        )
-                    } else if (selected && isInkStyle) {
-                        Modifier.inkNavigationIndicator(
                             shape = itemShape,
                             interactionKey = destination,
                         )

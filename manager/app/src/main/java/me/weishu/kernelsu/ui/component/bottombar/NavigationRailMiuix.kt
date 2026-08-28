@@ -29,10 +29,6 @@ import me.weishu.kernelsu.ui.component.snow.isSnowInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.isPixelInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelNavigationContainerColor
 import me.weishu.kernelsu.ui.component.pixel.pixelNavigationSurface
-import me.weishu.kernelsu.ui.component.ink.inkNavigationContainerColor
-import me.weishu.kernelsu.ui.component.ink.inkNavigationIndicator
-import me.weishu.kernelsu.ui.component.ink.inkNavigationSurface
-import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationContainerColor
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationIndicator
 import me.weishu.kernelsu.ui.component.snow.seasonNavigationSurface
@@ -58,7 +54,6 @@ fun NavigationRailMiuix(
     val customIcons = LocalCustomNavigationIcons.current
     val railColor = when {
         isPixelInterfaceStyle() -> pixelNavigationContainerColor()
-        isInkInterfaceStyle() -> inkNavigationContainerColor()
         blurBackdrop != null -> Color.Transparent
         isSnowInterfaceStyle() -> seasonNavigationContainerColor()
         else -> MiuixTheme.colorScheme.surface
@@ -115,7 +110,6 @@ private fun MiuixCustomNavigationRail(
     val customIcons = LocalCustomNavigationIcons.current
     val railColor = when {
         isPixelInterfaceStyle() -> pixelNavigationContainerColor()
-        isInkInterfaceStyle() -> inkNavigationContainerColor()
         blurBackdrop != null -> Color.Transparent
         isSnowInterfaceStyle() -> seasonNavigationContainerColor()
         else -> MiuixTheme.colorScheme.surface
@@ -153,8 +147,7 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
 ) {
     val label = state.displayLabel(stringResource(destination.label))
     val isSnowStyle = isSnowInterfaceStyle()
-    val isInkStyle = isInkInterfaceStyle()
-    val itemShape = if (isSnowStyle || isInkStyle) RoundedCornerShape(10.dp) else CircleShape
+    val itemShape = if (isSnowStyle) RoundedCornerShape(10.dp) else CircleShape
     val iconTint = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
@@ -180,8 +173,6 @@ private fun ColumnScope.MiuixCustomNavigationRailItem(
                 .then(
                     if (selected && isSnowStyle) {
                         Modifier.seasonNavigationIndicator(itemShape)
-                    } else if (selected && isInkStyle) {
-                        Modifier.inkNavigationIndicator(itemShape, interactionKey = destination)
                     } else {
                         Modifier.background(
                             if (selected) {
@@ -230,7 +221,6 @@ private fun Modifier.navigationRailDecoration(): Modifier {
     val shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
     return when {
         isPixelInterfaceStyle() -> pixelNavigationSurface(shape)
-        isInkInterfaceStyle() -> inkNavigationSurface(shape, paintBackground = false)
         isSnowInterfaceStyle() -> seasonNavigationSurface(shape, paintBackground = false)
         else -> this
     }

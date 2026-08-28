@@ -31,7 +31,6 @@ import me.weishu.kernelsu.ui.component.decoration.CustomUiDecorationPreset
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
-import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.screen.settings.UiDecorationSaveState
 import me.weishu.kernelsu.ui.theme.ColorMode
@@ -98,9 +97,6 @@ class SettingsViewModel(
             val seasonCardMotionEnabled = repo.seasonCardMotionEnabled
             val rainStyle = repo.rainStyle
             val rainCardMotionEnabled = repo.rainCardMotionEnabled
-            val inkStyle = repo.inkStyle
-            val inkFontEnabled = repo.inkFontEnabled
-            val inkCardMotionEnabled = repo.inkCardMotionEnabled
             val pixelStyle = repo.pixelStyle
             val pixelCardMotionEnabled = repo.pixelCardMotionEnabled
             val pixelPetEnabled = repo.pixelPetEnabled
@@ -221,9 +217,6 @@ class SettingsViewModel(
                     seasonCardMotionEnabled = seasonCardMotionEnabled,
                     rainStyle = rainStyle,
                     rainCardMotionEnabled = rainCardMotionEnabled,
-                    inkStyle = inkStyle,
-                    inkFontEnabled = inkFontEnabled,
-                    inkCardMotionEnabled = inkCardMotionEnabled,
                     pixelStyle = pixelStyle,
                     pixelCardMotionEnabled = pixelCardMotionEnabled,
                     pixelPetEnabled = pixelPetEnabled,
@@ -388,11 +381,6 @@ class SettingsViewModel(
                 return
             }
 
-            InterfaceStyle.Ink.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.INK)
-                return
-            }
-
             InterfaceStyle.Pixel.value -> {
                 applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.PIXEL)
                 return
@@ -407,7 +395,6 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.LiquidGlass.value ||
             oldMode == InterfaceStyle.Snow.value ||
             oldMode == InterfaceStyle.Rain.value ||
-            oldMode == InterfaceStyle.Ink.value ||
             oldMode == InterfaceStyle.Pixel.value
 
         if (isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value) {
@@ -438,11 +425,6 @@ class SettingsViewModel(
         } else {
             null
         }
-        val selectedInkStyle = if (mode == InterfaceStyle.Ink.value) {
-            InkStyle.fromValue(repo.inkStyle)
-        } else {
-            null
-        }
         val selectedPixelStyle = if (mode == InterfaceStyle.Pixel.value) {
             PixelStyle.fromValue(repo.pixelStyle)
         } else {
@@ -453,7 +435,6 @@ class SettingsViewModel(
         repo.themeMode = colorMode
         selectedSeason?.let { repo.seasonStyle = it.value }
         selectedRainStyle?.let { repo.rainStyle = it.value }
-        selectedInkStyle?.let { repo.inkStyle = it.value }
         selectedPixelStyle?.let { repo.pixelStyle = it.value }
         refresh()
     }
@@ -594,28 +575,6 @@ class SettingsViewModel(
     fun setRainCardMotionEnabled(enabled: Boolean) {
         repo.rainCardMotionEnabled = enabled
         _uiState.update { it.copy(rainCardMotionEnabled = enabled) }
-    }
-
-    fun setInkStyleIndex(index: Int) {
-        val inkStyle = InkStyle.fromIndex(index)
-        repo.inkStyle = inkStyle.value
-        _uiState.update {
-            it.copy(
-                inkStyle = inkStyle.value,
-                keyColor = inkStyle.keyColor,
-                themePreset = ThemePreset.INK.value,
-            )
-        }
-    }
-
-    fun setInkFontEnabled(enabled: Boolean) {
-        repo.inkFontEnabled = enabled
-        _uiState.update { it.copy(inkFontEnabled = enabled) }
-    }
-
-    fun setInkCardMotionEnabled(enabled: Boolean) {
-        repo.inkCardMotionEnabled = enabled
-        _uiState.update { it.copy(inkCardMotionEnabled = enabled) }
     }
 
     fun setPixelStyleIndex(index: Int) {

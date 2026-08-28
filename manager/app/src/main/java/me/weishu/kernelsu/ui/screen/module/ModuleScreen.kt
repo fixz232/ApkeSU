@@ -208,7 +208,6 @@ fun ModulePager(
 
         InterfaceStyle.Snow.value,
         InterfaceStyle.Rain.value,
-        InterfaceStyle.Ink.value,
         InterfaceStyle.Pixel.value -> {
             ModulePagerMiuix(
                 uiState = rawUiState,

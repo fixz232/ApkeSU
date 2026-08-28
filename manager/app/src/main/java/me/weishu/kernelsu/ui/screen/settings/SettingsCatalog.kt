@@ -34,9 +34,6 @@ internal object SettingsCatalog {
         entry("rain_style", SettingsCategory.Appearance, R.string.interface_style_rain) {
             it.uiMode == InterfaceStyle.Rain.value
         },
-        entry("ink_style", SettingsCategory.Appearance, R.string.interface_style_ink) {
-            it.uiMode == InterfaceStyle.Ink.value
-        },
         entry("pixel_style", SettingsCategory.Appearance, R.string.settings_pixel_style) {
             it.uiMode == InterfaceStyle.Pixel.value
         },

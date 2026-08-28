@@ -199,7 +199,6 @@ fun HomePager(
 
             InterfaceStyle.Snow.value,
             InterfaceStyle.Rain.value,
-            InterfaceStyle.Ink.value,
             InterfaceStyle.Pixel.value -> HomePagerMiuix(
                 state = uiState,
                 actions = actions,

@@ -37,7 +37,6 @@ import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.ContactPage
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Delete
@@ -59,7 +58,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
@@ -101,12 +99,9 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.StyledSwitch
 import me.weishu.kernelsu.ui.component.ApkeSecondaryScaffold
 import me.weishu.kernelsu.ui.component.ApkeUiTokens
-import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
-import me.weishu.kernelsu.ui.component.ink.inkMiuixCardSurface
-import me.weishu.kernelsu.ui.component.ink.isInkInterfaceStyle
 import me.weishu.kernelsu.ui.component.dialog.rememberLoadingDialog
 import me.weishu.kernelsu.ui.component.miuix.SendLogDialog
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
@@ -158,9 +153,6 @@ fun SettingsCategoryScreen(routeValue: String) {
                 onSetRainStyle = viewModel::setRainStyleIndex,
                 onSetRainCardMotion = viewModel::setRainCardMotionEnabled,
                 onSetDayNightMode = viewModel::setDayNightMode,
-                onSetInkStyle = viewModel::setInkStyleIndex,
-                onSetInkFontEnabled = viewModel::setInkFontEnabled,
-                onSetInkCardMotion = viewModel::setInkCardMotionEnabled,
                 onSetPixelStyle = viewModel::setPixelStyleIndex,
                 onSetPixelCardMotion = viewModel::setPixelCardMotionEnabled,
                 onOpen = navigator::push,
@@ -294,9 +286,6 @@ private fun AppearanceSettingsContent(
     onSetRainStyle: (Int) -> Unit,
     onSetRainCardMotion: (Boolean) -> Unit,
     onSetDayNightMode: (Boolean) -> Unit,
-    onSetInkStyle: (Int) -> Unit,
-    onSetInkFontEnabled: (Boolean) -> Unit,
-    onSetInkCardMotion: (Boolean) -> Unit,
     onSetPixelStyle: (Int) -> Unit,
     onSetPixelCardMotion: (Boolean) -> Unit,
     onOpen: (Route) -> Unit,
@@ -333,33 +322,6 @@ private fun AppearanceSettingsContent(
                 ),
                 selectedIndex = if (uiState.uiMode == InterfaceStyle.Delta.value) 1 else 0,
                 onSelected = { onSetAlphaDeltaMode(it == 1) },
-            )
-        }
-        if (uiState.uiMode == InterfaceStyle.Ink.value) {
-            SettingsDivider()
-            SettingsChoiceRow(
-                title = stringResource(R.string.settings_ink_style),
-                summary = stringResource(InkStyle.fromValue(uiState.inkStyle).summaryRes),
-                icon = Icons.Rounded.Brush,
-                options = InkStyle.entries.map { stringResource(it.labelRes) },
-                selectedIndex = InkStyle.selectedIndex(uiState.inkStyle),
-                onSelected = onSetInkStyle,
-            )
-            SettingsDivider()
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_ink_font),
-                summary = stringResource(R.string.settings_ink_font_summary),
-                icon = Icons.Rounded.TextFields,
-                checked = uiState.inkFontEnabled,
-                onCheckedChange = onSetInkFontEnabled,
-            )
-            SettingsDivider()
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_ink_card_motion),
-                summary = stringResource(R.string.settings_ink_card_motion_summary),
-                icon = Icons.Rounded.AutoFixHigh,
-                checked = uiState.inkCardMotionEnabled,
-                onCheckedChange = onSetInkCardMotion,
             )
         }
         if (uiState.uiMode == InterfaceStyle.Snow.value) {
@@ -860,7 +822,6 @@ private fun SettingsGroup(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(8.dp)
-    val isInk = isInkInterfaceStyle()
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(
             text = title,
@@ -870,16 +831,11 @@ private fun SettingsGroup(
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         Surface(
-            color = if (isInk) {
-                Color.Transparent
-            } else {
-                immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow)
-            },
+            color = immersiveSurfaceColor(MaterialTheme.colorScheme.surfaceContainerLow),
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = shape,
             modifier = Modifier
-                .fillMaxWidth()
-                .inkMiuixCardSurface(shape = shape),
+                .fillMaxWidth(),
         ) {
             Column(content = content)
         }

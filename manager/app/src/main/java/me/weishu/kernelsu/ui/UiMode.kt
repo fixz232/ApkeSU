@@ -25,7 +25,6 @@ enum class InterfaceStyle(val value: String, @StringRes val labelRes: Int) {
     LiquidGlass("liquid_glass", R.string.interface_style_liquid_glass),
     Snow("snow", R.string.interface_style_snow),
     Rain("rain", R.string.interface_style_rain),
-    Ink("ink", R.string.interface_style_ink),
     Pixel("pixel", R.string.interface_style_pixel),
     Skrootpro("skrootpro", R.string.interface_style_skrootpro),
     Alpha("alpha", R.string.interface_style_alpha),

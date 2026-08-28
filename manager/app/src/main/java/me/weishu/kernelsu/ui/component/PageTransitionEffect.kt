@@ -32,7 +32,6 @@ import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.rain.RainStyle
 import me.weishu.kernelsu.ui.component.snow.SeasonStyle
-import me.weishu.kernelsu.ui.component.ink.InkStyle
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -113,7 +112,6 @@ internal enum class PageTransitionVisual {
     Pixel,
     Season,
     Rain,
-    Ink,
 }
 
 internal data class PageTransitionTransform(
@@ -139,7 +137,6 @@ internal fun resolvePageTransitionVisual(
             InterfaceStyle.Pixel.value -> PageTransitionVisual.Pixel
             InterfaceStyle.Snow.value -> PageTransitionVisual.Season
             InterfaceStyle.Rain.value -> PageTransitionVisual.Rain
-            InterfaceStyle.Ink.value -> PageTransitionVisual.Ink
             InterfaceStyle.LiquidGlass.value -> PageTransitionVisual.Glass
             else -> PageTransitionVisual.Depth
         }
@@ -159,8 +156,7 @@ internal fun resolvePageTransitionTransform(
         PageTransitionVisual.Off -> PageTransitionTransform()
         PageTransitionVisual.Depth,
         PageTransitionVisual.Season,
-        PageTransitionVisual.Rain,
-        PageTransitionVisual.Ink -> PageTransitionTransform(
+        PageTransitionVisual.Rain -> PageTransitionTransform(
             translationXFraction = -0.052f * offset,
             scaleX = 1f - 0.018f * distance,
             scaleY = 1f - 0.018f * distance,
@@ -237,7 +233,6 @@ fun Modifier.mainPageTransition(
     interfaceStyle: String,
     seasonStyle: SeasonStyle,
     rainStyle: RainStyle,
-    inkStyle: InkStyle,
     pixelStyle: PixelStyle,
     animationsEnabled: Boolean,
     containsEmbeddedAndroidView: Boolean = false,
@@ -246,11 +241,10 @@ fun Modifier.mainPageTransition(
     val visual = resolvePageTransitionVisual(effect, interfaceStyle)
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
-    val accent = remember(visual, seasonStyle, rainStyle, inkStyle, pixelStyle, primary) {
+    val accent = remember(visual, seasonStyle, rainStyle, pixelStyle, primary) {
         when (visual) {
             PageTransitionVisual.Season -> Color(seasonStyle.keyColor)
             PageTransitionVisual.Rain -> Color(rainStyle.keyColor)
-            PageTransitionVisual.Ink -> Color(inkStyle.keyColor)
             PageTransitionVisual.Pixel -> Color(pixelStyle.keyColor)
             else -> primary
         }
@@ -293,7 +287,6 @@ fun Modifier.mainPageTransition(
                 PageTransitionVisual.Pixel -> drawPixelPageEdge(offset, progress, accent, secondary)
                 PageTransitionVisual.Season -> drawSeasonPageEdge(offset, progress, accent, secondary)
                 PageTransitionVisual.Rain -> drawRainPageEdge(offset, progress, accent, secondary)
-                PageTransitionVisual.Ink -> drawInkPageEdge(offset, progress, accent, secondary)
                 else -> Unit
             }
         }
@@ -411,52 +404,6 @@ private fun DrawScope.drawRainPageEdge(
         topLeft = Offset(centerX - radius, size.height - 22.dp.toPx()),
         size = Size(radius * 2f, 7.dp.toPx()),
         style = Stroke(width = 0.9.dp.toPx()),
-    )
-}
-
-private fun DrawScope.drawInkPageEdge(
-    offset: Float,
-    progress: Float,
-    primary: Color,
-    secondary: Color,
-) {
-    val direction = if (offset >= 0f) 1f else -1f
-    val edge = if (offset >= 0f) 0f else size.width
-    val washWidth = (12.dp.toPx() + 16.dp.toPx() * progress).coerceAtMost(size.width * 0.10f)
-    val washX = if (direction > 0f) edge else edge - washWidth
-    drawRect(
-        brush = Brush.horizontalGradient(
-            colors = if (direction > 0f) {
-                listOf(primary.copy(alpha = 0.18f * progress), Color.Transparent)
-            } else {
-                listOf(Color.Transparent, primary.copy(alpha = 0.18f * progress))
-            },
-            startX = washX,
-            endX = washX + washWidth,
-        ),
-        topLeft = Offset(washX, 0f),
-        size = Size(washWidth, size.height),
-    )
-    repeat(5) { index ->
-        val y = size.height * (0.17f + index * 0.145f)
-        val reach = (5 + index % 3 * 4).dp.toPx() * progress
-        drawLine(
-            color = if (index % 2 == 0) {
-                primary.copy(alpha = 0.36f * progress)
-            } else {
-                secondary.copy(alpha = 0.26f * progress)
-            },
-            start = Offset(edge, y + 4.dp.toPx()),
-            end = Offset(edge + direction * reach, y),
-            strokeWidth = 0.75.dp.toPx(),
-        )
-    }
-    val waterY = size.height * 0.86f
-    drawLine(
-        color = primary.copy(alpha = 0.30f * progress),
-        start = Offset(edge, waterY),
-        end = Offset(edge + direction * 18.dp.toPx() * progress, waterY),
-        strokeWidth = 0.7.dp.toPx(),
     )
 }
 

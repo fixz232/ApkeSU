@@ -13,20 +13,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
-import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.InterfaceStyle
 import me.weishu.kernelsu.ui.LocalInterfaceStyle
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.rainPalette
-import me.weishu.kernelsu.ui.component.ink.LocalInkFontEnabled
-import me.weishu.kernelsu.ui.component.ink.LocalInkStyle
-import me.weishu.kernelsu.ui.component.ink.InkPalette
-import me.weishu.kernelsu.ui.component.ink.inkPalette
 import me.weishu.kernelsu.ui.util.AppFontState
 import me.weishu.kernelsu.ui.util.resolveAppFontFamily
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
@@ -49,10 +42,7 @@ fun MiuixKernelSUTheme(
     val systemDarkTheme = isSystemInDarkTheme()
     val isLiquidGlass = LocalInterfaceStyle.current == InterfaceStyle.LiquidGlass.value
     val isRainStyle = LocalInterfaceStyle.current == InterfaceStyle.Rain.value
-    val isInkStyle = LocalInterfaceStyle.current == InterfaceStyle.Ink.value
     val rainStyle = LocalRainStyle.current
-    val inkStyle = LocalInkStyle.current
-    val inkFontEnabled = LocalInkFontEnabled.current
     val forceInterfaceDark = isInterfaceForcedDark(
         interfaceStyle = LocalInterfaceStyle.current,
         rainStyle = LocalRainStyle.current,
@@ -74,10 +64,7 @@ fun MiuixKernelSUTheme(
     val rainColors = remember(isRainStyle, rainStyle, darkTheme) {
         if (isRainStyle) rainPalette(rainStyle, darkTheme) else null
     }
-    val inkColors = remember(isInkStyle, inkStyle, darkTheme) {
-        if (isInkStyle) inkPalette(inkStyle, darkTheme) else null
-    }
-    val effectiveMaterialColorScheme = remember(materialColorScheme, rainColors, inkColors, darkTheme) {
+    val effectiveMaterialColorScheme = remember(materialColorScheme, rainColors, darkTheme) {
         when {
             rainColors != null -> {
                 val secondaryText = if (darkTheme) Color(0xFFB8C6CE) else Color(0xFF435D68)
@@ -89,16 +76,11 @@ fun MiuixKernelSUTheme(
                 )
             }
 
-            inkColors != null -> materialColorScheme.withInkColors(inkColors)
             else -> materialColorScheme
         }
     }
-    val appFontFamily = remember(appFontState, isInkStyle, inkFontEnabled) {
-        if (isInkStyle && inkFontEnabled) {
-            FontFamily(Font(R.font.ink_wenkai))
-        } else {
-            resolveAppFontFamily(context, appFontState)
-        }
+    val appFontFamily = remember(appFontState) {
+        resolveAppFontFamily(context, appFontState)
     }
     val materialTypography = remember(appFontFamily) {
         Typography(fontFamily = appFontFamily)
@@ -168,7 +150,6 @@ fun MiuixKernelSUTheme(
                 appSettings.colorMode,
                 appSettings.monetSurfaceOpacity,
                 rainColors,
-                inkColors,
                 darkTheme,
             ) {
                 val base = if (appSettings.colorMode.isMonet) {
@@ -183,7 +164,6 @@ fun MiuixKernelSUTheme(
                         outline = rainColors.outline,
                     )
 
-                    inkColors != null -> base.withInkColors(inkColors)
                     else -> base
                 }
             }
@@ -228,45 +208,6 @@ private fun Colors.withRainTextColors(
     onSurfaceContainerHigh = content,
     onSurfaceContainerHighest = content,
     outline = outline,
-)
-
-private fun ColorScheme.withInkColors(palette: InkPalette): ColorScheme = copy(
-    primary = palette.primary,
-    secondary = palette.secondary,
-    tertiary = palette.seal,
-    background = palette.backgroundBottom,
-    onBackground = palette.content,
-    surface = palette.surfaceBottom,
-    surfaceVariant = palette.surfaceTop,
-    surfaceContainerLowest = palette.surfaceBottom,
-    surfaceContainerLow = palette.surfaceBottom,
-    surfaceContainer = palette.surfaceTop,
-    surfaceContainerHigh = palette.surfaceTop,
-    surfaceContainerHighest = palette.surfaceTop,
-    onSurface = palette.content,
-    onSurfaceVariant = palette.secondaryContent,
-    outline = palette.outline,
-)
-
-private fun Colors.withInkColors(palette: InkPalette): Colors = copy(
-    primary = palette.primary,
-    secondary = palette.secondary,
-    surface = palette.surfaceBottom,
-    surfaceVariant = palette.surfaceTop,
-    surfaceContainer = palette.surfaceTop,
-    surfaceContainerHigh = palette.surfaceTop,
-    surfaceContainerHighest = palette.surfaceTop,
-    onBackground = palette.content,
-    onBackgroundVariant = palette.secondaryContent,
-    onSurface = palette.content,
-    onSurfaceSecondary = palette.secondaryContent,
-    onSurfaceVariantSummary = palette.secondaryContent,
-    onSurfaceVariantActions = palette.content,
-    onSurfaceContainer = palette.content,
-    onSurfaceContainerVariant = palette.secondaryContent,
-    onSurfaceContainerHigh = palette.content,
-    onSurfaceContainerHighest = palette.content,
-    outline = palette.outline,
 )
 
 @Composable

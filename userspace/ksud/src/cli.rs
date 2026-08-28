@@ -690,6 +690,9 @@ enum Pathmask {
     SetAutoLoad {
         /// true to auto-load, false to keep the saved config disabled
         enabled: bool,
+        /// optional boot delay in seconds (0 applies immediately)
+        #[arg(long)]
+        delay_seconds: Option<u64>,
     },
 
     /// Probe whether a path is visible after dropping to an Android UID
@@ -1078,7 +1081,10 @@ pub fn run() -> Result<()> {
                 Pathmask::ImportJson { json } => pathmask::import_config_text(&json),
                 Pathmask::Apply => pathmask::apply(),
                 Pathmask::ApplyJson { json } => pathmask::apply_config_text(&json),
-                Pathmask::SetAutoLoad { enabled } => pathmask::set_auto_load(enabled),
+                Pathmask::SetAutoLoad {
+                    enabled,
+                    delay_seconds,
+                } => pathmask::set_auto_load(enabled, delay_seconds),
                 Pathmask::TestVisibility { uid, path } => pathmask::test_visibility(uid, &path),
                 Pathmask::Unload => pathmask::unload(),
                 Pathmask::DeleteConfig => pathmask::delete_config(),

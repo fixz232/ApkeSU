@@ -48,12 +48,6 @@ import me.weishu.kernelsu.ui.component.rain.RAIN_STYLE_KEY
 import me.weishu.kernelsu.ui.component.rain.RAIN_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.rain.DEFAULT_RAIN_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.rain.RainStyle
-import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_CARD_MOTION_ENABLED
-import me.weishu.kernelsu.ui.component.ink.DEFAULT_INK_FONT_ENABLED
-import me.weishu.kernelsu.ui.component.ink.INK_CARD_MOTION_ENABLED_KEY
-import me.weishu.kernelsu.ui.component.ink.INK_FONT_ENABLED_KEY
-import me.weishu.kernelsu.ui.component.ink.INK_STYLE_KEY
-import me.weishu.kernelsu.ui.component.ink.InkStyle
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
@@ -151,9 +145,6 @@ class MainActivityViewModel(
             seasonCardMotionEnabled = settingRepo.seasonCardMotionEnabled,
             rainStyle = settingRepo.rainStyle,
             rainCardMotionEnabled = settingRepo.rainCardMotionEnabled,
-            inkStyle = settingRepo.inkStyle,
-            inkFontEnabled = settingRepo.inkFontEnabled,
-            inkCardMotionEnabled = settingRepo.inkCardMotionEnabled,
             pixelStyle = settingRepo.pixelStyle,
             pixelCardMotionEnabled = settingRepo.pixelCardMotionEnabled,
             uiDecorationConfig = settingRepo.uiDecorationConfig,
@@ -217,9 +208,6 @@ class MainActivityViewModel(
             seasonCardMotionEnabled = DEFAULT_SEASON_CARD_MOTION_ENABLED,
             rainStyle = RainStyle.DEFAULT_VALUE,
             rainCardMotionEnabled = DEFAULT_RAIN_CARD_MOTION_ENABLED,
-            inkStyle = InkStyle.DEFAULT_VALUE,
-            inkFontEnabled = DEFAULT_INK_FONT_ENABLED,
-            inkCardMotionEnabled = DEFAULT_INK_CARD_MOTION_ENABLED,
             pixelStyle = PixelStyle.DEFAULT_VALUE,
             pixelCardMotionEnabled = DEFAULT_PIXEL_CARD_MOTION_ENABLED,
             uiDecorationConfig = UiDecorationConfig(),
@@ -281,9 +269,6 @@ class MainActivityViewModel(
             SEASON_CARD_MOTION_ENABLED_KEY,
             RAIN_STYLE_KEY,
             RAIN_CARD_MOTION_ENABLED_KEY,
-            INK_STYLE_KEY,
-            INK_FONT_ENABLED_KEY,
-            INK_CARD_MOTION_ENABLED_KEY,
             PIXEL_STYLE_KEY,
             PIXEL_CARD_MOTION_ENABLED_KEY,
             UI_DECORATION_CONFIG_KEY,
