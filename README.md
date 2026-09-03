@@ -74,7 +74,7 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 - [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) 动态管理器功能设计、IOCTL 编号与加载思路参考
 - [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
 - [skrootpro](https://github.com/abcz316/SKRoot-linuxKernelRoot)UI框架借鉴
-- [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持
+- [kowsu](https://github.com/KOWX712/KernelSU.git) ko文件来源
 - [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/): KernelSU设计灵感来源
 - [Magisk](https://github.com/topjohnwu/Magisk): 知名Root开源项目
 - [genuine](https://github.com/brevent/genuine/): APK签名校验方案
