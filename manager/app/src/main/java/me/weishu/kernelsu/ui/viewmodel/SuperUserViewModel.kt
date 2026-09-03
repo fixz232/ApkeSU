@@ -160,22 +160,22 @@ class SuperUserViewModel(
 
         return groups.mapNotNull { group ->
             val uidMatched = group.uid.toString().contains(text, true)
-            val matchedPackageNames = group.apps.filter {
+            val matchedIdentifiers = group.apps.filter {
                 uidMatched ||
                 it.label.contains(text, true) ||
-                        it.packageName.contains(text, true) ||
+                        it.displayIdentifier.contains(text, true) ||
                         PinyinUtil.toPinyin(it.label).contains(text, true)
-            }.mapTo(linkedSetOf()) { it.packageName }
+            }.mapTo(linkedSetOf()) { it.displayIdentifier }
 
-            if (matchedPackageNames.isEmpty()) {
+            if (matchedIdentifiers.isEmpty()) {
                 null
             } else {
                 val sortedApps = group.apps.sortedWith(
-                    compareByDescending { it.packageName in matchedPackageNames }
+                    compareByDescending { it.displayIdentifier in matchedIdentifiers }
                 )
                 group.copy(
                     apps = sortedApps,
-                    matchedPackageNames = matchedPackageNames,
+                    matchedIdentifiers = matchedIdentifiers,
                 )
             }
         }
@@ -250,6 +250,8 @@ class SuperUserViewModel(
 
         return list.filter {
             if (it.packageName == ksuApp.packageName) return@filter false
+            // UID 1053 is the single system-wide WebView zygote (primary user only).
+            if (it.isWebViewZygote) return@filter true
             if (it.allowSu || it.hasCustomProfile) {
                 return@filter true
             }
@@ -313,7 +315,7 @@ class SuperUserViewModel(
 
         val collator = Collator.getInstance(Locale.getDefault())
         val base: Comparator<GroupedApps> = when (sortType) {
-            SORT_BY_PACKAGE_NAME -> compareBy { it.primary.packageName }
+            SORT_BY_PACKAGE_NAME -> compareBy { it.primary.displayIdentifier }
             SORT_BY_INSTALL_TIME -> compareBy { it.primary.packageInfo.firstInstallTime }
             SORT_BY_UPDATE_TIME -> compareBy { it.primary.packageInfo.lastUpdateTime }
             else -> Comparator { a, b -> collator.compare(a.primary.label, b.primary.label) }

@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 @Composable
 fun AppProfileScreen(uid: Int) {
+    val uiMode = LocalUiMode.current
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -56,16 +57,17 @@ fun AppProfileScreen(uid: Int) {
         return
     }
 
-    val packageName = primaryAppInfo.packageName
+    val packageName = primaryAppInfo.profileKey
     val sharedUserId = remember(uid) {
         primaryAppInfo.packageInfo.sharedUserId
             ?: appGroup.apps.firstOrNull { it.packageInfo.sharedUserId != null }?.packageInfo?.sharedUserId
             ?: ""
     }
 
-    val initialProfile = remember(uid, packageName) {
-        (Natives.getAppProfile(packageName, uid) ?: Natives.Profile(packageName, uid)).also {
-            if (it.allowSu) {
+    val initialProfile = remember(uid, packageName, primaryAppInfo.special) {
+        val loaded = Natives.getAppProfile(packageName, uid) ?: Natives.Profile(packageName, uid)
+        (if (primaryAppInfo.special) loaded.copy(allowSu = false) else loaded).also {
+            if (it.allowSu && !primaryAppInfo.special) {
                 it.rules = getSepolicy(packageName)
             }
         }
@@ -85,7 +87,11 @@ fun AppProfileScreen(uid: Int) {
 
     fun showMessage(message: String) {
         scope.launch {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if (uiMode == UiMode.Material) {
+                materialSnackbarHost.showSnackbar(message)
+            } else {
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -111,13 +117,18 @@ fun AppProfileScreen(uid: Int) {
             navigator.push(Route.AppProfileTemplate)
         },
         onProfileChange = profileChange@ { updatedProfile ->
-            if (updatedProfile.allowSu && uid < 2000 && uid != 1000) {
+            val profileToSave = if (primaryAppInfo.special) {
+                updatedProfile.copy(allowSu = false)
+            } else {
+                updatedProfile
+            }
+            if (profileToSave.allowSu && uid < 2000 && uid != 1000) {
                 showMessage(suNotAllowed)
                 return@profileChange
             }
 
             val generation = profileWriteGeneration.incrementAndGet()
-            profile = updatedProfile
+            profile = profileToSave
 
             scope.launch {
                 profileWriteMutex.withLock {
@@ -125,11 +136,11 @@ fun AppProfileScreen(uid: Int) {
                     // finish, then the newest profile is applied after it.
                     if (generation != profileWriteGeneration.get()) return@withLock
 
-                    val desiredRules = updatedProfile.rules.takeIf {
-                        updatedProfile.allowSu && !updatedProfile.rootUseDefault
+                    val desiredRules = profileToSave.rules.takeIf {
+                        profileToSave.allowSu && !profileToSave.rootUseDefault
                     }.orEmpty()
-                    val sepolicyUpdated = withContext(Dispatchers.IO) {
-                        setSepolicy(updatedProfile.name, desiredRules)
+                    val sepolicyUpdated = primaryAppInfo.special || withContext(Dispatchers.IO) {
+                        setSepolicy(profileToSave.name, desiredRules)
                     }
                     if (!sepolicyUpdated) {
                         if (generation == profileWriteGeneration.get()) {
@@ -140,22 +151,27 @@ fun AppProfileScreen(uid: Int) {
                     }
 
                     val updated = withContext(Dispatchers.IO) {
-                        if (Natives.setAppProfile(updatedProfile)) {
+                        if (Natives.setAppProfile(profileToSave)) {
                             true
                         } else {
-                            ensureManagerRegistered() && Natives.setAppProfile(updatedProfile)
+                            ensureManagerRegistered() && Natives.setAppProfile(profileToSave)
                         }
                     }
                     if (updated) {
-                        persistedProfile = updatedProfile
+                        persistedProfile = profileToSave
                         if (generation == profileWriteGeneration.get()) {
-                            profile = updatedProfile
+                            profile = profileToSave
+                            if (uiMode == UiMode.Material) {
+                                viewModel.loadAppList()
+                            }
                         }
                     } else {
-                        withContext(Dispatchers.IO) {
-                            setSepolicy(persistedProfile.name, persistedProfile.rules.takeIf {
-                                persistedProfile.allowSu && !persistedProfile.rootUseDefault
-                            }.orEmpty())
+                        if (!primaryAppInfo.special) {
+                            withContext(Dispatchers.IO) {
+                                setSepolicy(persistedProfile.name, persistedProfile.rules.takeIf {
+                                    persistedProfile.allowSu && !persistedProfile.rootUseDefault
+                                }.orEmpty())
+                            }
                         }
                         if (generation == profileWriteGeneration.get()) {
                             profile = persistedProfile
@@ -167,7 +183,7 @@ fun AppProfileScreen(uid: Int) {
         },
     )
 
-    when (LocalUiMode.current) {
+    when (uiMode) {
         UiMode.Miuix -> AppProfileScreenMiuix(state, actions)
         UiMode.Material -> AppProfileScreenMaterial(state, actions, materialSnackbarHost)
     }

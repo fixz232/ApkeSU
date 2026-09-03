@@ -21,6 +21,8 @@ import kotlinx.coroutines.withTimeout
 import me.weishu.kernelsu.IKsuInterface
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.data.model.AppInfo
+import me.weishu.kernelsu.data.model.WEBVIEW_ZYGOTE_PROFILE_KEY
+import me.weishu.kernelsu.data.model.WEBVIEW_ZYGOTE_UID
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.KsuService
 import me.weishu.kernelsu.ui.util.KsuCli
@@ -44,7 +46,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
                 Log.w(TAG, "root package query failed, falling back to current user", it)
             }.getOrNull()
 
-            if (rootResult != null && rootResult.first.isNotEmpty()) {
+            if (rootResult != null && rootResult.first.any { !it.special }) {
                 return@runCatching rootResult
             }
 
@@ -52,7 +54,8 @@ class SuperUserRepositoryImpl : SuperUserRepository {
             val localPackages = getInstalledPackagesLocal(0)
             val localApps = localPackages.mapNotNull { packageInfo ->
                 parseAppInfo(packageInfo, allowedUids)
-            }
+            }.toMutableList()
+            createWebViewZygoteApp()?.let(localApps::add)
             Log.i(
                 TAG,
                 "load local fallback cost: ${SystemClock.elapsedRealtime() - start}, " +
@@ -102,7 +105,8 @@ class SuperUserRepositoryImpl : SuperUserRepository {
             val allowedUids = getAllowListUids()
             val newApps = packages.mapNotNull { packageInfo ->
                 parseAppInfo(packageInfo, allowedUids)
-            }
+            }.toMutableList()
+            createWebViewZygoteApp()?.let(newApps::add)
 
             Log.i(TAG, "load root service cost: ${SystemClock.elapsedRealtime() - start}, packages: ${newApps.size}")
             return newApps to idsArray.toList()
@@ -128,6 +132,38 @@ class SuperUserRepositoryImpl : SuperUserRepository {
         }
     }
 
+    private fun createWebViewZygoteApp(): AppInfo? {
+        return runCatching {
+            val pm = ksuApp.packageManager
+            val androidInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getApplicationInfo("android", PackageManager.ApplicationInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getApplicationInfo("android", 0)
+            }
+            val systemInfo = ApplicationInfo(androidInfo).apply {
+                uid = WEBVIEW_ZYGOTE_UID
+            }
+            val placeholder = PackageInfo().apply {
+                packageName = ""
+                applicationInfo = systemInfo
+            }
+            val profile = Natives.getAppProfile(WEBVIEW_ZYGOTE_PROFILE_KEY, WEBVIEW_ZYGOTE_UID)
+                ?: Natives.Profile(WEBVIEW_ZYGOTE_PROFILE_KEY, WEBVIEW_ZYGOTE_UID)
+
+            AppInfo(
+                label = "WebView Zygote",
+                packageInfo = placeholder,
+                profile = profile.copy(allowSu = false),
+                profileKey = WEBVIEW_ZYGOTE_PROFILE_KEY,
+                special = true,
+            )
+        }.getOrElse {
+            Log.w(TAG, "failed to create WebView Zygote profile entry", it)
+            null
+        }
+    }
+
     override suspend fun refreshProfiles(currentApps: List<AppInfo>): Result<List<AppInfo>> = withContext(Dispatchers.IO) {
         runCatching {
             if (currentApps.isEmpty()) return@runCatching emptyList()
@@ -135,12 +171,15 @@ class SuperUserRepositoryImpl : SuperUserRepository {
             val allowedUids = getAllowListUids()
             currentApps.map { app ->
                 val profile = runCatching<Natives.Profile?> {
-                    Natives.getAppProfile(app.packageName, app.uid)
+                    Natives.getAppProfile(app.profileKey, app.uid)
                 }.getOrElse {
-                    Log.w(TAG, "get profile failed for ${app.packageName}", it)
+                    Log.w(TAG, "get profile failed for ${app.profileKey}", it)
                     null
                 }
-                app.copy(profile = profile, isGrantedByKernel = app.uid in allowedUids)
+                app.copy(
+                    profile = if (app.special) profile?.copy(allowSu = false) else profile,
+                    isGrantedByKernel = !app.special && app.uid in allowedUids,
+                )
             }
         }
     }
@@ -152,6 +191,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
 
             val pm = ksuApp.packageManager
             val uid = appInfo.uid
+            if (uid == WEBVIEW_ZYGOTE_UID) return null
             val profile = runCatching<Natives.Profile?> {
                 Natives.getAppProfile(packageInfo.packageName, uid)
             }.getOrElse {

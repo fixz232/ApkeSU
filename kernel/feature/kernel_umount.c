@@ -1,5 +1,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/task_work.h>
 #include <linux/cred.h>
 #include <linux/compiler.h>
@@ -20,7 +21,6 @@
 #include "ksu.h"
 
 static bool ksu_kernel_umount_enabled = true;
-bool ksu_webview_zygote_umount_enabled = false;
 
 static int kernel_umount_feature_get(u64 *value)
 {
@@ -45,16 +45,27 @@ static const struct ksu_feature_handler kernel_umount_handler = {
 
 static int webview_zygote_umount_feature_get(u64 *value)
 {
-    *value = ksu_webview_zygote_umount_enabled ? 1 : 0;
+    *value = ksu_uid_should_umount(WEBVIEW_ZYGOTE_UID) ? 1 : 0;
     return 0;
 }
 
 static int webview_zygote_umount_feature_set(u64 value)
 {
-    bool enable = value != 0;
-    ksu_webview_zygote_umount_enabled = enable;
-    pr_info("webview_zygote_umount: set to %d\n", enable);
-    return 0;
+    struct app_profile profile = {
+        .version = KSU_APP_PROFILE_VER,
+        .curr_uid = WEBVIEW_ZYGOTE_UID,
+        .allow_su = false,
+        .nrp_config = {
+            .use_default = false,
+            .profile = {
+                .umount_modules = value != 0,
+            },
+        },
+    };
+
+    strscpy(profile.key, "webview_zygote", sizeof(profile.key));
+    pr_info("webview_zygote_umount: set profile to %d\n", value != 0);
+    return ksu_set_app_profile(&profile);
 }
 
 static const struct ksu_feature_handler webview_zygote_umount_handler = {
@@ -110,7 +121,7 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
     // 1. Normal app: zygote -> appuid
     // 2. Isolated process forked from zygote: zygote -> isolated_process
     // 3. App zygote forked from zygote: zygote -> appuid
-    // 4. Webview zygote forked from zygote: zygote -> webview_zygote (controlled by feature policy)
+    // 4. Webview zygote forked from zygote: zygote -> webview_zygote
     // 5. Isolated process forked from app zygote: appuid -> isolated_process (already handled by 3)
     // 6. Isolated process forked from webview zygote (already handled by 4)
     if (!is_appuid(new_uid) && new_uid != WEBVIEW_ZYGOTE_UID && !is_isolated_process(new_uid)) {

@@ -285,7 +285,7 @@ class WebViewInterface(private val state: WebUIState) {
      */
     private fun packageRecords(): List<PackageRecord> {
         val records = LinkedHashMap<String, PackageRecord>()
-        val cached = SuperUserViewModel.apps.mapNotNull { appInfo ->
+        val cached = SuperUserViewModel.apps.filterNot { it.special }.mapNotNull { appInfo ->
             val packageInfo = appInfo.packageInfo
             val applicationInfo = packageInfo.applicationInfo ?: return@mapNotNull null
             PackageRecord(
