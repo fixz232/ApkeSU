@@ -13,6 +13,7 @@
   </p>
   <p>
     <a href="#项目说明">项目说明</a> ·
+    <a href="#主要功能">主要功能</a> ·
     <a href="#上游项目信息">上游信息</a> ·
     <a href="#开源协议遵守说明">开源协议</a> ·
     <a href="#免责声明">免责声明</a>
@@ -30,6 +31,10 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 ## 项目说明
 
 本项目继承 KernelSU 的开源授权结构：`kernel/` 目录遵循上游 KernelSU/Linux kernel 的 **GPL-2.0-only** 授权；除 `kernel/` 之外的 KernelSU 衍生代码遵循 **GPL-3.0-or-later** 授权；第三方依赖遵循各自上游许可证，清单见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+## 主要功能
+
+- **动态管理器**：保留 ApkeSU 内置主管理器，同时允许用户为一个已安装且兼容的管理器授予副管理器权限。身份同时绑定包名、App ID、APK v2 证书大小和证书 SHA-256，并在软件包变化后由内核重新校验。该功能授予完整 Root 管理权限，使用前请阅读[动态管理器安全与使用说明](./docs/DYNAMIC_MANAGER.md)。
 
 ## 上游项目信息
 
@@ -66,6 +71,7 @@ ApkeSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 官方上游仓�
 
 - [KernelSU](https://github.com/tiann/KernelSU)，感谢作者weishu与全部贡献者
 - [Sukisu-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) SuSFS方案参考
+- [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) 动态管理器功能设计、IOCTL 编号与加载思路参考
 - [FolkPatch](https://github.com/LyraVoid/FolkPatch) UI框架代码引用
 - [skrootpro](https://github.com/abcz316/SKRoot-linuxKernelRoot)UI框架借鉴
 - [kowsu](https://github.com/KOWX712/KernelSU.git) 技术支持

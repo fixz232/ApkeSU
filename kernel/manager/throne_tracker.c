@@ -9,6 +9,7 @@
 #include <linux/version.h>
 
 #include "policy/allowlist.h"
+#include "feature/dynamic_manager.h"
 #include "manager/apk_sign.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager/manager_identity.h"
@@ -270,6 +271,155 @@ void search_manager(const char *path, int depth, struct list_head *uid_data)
     }
 }
 
+struct package_search_context {
+    struct dir_context ctx;
+    struct list_head *data_path_list;
+    const char *parent_dir;
+    const char *target_package;
+    int depth;
+    bool *matched;
+    bool *valid;
+    bool *scan_complete;
+};
+
+static FILLDIR_RETURN_TYPE package_search_actor(struct dir_context *ctx, const char *name, int namelen, loff_t off,
+                                                u64 ino, unsigned int d_type)
+{
+    struct package_search_context *search = container_of(ctx, struct package_search_context, ctx);
+    char path[DATA_PATH_LEN];
+
+    (void)off;
+    (void)ino;
+    if (!*search->valid || !*search->scan_complete)
+        return FILLDIR_ACTOR_STOP;
+    if ((namelen == 1 && name[0] == '.') || (namelen == 2 && name[0] == '.' && name[1] == '.'))
+        return FILLDIR_ACTOR_CONTINUE;
+    if (d_type == DT_DIR && namelen >= 8 && !strncmp(name, "vmdl", 4) && !strncmp(name + namelen - 4, ".tmp", 4))
+        return FILLDIR_ACTOR_CONTINUE;
+    if (snprintf(path, sizeof(path), "%s/%.*s", search->parent_dir, namelen, name) >= sizeof(path)) {
+        *search->scan_complete = false;
+        return FILLDIR_ACTOR_STOP;
+    }
+
+    if (d_type == DT_DIR && search->depth > 0) {
+        struct data_path *data = kzalloc(sizeof(*data), GFP_KERNEL);
+
+        if (!data) {
+            *search->scan_complete = false;
+            return FILLDIR_ACTOR_STOP;
+        }
+        strscpy(data->dirpath, path, sizeof(data->dirpath));
+        data->depth = search->depth - 1;
+        list_add_tail(&data->list, search->data_path_list);
+    } else if (namelen == 8 && !strncmp(name, "base.apk", namelen)) {
+        char package_name[KSU_MAX_PACKAGE_NAME];
+
+        if (get_pkg_from_apk_path(package_name, path) < 0) {
+            *search->scan_complete = false;
+            return FILLDIR_ACTOR_STOP;
+        }
+        if (!strcmp(package_name, search->target_package)) {
+            *search->matched = true;
+            if (!ksu_dynamic_manager_validate_apk(path)) {
+                *search->valid = false;
+                return FILLDIR_ACTOR_STOP;
+            }
+        }
+    }
+    return FILLDIR_ACTOR_CONTINUE;
+}
+
+static bool validate_package_apks(const char *root, int depth, const char *target_package)
+{
+    struct list_head paths;
+    struct data_path first = { .depth = depth };
+    struct data_path *path, *next;
+    unsigned long data_app_magic = 0;
+    bool matched = false;
+    bool valid = true;
+    bool scan_complete = true;
+    int level;
+
+    INIT_LIST_HEAD(&paths);
+    strscpy(first.dirpath, root, sizeof(first.dirpath));
+    list_add_tail(&first.list, &paths);
+
+    for (level = depth; level >= 0 && valid && scan_complete; level--) {
+        list_for_each_entry_safe (path, next, &paths, list) {
+            struct package_search_context context = {
+                .ctx.actor = package_search_actor,
+                .data_path_list = &paths,
+                .parent_dir = path->dirpath,
+                .target_package = target_package,
+                .depth = path->depth,
+                .matched = &matched,
+                .valid = &valid,
+                .scan_complete = &scan_complete,
+            };
+            struct file *file;
+
+            if (valid && scan_complete) {
+                file = filp_open(path->dirpath, O_RDONLY | O_NOFOLLOW, 0);
+                if (IS_ERR(file)) {
+                    scan_complete = false;
+                } else {
+                    if (!data_app_magic)
+                        data_app_magic = file->f_inode->i_sb->s_magic;
+                    if (file->f_inode->i_sb->s_magic != data_app_magic || iterate_dir(file, &context.ctx) < 0)
+                        scan_complete = false;
+                    filp_close(file, NULL);
+                }
+            }
+            list_del(&path->list);
+            if (path != &first)
+                kfree(path);
+        }
+    }
+
+    list_for_each_entry_safe (path, next, &paths, list) {
+        list_del(&path->list);
+        if (path != &first)
+            kfree(path);
+    }
+    return scan_complete && matched && valid;
+}
+
+static void revalidate_dynamic_manager(struct list_head *uid_list, bool package_list_valid)
+{
+    struct uid_data *entry;
+    char package_name[KSU_MAX_PACKAGE_NAME];
+    uid_t appid;
+    u64 revision;
+    bool identity_exists = false;
+    bool appid_shared = false;
+    bool valid = false;
+
+    if (!ksu_dynamic_manager_get_identity(package_name, sizeof(package_name), &appid, &revision))
+        return;
+
+    if (package_list_valid) {
+        list_for_each_entry (entry, uid_list, list) {
+            if (KSU_APPID(entry->uid) != appid)
+                continue;
+            if (!strcmp(entry->package, package_name))
+                identity_exists = true;
+            else
+                appid_shared = true;
+        }
+    }
+
+    if (package_list_valid && identity_exists && !appid_shared)
+        valid = validate_package_apks("/data/app", 2, package_name);
+
+    ksu_dynamic_manager_set_active(appid, revision, valid);
+    if (!valid) {
+        if (!package_list_valid)
+            pr_warn("dynamic manager %s is inactive: package identity data is unavailable\n", package_name);
+        else
+            pr_warn("dynamic manager %s is inactive: shared App ID, identity, or signature mismatch\n", package_name);
+    }
+}
+
 static bool is_uid_exist(uid_t uid, char *package, void *data)
 {
     struct list_head *list = (struct list_head *)data;
@@ -288,14 +438,16 @@ static bool is_uid_exist(uid_t uid, char *package, void *data)
 
 void track_throne(bool prune_only)
 {
+    struct list_head uid_list;
     struct file *fp = filp_open(SYSTEM_PACKAGES_LIST_PATH, O_RDONLY, 0);
+    bool package_list_valid = true;
+
+    INIT_LIST_HEAD(&uid_list);
     if (IS_ERR(fp)) {
         pr_err("%s: open " SYSTEM_PACKAGES_LIST_PATH " failed: %ld\n", __func__, PTR_ERR(fp));
+        revalidate_dynamic_manager(&uid_list, false);
         return;
     }
-
-    struct list_head uid_list;
-    INIT_LIST_HEAD(&uid_list);
 
     char chr = 0;
     loff_t pos = 0;
@@ -303,21 +455,29 @@ void track_throne(bool prune_only)
     char buf[KSU_MAX_PACKAGE_NAME];
     for (;;) {
         ssize_t count = kernel_read(fp, &chr, sizeof(chr), &pos);
-        if (count != sizeof(chr))
+        if (count == 0) {
+            if (pos != line_start)
+                package_list_valid = false;
             break;
+        }
+        if (count != sizeof(chr)) {
+            package_list_valid = false;
+            break;
+        }
         if (chr != '\n')
             continue;
 
         count = kernel_read(fp, buf, sizeof(buf) - 1, &line_start);
         if (count <= 0) {
+            package_list_valid = false;
             break;
         }
         buf[count] = '\0';
 
         struct uid_data *data = kzalloc(sizeof(struct uid_data), GFP_KERNEL);
         if (!data) {
-            filp_close(fp, 0);
-            goto out;
+            package_list_valid = false;
+            break;
         }
 
         char *tmp = buf;
@@ -327,6 +487,7 @@ void track_throne(bool prune_only)
         if (!uid || !package) {
             kfree(data);
             pr_err("update_uid: package or uid is NULL!\n");
+            package_list_valid = false;
             break;
         }
 
@@ -334,6 +495,7 @@ void track_throne(bool prune_only)
         if (kstrtou32(uid, 10, &res)) {
             kfree(data);
             pr_err("update_uid: uid parse err\n");
+            package_list_valid = false;
             break;
         }
         data->uid = res;
@@ -347,6 +509,11 @@ void track_throne(bool prune_only)
     // now update uid list
     struct uid_data *np;
     struct uid_data *n;
+
+    revalidate_dynamic_manager(&uid_list, package_list_valid);
+
+    if (!package_list_valid)
+        goto out;
 
     if (prune_only)
         goto prune;

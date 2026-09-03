@@ -198,6 +198,7 @@ import me.weishu.kernelsu.ui.screen.settings.AiModuleStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.BuiltinMountScreen
 import me.weishu.kernelsu.ui.screen.settings.CpuSpoofScreen
 import me.weishu.kernelsu.ui.screen.settings.DeviceIdentityScreen
+import me.weishu.kernelsu.ui.screen.settings.DynamicManagerScreen
 import me.weishu.kernelsu.ui.screen.settings.GraphicsRendererScreen
 import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
@@ -566,6 +567,7 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.Sulog> { SulogScreen() }
                                 entry<Route.SuperUserTools> { SuperUserToolsScreen() }
                                 entry<Route.AppIdManager> { AppIdManagerScreen() }
+                                entry<Route.DynamicManager> { DynamicManagerScreen() }
                                 entry<Route.AppFreeze> { AppFreezeScreen() }
                                 entry<Route.ColorPalette> { ColorPaletteScreen() }
                                 entry<Route.LauncherIcon> { LauncherIconScreen() }

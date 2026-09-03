@@ -45,4 +45,12 @@ class SettingsCatalogTest {
             SettingsCatalog.visibleEntryCount(SettingsCategory.RootAndPermissions, SettingsUiState()),
         )
     }
+
+    @Test
+    fun homeAndManagerCountIncludesDynamicManager() {
+        assertEquals(
+            7,
+            SettingsCatalog.visibleEntryCount(SettingsCategory.HomeAndManager, SettingsUiState()),
+        )
+    }
 }

@@ -17,6 +17,7 @@ mod android {
     pub const PROFILE_TEMPLATE_DIR: &str = concatcp!(PROFILE_DIR, "templates/");
 
     pub const KSURC_PATH: &str = concatcp!(WORKING_DIR, ".ksurc");
+    pub const DYNAMIC_MANAGER_CONFIG: &str = concatcp!(WORKING_DIR, ".dynamic_manager.json");
     pub const DAEMON_PATH: &str = concatcp!(ADB_DIR, "ksud");
     pub const LIBADBROOT_PATH: &str = concatcp!(LIBRARY_DIR, "libadbroot.so");
 
@@ -61,8 +62,10 @@ pub const DEFAULT_MANAGER_PACKAGE: &str = "io.github.fixz.apkesu";
 #[allow(unused)]
 pub const VIVO_MANAGER_PACKAGE: &str = "io.github.fixz.apkesu.vivo";
 
+#[cfg(target_os = "android")]
 pub const TRUSTED_MANAGER_PACKAGES: &[&str] = &[DEFAULT_MANAGER_PACKAGE, VIVO_MANAGER_PACKAGE];
 
+#[cfg(target_os = "android")]
 pub fn is_trusted_manager_package(package_name: &str) -> bool {
     TRUSTED_MANAGER_PACKAGES.contains(&package_name)
 }

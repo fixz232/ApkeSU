@@ -13,6 +13,7 @@
   </p>
   <p>
     <a href="#project-overview">Project overview</a> ·
+    <a href="#key-features">Features</a> ·
     <a href="#upstream-project">Upstream</a> ·
     <a href="#open-source-compliance">Licensing</a> ·
     <a href="#disclaimer">Disclaimer</a>
@@ -30,6 +31,10 @@ ApkeSU is a derivative open-source project based on the official [KernelSU](http
 ## Project overview
 
 This project inherits KernelSU's licensing structure: the `kernel/` directory is licensed under **GPL-2.0-only**, in line with upstream KernelSU and the Linux kernel; KernelSU-derived code outside `kernel/` is licensed under **GPL-3.0-or-later**. Third-party dependencies remain under their respective upstream licenses. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for details.
+
+## Key features
+
+- **Dynamic Manager**: keeps the built-in ApkeSU Manager available while allowing one installed compatible application to receive secondary Manager authority. The identity is bound to its package name, App ID, APK v2 certificate size, and certificate SHA-256, then revalidated by the kernel after package changes. This grants full root-management authority; read the [Dynamic Manager security and usage guide](./docs/DYNAMIC_MANAGER.md) before enabling it.
 
 ## Upstream project
 
@@ -68,6 +73,7 @@ This tool is intended only for local technical research on Android devices, lear
 
 - [KernelSU](https://github.com/tiann/KernelSU), with thanks to author weishu and all contributors
 - [SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra), reference for the SuSFS solution
+- [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU), reference for the Dynamic Manager design, IOCTL command allocation, and loading approach
 - [FolkPatch](https://github.com/LyraVoid/FolkPatch), referenced UI framework code
 - [kowsu](https://github.com/KOWX712/KernelSU.git), technical support
 - [Kernel-Assisted Superuser](https://git.zx2c4.com/kernel-assisted-superuser/about/), inspiration for KernelSU's design

@@ -3410,4 +3410,33 @@
     <string name="pixel_pet_appearance_dawn">晨曦</string>
     <string name="pixel_pet_appearance_frost">霜白</string>
     <string name="pixel_pet_appearance_dusk">暮紫</string>
+    <!-- 动态管理器 -->
+    <string name="dynamic_manager_title">动态管理器</string>
+    <string name="dynamic_manager_settings_summary">为一个已安装的兼容管理器授予与软件包身份绑定的副管理器权限</string>
+    <string name="dynamic_manager_active">已启用并通过验证</string>
+    <string name="dynamic_manager_inactive">已配置，但软件包或签名验证失败</string>
+    <string name="dynamic_manager_not_configured">未配置副管理器</string>
+    <string name="dynamic_manager_unsupported">当前运行的内核不支持动态管理器</string>
+    <string name="dynamic_manager_status_unavailable">无法读取动态管理器状态</string>
+    <string name="dynamic_manager_refresh">刷新</string>
+    <string name="dynamic_manager_revoke">撤销</string>
+    <string name="dynamic_manager_confirm_title">授予完整管理器权限？</string>
+    <string name="dynamic_manager_confirm_message">%1$s（%2$s）将获得与 ApkeSU 相同的 Root 管理权限。仅在你信任并审计过此 APK 时继续。</string>
+    <string name="dynamic_manager_grant">授权</string>
+    <string name="dynamic_manager_granted">已授予副管理器权限</string>
+    <string name="dynamic_manager_revoked">已撤销副管理器权限</string>
+    <string name="dynamic_manager_failed">操作失败</string>
+    <string name="dynamic_manager_revoke_title">撤销副管理器权限？</string>
+    <string name="dynamic_manager_revoke_message">选中的应用会立即失去管理器权限，内置 ApkeSU 管理器仍可正常使用。</string>
+    <string name="dynamic_manager_runtime">运行时身份</string>
+    <string name="dynamic_manager_search">搜索兼容管理器</string>
+    <string name="dynamic_manager_clear_search">清除搜索</string>
+    <string name="dynamic_manager_no_candidates">未发现兼容管理器</string>
+    <string name="dynamic_manager_no_candidates_summary">请安装位于 /data/app、内含 libksud.so 且使用内核兼容 APK v2 签名的管理器。</string>
+    <string name="dynamic_manager_security_title">完整 Root 权限</string>
+    <string name="dynamic_manager_security_summary">同一时间只能启用一个副管理器。ApkeSU 会绑定其包名、App ID、证书大小和 SHA-256；卸载或身份变化后会停用权限，直到重新验证。</string>
+    <string name="dynamic_manager_app_id">App ID：%1$d</string>
+    <string name="dynamic_manager_certificate">证书：%1$d 字节 · SHA-256 %2$s…</string>
+    <string name="dynamic_manager_selected">已选择并启用</string>
+    <string name="dynamic_manager_rebind">重新验证</string>
 </resources>

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.Adb
+import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
@@ -417,6 +418,13 @@ private fun HomeManagerSettingsContent(
             summary = stringResource(R.string.settings_manager_identity_summary),
             icon = Icons.Rounded.Apps,
             onClick = { onOpen(Route.LauncherIcon) },
+        )
+        SettingsDivider()
+        SettingsActionRow(
+            title = stringResource(R.string.dynamic_manager_title),
+            summary = stringResource(R.string.dynamic_manager_settings_summary),
+            icon = Icons.Rounded.AdminPanelSettings,
+            onClick = { onOpen(Route.DynamicManager) },
         )
         SettingsDivider()
         SettingsActionRow(

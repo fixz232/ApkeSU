@@ -3450,4 +3450,33 @@
     <string name="pixel_pet_appearance_dawn">Dawn</string>
     <string name="pixel_pet_appearance_frost">Frost</string>
     <string name="pixel_pet_appearance_dusk">Dusk</string>
+    <!-- Dynamic Manager -->
+    <string name="dynamic_manager_title">Dynamic Manager</string>
+    <string name="dynamic_manager_settings_summary">Grant one installed compatible manager a package-bound secondary Manager identity</string>
+    <string name="dynamic_manager_active">Active and verified</string>
+    <string name="dynamic_manager_inactive">Configured, but package or signature verification failed</string>
+    <string name="dynamic_manager_not_configured">No secondary Manager configured</string>
+    <string name="dynamic_manager_unsupported">The running kernel does not support Dynamic Manager</string>
+    <string name="dynamic_manager_status_unavailable">Dynamic Manager status is unavailable</string>
+    <string name="dynamic_manager_refresh">Refresh</string>
+    <string name="dynamic_manager_revoke">Revoke</string>
+    <string name="dynamic_manager_confirm_title">Grant full Manager authority?</string>
+    <string name="dynamic_manager_confirm_message">%1$s (%2$s) will receive the same root-management authority as ApkeSU. Continue only if you trust and have audited this APK.</string>
+    <string name="dynamic_manager_grant">Grant</string>
+    <string name="dynamic_manager_granted">Secondary Manager authority granted</string>
+    <string name="dynamic_manager_revoked">Secondary Manager authority revoked</string>
+    <string name="dynamic_manager_failed">Operation failed</string>
+    <string name="dynamic_manager_revoke_title">Revoke secondary Manager?</string>
+    <string name="dynamic_manager_revoke_message">The selected application will immediately lose Manager authority. The built-in ApkeSU Manager remains available.</string>
+    <string name="dynamic_manager_runtime">Runtime identity</string>
+    <string name="dynamic_manager_search">Search compatible managers</string>
+    <string name="dynamic_manager_clear_search">Clear search</string>
+    <string name="dynamic_manager_no_candidates">No compatible Manager found</string>
+    <string name="dynamic_manager_no_candidates_summary">Install a Manager APK under /data/app that bundles libksud.so and uses a kernel-compatible APK v2 signature.</string>
+    <string name="dynamic_manager_security_title">Full root authority</string>
+    <string name="dynamic_manager_security_summary">Only one secondary Manager can be active. ApkeSU binds its package name, App ID, certificate size, and SHA-256. Uninstalling it or changing its identity disables access until it is verified again.</string>
+    <string name="dynamic_manager_app_id">App ID: %1$d</string>
+    <string name="dynamic_manager_certificate">Certificate: %1$d bytes · SHA-256 %2$s…</string>
+    <string name="dynamic_manager_selected">Selected and active</string>
+    <string name="dynamic_manager_rebind">Verify again</string>
 </resources>

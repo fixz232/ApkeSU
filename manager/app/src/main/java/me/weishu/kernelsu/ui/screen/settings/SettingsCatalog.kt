@@ -41,6 +41,7 @@ internal object SettingsCatalog {
         entry("theme_store", SettingsCategory.Appearance, R.string.theme_store, R.string.theme_store_settings_summary),
 
         entry("manager_identity", SettingsCategory.HomeAndManager, R.string.settings_manager_identity, R.string.settings_manager_identity_summary),
+        entry("dynamic_manager", SettingsCategory.HomeAndManager, R.string.dynamic_manager_title, R.string.dynamic_manager_settings_summary),
         entry("home_title", SettingsCategory.HomeAndManager, R.string.settings_home_title, R.string.settings_home_title_default_summary),
         entry("home_layout", SettingsCategory.HomeAndManager, R.string.home_layout_title, R.string.home_layout_settings_summary),
         entry("pixel_pet", SettingsCategory.HomeAndManager, R.string.pixel_pet_title),

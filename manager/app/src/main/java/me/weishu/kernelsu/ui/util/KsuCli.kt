@@ -55,6 +55,10 @@ private val managerRegistrationLock = Any()
 private const val MANAGER_REGISTRATION_RETRY_MILLIS = 30_000L
 private const val FIRST_APPLICATION_APPID = 10_000
 private const val LAST_APPLICATION_APPID = 19_999
+private const val DYNAMIC_MANAGER_STATUS_SCHEMA_VERSION = 1
+private const val DYNAMIC_MANAGER_MIN_CERTIFICATE_SIZE = 0x100
+private const val DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE = 1024
+private val DYNAMIC_MANAGER_CERTIFICATE_SHA256 = Regex("[0-9a-f]{64}")
 private var lastManagerRegistrationFailureKey: String? = null
 private var lastManagerRegistrationFailureAt = 0L
 const val HYBRID_MOUNT_MODULE_ID = "hybrid_mount"
@@ -96,6 +100,17 @@ data class FlashResult(
     constructor(result: Shell.Result, showReboot: Boolean) : this(result.code, result.err.joinToString("\n"), showReboot)
     constructor(result: Shell.Result) : this(result, result.isSuccess)
 }
+
+data class DynamicManagerCliState(
+    val supported: Boolean = false,
+    val configured: Boolean = false,
+    val active: Boolean = false,
+    val packageName: String = "",
+    val appId: Int = 0,
+    val certificateSize: Int = 0,
+    val certificateSha256: String = "",
+    val error: String = "",
+)
 
 data class BuiltinMountStatus(
     val moduleId: String = HYBRID_MOUNT_MODULE_ID,
@@ -821,6 +836,91 @@ private suspend fun runKsudCommandWithOutput(
         stdout = stdout.joinToString("\n"),
         stderr = stderr.joinToString("\n"),
     )
+}
+
+internal fun parseDynamicManagerStatusJson(content: String): DynamicManagerCliState {
+    val json = JSONObject(content)
+    require(json.optInt("schemaVersion", -1) == DYNAMIC_MANAGER_STATUS_SCHEMA_VERSION) {
+        "Unsupported Dynamic Manager status schema"
+    }
+    val supported = json.optBoolean("supported", false)
+    val configured = json.optBoolean("configured", false)
+    val active = json.optBoolean("active", false)
+    val packageName = json.optString("packageName", "")
+    val appId = json.optInt("appId", 0)
+    val certificateSize = json.optInt("certificateSize", 0)
+    val certificateSha256 = json.optString("certificateSha256", "")
+    require(!active || configured) { "Active Dynamic Manager is not configured" }
+    if (configured) {
+        require(packageName.isNotBlank() && packageName.length < 256) {
+            "Dynamic Manager package name is invalid"
+        }
+        require(appId in FIRST_APPLICATION_APPID..LAST_APPLICATION_APPID) {
+            "Dynamic Manager App ID is invalid"
+        }
+        require(certificateSize in DYNAMIC_MANAGER_MIN_CERTIFICATE_SIZE..DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE) {
+            "Dynamic Manager certificate size is invalid"
+        }
+        require(DYNAMIC_MANAGER_CERTIFICATE_SHA256.matches(certificateSha256)) {
+            "Dynamic Manager certificate SHA-256 is invalid"
+        }
+    }
+    return DynamicManagerCliState(
+        supported = supported,
+        configured = configured,
+        active = active,
+        packageName = packageName,
+        appId = appId,
+        certificateSize = certificateSize,
+        certificateSha256 = certificateSha256,
+        error = json.optString("error", "").takeUnless { it == "null" }.orEmpty(),
+    )
+}
+
+suspend fun getDynamicManagerStatus(): Result<DynamicManagerCliState> {
+    val result = runKsudCommandWithOutput("kernel dynamic-manager status")
+    if (!result.success) {
+        return Result.failure(
+            IllegalStateException(
+                result.stderr.trim().ifBlank { "ksud exited with code ${result.code}" },
+            ),
+        )
+    }
+    return runCatching { parseDynamicManagerStatusJson(result.stdout) }
+}
+
+suspend fun setDynamicManagerApk(
+    apkPath: String,
+    packageName: String,
+    appId: Int,
+): Result<Unit> {
+    val result = runKsudCommandWithOutput(
+        "kernel dynamic-manager set-apk ${shellQuote(apkPath)} " +
+            "--package ${shellQuote(packageName)} --appid $appId",
+        timeoutMillis = SHELL_JOB_TIMEOUT_MILLIS * 2,
+    )
+    return if (result.success) {
+        Result.success(Unit)
+    } else {
+        Result.failure(
+            IllegalStateException(
+                result.stderr.trim().ifBlank { "ksud exited with code ${result.code}" },
+            ),
+        )
+    }
+}
+
+suspend fun clearDynamicManager(): Result<Unit> {
+    val result = runKsudCommandWithOutput("kernel dynamic-manager clear")
+    return if (result.success) {
+        Result.success(Unit)
+    } else {
+        Result.failure(
+            IllegalStateException(
+                result.stderr.trim().ifBlank { "ksud exited with code ${result.code}" },
+            ),
+        )
+    }
 }
 
 private fun KsudCommandOutput.toKpmResult(): KpmCommandResult {

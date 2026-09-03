@@ -25,6 +25,8 @@ mod cpu_spoof;
 mod debug;
 mod defs;
 #[cfg(target_os = "android")]
+mod dynamic_manager;
+#[cfg(target_os = "android")]
 mod epkesu_hide;
 #[cfg(target_os = "android")]
 mod feature;

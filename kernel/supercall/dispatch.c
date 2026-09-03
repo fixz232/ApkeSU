@@ -13,8 +13,10 @@
 #include "klog.h" // IWYU pragma: keep
 #include "ksu.h"
 #include "runtime/ksud_boot.h"
+#include "feature/dynamic_manager.h"
 #include "feature/kernel_umount.h"
 #include "manager/manager_identity.h"
+#include "manager/throne_tracker.h"
 #include "selinux/selinux.h"
 #include "infra/file_wrapper.h"
 #include "hook/tp_marker.h"
@@ -345,6 +347,30 @@ static int do_set_manager_appid(void __user *arg)
     ksu_set_manager_appid(cmd.appid);
     pr_info("manager appid set by root: %u\n", cmd.appid);
 
+    return 0;
+}
+
+static int do_dynamic_manager(void __user *arg)
+{
+    struct ksu_dynamic_manager_cmd cmd;
+    int ret;
+
+    if (copy_from_user(&cmd, arg, sizeof(cmd)))
+        return -EFAULT;
+
+    if ((cmd.operation == KSU_DYNAMIC_MANAGER_OP_SET || cmd.operation == KSU_DYNAMIC_MANAGER_OP_CLEAR) &&
+        current_uid().val != 0 && !is_primary_manager())
+        return -EPERM;
+
+    ret = ksu_handle_dynamic_manager(&cmd);
+    if (ret)
+        return ret;
+
+    if (cmd.operation == KSU_DYNAMIC_MANAGER_OP_SET)
+        track_throne(false);
+
+    if (copy_to_user(arg, &cmd, sizeof(cmd)))
+        return -EFAULT;
     return 0;
 }
 
@@ -874,6 +900,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .name = "SET_MANAGER_APPID",
         .handler = do_set_manager_appid,
         .perm_check = only_root
+    },
+    {
+        .cmd = KSU_IOCTL_DYNAMIC_MANAGER,
+        .name = "DYNAMIC_MANAGER",
+        .handler = do_dynamic_manager,
+        .perm_check = manager_or_root
     },
     {
         .cmd = 0,

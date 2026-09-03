@@ -9,8 +9,9 @@ use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::lkm_image::BootPatchV2Args;
 use crate::module::regenerate_preinit_rc;
 use crate::{
-    apk_sign, assets, builtin_mount, cpu_spoof, debug, defs, epkesu_hide, init_event, kpatch_next,
-    kpm, ksu_uapi, ksucalls, module, module_config, pathmask, rescue, sulog, utils,
+    apk_sign, assets, builtin_mount, cpu_spoof, debug, defs, dynamic_manager, epkesu_hide,
+    init_event, kpatch_next, kpm, ksu_uapi, ksucalls, module, module_config, pathmask, rescue,
+    sulog, utils,
 };
 
 /// KernelSU userspace cli
@@ -809,8 +810,32 @@ enum Kernel {
         #[command(subcommand)]
         command: UmountOp,
     },
+    /// Manage the package-bound secondary Manager identity
+    DynamicManager {
+        #[command(subcommand)]
+        command: DynamicManagerOp,
+    },
     /// Notify that module is mounted
     NotifyModuleMounted,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum DynamicManagerOp {
+    /// Print persisted and kernel runtime state as JSON
+    Status,
+    /// Verify an installed Manager APK and grant it secondary Manager authority
+    SetApk {
+        /// Installed /data/app/.../base.apk path
+        apk: String,
+        /// Exact Android package name
+        #[arg(long)]
+        package: String,
+        /// Normalized Android application ID (UID modulo 100000)
+        #[arg(long)]
+        appid: u32,
+    },
+    /// Revoke the secondary Manager and persist the disabled state
+    Clear,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -1348,6 +1373,15 @@ pub fn run() -> Result<()> {
                 UmountOp::Add { mnt, flags } => ksucalls::umount_list_add(&mnt, flags),
                 UmountOp::Del { mnt } => ksucalls::umount_list_del(&mnt),
                 UmountOp::Wipe => ksucalls::umount_list_wipe().map_err(Into::into),
+            },
+            Kernel::DynamicManager { command } => match command {
+                DynamicManagerOp::Status => dynamic_manager::print_status(),
+                DynamicManagerOp::SetApk {
+                    apk,
+                    package,
+                    appid,
+                } => dynamic_manager::set_apk(&apk, &package, appid),
+                DynamicManagerOp::Clear => dynamic_manager::clear(),
             },
             Kernel::NotifyModuleMounted => {
                 ksucalls::report_module_mounted();

@@ -4,6 +4,8 @@
 #include <linux/cred.h>
 #include <linux/types.h>
 
+#include "feature/dynamic_manager.h"
+
 #define KSU_INVALID_APPID -1
 #define KSU_PER_USER_RANGE 100000
 #define KSU_FIRST_APPLICATION_APPID 10000
@@ -26,6 +28,11 @@ static inline bool ksu_is_manager_appid_valid()
 }
 
 static inline bool is_manager()
+{
+    return current_uid().val == 0;
+}
+
+static inline bool is_primary_manager()
 {
     return current_uid().val == 0;
 }
@@ -58,12 +65,21 @@ static inline bool ksu_is_manager_appid_valid()
 
 static inline bool is_manager()
 {
+    uid_t appid = ksu_normalize_appid(current_uid().val);
+
+    return unlikely(ksu_manager_appid == appid || ksu_is_dynamic_manager_appid(appid));
+}
+
+static inline bool is_primary_manager()
+{
     return unlikely(ksu_manager_appid == ksu_normalize_appid(current_uid().val));
 }
 
 static inline bool is_uid_manager(uid_t uid)
 {
-    return unlikely(ksu_manager_appid == ksu_normalize_appid(uid));
+    uid_t appid = ksu_normalize_appid(uid);
+
+    return unlikely(ksu_manager_appid == appid || ksu_is_dynamic_manager_appid(appid));
 }
 
 static inline uid_t ksu_get_manager_appid()

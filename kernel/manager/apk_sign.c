@@ -105,6 +105,8 @@ static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned
         !read_length_prefixed_end(fp, pos, signer_end, &signed_data_end) ||
         !read_length_prefixed_end(fp, pos, signed_data_end, &digests_end))
         return false;
+    if (signer_end != signers_end)
+        return false;
 
     *pos = digests_end;
     if (!read_length_prefixed_end(fp, pos, signed_data_end, &certificates_end) ||
@@ -141,7 +143,7 @@ static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned
     return strcmp(expected_sha256, hash_str) == 0;
 }
 
-static __always_inline bool check_v2_signature(char *path, unsigned expected_size, const char *expected_sha256)
+bool ksu_apk_matches_v2_signature(const char *path, unsigned expected_size, const char *expected_sha256)
 {
     unsigned char buffer[0x10] = { 0 };
     u32 cd_offset, cd_size;
@@ -323,38 +325,37 @@ module_param_cb(ksu_debug_manager_appid, &debug_manager_appid_param_ops,
 
 int get_pkg_from_apk_path(char *pkg, const char *path)
 {
-    int len = strlen(path);
-    if (len >= KSU_MAX_PACKAGE_NAME || len < 1)
+    const char *last_slash;
+    const char *parent_start;
+    const char *hyphen;
+    size_t len;
+    size_t parent_len;
+    size_t pkg_len;
+
+    if (!pkg || !path)
         return -1;
 
-    const char *last_slash = NULL;
-    const char *second_last_slash = NULL;
-
-    int i;
-    for (i = len - 1; i >= 0; i--) {
-        if (path[i] == '/') {
-            if (!last_slash) {
-                last_slash = &path[i];
-            } else {
-                second_last_slash = &path[i];
-                break;
-            }
-        }
-    }
-
-    if (!last_slash || !second_last_slash)
+    len = strnlen(path, PATH_MAX);
+    if (!len || len >= PATH_MAX)
         return -1;
 
-    const char *last_hyphen = strchr(second_last_slash, '-');
-    if (!last_hyphen || last_hyphen > last_slash)
+    last_slash = strrchr(path, '/');
+    if (!last_slash || last_slash == path || !last_slash[1])
         return -1;
 
-    int pkg_len = last_hyphen - second_last_slash - 1;
-    if (pkg_len >= KSU_MAX_PACKAGE_NAME || pkg_len <= 0)
+    parent_start = last_slash;
+    while (parent_start > path && parent_start[-1] != '/')
+        parent_start--;
+    parent_len = last_slash - parent_start;
+    if (!parent_len)
         return -1;
 
-    // Copying the package name
-    memcpy(pkg, second_last_slash + 1, pkg_len);
+    hyphen = memchr(parent_start, '-', parent_len);
+    pkg_len = hyphen ? (size_t)(hyphen - parent_start) : parent_len;
+    if (!pkg_len || pkg_len >= KSU_MAX_PACKAGE_NAME)
+        return -1;
+
+    memcpy(pkg, parent_start, pkg_len);
     pkg[pkg_len] = '\0';
 
     return 0;
@@ -378,11 +379,11 @@ bool is_manager_apk(char *path)
         return false;
     }
 #endif
-    if (check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH)) {
+    if (ksu_apk_matches_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH)) {
         return true;
     }
 #ifdef EXPECTED_SIZE2
-    return check_v2_signature(path, EXPECTED_SIZE2, EXPECTED_HASH2);
+    return ksu_apk_matches_v2_signature(path, EXPECTED_SIZE2, EXPECTED_HASH2);
 #else
     return false;
 #endif

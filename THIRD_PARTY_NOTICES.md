@@ -154,3 +154,29 @@ When publishing a KO package, include:
   - the exact ApkeSU source revision;
   - the exact KMI and DDK release;
   - the generated binary artifact and enough build instructions to reproduce it.
+
+5. ReSukiSU Dynamic Manager reference
+-------------------------------------
+
+The ApkeSU Dynamic Manager implementation was designed with reference to the
+Dynamic Manager feature, IOCTL command allocation, and loading approach in
+[ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU), audited at commit
+[`0b5efe9e0102c43ca5c41174d500f5a7080cd0c7`](https://github.com/ReSukiSU/ReSukiSU/commit/0b5efe9e0102c43ca5c41174d500f5a7080cd0c7)
+(2026-08-31).
+
+Relevant upstream areas include:
+
+  - `kernel/feature/dynamic_manager.c` and `.h`;
+  - `userspace/ksud/src/android/dynamic_manager.rs`;
+  - the Manager Dynamic Manager repository, model, use cases, ViewModel, and UI.
+
+ReSukiSU applies GPL-2.0-only to its `kernel/` directory and GPL-3.0-or-later
+to the remaining project code. ApkeSU retains the same applicable license split
+for this adaptation. The ApkeSU implementation is not a verbatim import: it
+keeps a fixed built-in primary Manager, exposes one secondary slot, binds the
+slot to package name and normalized App ID in addition to the APK v2
+certificate, rejects shared App IDs, persists a versioned root-only
+configuration atomically, and omits manual certificate entry from the Manager
+UI. Its command structure and semantics are ApkeSU-specific and do not claim
+binary compatibility with ReSukiSU. See `docs/DYNAMIC_MANAGER.md` for the
+security contract and limitations.

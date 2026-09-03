@@ -112,6 +112,7 @@ fun SettingPager(
         onOpenTheme = { navigator.push(Route.ColorPalette) },
         onOpenThemeStore = { navigator.push(Route.ThemeStore) },
         onOpenLanguage = { navigator.push(Route.LanguageSettings) },
+        onOpenDynamicManager = { navigator.push(Route.DynamicManager) },
         onSetDayNightMode = viewModel::setDayNightMode,
         onSetSwitchStyleIndex = viewModel::setSwitchStyleIndex,
         onSetSeasonStyleIndex = viewModel::setSeasonStyleIndex,

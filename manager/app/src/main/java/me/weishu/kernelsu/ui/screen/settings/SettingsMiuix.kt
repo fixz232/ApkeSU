@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.Adb
+import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Badge
@@ -386,6 +387,12 @@ fun SettingPagerMiuix(
                             summary = stringResource(id = R.string.settings_manager_identity_summary),
                             icon = Icons.Rounded.Apps,
                             onClick = actions.onOpenLauncherIcon,
+                        )
+                        CategorizedMiuixActionRow(
+                            title = stringResource(id = R.string.dynamic_manager_title),
+                            summary = stringResource(id = R.string.dynamic_manager_settings_summary),
+                            icon = Icons.Rounded.AdminPanelSettings,
+                            onClick = actions.onOpenDynamicManager,
                         )
                         CategorizedMiuixActionRow(
                             title = stringResource(id = R.string.settings_home_title),

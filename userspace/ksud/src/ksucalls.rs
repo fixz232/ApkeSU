@@ -420,6 +420,84 @@ pub fn set_manager_appid(appid: u32) -> std::io::Result<()> {
     )))
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DynamicManagerKernelState {
+    pub enabled: bool,
+    pub active: bool,
+    pub appid: u32,
+    pub cert_size: u32,
+    pub package_name: String,
+    pub cert_sha256: String,
+}
+
+fn copy_dynamic_manager_field<const N: usize>(value: &str) -> std::io::Result<[u8; N]> {
+    if value.is_empty() || value.len() >= N || value.as_bytes().contains(&0) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "dynamic manager field is empty, too long, or contains a null byte",
+        ));
+    }
+    let mut field = [0u8; N];
+    field[..value.len()].copy_from_slice(value.as_bytes());
+    Ok(field)
+}
+
+const fn dynamic_manager_command(operation: u32) -> ksu_uapi::ksu_dynamic_manager_cmd {
+    ksu_uapi::ksu_dynamic_manager_cmd {
+        operation,
+        appid: 0,
+        cert_size: 0,
+        enabled: 0,
+        active: 0,
+        reserved: [0; 2],
+        package_name: [0; ksu_uapi::KSU_MAX_PACKAGE_NAME as usize],
+        cert_sha256: [0; ksu_uapi::KSU_DYNAMIC_MANAGER_CERT_SHA256_LEN as usize],
+        reserved2: [0; 3],
+    }
+}
+
+pub fn set_dynamic_manager(
+    appid: u32,
+    package_name: &str,
+    cert_size: u32,
+    cert_sha256: &str,
+) -> std::io::Result<()> {
+    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_SET);
+    cmd.appid = appid;
+    cmd.cert_size = cert_size;
+    cmd.package_name = copy_dynamic_manager_field(package_name)?;
+    cmd.cert_sha256 = copy_dynamic_manager_field(cert_sha256)?;
+    ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
+    Ok(())
+}
+
+pub fn get_dynamic_manager() -> std::io::Result<DynamicManagerKernelState> {
+    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_GET);
+    ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
+
+    let decode = |bytes: &[u8]| {
+        let end = bytes
+            .iter()
+            .position(|value| *value == 0)
+            .unwrap_or(bytes.len());
+        String::from_utf8_lossy(&bytes[..end]).into_owned()
+    };
+    Ok(DynamicManagerKernelState {
+        enabled: cmd.enabled != 0,
+        active: cmd.active != 0,
+        appid: cmd.appid,
+        cert_size: cmd.cert_size,
+        package_name: decode(&cmd.package_name),
+        cert_sha256: decode(&cmd.cert_sha256),
+    })
+}
+
+pub fn clear_dynamic_manager() -> std::io::Result<()> {
+    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_CLEAR);
+    ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
+    Ok(())
+}
+
 /// Get mark status for a process (pid=0 returns total marked count)
 pub fn mark_get(pid: i32) -> std::io::Result<u32> {
     let mut cmd = ksu_uapi::ksu_manage_mark_cmd {

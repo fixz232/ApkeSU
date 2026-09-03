@@ -22,6 +22,9 @@ pub fn on_post_data_fs() -> Result<()> {
 
     ksucalls::report_post_fs_data();
     crate::late_load::register_default_manager_appid();
+    if let Err(error) = crate::dynamic_manager::restore_at_boot() {
+        warn!("failed to restore dynamic manager: {error:#}");
+    }
 
     utils::umask(0);
 
