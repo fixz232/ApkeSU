@@ -19,6 +19,9 @@
 #endif
 
 #include "manager/apk_sign.h"
+#include "feature/dynamic_manager.h"
+#include "manager/manager_identity.h"
+#include "manager/manager_sign.h"
 #include "uapi/app_profile.h"
 #include "klog.h" // IWYU pragma: keep
 
@@ -93,11 +96,75 @@ static bool read_length_prefixed_end(struct file *fp, loff_t *pos, loff_t contai
     return true;
 }
 
-static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned expected_size,
-                        const char *expected_sha256)
+struct zip_central_directory_header {
+    u32 signature;
+    u16 version_made_by;
+    u16 version_needed;
+    u16 flags;
+    u16 compression;
+    u16 mod_time;
+    u16 mod_date;
+    u32 crc32;
+    u32 compressed_size;
+    u32 uncompressed_size;
+    u16 file_name_length;
+    u16 extra_field_length;
+    u16 file_comment_length;
+    u16 disk_number_start;
+    u16 internal_attributes;
+    u32 external_attributes;
+    u32 local_header_offset;
+} __attribute__((packed));
+
+/* A v1-signed APK necessarily contains this entry. */
+static int has_v1_signature_file(struct file *fp, loff_t directory_offset,
+                                 u32 directory_size)
+{
+    static const char manifest[] = "META-INF/MANIFEST.MF";
+    struct zip_central_directory_header header;
+    loff_t pos = directory_offset;
+    loff_t end = directory_offset + directory_size;
+
+    if (directory_offset < 0 || end < directory_offset)
+        return -EINVAL;
+
+    while (pos < end) {
+        char file_name[sizeof(manifest)];
+        u64 variable_size;
+
+        if (!read_exact(fp, &header, sizeof(header), &pos, end) ||
+            header.signature != 0x02014b50)
+            return -EINVAL;
+
+        variable_size = (u64)header.file_name_length +
+                        header.extra_field_length +
+                        header.file_comment_length;
+        if (variable_size > (u64)(end - pos))
+            return -EINVAL;
+
+        if (header.file_name_length == sizeof(manifest) - 1) {
+            if (!read_exact(fp, file_name, sizeof(manifest) - 1, &pos, end))
+                return -EINVAL;
+            file_name[sizeof(manifest) - 1] = '\0';
+            if (!memcmp(file_name, manifest, sizeof(manifest)))
+                return 1;
+        } else {
+            pos += header.file_name_length;
+        }
+        pos += header.extra_field_length + header.file_comment_length;
+    }
+
+    return pos == end ? 0 : -EINVAL;
+}
+
+static bool check_block(struct file *fp, loff_t *pos, loff_t block_end,
+                        unsigned *certificate_size_out, char hash_out[65])
 {
     loff_t signers_end, signer_end, signed_data_end, digests_end, certificates_end;
+    unsigned char *cert;
+    unsigned char digest[SHA256_DIGEST_SIZE];
     u32 certificate_size;
+    bool valid = false;
 
     // v2 block: signers sequence -> first signer -> signed data -> digests
     if (!read_length_prefixed_end(fp, pos, block_end, &signers_end) ||
@@ -116,34 +183,33 @@ static bool check_block(struct file *fp, loff_t *pos, loff_t block_end, unsigned
     if (certificate_size > INT_MAX || certificate_size > (u64)(certificates_end - *pos))
         return false;
 
-#define CERT_MAX_LENGTH 1024
-    if (certificate_size != expected_size)
-        return false;
-
-    if (certificate_size > CERT_MAX_LENGTH) {
+#define CERT_MAX_LENGTH 0x1000
+    if (certificate_size < 0x100 || certificate_size > CERT_MAX_LENGTH) {
         pr_info("cert length overlimit\n");
         return false;
     }
 
-    char cert[CERT_MAX_LENGTH];
-    if (!read_exact(fp, cert, certificate_size, pos, certificates_end))
+    cert = kmalloc(certificate_size, GFP_KERNEL);
+    if (!cert)
         return false;
-
-    unsigned char digest[SHA256_DIGEST_SIZE];
+    if (!read_exact(fp, cert, certificate_size, pos, certificates_end))
+        goto out;
     if (ksu_sha256(cert, certificate_size, digest)) {
         pr_info("sha256 error\n");
-        return false;
+        goto out;
     }
 
-    char hash_str[SHA256_DIGEST_SIZE * 2 + 1];
-    hash_str[SHA256_DIGEST_SIZE * 2] = '\0';
-
-    bin2hex(hash_str, digest, SHA256_DIGEST_SIZE);
-    pr_info("sha256: %s, expected: %s\n", hash_str, expected_sha256);
-    return strcmp(expected_sha256, hash_str) == 0;
+    bin2hex(hash_out, digest, SHA256_DIGEST_SIZE);
+    hash_out[SHA256_DIGEST_SIZE * 2] = '\0';
+    *certificate_size_out = certificate_size;
+    valid = true;
+out:
+    kfree(cert);
+    return valid;
 }
 
-bool ksu_apk_matches_v2_signature(const char *path, unsigned expected_size, const char *expected_sha256)
+static bool get_v2_signature(const char *path, unsigned *certificate_size,
+                             char certificate_sha256[65])
 {
     unsigned char buffer[0x10] = { 0 };
     u32 cd_offset, cd_size;
@@ -252,7 +318,8 @@ bool ksu_apk_matches_v2_signature(const char *path, unsigned expected_size, cons
 
         if (id == 0x7109871au) {
             v2_signing_blocks++;
-            v2_signing_valid = check_block(fp, &pos, pair_end, expected_size, expected_sha256);
+            v2_signing_valid = check_block(fp, &pos, pair_end, certificate_size,
+                                           certificate_sha256);
         } else if (id == 0xf05368c0u) {
             // http://aospxref.com/android-14.0.0_r2/xref/frameworks/base/core/java/android/util/apk/ApkSignatureSchemeV3Verifier.java#73
             v3_signing_exist = true;
@@ -274,6 +341,18 @@ bool ksu_apk_matches_v2_signature(const char *path, unsigned expected_size, cons
         v2_signing_valid = false;
     }
 
+    if (v2_signing_valid) {
+        int v1_status = has_v1_signature_file(fp, cd_offset, cd_size);
+
+        if (v1_status != 0) {
+            if (v1_status > 0)
+                pr_err("Unexpected v1 signature scheme found!\n");
+            else
+                pr_err("Invalid ZIP central directory\n");
+            goto invalid;
+        }
+    }
+
     goto clean;
 
 invalid:
@@ -287,6 +366,19 @@ clean:
     }
 
     return v2_signing_valid;
+}
+
+bool ksu_apk_matches_v2_signature(const char *path, unsigned expected_size,
+                                  const char *expected_sha256)
+{
+    unsigned certificate_size = 0;
+    char certificate_sha256[65] = { 0 };
+
+    if (!expected_sha256 ||
+        !get_v2_signature(path, &certificate_size, certificate_sha256))
+        return false;
+    return certificate_size == expected_size &&
+           !strcmp(certificate_sha256, expected_sha256);
 }
 
 #ifdef CONFIG_KSU_DEBUG
@@ -339,8 +431,13 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
     if (!len || len >= PATH_MAX)
         return -1;
 
-    last_slash = strrchr(path, '/');
-    if (!last_slash || last_slash == path || !last_slash[1])
+    last_slash = path + len;
+    while (last_slash > path) {
+        last_slash--;
+        if (*last_slash == '/')
+            break;
+    }
+    if (*last_slash != '/' || last_slash == path || !last_slash[1])
         return -1;
 
     parent_start = last_slash;
@@ -361,30 +458,49 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
     return 0;
 }
 
-bool is_manager_apk(char *path)
+static int manager_signature_index(unsigned size, const char *sha256)
 {
-#ifdef KSU_MANAGER_PACKAGE
+    if (size == EXPECTED_SIZE && !strcmp(sha256, EXPECTED_HASH))
+        return KSU_SIGNATURE_INDEX_PRIMARY;
+#ifdef EXPECTED_SIZE2
+    if (size == EXPECTED_SIZE2 && !strcmp(sha256, EXPECTED_HASH2))
+        return 1;
+#endif
+    if (ksu_dynamic_manager_matches(size, sha256))
+        return KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER;
+    return -ENODATA;
+}
+
+bool is_manager_apk(char *path, u8 *signature_index)
+{
+    unsigned certificate_size = 0;
+    char certificate_sha256[65] = { 0 };
+    int matched_index;
+
+    if (!get_v2_signature(path, &certificate_size, certificate_sha256))
+        return false;
+
+    matched_index = manager_signature_index(certificate_size,
+                                            certificate_sha256);
+    if (matched_index < 0)
+        return false;
+
+#if defined(KSU_MANAGER_PACKAGE)
+    if (matched_index != KSU_SIGNATURE_INDEX_DYNAMIC_MANAGER) {
     char pkg[KSU_MAX_PACKAGE_NAME];
+
     if (get_pkg_from_apk_path(pkg, path) < 0) {
         pr_err("Failed to get package name from apk path: %s\n", path);
         return false;
     }
 
-    // pkg is `<real package>`
-    bool package_matches = strcmp(pkg, KSU_MANAGER_PACKAGE) == 0;
-#ifdef KSU_MANAGER_PACKAGE2
-    package_matches = package_matches || strcmp(pkg, KSU_MANAGER_PACKAGE2) == 0;
-#endif
-    if (!package_matches) {
+    if (strcmp(pkg, KSU_MANAGER_PACKAGE) != 0) {
         return false;
     }
-#endif
-    if (ksu_apk_matches_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH)) {
-        return true;
     }
-#ifdef EXPECTED_SIZE2
-    return ksu_apk_matches_v2_signature(path, EXPECTED_SIZE2, EXPECTED_HASH2);
-#else
-    return false;
 #endif
+
+    if (signature_index)
+        *signature_index = matched_index;
+    return true;
 }

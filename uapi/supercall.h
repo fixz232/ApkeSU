@@ -98,23 +98,27 @@ struct ksu_set_manager_appid_cmd {
     __u32 appid; /* Input: manager app id */
 };
 
-#define KSU_DYNAMIC_MANAGER_OP_SET 0U
-#define KSU_DYNAMIC_MANAGER_OP_GET 1U
-#define KSU_DYNAMIC_MANAGER_OP_CLEAR 2U
-
-#define KSU_DYNAMIC_MANAGER_CERT_SHA256_LEN 65
+#define DYNAMIC_MANAGER_OP_SET 0U
+#define DYNAMIC_MANAGER_OP_GET 1U
+#define DYNAMIC_MANAGER_OP_WIPE 2U
+#define DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS 3U
 
 struct ksu_dynamic_manager_cmd {
-    __u32 operation; /* Input: KSU_DYNAMIC_MANAGER_OP_* */
-    __u32 appid; /* Input/Output: normalized Android application ID */
-    __u32 cert_size; /* Input/Output: APK v2 signer certificate size */
-    __u8 enabled; /* Output: configuration exists */
-    __u8 active; /* Output: package and signature were verified */
-    __u8 reserved[2];
-    __u8 package_name[KSU_MAX_PACKAGE_NAME]; /* Input/Output: null-terminated */
-    __u8 cert_sha256[KSU_DYNAMIC_MANAGER_CERT_SHA256_LEN]; /* lowercase hex + null */
-    __u8 reserved2[3];
+    __u8 operation; /* Input: DYNAMIC_MANAGER_OP_* */
+    __u32 size; /* Input/Output: APK v2 signer certificate size */
+    __u8 hash[64]; /* Input/Output: lowercase SHA-256 hex, not null-terminated */
 };
+
+struct ksu_manager_entry {
+    __u32 uid; /* Output: normalized Android application ID */
+    __u8 signature_index; /* Output: matched built-in/dynamic signature slot */
+} __attribute__((packed));
+
+struct ksu_get_managers_cmd {
+    __u16 count; /* Input/Output: capacity/number of copied entries */
+    __u16 total_count; /* Output: total number of registered managers */
+    struct ksu_manager_entry managers[0];
+} __attribute__((packed));
 
 struct ksu_get_app_profile_cmd {
     struct app_profile profile; /* Input/Output: app profile structure */
@@ -198,6 +202,7 @@ static const __u32 KSU_IOCTL_SET_INIT_PGRP = _IO('K', 19);
 static const __u32 KSU_IOCTL_GET_SULOG_FD = _IOW('K', 20, struct ksu_get_sulog_fd_cmd);
 static const __u32 KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT = _IO('K', 21);
 static const __u32 KSU_IOCTL_SET_MANAGER_APPID = _IOW('K', 22, struct ksu_set_manager_appid_cmd);
-/* Downstream extension. 100-102 are reserved by existing ApkeSU integrations. */
-static const __u32 KSU_IOCTL_DYNAMIC_MANAGER = _IOWR('K', 103, struct ksu_dynamic_manager_cmd);
+/* Downstream extensions. 100-102 and 104 are reserved by existing integrations. */
+static const __u32 KSU_IOCTL_DYNAMIC_MANAGER = _IOC(_IOC_READ | _IOC_WRITE, 'K', 103, 0);
+static const __u32 KSU_IOCTL_GET_MANAGERS = _IOC(_IOC_READ | _IOC_WRITE, 'K', 105, 0);
 #endif

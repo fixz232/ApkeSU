@@ -22,12 +22,6 @@ val androidSourceCompatibility: JavaVersion by rootProject.extra
 val androidTargetCompatibility: JavaVersion by rootProject.extra
 val managerVersionCode: Int by rootProject.extra
 val managerVersionName: String by rootProject.extra
-val isVivoBuild = providers.gradleProperty("APKESU_VIVO").orNull?.toBoolean() ?: false
-val managerApplicationId = if (isVivoBuild) {
-    "io.github.fixz.apkesu.vivo"
-} else {
-    "io.github.fixz.apkesu"
-}
 
 val bundledKsudFiles = listOf(
     file("src/main/jniLibs/arm64-v8a/libksud.so"),
@@ -164,7 +158,7 @@ android {
     ndkVersion = androidCompileNdkVersion
 
     defaultConfig {
-        applicationId = managerApplicationId
+        applicationId = "io.github.fixz.apkesu"
         minSdk = androidMinSdkVersion
         targetSdk = androidTargetSdkVersion
         versionCode = managerVersionCode
@@ -204,13 +198,7 @@ androidComponents {
 }
 
 base {
-    archivesName.set(
-        if (isVivoBuild) {
-            "ApkeSU_Vivo_${managerVersionName}_${managerVersionCode}"
-        } else {
-            "ApkeSU_${managerVersionName}_${managerVersionCode}"
-        }
-    )
+    archivesName.set("ApkeSU_${managerVersionName}_${managerVersionCode}")
 }
 
 dependencies {

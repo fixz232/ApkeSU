@@ -2161,7 +2161,7 @@
     <string name="hidden_path_apply_failed">適用に失敗しました。ログを確認してください。</string>
     <string name="hidden_path_unload_success">現在カーネルによって隠されているパスが削除されました</string>
     <string name="hidden_path_unload_failed">削除に失敗しました。ログを確認してください。</string>
-    <string name="hidden_path_import_success">構成がインポートされました。非表示のパスを適用してアクティブにします。</string>
+    <string name="hidden_path_import_success">設定をインポートして適用しました</string>
     <string name="hidden_path_import_failed">インポートに失敗しました。設定ファイルを確認してください。</string>
     <string name="hidden_path_export_success">構成がエクスポートされました</string>
     <string name="hidden_path_export_failed">エクスポートに失敗しました</string>
@@ -2225,7 +2225,7 @@
     <string name="hidden_path_help_absolute_paths">絶対パスを使用してください。複数のパスは、target_paths パラメータを通じて LKM に渡されます。</string>
     <string name="hidden_path_help_app_scope">アプリの選択では、パッケージ名または UID を受け入れます。アプリごとのスコープは、deny_uid に解決されます。</string>
     <string name="hidden_path_help_managed_paths">モジュール管理の破損を防ぐために、/data/adb/modules、/data/adb/ksu、/data/adb/ap、および同様の管理ディレクトリにはアプリ UID による非表示が必要であり、グローバルに非表示にすることはできません。</string>
-    <string name="hidden_path_help_apply">適用後、ksud はターゲット パスが表示されるまで待機し、新しい構成でパスマスクをホットリロードします。</string>
+    <string name="hidden_path_help_apply">保存またはインポートすると設定がすぐに適用されます。後からマウントされたパスは次の起動処理段階で読み込まれます。</string>
     <string name="hidden_path_help_debug">非表示にしても効果がない場合は、ログ内のresolved_count、KMI、およびカーネル dmesg 出力を調べてください。</string>
     <string name="hidden_path_added">追加されました</string>
     <string name="hidden_path_logs_empty">非表示のパス ログはありません</string>

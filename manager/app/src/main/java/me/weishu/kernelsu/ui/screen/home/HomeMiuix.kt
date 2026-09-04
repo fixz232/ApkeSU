@@ -49,18 +49,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PowerSettingsNew
-import androidx.compose.material.icons.rounded.Restaurant
-import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.CheckCircleOutline
-import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.runtime.Composable
@@ -125,19 +121,7 @@ import me.weishu.kernelsu.ui.component.pixel.PixelOceanMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelThreeKingdomsMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelTribalJungleMotto
 import me.weishu.kernelsu.ui.component.pixel.PixelVikingMotto
-import me.weishu.kernelsu.ui.component.pixel.PixelPetLkmHabitatBackdrop
-import me.weishu.kernelsu.ui.component.pixel.PixelPetLkmInteractivePet
-import me.weishu.kernelsu.ui.component.pixel.PixelPetBehaviorEngine
-import me.weishu.kernelsu.ui.component.pixel.PixelPetCareNeed
-import me.weishu.kernelsu.ui.component.pixel.PixelPetProgressBar
-import me.weishu.kernelsu.ui.component.pixel.PixelPetStore
-import me.weishu.kernelsu.ui.component.pixel.pixelPetCountdownLabel
-import me.weishu.kernelsu.ui.component.pixel.PixelStyle
-import me.weishu.kernelsu.ui.component.pixel.LocalPixelPetState
-import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
 import me.weishu.kernelsu.ui.component.pixel.pixelAwareMiuixCardCornerRadius
-import me.weishu.kernelsu.ui.navigation3.LocalNavigator
-import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.component.snow.SeasonMotto
 import me.weishu.kernelsu.ui.component.rain.RainMotto
 import me.weishu.kernelsu.ui.component.rain.isRainInterfaceStyle
@@ -663,11 +647,6 @@ private fun ActivatedLkmCard(
             else -> Color(0xFFD83B45)
         }
         val workingMode = state.workingModeLabel
-        val context = LocalContext.current.applicationContext
-        val navigator = LocalNavigator.current
-        val pixelPetState = LocalPixelPetState.current
-        val showPixelPet = LocalPixelStyle.current == PixelStyle.PetCompanion && pixelPetState.enabled
-        val petAnimationPhase = me.weishu.kernelsu.ui.component.pixel.rememberPixelPetIdlePhase(showPixelPet)
         val wallpaperState = rememberHomeMetricCardWallpaperState(
             target = wallpaperTarget,
             onWallpaperSelected = {},
@@ -705,13 +684,6 @@ private fun ActivatedLkmCard(
             cornerRadius = pixelAwareMiuixCardCornerRadius(18.dp),
             modifier = modifier
                 .fillMaxWidth()
-                .then(
-                    if (showPixelPet && !compact) {
-                        Modifier.height(MIUIX_LKM_CARD_HEIGHT)
-                    } else {
-                        Modifier
-                    },
-                )
                 .homeLiquidGlassSurface(
                     enabled = !hasLkmWallpaper,
                     customTarget = CustomCardTarget.Lkm,
@@ -723,18 +695,14 @@ private fun ActivatedLkmCard(
             insideMargin = PaddingValues(0.dp),
             onClick = {
                 if (!state.isLateLoadMode) {
-                    if (showPixelPet) {
-                        navigator.push(Route.PixelPet)
-                    } else {
-                        actions.onInstallClick()
-                    }
+                    actions.onInstallClick()
                 }
             },
             showIndication = !state.isLateLoadMode,
             pressFeedbackType = PressFeedbackType.Tilt
         ) {
             BoxWithConstraints(
-                modifier = if (compact || showPixelPet) {
+                modifier = if (compact) {
                     Modifier.fillMaxSize()
                 } else {
                     Modifier.fillMaxWidth()
@@ -748,29 +716,7 @@ private fun ActivatedLkmCard(
                     wallpaperFit = wallpaperFit,
                     visualSettings = wallpaperState.visualSettings,
                 )
-                if (showPixelPet) {
-                    PixelPetLkmHabitatBackdrop(
-                        state = pixelPetState,
-                        modifier = Modifier.fillMaxSize(),
-                        idlePhase = petAnimationPhase,
-                        wallpaperVisible = hasLkmWallpaper,
-                        showFurniture = true,
-                    )
-                }
-                if (showPixelPet) {
-                    PixelPetLkmCardContent(
-                        state = pixelPetState,
-                        titleColor = primaryContentColor,
-                        secondaryColor = secondaryContentColor,
-                        statusTagBackgroundColor = statusTagBackgroundColor,
-                        statusTagContentColor = statusTagContentColor,
-                        navigator = navigator,
-                        context = context,
-                        idlePhase = petAnimationPhase,
-                        compact = compact,
-                    )
-                }
-                if (!showPixelPet && dense) {
+                if (dense) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -813,7 +759,7 @@ private fun ActivatedLkmCard(
                             )
                         }
                     }
-                } else if (!showPixelPet) {
+                } else {
                     Icon(
                         modifier = Modifier
                             .size(if (compact) 104.dp else 148.dp)
@@ -899,335 +845,6 @@ private fun ActivatedLkmCard(
                 }
             }
         }
-}
-
-@Composable
-private fun PixelPetLkmCardContent(
-    state: me.weishu.kernelsu.ui.component.pixel.PixelPetState,
-    titleColor: Color,
-    secondaryColor: Color,
-    statusTagBackgroundColor: Color,
-    statusTagContentColor: Color,
-    navigator: me.weishu.kernelsu.ui.navigation3.Navigator,
-    context: Context,
-    idlePhase: Float,
-    compact: Boolean,
-) {
-    val careNeed = PixelPetBehaviorEngine.primaryNeed(state)
-    val careValue = pixelPetCareValue(state, careNeed)
-    val careLabel = pixelPetCareLabel(state, careNeed)
-    val contextActionIcon = when (careNeed) {
-        PixelPetCareNeed.Hungry -> Icons.Rounded.Restaurant
-        PixelPetCareNeed.Lonely,
-        PixelPetCareNeed.Content,
-        -> Icons.Rounded.ChatBubbleOutline
-        PixelPetCareNeed.Restless -> Icons.Rounded.Explore
-        PixelPetCareNeed.Incubating,
-        PixelPetCareNeed.Tired,
-        PixelPetCareNeed.Dirty,
-        PixelPetCareNeed.Shelter,
-        PixelPetCareNeed.Stargazing,
-        -> Icons.Rounded.Fullscreen
-    }
-    val contextActionLabel = when (careNeed) {
-        PixelPetCareNeed.Hungry -> stringResource(R.string.pixel_pet_feed)
-        PixelPetCareNeed.Lonely,
-        PixelPetCareNeed.Content,
-        -> stringResource(R.string.pixel_pet_open_chat)
-        PixelPetCareNeed.Restless -> stringResource(R.string.pixel_pet_explore_habitat)
-        PixelPetCareNeed.Incubating -> stringResource(R.string.pixel_pet_title)
-        PixelPetCareNeed.Tired,
-        PixelPetCareNeed.Dirty,
-        PixelPetCareNeed.Shelter,
-        PixelPetCareNeed.Stargazing,
-        -> stringResource(R.string.pixel_pet_habitat_fullscreen)
-    }
-    val onContextAction: () -> Unit = {
-        when (careNeed) {
-            PixelPetCareNeed.Hungry -> PixelPetStore.feed(context)
-            PixelPetCareNeed.Lonely,
-            PixelPetCareNeed.Content,
-            -> navigator.push(Route.PixelPetChat)
-            PixelPetCareNeed.Restless -> PixelPetStore.exploreHabitat(context)
-            PixelPetCareNeed.Incubating -> navigator.push(Route.PixelPet)
-            PixelPetCareNeed.Tired,
-            PixelPetCareNeed.Dirty,
-            PixelPetCareNeed.Shelter,
-            PixelPetCareNeed.Stargazing,
-            -> navigator.push(Route.PixelPetHabitat)
-        }
-    }
-    if (compact) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        ) {
-            PixelPetLkmInteractivePet(
-                state = state,
-                compact = true,
-                onInteract = {
-                    if (state.hatched) {
-                        PixelPetStore.interact(context)
-                    } else {
-                        navigator.push(Route.PixelPet)
-                    }
-                },
-                onOpenChat = { navigator.push(Route.PixelPetChat) },
-                onPet = {
-                    if (state.hatched) {
-                        PixelPetStore.pet(context)
-                    } else {
-                        navigator.push(Route.PixelPet)
-                    }
-                },
-                onFeed = { PixelPetStore.feed(context) },
-                onExplore = { PixelPetStore.exploreHabitat(context) },
-                onPositionChanged = { x, y, landscape ->
-                    PixelPetStore.setLkmPosition(context, x, y, snap = true, landscape = landscape)
-                },
-                idlePhase = idlePhase,
-                showFurniture = false,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 24.dp, bottom = 20.dp),
-            )
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = if (state.hatched) state.name else stringResource(R.string.pixel_pet_egg_name),
-                    modifier = Modifier.weight(1f),
-                    color = titleColor,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                IconButton(
-                    modifier = Modifier.background(statusTagBackgroundColor.copy(alpha = 0.72f), CircleShape),
-                    minHeight = 44.dp,
-                    minWidth = 44.dp,
-                    onClick = { navigator.push(Route.Install) },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = stringResource(R.string.install),
-                        tint = statusTagContentColor,
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = careLabel,
-                    modifier = Modifier.weight(1f),
-                    color = secondaryColor,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                PixelPetProgressBar(
-                    value = careValue,
-                    color = statusTagContentColor.copy(alpha = 0.84f),
-                    modifier = Modifier.width(54.dp),
-                )
-            }
-        }
-    } else {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (state.hatched) state.name else stringResource(R.string.pixel_pet_egg_name),
-                        color = titleColor,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = if (state.hatched) {
-                            "${stringResource(state.habitat.labelRes)} / ${stringResource(state.currentAction.labelRes)}"
-                        } else if (state.isIncubating) {
-                            stringResource(
-                                R.string.pixel_pet_incubating,
-                                pixelPetCountdownLabel(state.incubationRemainingMillis()),
-                            )
-                        } else {
-                            stringResource(R.string.pixel_pet_egg_summary)
-                        },
-                        color = secondaryColor,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(
-                    modifier = Modifier.background(statusTagBackgroundColor.copy(alpha = 0.82f), CircleShape),
-                    minHeight = 44.dp,
-                    minWidth = 44.dp,
-                    onClick = { navigator.push(Route.PixelPet) },
-                ) {
-                    Icon(
-                        modifier = Modifier.size(17.dp),
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = stringResource(R.string.pixel_pet_title),
-                        tint = statusTagContentColor,
-                    )
-                }
-            }
-            PixelPetLkmInteractivePet(
-                state = state,
-                compact = false,
-                onInteract = {
-                    if (state.hatched) {
-                        PixelPetStore.interact(context)
-                    } else {
-                        navigator.push(Route.PixelPet)
-                    }
-                },
-                onOpenChat = { navigator.push(Route.PixelPetChat) },
-                onPet = {
-                    if (state.hatched) {
-                        PixelPetStore.pet(context)
-                    } else {
-                        navigator.push(Route.PixelPet)
-                    }
-                },
-                onFeed = { PixelPetStore.feed(context) },
-                onExplore = { PixelPetStore.exploreHabitat(context) },
-                onPositionChanged = { x, y, landscape ->
-                    PixelPetStore.setLkmPosition(context, x, y, snap = true, landscape = landscape)
-                },
-                idlePhase = idlePhase,
-                showFurniture = false,
-                avatarSize = 106.dp,
-                hitSize = 122.dp,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 28.dp, bottom = 58.dp),
-            )
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(statusTagBackgroundColor.copy(alpha = 0.64f), RoundedCornerShape(10.dp))
-                    .padding(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
-                    Text(
-                        text = careLabel,
-                        color = secondaryColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    PixelPetProgressBar(
-                        value = careValue,
-                        color = statusTagContentColor.copy(alpha = 0.88f),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                PixelPetLkmQuickAction(
-                    icon = contextActionIcon,
-                    contentDescription = contextActionLabel,
-                    tint = statusTagContentColor,
-                    onClick = onContextAction,
-                )
-                PixelPetLkmQuickAction(
-                    icon = Icons.Rounded.ChatBubbleOutline,
-                    contentDescription = stringResource(R.string.pixel_pet_open_chat),
-                    tint = statusTagContentColor,
-                    onClick = { navigator.push(Route.PixelPetChat) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PixelPetLkmQuickAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    IconButton(
-        modifier = Modifier.background(tint.copy(alpha = 0.16f), CircleShape),
-        minHeight = 38.dp,
-        minWidth = 38.dp,
-        onClick = onClick,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(17.dp),
-        )
-    }
-}
-
-private fun pixelPetCareValue(
-    state: me.weishu.kernelsu.ui.component.pixel.PixelPetState,
-    need: PixelPetCareNeed,
-): Int = when (need) {
-    PixelPetCareNeed.Incubating -> (state.incubationProgress() * 100f).toInt()
-    PixelPetCareNeed.Hungry -> state.hunger
-    PixelPetCareNeed.Tired -> minOf(state.energy, state.sleepQuality)
-    PixelPetCareNeed.Dirty -> state.cleanliness
-    PixelPetCareNeed.Lonely -> state.moodValue
-    PixelPetCareNeed.Restless -> state.exploration
-    PixelPetCareNeed.Shelter -> minOf(state.energy, state.sleepQuality)
-    PixelPetCareNeed.Stargazing -> state.exploration
-    PixelPetCareNeed.Content -> state.moodValue
-}
-
-@Composable
-private fun pixelPetCareLabel(
-    state: me.weishu.kernelsu.ui.component.pixel.PixelPetState,
-    need: PixelPetCareNeed,
-): String = when (need) {
-    PixelPetCareNeed.Incubating -> if (state.isIncubating) {
-        stringResource(R.string.pixel_pet_incubating, pixelPetCountdownLabel(state.incubationRemainingMillis()))
-    } else {
-        stringResource(R.string.pixel_pet_egg_summary)
-    }
-    PixelPetCareNeed.Hungry -> stringResource(R.string.pixel_pet_hunger_value, state.hunger)
-    PixelPetCareNeed.Tired -> stringResource(R.string.pixel_pet_energy_value, state.energy)
-    PixelPetCareNeed.Dirty -> stringResource(R.string.pixel_pet_cleanliness_value, state.cleanliness)
-    PixelPetCareNeed.Lonely,
-    PixelPetCareNeed.Content,
-    -> stringResource(R.string.pixel_pet_mood_value, state.moodValue)
-    PixelPetCareNeed.Restless -> "${stringResource(R.string.pixel_pet_exploration)} ${state.exploration}%"
-    PixelPetCareNeed.Shelter -> stringResource(R.string.pixel_pet_energy_value, state.energy)
-    PixelPetCareNeed.Stargazing -> "${stringResource(R.string.pixel_pet_exploration)} ${state.exploration}%"
 }
 
 @Composable

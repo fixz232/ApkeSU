@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
@@ -44,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,7 +77,9 @@ fun DynamicManagerScreen() {
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     var pendingGrant by remember { mutableStateOf<DynamicManagerCandidate?>(null) }
     var confirmRevoke by remember { mutableStateOf(false) }
+    var showManualConfig by remember { mutableStateOf(false) }
     val grantedMessage = stringResource(R.string.dynamic_manager_granted)
+    val configuredMessage = stringResource(R.string.dynamic_manager_configured)
     val revokedMessage = stringResource(R.string.dynamic_manager_revoked)
     val failedPrefix = stringResource(R.string.dynamic_manager_failed)
 
@@ -82,6 +87,7 @@ fun DynamicManagerScreen() {
         val notice = state.notice ?: return@LaunchedEffect
         val message = when (notice) {
             DynamicManagerNotice.Granted -> grantedMessage
+            DynamicManagerNotice.Configured -> configuredMessage
             DynamicManagerNotice.Revoked -> revokedMessage
             is DynamicManagerNotice.Failed -> "$failedPrefix: ${notice.detail}"
         }
@@ -169,6 +175,7 @@ fun DynamicManagerScreen() {
                 state = state,
                 onQueryChange = viewModel::updateQuery,
                 onGrant = { pendingGrant = it },
+                onManualConfig = { showManualConfig = true },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -228,6 +235,19 @@ fun DynamicManagerScreen() {
             },
         )
     }
+
+    if (showManualConfig) {
+        DynamicManagerManualDialog(
+            initialSize = state.runtime.certificateSize.takeIf { state.runtime.configured },
+            initialHash = state.runtime.certificateSha256.takeIf { state.runtime.configured }.orEmpty(),
+            busy = state.busy,
+            onDismiss = { if (!state.busy) showManualConfig = false },
+            onConfirm = { size, hash ->
+                showManualConfig = false
+                viewModel.setManual(size, hash)
+            },
+        )
+    }
 }
 
 @Composable
@@ -235,6 +255,7 @@ private fun DynamicManagerContent(
     state: DynamicManagerUiState,
     onQueryChange: (String) -> Unit,
     onGrant: (DynamicManagerCandidate) -> Unit,
+    onManualConfig: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -301,6 +322,20 @@ private fun DynamicManagerContent(
             }
         }
 
+        item(key = "manual-config") {
+            OutlinedButton(
+                onClick = onManualConfig,
+                enabled = state.runtime.supported && !state.busy,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ApkeUiTokens.MinTouchTarget),
+            ) {
+                Icon(Icons.Rounded.Edit, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.dynamic_manager_manual_config))
+            }
+        }
+
         item(key = "search") {
             OutlinedTextField(
                 value = state.query,
@@ -335,14 +370,12 @@ private fun DynamicManagerContent(
                 key = { "${it.packageName}:${it.appId}" },
                 contentType = { "dynamic-manager-candidate" },
             ) { candidate ->
-                val selected = state.runtime.configured &&
-                    state.runtime.packageName == candidate.packageName &&
-                    state.runtime.appId == candidate.appId
+                val selected = candidate.isSelected
                 DynamicManagerCandidateRow(
                     candidate = candidate,
                     selected = selected,
                     active = selected && state.runtime.active,
-                    enabled = state.runtime.supported,
+                    enabled = state.runtime.supported && candidate.isChangeable,
                     busy = state.busy,
                     submitting = state.submittingPackage == candidate.packageName,
                     onClick = { if (!selected || !state.runtime.active) onGrant(candidate) },
@@ -381,12 +414,6 @@ private fun DynamicManagerStatusRow(state: DynamicManagerUiState) {
         }
         if (runtime.configured) {
             ApkeListDivider()
-            Text(runtime.packageName, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                stringResource(R.string.dynamic_manager_app_id, runtime.appId),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Text(
                 stringResource(
                     R.string.dynamic_manager_certificate,
@@ -398,8 +425,105 @@ private fun DynamicManagerStatusRow(state: DynamicManagerUiState) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            val activeAppIds = runtime.managerSignatureIndexes
+                .filterValues { it == 255 }
+                .keys
+                .sorted()
+            if (activeAppIds.isNotEmpty()) {
+                Text(
+                    stringResource(
+                        R.string.dynamic_manager_active_app_ids,
+                        activeAppIds.joinToString(),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun DynamicManagerManualDialog(
+    initialSize: Int?,
+    initialHash: String,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, String) -> Unit,
+) {
+    var sizeText by remember(initialSize) { mutableStateOf(initialSize?.toString().orEmpty()) }
+    var hashText by remember(initialHash) { mutableStateOf(initialHash) }
+    val size = sizeText.toIntOrNull()
+    val validSize = size != null && size in 0x100..0x1000
+    val validHash = hashText.length == 64 && hashText.all { it in '0'..'9' || it in 'a'..'f' }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+        title = { Text(stringResource(R.string.dynamic_manager_manual_config)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.dynamic_manager_manual_config_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = sizeText,
+                    onValueChange = { value -> sizeText = value.filter(Char::isDigit).take(4) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.dynamic_manager_signature_size)) },
+                    supportingText = {
+                        if (sizeText.isNotEmpty() && !validSize) {
+                            Text(stringResource(R.string.dynamic_manager_signature_size_error))
+                        }
+                    },
+                    isError = sizeText.isNotEmpty() && !validSize,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                OutlinedTextField(
+                    value = hashText,
+                    onValueChange = { value ->
+                        hashText = value
+                            .trim()
+                            .lowercase()
+                            .filter { it in '0'..'9' || it in 'a'..'f' }
+                            .take(64)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    minLines = 2,
+                    maxLines = 3,
+                    label = { Text(stringResource(R.string.dynamic_manager_signature_sha256)) },
+                    supportingText = {
+                        Text(
+                            if (hashText.isNotEmpty() && !validHash) {
+                                stringResource(R.string.dynamic_manager_signature_sha256_error)
+                            } else {
+                                "${hashText.length}/64"
+                            },
+                        )
+                    },
+                    isError = hashText.isNotEmpty() && !validHash,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(size ?: return@Button, hashText) },
+                enabled = !busy && validSize && validHash,
+            ) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable

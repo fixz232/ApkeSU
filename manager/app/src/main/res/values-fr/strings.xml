@@ -2178,7 +2178,7 @@ Mode</string>
     <string name="hidden_path_apply_failed">Échec de l\&apos;application. Vérifiez les journaux.</string>
     <string name="hidden_path_unload_success">Les chemins actuellement masqués par le noyau ont été supprimés</string>
     <string name="hidden_path_unload_failed">Échec de la suppression. Vérifiez les journaux.</string>
-    <string name="hidden_path_import_success">Configuration importée. Appliquez des chemins cachés pour l\&apos;activer.</string>
+    <string name="hidden_path_import_success">Configuration importée et appliquée</string>
     <string name="hidden_path_import_failed">L\&apos;importation a échoué. Vérifiez le fichier de configuration.</string>
     <string name="hidden_path_export_success">Configuration exportée</string>
     <string name="hidden_path_export_failed">Échec de l\&apos;exportation</string>
@@ -2242,7 +2242,7 @@ Mode</string>
     <string name="hidden_path_help_absolute_paths">Utilisez des chemins absolus. Plusieurs chemins sont transmis au LKM via le paramètre target_paths.</string>
     <string name="hidden_path_help_app_scope">La sélection d\&apos;applications accepte les noms de packages ou les UID. La portée par application est résolue en deny_uids.</string>
     <string name="hidden_path_help_managed_paths">Pour éviter toute interruption de la gestion des modules, /data/adb/modules, /data/adb/ksu, /data/adb/ap et les répertoires de gestion similaires nécessitent le masquage par UID d\&apos;application et ne peuvent pas être masqués globalement.</string>
-    <string name="hidden_path_help_apply">Après l\&apos;application, ksud attend que les chemins cibles apparaissent, puis recharge à chaud le masque de chemin avec la nouvelle configuration.</string>
+    <string name="hidden_path_help_apply">L\&apos;enregistrement ou l\&apos;importation applique immédiatement la configuration. Les chemins montés ultérieurement seront chargés à la prochaine étape du démarrage.</string>
     <string name="hidden_path_help_debug">Si le masquage n\&apos;a aucun effet, inspectez la sortie wanted_count, KMI et dmesg du noyau dans les journaux.</string>
     <string name="hidden_path_added">Ajouté</string>
     <string name="hidden_path_logs_empty">Aucun journal de chemin caché</string>

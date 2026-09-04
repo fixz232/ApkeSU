@@ -413,18 +413,6 @@ fun SettingPagerMiuix(
                             icon = Icons.Rounded.Dashboard,
                             onClick = actions.onOpenHomeLayout,
                         )
-                        CategorizedMiuixActionRow(
-                            title = stringResource(id = R.string.pixel_pet_title),
-                            summary = stringResource(
-                                id = if (uiState.pixelPetEnabled) {
-                                    R.string.pixel_pet_enabled_summary
-                                } else {
-                                    R.string.pixel_pet_disabled_summary
-                                },
-                            ),
-                            icon = Icons.Rounded.AutoFixHigh,
-                            onClick = actions.onOpenPixelPet,
-                        )
                         CategorizedMiuixSwitchRow(
                             title = stringResource(id = R.string.settings_show_home_support_card),
                             summary = stringResource(id = R.string.settings_show_home_support_card_summary),

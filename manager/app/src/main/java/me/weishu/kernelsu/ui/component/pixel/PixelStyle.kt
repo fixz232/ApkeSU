@@ -118,12 +118,6 @@ enum class PixelStyle(
         labelRes = R.string.pixel_style_cloud_town,
         summaryRes = R.string.pixel_style_cloud_town_summary,
         keyColor = 0xFF6C7E99.toInt(),
-    ),
-    PetCompanion(
-        value = "pet_companion",
-        labelRes = R.string.pixel_style_pet_companion,
-        summaryRes = R.string.pixel_style_pet_companion_summary,
-        keyColor = 0xFFB678A8.toInt(),
     );
 
     companion object {
@@ -586,29 +580,4 @@ fun pixelPalette(style: PixelStyle, dark: Boolean): PixelPalette = when (style) 
         )
     }
 
-    PixelStyle.PetCompanion -> if (dark) {
-        PixelPalette(
-            background = Color(0xFF17131C),
-            backgroundAlt = Color(0xFF282033),
-            surface = Color(0xFF342944),
-            surfaceAlt = Color(0xFF251E31),
-            primary = Color(0xFFF0B4D6),
-            secondary = Color(0xFF9CD6D0),
-            outline = Color(0xFF9A789B),
-            highlight = Color(0xFFFFF3FB),
-            shadow = Color(0xFF09070D),
-        )
-    } else {
-        PixelPalette(
-            background = Color(0xFFF6E9F0),
-            backgroundAlt = Color(0xFFE9D8E5),
-            surface = Color(0xFFFFF8FC),
-            surfaceAlt = Color(0xFFF1E1EC),
-            primary = Color(0xFF9B557F),
-            secondary = Color(0xFF4D8D88),
-            outline = Color(0xFF967A8D),
-            highlight = Color(0xFFFFFFFF),
-            shadow = Color(0xFF5A4151),
-        )
-    }
 }

@@ -10,6 +10,7 @@ import me.weishu.kernelsu.ui.util.DynamicManagerCliState
 import me.weishu.kernelsu.ui.util.clearDynamicManager
 import me.weishu.kernelsu.ui.util.getDynamicManagerStatus
 import me.weishu.kernelsu.ui.util.setDynamicManagerApk
+import me.weishu.kernelsu.ui.util.setDynamicManagerCertificate
 import java.io.File
 import java.util.zip.ZipFile
 
@@ -23,7 +24,13 @@ data class DynamicManagerCandidate(
     val packageName: String,
     val apkPath: String,
     val appId: Int,
-)
+    val managerSignatureIndex: Int? = null,
+) {
+    val isSelected: Boolean get() = managerSignatureIndex == DYNAMIC_MANAGER_SIGNATURE_INDEX
+    val isChangeable: Boolean get() = managerSignatureIndex == null || isSelected
+}
+
+private const val DYNAMIC_MANAGER_SIGNATURE_INDEX = 255
 
 data class DynamicManagerSnapshot(
     val runtime: DynamicManagerCliState,
@@ -35,20 +42,13 @@ class DynamicManagerRepository {
         runCatching {
             val runtime = getDynamicManagerStatus().getOrThrow()
             val installedPackages = installedPackages()
-            val packagesByAppId = installedPackages
-                .mapNotNull { packageInfo ->
-                    packageInfo.applicationInfo?.let { applicationInfo ->
-                        applicationInfo.uid % PER_USER_RANGE to packageInfo.packageName
-                    }
-                }
-                .groupBy(keySelector = { it.first }, valueTransform = { it.second })
             val candidates = installedPackages
                 .asSequence()
-                .mapNotNull { packageInfo -> toCandidate(packageInfo, packagesByAppId) }
+                .mapNotNull { packageInfo -> toCandidate(packageInfo, runtime.managerSignatureIndexes) }
                 .sortedWith(
-                    compareByDescending<DynamicManagerCandidate> {
-                        runtime.packageName == it.packageName && runtime.appId == it.appId
-                    }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+                    compareByDescending<DynamicManagerCandidate> { it.isSelected }
+                        .thenByDescending { it.managerSignatureIndex != null }
+                        .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
                         .thenBy { it.packageName },
                 )
                 .toList()
@@ -57,12 +57,13 @@ class DynamicManagerRepository {
     }
 
     suspend fun grant(candidate: DynamicManagerCandidate): Result<Unit> = withContext(Dispatchers.IO) {
-        setDynamicManagerApk(
-            apkPath = candidate.apkPath,
-            packageName = candidate.packageName,
-            appId = candidate.appId,
-        )
+        setDynamicManagerApk(apkPath = candidate.apkPath)
     }
+
+    suspend fun setManual(certificateSize: Int, certificateSha256: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            setDynamicManagerCertificate(certificateSize, certificateSha256)
+        }
 
     suspend fun revoke(): Result<Unit> = withContext(Dispatchers.IO) {
         clearDynamicManager()
@@ -80,19 +81,17 @@ class DynamicManagerRepository {
 
     private fun toCandidate(
         packageInfo: PackageInfo,
-        packagesByAppId: Map<Int, List<String>>,
+        managerSignatureIndexes: Map<Int, Int>,
     ): DynamicManagerCandidate? {
         val applicationInfo = packageInfo.applicationInfo ?: return null
         val packageName = packageInfo.packageName.orEmpty()
         if (packageName == ksuApp.packageName ||
-            packageName == "io.github.fixz.apkesu" ||
-            packageName == "io.github.fixz.apkesu.vivo"
+            packageName == "io.github.fixz.apkesu"
         ) {
             return null
         }
         val appId = applicationInfo.uid % PER_USER_RANGE
         if (appId !in FIRST_APPLICATION_APP_ID..LAST_APPLICATION_APP_ID) return null
-        if (packagesByAppId[appId].orEmpty().distinct().size != 1) return null
         val apkPath = applicationInfo.sourceDir.orEmpty()
         val apkPaths = buildList {
             add(apkPath)
@@ -111,6 +110,7 @@ class DynamicManagerRepository {
             packageName = packageName,
             apkPath = apkPath,
             appId = appId,
+            managerSignatureIndex = managerSignatureIndexes[appId],
         )
     }
 

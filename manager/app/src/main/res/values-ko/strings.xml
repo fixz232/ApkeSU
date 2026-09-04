@@ -2161,7 +2161,7 @@
     <string name="hidden_path_apply_failed">적용에 실패했습니다. 로그를 확인하세요.</string>
     <string name="hidden_path_unload_success">현재 커널에 의해 숨겨진 경로가 제거되었습니다.</string>
     <string name="hidden_path_unload_failed">제거에 실패했습니다. 로그를 확인하세요.</string>
-    <string name="hidden_path_import_success">구성을 가져왔습니다. 활성화하려면 숨겨진 경로를 적용하세요.</string>
+    <string name="hidden_path_import_success">구성을 가져와 적용했습니다</string>
     <string name="hidden_path_import_failed">가져오기에 실패했습니다. 구성 파일을 확인하십시오.</string>
     <string name="hidden_path_export_success">구성을 내보냈습니다.</string>
     <string name="hidden_path_export_failed">내보내기에 실패했습니다.</string>
@@ -2225,7 +2225,7 @@
     <string name="hidden_path_help_absolute_paths">절대 경로를 사용하십시오. 여러 경로가 target_paths 매개변수를 통해 LKM에 전달됩니다.</string>
     <string name="hidden_path_help_app_scope">앱 선택은 패키지 이름 또는 UID를 허용합니다. 앱별 범위는 거부_uids로 확인됩니다.</string>
     <string name="hidden_path_help_managed_paths">모듈 관리가 중단되는 것을 방지하려면 /data/adb/modules, /data/adb/ksu, /data/adb/ap 및 유사한 관리 디렉토리에 앱 UID별 숨기기가 필요하며 전체적으로 숨길 수 없습니다.</string>
-    <string name="hidden_path_help_apply">적용 후 ksud는 대상 경로가 나타날 때까지 기다린 다음 새로운 구성으로 경로 마스크를 핫 리로드합니다.</string>
+    <string name="hidden_path_help_apply">저장하거나 가져오면 구성이 즉시 적용됩니다. 나중에 마운트된 경로는 다음 부팅 처리 단계에서 로드됩니다.</string>
     <string name="hidden_path_help_debug">숨김이 효과가 없으면 로그에서 received_count, KMI 및 커널 dmesg 출력을 검사하십시오.</string>
     <string name="hidden_path_added">추가됨</string>
     <string name="hidden_path_logs_empty">숨겨진 경로 로그가 없습니다.</string>

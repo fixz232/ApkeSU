@@ -437,19 +437,6 @@ private fun HomeManagerSettingsContent(
             icon = Icons.Rounded.EditNote,
             onClick = onEditHomeTitle,
         )
-        SettingsDivider()
-        SettingsActionRow(
-            title = stringResource(R.string.pixel_pet_title),
-            summary = stringResource(
-                if (uiState.pixelPetEnabled) {
-                    R.string.pixel_pet_enabled_summary
-                } else {
-                    R.string.pixel_pet_disabled_summary
-                }
-            ),
-            icon = Icons.Rounded.AutoFixHigh,
-            onClick = { onOpen(Route.PixelPet) },
-        )
     }
     SettingsGroup(stringResource(R.string.settings_group_home_layout)) {
         SettingsActionRow(

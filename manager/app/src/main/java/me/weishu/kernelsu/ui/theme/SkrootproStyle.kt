@@ -71,7 +71,6 @@ fun skrootproTopBarColors(defaultContainer: Color, defaultContent: Color): TopBa
                 PixelStyle.VikingSnowfield,
                 PixelStyle.JiangnanWatertown,
                 PixelStyle.CloudTown,
-                PixelStyle.PetCompanion,
                 -> palette.primary
 
                 PixelStyle.RustWasteland -> if (dark) {

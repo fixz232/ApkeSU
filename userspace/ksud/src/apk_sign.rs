@@ -9,7 +9,10 @@ const APK_V2_BLOCK_ID: u32 = 0x7109_871a;
 const APK_V3_BLOCK_ID: u32 = 0xf053_68c0;
 const APK_V31_BLOCK_ID: u32 = 0x1b93_ad61;
 const MIN_CERT_SIZE: u32 = 0x100;
-const MAX_CERT_SIZE: u32 = 1024;
+const MAX_CERT_SIZE: u32 = 0x1000;
+const ZIP_CENTRAL_DIRECTORY_HEADER_SIZE: u64 = 46;
+const ZIP_CENTRAL_DIRECTORY_MAGIC: u32 = 0x0201_4b50;
+const V1_MANIFEST: &[u8] = b"META-INF/MANIFEST.MF";
 
 fn read_exact_at(file: &mut File, offset: u64, bytes: &mut [u8]) -> Result<()> {
     file.seek(SeekFrom::Start(offset))?;
@@ -77,6 +80,57 @@ fn find_eocd(file: &mut File, file_size: u64) -> Result<(u64, u64, u64)> {
     bail!("ZIP end-of-central-directory record not found")
 }
 
+fn has_v1_signature_file(
+    file: &mut File,
+    directory_offset: u64,
+    directory_size: u64,
+) -> Result<bool> {
+    let directory_end = directory_offset
+        .checked_add(directory_size)
+        .context("ZIP central directory length overflow")?;
+    let mut position = directory_offset;
+    let mut header = [0u8; ZIP_CENTRAL_DIRECTORY_HEADER_SIZE as usize];
+
+    while position < directory_end {
+        ensure!(
+            directory_end.saturating_sub(position) >= ZIP_CENTRAL_DIRECTORY_HEADER_SIZE,
+            "truncated ZIP central directory entry"
+        );
+        read_exact_at(file, position, &mut header)?;
+        ensure!(
+            u32::from_le_bytes(header[0..4].try_into()?) == ZIP_CENTRAL_DIRECTORY_MAGIC,
+            "invalid ZIP central directory entry"
+        );
+        let file_name_length = u64::from(u16::from_le_bytes(header[28..30].try_into()?));
+        let extra_field_length = u64::from(u16::from_le_bytes(header[30..32].try_into()?));
+        let comment_length = u64::from(u16::from_le_bytes(header[32..34].try_into()?));
+        position += ZIP_CENTRAL_DIRECTORY_HEADER_SIZE;
+        let variable_size = file_name_length
+            .checked_add(extra_field_length)
+            .and_then(|size| size.checked_add(comment_length))
+            .context("ZIP central directory entry length overflow")?;
+        ensure!(
+            variable_size <= directory_end.saturating_sub(position),
+            "ZIP central directory entry exceeds its container"
+        );
+
+        if file_name_length == V1_MANIFEST.len() as u64 {
+            let mut file_name = [0u8; V1_MANIFEST.len()];
+            read_exact_at(file, position, &mut file_name)?;
+            if file_name == V1_MANIFEST {
+                return Ok(true);
+            }
+        }
+        position += variable_size;
+    }
+
+    ensure!(
+        position == directory_end,
+        "invalid ZIP central directory size"
+    );
+    Ok(false)
+}
+
 fn certificate_signature(file: &mut File, start: u64, end: u64) -> Result<(u32, String)> {
     let mut position = start;
     let signer_sequence_end = length_prefixed_end(file, &mut position, end)?;
@@ -106,7 +160,7 @@ fn certificate_signature(file: &mut File, start: u64, end: u64) -> Result<(u32, 
 pub fn get_apk_signature(apk: &str) -> Result<(u32, String)> {
     let mut file = File::open(apk).with_context(|| format!("failed to open APK {apk}"))?;
     let file_size = file.metadata()?.len();
-    let (eocd_offset, directory_offset, _) = find_eocd(&mut file, file_size)?;
+    let (eocd_offset, directory_offset, directory_size) = find_eocd(&mut file, file_size)?;
 
     if eocd_offset >= 20 {
         let mut zip64_magic = [0u8; 4];
@@ -177,6 +231,10 @@ pub fn get_apk_signature(apk: &str) -> Result<(u32, String)> {
         !has_v3,
         "APK v3/v3.1 signatures are not supported by this kernel verifier"
     );
+    ensure!(
+        !has_v1_signature_file(&mut file, directory_offset, directory_size)?,
+        "APK v1 signatures are not supported by this kernel verifier"
+    );
     v2_signature.context("APK v2 signer certificate was not found")
 }
 
@@ -192,7 +250,7 @@ mod tests {
         result
     }
 
-    fn test_apk(certificates: &[&[u8]]) -> tempfile::NamedTempFile {
+    fn test_apk(certificates: &[&[u8]], include_v1_manifest: bool) -> tempfile::NamedTempFile {
         let digests = length_prefixed(&[]);
         let certificate_entries = certificates
             .iter()
@@ -217,8 +275,18 @@ mod tests {
         apk.extend_from_slice(APK_SIG_MAGIC);
         let central_directory_offset = apk.len() as u32;
 
+        if include_v1_manifest {
+            let mut header = [0u8; ZIP_CENTRAL_DIRECTORY_HEADER_SIZE as usize];
+            header[0..4].copy_from_slice(&ZIP_CENTRAL_DIRECTORY_MAGIC.to_le_bytes());
+            header[28..30].copy_from_slice(&(V1_MANIFEST.len() as u16).to_le_bytes());
+            apk.extend_from_slice(&header);
+            apk.extend_from_slice(V1_MANIFEST);
+        }
+        let central_directory_size = apk.len() as u32 - central_directory_offset;
+
         apk.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
-        apk.extend_from_slice(&[0; 12]);
+        apk.extend_from_slice(&[0; 8]);
+        apk.extend_from_slice(&central_directory_size.to_le_bytes());
         apk.extend_from_slice(&central_directory_offset.to_le_bytes());
         apk.extend_from_slice(&0u16.to_le_bytes());
 
@@ -237,11 +305,18 @@ mod tests {
     #[test]
     fn parses_a_single_v2_signer_certificate() {
         let certificate = vec![0x5a; MIN_CERT_SIZE as usize];
-        let apk = test_apk(&[&certificate]);
+        let apk = test_apk(&[&certificate], false);
         assert_eq!(
             get_apk_signature(apk.path().to_str().unwrap()).unwrap(),
             (MIN_CERT_SIZE, sha256::digest(&certificate)),
         );
+    }
+
+    #[test]
+    fn rejects_v1_and_v2_mixed_signatures() {
+        let certificate = vec![0x5a; MIN_CERT_SIZE as usize];
+        let apk = test_apk(&[&certificate], true);
+        assert!(get_apk_signature(apk.path().to_str().unwrap()).is_err());
     }
 
     #[test]

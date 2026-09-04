@@ -201,24 +201,25 @@ class ThemeStorePackageTest {
     }
 
     @Test
-    fun themeStoreAppearance_acceptsPixelPetFields() {
-        val appearance = ThemeStoreAppearanceState(
+    fun legacyPixelPetAppearanceFallsBackWithoutBeingReExported() {
+        val fallback = ThemeStoreAppearanceState(
             themeMode = ColorMode.DARK.value,
             miuixMonet = false,
             keyColor = 0xFF6750A4.toInt(),
             colorStyle = "TonalSpot",
             colorSpec = ColorSpec.SpecVersion.entries.first().name,
             monetSurfaceOpacity = 0.72f,
-            pixelStyle = "pet_companion",
-            pixelPetEnabled = true,
         )
-        val config = currentThemeConfig().put("appearance", appearance.toJson())
+        val legacyAppearance = fallback.toJson()
+            .put("pixelStyle", "pet_companion")
+            .put("pixelPetEnabled", true)
+        val config = currentThemeConfig().put("appearance", legacyAppearance)
 
         validateThemeStoreConfig(config)
 
-        val parsed = ThemeStoreAppearanceState.fromJson(appearance.toJson(), appearance.copy(pixelPetEnabled = false))
-        assertEquals("pet_companion", parsed.pixelStyle)
-        assertTrue(parsed.pixelPetEnabled)
+        val parsed = ThemeStoreAppearanceState.fromJson(legacyAppearance, fallback)
+        assertEquals("classic_handheld", parsed.pixelStyle)
+        assertEquals(false, parsed.toJson().has("pixelPetEnabled"))
     }
 
     @Test

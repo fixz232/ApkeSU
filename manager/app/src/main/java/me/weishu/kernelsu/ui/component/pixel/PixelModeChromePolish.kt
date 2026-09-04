@@ -110,7 +110,6 @@ internal fun DrawScope.drawPixelModeHudPolish(
 
         PixelStyle.OceanDepths,
         PixelStyle.CyberHacker,
-        PixelStyle.PetCompanion,
         -> Unit
 
         PixelStyle.ThreeKingdoms -> drawThreeKingdomsModeHudPolish(
@@ -329,7 +328,6 @@ internal fun DrawScope.drawPixelModeNavigationFrame(
             palette = palette,
             unit = unit,
         )
-        PixelStyle.PetCompanion -> Unit
     }
 }
 
@@ -393,7 +391,6 @@ internal fun DrawScope.drawPixelModeIndicatorPolish(
 
         PixelStyle.OceanDepths,
         PixelStyle.CyberHacker,
-        PixelStyle.PetCompanion,
         -> Unit
 
         PixelStyle.ThreeKingdoms -> drawThreeKingdomsModeIndicatorPolish(

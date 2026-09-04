@@ -209,8 +209,9 @@ private val TEXT_STATUS_UNAVAILABLE get() = hiddenPathText(R.string.hidden_path_
 private val TEXT_PENDING_CHANGES get() = hiddenPathText(R.string.hidden_path_pending_changes)
 private const val PREF_HIDDEN_PATH_TEMPLATES = "hidden_path_config_templates"
 private const val PREF_KEY_TEMPLATES = "templates"
-private const val MAX_HIDDEN_PATHS = 64
+private const val MAX_HIDDEN_PATHS = 16
 private const val MAX_HIDDEN_APPS = 256
+private const val MAX_TARGET_PATH_BYTES = 255
 private const val MAX_PATH_PARAMETER_BYTES = 1900
 
 private val COMMON_HIDDEN_PATHS = listOf(
@@ -270,6 +271,52 @@ fun HiddenPathConfigScreen() {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var diagnosticExportText by remember { mutableStateOf("") }
 
+    fun applyImportedConfig(importedConfig: HiddenPathConfigState) {
+        if (applying || unloadingActive) return
+        val blockReason = importedConfig.blockReason()
+        if (blockReason != null) {
+            Toast.makeText(
+                context,
+                "$TEXT_IMPORT_FAIL: $blockReason",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+
+        val candidate = sanitizeHiddenPathConfig(importedConfig)
+        applying = true
+        scope.launch {
+            try {
+                val result = saveAndApplyHiddenPathConfig(candidate)
+                val refreshed = readHiddenPathConfig()
+                if (result.success) {
+                    config = refreshed.config ?: candidate
+                    lastAppliedConfig = config
+                    statusError = refreshed.error
+                } else {
+                    if (refreshed.config != null) {
+                        config = refreshed.config
+                        lastAppliedConfig = refreshed.config
+                    }
+                    statusError = result.errorMessage.ifBlank { refreshed.error }
+                    selectedTab = 2
+                }
+                logs = getHiddenPathLogs()
+                Toast.makeText(
+                    context,
+                    if (result.success) {
+                        TEXT_IMPORT_OK
+                    } else {
+                        result.errorMessage.ifBlank { TEXT_IMPORT_FAIL }
+                    },
+                    Toast.LENGTH_LONG,
+                ).show()
+            } finally {
+                applying = false
+            }
+        }
+    }
+
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument(HIDDEN_PATH_CONFIG_MIME_TYPE),
     ) { uri ->
@@ -304,12 +351,14 @@ fun HiddenPathConfigScreen() {
             }
             imported
                 .onSuccess { next ->
-                    config = sanitizeHiddenPathConfig(next).forPendingApply()
-                    statusError = ""
-                    Toast.makeText(context, TEXT_IMPORT_OK, Toast.LENGTH_LONG).show()
+                    applyImportedConfig(next)
                 }
-                .onFailure {
-                    Toast.makeText(context, TEXT_IMPORT_FAIL, Toast.LENGTH_LONG).show()
+                .onFailure { error ->
+                    Toast.makeText(
+                        context,
+                        error.message?.let { "$TEXT_IMPORT_FAIL: $it" } ?: TEXT_IMPORT_FAIL,
+                        Toast.LENGTH_LONG,
+                    ).show()
                 }
         }
     }
@@ -481,7 +530,7 @@ fun HiddenPathConfigScreen() {
                     } else {
                         config = config.copy(
                             loaded = false,
-                            resolvedCount = "",
+                            resolvedCount = 0,
                             activeTargetPaths = "",
                         )
                         statusError = refreshed.error
@@ -1350,7 +1399,7 @@ private fun HiddenPathStatusPanel(
     onAutoLoadChange: (Boolean) -> Unit,
     onAutoLoadDelayChange: (Int) -> Unit,
 ) {
-    val partial = config.isPartial || (config.loaded && config.unresolvedTargetCount > 0)
+    val partial = config.isPartial
     val statusText = when {
         statusError.isNotBlank() -> TEXT_STATUS_UNAVAILABLE
         partial -> TEXT_PARTIAL
@@ -1407,7 +1456,7 @@ private fun HiddenPathStatusPanel(
                 ),
                 ApkeMetricItem(
                     label = hiddenPathText(R.string.hidden_path_missing_count),
-                    value = config.notEffectiveTargetCount.toString(),
+                    value = config.pendingTargetCount.toString(),
                 ),
                 ApkeMetricItem(
                     label = hiddenPathText(R.string.hidden_path_auto_load),
@@ -1431,7 +1480,7 @@ private fun HiddenPathStatusPanel(
                     R.string.hidden_path_partial_summary,
                     config.activeCount,
                     config.availableCount,
-                    config.notEffectiveTargetCount,
+                    config.unresolvedTargetCount,
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.tertiary,
@@ -1577,6 +1626,8 @@ private fun HiddenPathConfigState.blockReason(): String? {
         targetPaths.isEmpty() -> TEXT_NO_PATH
         targetPaths.size > MAX_HIDDEN_PATHS ->
             hiddenPathText(R.string.hidden_path_too_many_paths, MAX_HIDDEN_PATHS)
+        targetPaths.any { it.toByteArray(Charsets.UTF_8).size > MAX_TARGET_PATH_BYTES } ->
+            hiddenPathText(R.string.hidden_path_target_too_long, MAX_TARGET_PATH_BYTES)
         targetPaths.joinToString(",").toByteArray(Charsets.UTF_8).size > MAX_PATH_PARAMETER_BYTES ->
             hiddenPathText(R.string.hidden_path_path_parameter_too_long)
         targetPaths.any { normalizeHiddenPath(it) == null } -> TEXT_INVALID_PATH
@@ -2013,7 +2064,7 @@ private fun HiddenPathDiagnosticsTab(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ConfigSection(title = hiddenPathText(R.string.hidden_path_runtime_diagnostics)) {
-            val partial = config.isPartial || (config.loaded && config.unresolvedTargetCount > 0)
+            val partial = config.isPartial
             StatusLine(
                 hiddenPathText(R.string.hidden_path_load_status),
                 when {
@@ -2486,6 +2537,7 @@ private fun normalizeHiddenPath(rawPath: String): String? {
     val hasTraversalSegment = path.split('/').any { segment -> segment == "." || segment == ".." }
     if (
         path.startsWith("/") && path != "/" && !hasTraversalSegment &&
+        path.toByteArray(Charsets.UTF_8).size <= MAX_TARGET_PATH_BYTES &&
         !path.contains(",") &&
         !path.contains('\u0000') &&
         !path.contains('"') &&

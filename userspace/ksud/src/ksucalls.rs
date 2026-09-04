@@ -420,82 +420,116 @@ pub fn set_manager_appid(appid: u32) -> std::io::Result<()> {
     )))
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DynamicManagerKernelState {
-    pub enabled: bool,
-    pub active: bool,
-    pub appid: u32,
     pub cert_size: u32,
-    pub package_name: String,
-    pub cert_sha256: String,
+    pub cert_sha256: [u8; 64],
 }
 
-fn copy_dynamic_manager_field<const N: usize>(value: &str) -> std::io::Result<[u8; N]> {
-    if value.is_empty() || value.len() >= N || value.as_bytes().contains(&0) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "dynamic manager field is empty, too long, or contains a null byte",
-        ));
-    }
-    let mut field = [0u8; N];
-    field[..value.len()].copy_from_slice(value.as_bytes());
-    Ok(field)
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ManagerKernelState {
+    pub appid: u32,
+    pub signature_index: u8,
 }
 
-const fn dynamic_manager_command(operation: u32) -> ksu_uapi::ksu_dynamic_manager_cmd {
+const fn dynamic_manager_command(operation: u8) -> ksu_uapi::ksu_dynamic_manager_cmd {
     ksu_uapi::ksu_dynamic_manager_cmd {
         operation,
-        appid: 0,
-        cert_size: 0,
-        enabled: 0,
-        active: 0,
-        reserved: [0; 2],
-        package_name: [0; ksu_uapi::KSU_MAX_PACKAGE_NAME as usize],
-        cert_sha256: [0; ksu_uapi::KSU_DYNAMIC_MANAGER_CERT_SHA256_LEN as usize],
-        reserved2: [0; 3],
+        size: 0,
+        hash: [0; 64],
     }
 }
 
 pub fn set_dynamic_manager(
-    appid: u32,
-    package_name: &str,
     cert_size: u32,
-    cert_sha256: &str,
+    cert_sha256: [u8; 64],
+    synchronous: bool,
 ) -> std::io::Result<()> {
-    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_SET);
-    cmd.appid = appid;
-    cmd.cert_size = cert_size;
-    cmd.package_name = copy_dynamic_manager_field(package_name)?;
-    cmd.cert_sha256 = copy_dynamic_manager_field(cert_sha256)?;
+    let operation = if synchronous {
+        ksu_uapi::DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS as u8
+    } else {
+        ksu_uapi::DYNAMIC_MANAGER_OP_SET as u8
+    };
+    let mut cmd = dynamic_manager_command(operation);
+    cmd.size = cert_size;
+    cmd.hash = cert_sha256;
     ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
     Ok(())
 }
 
 pub fn get_dynamic_manager() -> std::io::Result<DynamicManagerKernelState> {
-    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_GET);
+    let mut cmd = dynamic_manager_command(ksu_uapi::DYNAMIC_MANAGER_OP_GET as u8);
     ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
-
-    let decode = |bytes: &[u8]| {
-        let end = bytes
-            .iter()
-            .position(|value| *value == 0)
-            .unwrap_or(bytes.len());
-        String::from_utf8_lossy(&bytes[..end]).into_owned()
-    };
     Ok(DynamicManagerKernelState {
-        enabled: cmd.enabled != 0,
-        active: cmd.active != 0,
-        appid: cmd.appid,
-        cert_size: cmd.cert_size,
-        package_name: decode(&cmd.package_name),
-        cert_sha256: decode(&cmd.cert_sha256),
+        cert_size: cmd.size,
+        cert_sha256: cmd.hash,
     })
 }
 
 pub fn clear_dynamic_manager() -> std::io::Result<()> {
-    let mut cmd = dynamic_manager_command(ksu_uapi::KSU_DYNAMIC_MANAGER_OP_CLEAR);
+    let mut cmd = dynamic_manager_command(ksu_uapi::DYNAMIC_MANAGER_OP_WIPE as u8);
     ksuctl(ksu_uapi::KSU_IOCTL_DYNAMIC_MANAGER, &raw mut cmd)?;
     Ok(())
+}
+
+const MANAGER_LIST_HEADER_SIZE: usize = 4;
+const MANAGER_ENTRY_SIZE: usize = 5;
+const MAX_MANAGER_COUNT: usize = 10_000;
+
+fn read_u16_ne(bytes: &[u8]) -> u16 {
+    u16::from_ne_bytes([bytes[0], bytes[1]])
+}
+
+pub fn get_managers() -> std::io::Result<Vec<ManagerKernelState>> {
+    for _ in 0..3 {
+        let mut probe = [0u8; MANAGER_LIST_HEADER_SIZE];
+        ksuctl(ksu_uapi::KSU_IOCTL_GET_MANAGERS, probe.as_mut_ptr())?;
+        let total = usize::from(read_u16_ne(&probe[2..4]));
+        if total == 0 {
+            return Ok(Vec::new());
+        }
+        if total > MAX_MANAGER_COUNT {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "kernel returned too many managers",
+            ));
+        }
+
+        let mut buffer = vec![0u8; MANAGER_LIST_HEADER_SIZE + total * MANAGER_ENTRY_SIZE];
+        buffer[..2].copy_from_slice(&(total as u16).to_ne_bytes());
+        ksuctl(ksu_uapi::KSU_IOCTL_GET_MANAGERS, buffer.as_mut_ptr())?;
+        let count = usize::from(read_u16_ne(&buffer[..2]));
+        let current_total = usize::from(read_u16_ne(&buffer[2..4]));
+        if current_total > total {
+            continue;
+        }
+        if count > total || MANAGER_LIST_HEADER_SIZE + count * MANAGER_ENTRY_SIZE > buffer.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "kernel returned an invalid manager count",
+            ));
+        }
+
+        return Ok((0..count)
+            .map(|index| {
+                let offset = MANAGER_LIST_HEADER_SIZE + index * MANAGER_ENTRY_SIZE;
+                ManagerKernelState {
+                    appid: u32::from_ne_bytes([
+                        buffer[offset],
+                        buffer[offset + 1],
+                        buffer[offset + 2],
+                        buffer[offset + 3],
+                    ]),
+                    signature_index: buffer[offset + 4],
+                }
+            })
+            .collect());
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::WouldBlock,
+        "manager registry changed while it was being read",
+    ))
 }
 
 /// Get mark status for a process (pid=0 returns total marked count)

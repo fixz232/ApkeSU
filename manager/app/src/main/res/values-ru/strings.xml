@@ -2190,7 +2190,7 @@
     <string name="hidden_path_apply_failed">Не удалось применить. Проверьте журналы.</string>
     <string name="hidden_path_unload_success">Пути, скрытые ядром, были удалены.</string>
     <string name="hidden_path_unload_failed">Удаление не удалось. Проверьте журналы.</string>
-    <string name="hidden_path_import_success">Конфигурация импортирована. Примените скрытые пути, чтобы активировать его.</string>
+    <string name="hidden_path_import_success">Конфигурация импортирована и применена</string>
     <string name="hidden_path_import_failed">Не удалось импортировать. Проверьте файл конфигурации.</string>
     <string name="hidden_path_export_success">Конфигурация экспортирована.</string>
     <string name="hidden_path_export_failed">Экспорт не удался</string>
@@ -2254,7 +2254,7 @@
     <string name="hidden_path_help_absolute_paths">Используйте абсолютные пути. Несколько путей передаются в LKM через параметр target_paths.</string>
     <string name="hidden_path_help_app_scope">При выборе приложения принимаются имена пакетов или UID. Область действия каждого приложения разрешается в Deny_uids.</string>
     <string name="hidden_path_help_managed_paths">Чтобы предотвратить нарушение управления модулями, /data/adb/modules, /data/adb/ksu, /data/adb/ap и аналогичные каталоги управления требуют скрытия по UID приложения и не могут быть скрыты глобально.</string>
-    <string name="hidden_path_help_apply">После применения ksud ожидает появления целевых путей, а затем выполняет горячую перезагрузку маски пути с новой конфигурацией.</string>
+    <string name="hidden_path_help_apply">При сохранении или импорте конфигурация применяется сразу. Пути, смонтированные позже, будут загружены на следующем этапе запуска.</string>
     <string name="hidden_path_help_debug">Если скрытие не дало результата, проверьте в журналах выводsolve_count, KMI и ядра dmesg.</string>
     <string name="hidden_path_added">Добавлено</string>
     <string name="hidden_path_logs_empty">Никаких скрытых журналов пути</string>

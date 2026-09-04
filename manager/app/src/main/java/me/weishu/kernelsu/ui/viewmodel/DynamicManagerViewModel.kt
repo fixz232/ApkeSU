@@ -14,6 +14,7 @@ import me.weishu.kernelsu.ui.util.DynamicManagerCliState
 
 sealed interface DynamicManagerNotice {
     data object Granted : DynamicManagerNotice
+    data object Configured : DynamicManagerNotice
     data object Revoked : DynamicManagerNotice
     data class Failed(val detail: String) : DynamicManagerNotice
 }
@@ -110,6 +111,26 @@ class DynamicManagerViewModel(
         }
     }
 
+    fun setManual(certificateSize: Int, certificateSha256: String) {
+        if (_uiState.value.busy) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(submittingPackage = MANUAL_SUBMISSION, notice = null) }
+            repository.setManual(certificateSize, certificateSha256)
+                .onSuccess {
+                    _uiState.update { it.copy(notice = DynamicManagerNotice.Configured) }
+                    reloadAfterOperation()
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            submittingPackage = null,
+                            notice = DynamicManagerNotice.Failed(error.message.orEmpty()),
+                        )
+                    }
+                }
+        }
+    }
+
     fun revoke() {
         if (_uiState.value.busy) return
         viewModelScope.launch {
@@ -158,5 +179,9 @@ class DynamicManagerViewModel(
                     )
                 }
             }
+    }
+
+    private companion object {
+        const val MANUAL_SUBMISSION = "@manual"
     }
 }

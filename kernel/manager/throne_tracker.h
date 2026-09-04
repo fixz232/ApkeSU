@@ -1,26 +1,29 @@
-#ifndef __KSU_H_UID_OBSERVER
-#define __KSU_H_UID_OBSERVER
+#ifndef __KSU_H_THRONE_TRACKER
+#define __KSU_H_THRONE_TRACKER
 
-#include <linux/types.h>
+#define TRACK_THRONE_PRUNE_ONLY (1U << 0)
+#define TRACK_THRONE_FORCE_SEARCH_MGR (1U << 1)
+#define TRACK_THRONE_FORCE_SYNCHRONOUS (1U << 2)
+
 #ifdef CONFIG_KSU_DISABLE_MANAGER
-static inline void ksu_throne_tracker_init()
+static inline void ksu_throne_tracker_init(void)
 {
 }
 
-static inline void ksu_throne_tracker_exit()
+static inline void ksu_throne_tracker_exit(void)
 {
 }
 
-static inline void track_throne(bool prune_only)
+static inline void track_throne(unsigned int flags)
 {
-    (void)prune_only;
+    (void)flags;
 }
 #else
-void ksu_throne_tracker_init();
+void ksu_throne_tracker_init(void);
 
-void ksu_throne_tracker_exit();
+void ksu_throne_tracker_exit(void);
 
-void track_throne(bool prune_only);
+void track_throne(unsigned int flags);
 #endif
 
 #endif

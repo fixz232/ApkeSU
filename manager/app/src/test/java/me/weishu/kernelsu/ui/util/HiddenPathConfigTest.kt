@@ -17,7 +17,7 @@ class HiddenPathConfigTest {
         )
         val runtimeUpdated = saved.copy(
             loaded = true,
-            resolvedCount = "1",
+            resolvedCount = 1,
             activeTargetPaths = "/data/local/tmp/example",
             lastLog = "loaded",
         )
@@ -47,7 +47,7 @@ class HiddenPathConfigTest {
         val current = HiddenPathConfigState(
             loaded = true,
             currentKmi = "android14-6.1",
-            resolvedCount = "1",
+            resolvedCount = 1,
             autoLoadDelaySeconds = 45,
         )
         val imported = parseHiddenPathConfigJson(
@@ -126,6 +126,7 @@ class HiddenPathConfigTest {
         )
 
         assertTrue(partial.isPartial)
+        assertEquals(2, partial.pendingTargetCount)
         assertEquals(3, partial.notEffectiveTargetCount)
     }
 
@@ -141,5 +142,30 @@ class HiddenPathConfigTest {
         )
 
         assertEquals(12, unloaded.notEffectiveTargetCount)
+    }
+
+    @Test
+    fun statusParserAcceptsShellNoiseAndCompatibleFieldTypes() {
+        val result = parseHiddenPathStatusJson(
+            """
+            shell notice with {non-json braces}
+            device:/ # {"targetPaths":["/data/adb/ksu"],"appPackages":["com.example.app"],"loaded":true,"phase":"active","savedCount":"1","availableCount":1,"activeCount":"1","resolvedCount":"1","activeTargetPaths":["/data/adb/ksu"],"lastLog":"kept {inside} a JSON string"}device:/ #
+            """.trimIndent(),
+        )
+
+        val config = requireNotNull(result.config)
+        assertEquals("", result.error)
+        assertEquals(1, config.savedCount)
+        assertEquals(1, config.resolvedCount)
+        assertEquals("/data/adb/ksu", config.activeTargetPaths)
+    }
+
+    @Test
+    fun malformedStatusReturnsStructuredParseFailure() {
+        val result = parseHiddenPathStatusJson("not JSON")
+
+        assertEquals(null, result.config)
+        assertEquals("pathmask.status_parse_failed", result.errorCode)
+        assertTrue(result.error.isNotBlank())
     }
 }

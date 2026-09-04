@@ -146,22 +146,6 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
-    data object PixelPet : Route
-
-    @Parcelize
-    @Serializable
-    data object PixelPetHabitat : Route
-
-    @Parcelize
-    @Serializable
-    data object PixelPetChat : Route
-
-    @Parcelize
-    @Serializable
-    data object PixelPetSpriteStudio : Route
-
-    @Parcelize
-    @Serializable
     data object RescueProtection : Route
 
     @Parcelize

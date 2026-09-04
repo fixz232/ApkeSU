@@ -137,14 +137,12 @@ import me.weishu.kernelsu.ui.component.decoration.UiDecorationScope
 import me.weishu.kernelsu.ui.component.liquid.LocalLiquidGlassBackdrop
 import me.weishu.kernelsu.ui.component.liquid.liquidGlassBackdropColor
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelStyle
-import me.weishu.kernelsu.ui.component.pixel.LocalPixelPetState
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionEnabled
 import me.weishu.kernelsu.ui.component.pixel.LocalPixelCardMotionProgress
 import me.weishu.kernelsu.ui.component.pixel.PixelBackdrop
 import me.weishu.kernelsu.ui.component.pixel.PixelChromeOverlay
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
 import me.weishu.kernelsu.ui.component.pixel.rememberPixelCardMotionProgress
-import me.weishu.kernelsu.ui.component.pixel.rememberPixelPetState
 import me.weishu.kernelsu.ui.component.rain.LocalRainStyle
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionEnabled
 import me.weishu.kernelsu.ui.component.rain.LocalRainCardMotionProgress
@@ -204,10 +202,6 @@ import me.weishu.kernelsu.ui.screen.settings.HiddenPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.ForegroundToolProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.ImageToolScreen
 import me.weishu.kernelsu.ui.screen.settings.KpmScreen
-import me.weishu.kernelsu.ui.screen.settings.PixelPetScreen
-import me.weishu.kernelsu.ui.screen.settings.PixelPetChatScreen
-import me.weishu.kernelsu.ui.screen.settings.PixelPetHabitatScreen
-import me.weishu.kernelsu.ui.screen.settings.PixelPetSpriteStudioScreen
 import me.weishu.kernelsu.ui.screen.settings.SusfsPathConfigScreen
 import me.weishu.kernelsu.ui.screen.settings.RescueProtectionScreen
 import me.weishu.kernelsu.ui.screen.settings.HomeCardWallpaperScreen
@@ -407,7 +401,6 @@ class MainActivity : ComponentActivity() {
             val pixelCardMotionProgress = rememberPixelCardMotionProgress(
                 enabled = pixelInterfaceActive && uiState.pixelCardMotionEnabled,
             )
-            val pixelPetState = rememberPixelPetState()
             val darkMode = resolveEffectiveDarkMode(
                 colorMode = appSettings.colorMode,
                 systemDark = isSystemInDarkTheme(),
@@ -495,7 +488,6 @@ class MainActivity : ComponentActivity() {
                 LocalRainCardMotionProgress provides rainCardMotionProgress,
                 LocalRainSceneProgress provides rainSceneProgress,
                 LocalPixelStyle provides PixelStyle.fromValue(uiState.pixelStyle),
-                LocalPixelPetState provides pixelPetState.value,
                 LocalPixelCardMotionEnabled provides (
                     pixelInterfaceActive && uiState.pixelCardMotionEnabled
                     ),
@@ -600,10 +592,6 @@ class MainActivity : ComponentActivity() {
                                 entry<Route.DeviceIdentity> { DeviceIdentityScreen() }
                                 entry<Route.GraphicsRenderer> { GraphicsRendererScreen() }
                                 entry<Route.Kpm> { KpmScreen() }
-                                entry<Route.PixelPet> { PixelPetScreen() }
-                                entry<Route.PixelPetHabitat> { PixelPetHabitatScreen() }
-                                entry<Route.PixelPetChat> { PixelPetChatScreen() }
-                                entry<Route.PixelPetSpriteStudio> { PixelPetSpriteStudioScreen() }
                                 entry<Route.ImageTool> { ImageToolScreen() }
                                 entry<Route.BuiltinMount> { BuiltinMountScreen() }
                                 entry<Route.ThemeStore> { ThemeStoreScreen() }

@@ -358,17 +358,36 @@ static int do_dynamic_manager(void __user *arg)
     if (copy_from_user(&cmd, arg, sizeof(cmd)))
         return -EFAULT;
 
-    if ((cmd.operation == KSU_DYNAMIC_MANAGER_OP_SET || cmd.operation == KSU_DYNAMIC_MANAGER_OP_CLEAR) &&
-        current_uid().val != 0 && !is_primary_manager())
-        return -EPERM;
-
     ret = ksu_handle_dynamic_manager(&cmd);
     if (ret)
         return ret;
 
-    if (cmd.operation == KSU_DYNAMIC_MANAGER_OP_SET)
-        track_throne(false);
+    if (cmd.operation == DYNAMIC_MANAGER_OP_SET ||
+        cmd.operation == DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS) {
+        unsigned int flags = TRACK_THRONE_FORCE_SEARCH_MGR;
 
+        if (cmd.operation == DYNAMIC_MANAGER_OP_SET_SYNCHRONOUS)
+            flags |= TRACK_THRONE_FORCE_SYNCHRONOUS;
+        track_throne(flags);
+    }
+
+    if (cmd.operation == DYNAMIC_MANAGER_OP_GET &&
+        copy_to_user(arg, &cmd, sizeof(cmd)))
+        return -EFAULT;
+    return 0;
+}
+
+static int do_get_managers(void __user *arg)
+{
+    struct ksu_get_managers_cmd cmd;
+    int ret;
+
+    if (copy_from_user(&cmd, arg, sizeof(cmd)))
+        return -EFAULT;
+
+    ret = ksu_handle_get_managers_cmd(arg, &cmd);
+    if (ret)
+        return ret;
     if (copy_to_user(arg, &cmd, sizeof(cmd)))
         return -EFAULT;
     return 0;
@@ -905,6 +924,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .cmd = KSU_IOCTL_DYNAMIC_MANAGER,
         .name = "DYNAMIC_MANAGER",
         .handler = do_dynamic_manager,
+        .perm_check = only_root
+    },
+    {
+        .cmd = KSU_IOCTL_GET_MANAGERS,
+        .name = "GET_MANAGERS",
+        .handler = do_get_managers,
         .perm_check = manager_or_root
     },
     {

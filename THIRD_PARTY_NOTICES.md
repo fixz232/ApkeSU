@@ -164,7 +164,7 @@ Dynamic Manager feature, IOCTL command allocation, and loading approach in
 [`0b5efe9e0102c43ca5c41174d500f5a7080cd0c7`](https://github.com/ReSukiSU/ReSukiSU/commit/0b5efe9e0102c43ca5c41174d500f5a7080cd0c7)
 (2026-08-31).
 
-Relevant upstream areas include:
+The port follows the ReSukiSU certificate-only ABI and loading semantics in these upstream areas:
 
   - `kernel/feature/dynamic_manager.c` and `.h`;
   - `userspace/ksud/src/android/dynamic_manager.rs`;
@@ -172,11 +172,12 @@ Relevant upstream areas include:
 
 ReSukiSU applies GPL-2.0-only to its `kernel/` directory and GPL-3.0-or-later
 to the remaining project code. ApkeSU retains the same applicable license split
-for this adaptation. The ApkeSU implementation is not a verbatim import: it
-keeps a fixed built-in primary Manager, exposes one secondary slot, binds the
-slot to package name and normalized App ID in addition to the APK v2
-certificate, rejects shared App IDs, persists a versioned root-only
-configuration atomically, and omits manual certificate entry from the Manager
-UI. Its command structure and semantics are ApkeSU-specific and do not claim
-binary compatibility with ReSukiSU. See `docs/DYNAMIC_MANAGER.md` for the
-security contract and limitations.
+for this port. The IOCTL operations, certificate-only `{size, hash}` state,
+dynamic signature index `255`, manager enumeration, APK selection, and manual
+certificate entry intentionally follow ReSukiSU. ApkeSU-specific integration
+keeps its built-in primary Manager restricted to `io.github.fixz.apkesu`, uses
+its existing supercall/ksud lifecycle, persists state atomically, migrates the
+previous ApkeSU schema-v1 certificate, and hardens incomplete scans and APK ZIP
+validation. No ReSukiSU fixed-manager certificates or Vivo package variant are
+included. See `docs/DYNAMIC_MANAGER.md` for the security contract and
+limitations.

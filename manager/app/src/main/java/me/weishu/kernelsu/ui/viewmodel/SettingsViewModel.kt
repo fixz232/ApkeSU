@@ -99,7 +99,6 @@ class SettingsViewModel(
             val rainCardMotionEnabled = repo.rainCardMotionEnabled
             val pixelStyle = repo.pixelStyle
             val pixelCardMotionEnabled = repo.pixelCardMotionEnabled
-            val pixelPetEnabled = repo.pixelPetEnabled
             val uiDecorationConfig = repo.uiDecorationConfig
             val customUiDecorationPresets = repo.getCustomUiDecorationPresets()
             val recentUiDecorationComponents = repo.getRecentUiDecorationComponents()
@@ -219,7 +218,6 @@ class SettingsViewModel(
                     rainCardMotionEnabled = rainCardMotionEnabled,
                     pixelStyle = pixelStyle,
                     pixelCardMotionEnabled = pixelCardMotionEnabled,
-                    pixelPetEnabled = pixelPetEnabled,
                     uiDecorationConfig = uiDecorationConfig,
                     customUiDecorationPresets = customUiDecorationPresets,
                     recentUiDecorationComponents = recentUiDecorationComponents,
@@ -344,49 +342,26 @@ class SettingsViewModel(
 
     fun setUiMode(mode: String) {
         val normalizedMode = InterfaceStyle.normalizeValue(mode)
+        refreshJob?.cancel()
+        _uiState.update { it.copy(uiMode = normalizedMode) }
+
         if (repo.themeSyncStrategy == ThemeSyncStrategy.PER_STYLE) {
             repo.uiMode = normalizedMode
+            refreshAppearanceState()
             refresh()
             return
         }
 
-        when (normalizedMode) {
-            InterfaceStyle.Skrootpro.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.SKROOTPRO)
-                return
-            }
-
-            InterfaceStyle.Alpha.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.ALPHA)
-                return
-            }
-
-            InterfaceStyle.Delta.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.DELTA)
-                return
-            }
-
-            InterfaceStyle.LiquidGlass.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.LIQUID_GLASS)
-                return
-            }
-
-            InterfaceStyle.Snow.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.SNOW)
-                return
-            }
-
-            InterfaceStyle.Rain.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.RAIN)
-                return
-            }
-
-            InterfaceStyle.Pixel.value -> {
-                applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.PIXEL)
-                return
-            }
+        val interfacePreset = when (normalizedMode) {
+            InterfaceStyle.Skrootpro.value -> ThemePreset.SKROOTPRO
+            InterfaceStyle.Alpha.value -> ThemePreset.ALPHA
+            InterfaceStyle.Delta.value -> ThemePreset.DELTA
+            InterfaceStyle.LiquidGlass.value -> ThemePreset.LIQUID_GLASS
+            InterfaceStyle.Snow.value -> ThemePreset.SNOW
+            InterfaceStyle.Rain.value -> ThemePreset.RAIN
+            InterfaceStyle.Pixel.value -> ThemePreset.PIXEL
+            else -> null
         }
-
         val oldMode = repo.uiMode
         val currentThemeMode = repo.themeMode
         val isLeavingSpecialStyle = oldMode == InterfaceStyle.Skrootpro.value ||
@@ -396,47 +371,66 @@ class SettingsViewModel(
             oldMode == InterfaceStyle.Snow.value ||
             oldMode == InterfaceStyle.Rain.value ||
             oldMode == InterfaceStyle.Pixel.value
-
-        if (isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value) {
-            applyInterfacePresetPreservingColorMode(normalizedMode, ThemePreset.CLEAN_TOOL)
-            return
+        val preset = interfacePreset ?: ThemePreset.CLEAN_TOOL.takeIf {
+            isLeavingSpecialStyle && normalizedMode == InterfaceStyle.Miuix.value
         }
 
-        repo.uiMode = normalizedMode
-        repo.themeMode = currentThemeMode
-        _uiState.update {
-            it.copy(
-                uiMode = normalizedMode,
-                themeMode = currentThemeMode,
-                themePreset = ThemePreset.CUSTOM.value
-            )
-        }
+        repo.applyInterfaceStyle(normalizedMode, preset, currentThemeMode)
+        refreshAppearanceState()
+        refresh()
     }
 
-    private fun applyInterfacePresetPreservingColorMode(mode: String, preset: ThemePreset) {
-        val colorMode = repo.themeMode
-        val selectedSeason = if (mode == InterfaceStyle.Snow.value) {
-            SeasonStyle.fromValue(repo.seasonStyle)
-        } else {
-            null
+    private fun refreshAppearanceState() {
+        val uiMode = repo.uiMode
+        val themeMode = repo.themeMode
+        val miuixMonet = repo.miuixMonet
+        val keyColor = repo.keyColor
+        val colorStyle = repo.colorStyle
+        val colorSpec = repo.colorSpec
+        val monetSurfaceOpacity = repo.monetSurfaceOpacity
+        val enableBlur = resolveRealtimeBlurEnabled(uiMode, repo.enableBlur)
+        val enableFloatingBottomBar = repo.enableFloatingBottomBar
+        val enableFloatingBottomBarBlur = resolveRealtimeBlurEnabled(
+            uiMode,
+            repo.enableFloatingBottomBarBlur,
+        )
+        val pageScale = repo.pageScale
+        val fontScale = repo.fontScale
+        val blurIntensity = repo.blurIntensity
+        val themePreset = resolveThemePreset(
+            repo.themePreset,
+            uiMode = uiMode,
+            themeMode = themeMode,
+            miuixMonet = miuixMonet,
+            keyColor = keyColor,
+            colorStyle = colorStyle,
+            colorSpec = colorSpec,
+            monetSurfaceOpacity = monetSurfaceOpacity,
+            enableBlur = enableBlur,
+            enableFloatingBottomBar = enableFloatingBottomBar,
+            enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
+            pageScale = pageScale,
+            fontScale = fontScale,
+            blurIntensity = blurIntensity,
+        )
+        _uiState.update {
+            it.copy(
+                uiMode = uiMode,
+                themeMode = themeMode,
+                miuixMonet = miuixMonet,
+                keyColor = keyColor,
+                colorStyle = colorStyle,
+                colorSpec = colorSpec,
+                monetSurfaceOpacity = monetSurfaceOpacity,
+                themePreset = themePreset.value,
+                enableBlur = enableBlur,
+                enableFloatingBottomBar = enableFloatingBottomBar,
+                enableFloatingBottomBarBlur = enableFloatingBottomBarBlur,
+                pageScale = pageScale,
+                fontScale = fontScale,
+                blurIntensity = blurIntensity,
+            )
         }
-        val selectedRainStyle = if (mode == InterfaceStyle.Rain.value) {
-            RainStyle.fromValue(repo.rainStyle)
-        } else {
-            null
-        }
-        val selectedPixelStyle = if (mode == InterfaceStyle.Pixel.value) {
-            PixelStyle.fromValue(repo.pixelStyle)
-        } else {
-            null
-        }
-        repo.uiMode = mode
-        repo.applyThemePreset(preset)
-        repo.themeMode = colorMode
-        selectedSeason?.let { repo.seasonStyle = it.value }
-        selectedRainStyle?.let { repo.rainStyle = it.value }
-        selectedPixelStyle?.let { repo.pixelStyle = it.value }
-        refresh()
     }
 
     fun setCheckModuleUpdate(enabled: Boolean) {

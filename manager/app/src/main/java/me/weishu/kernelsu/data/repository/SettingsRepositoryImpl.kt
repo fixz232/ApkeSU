@@ -43,7 +43,6 @@ import me.weishu.kernelsu.ui.component.pixel.PIXEL_STYLE_KEY
 import me.weishu.kernelsu.ui.component.pixel.PIXEL_CARD_MOTION_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.pixel.DEFAULT_PIXEL_CARD_MOTION_ENABLED
 import me.weishu.kernelsu.ui.component.pixel.PixelStyle
-import me.weishu.kernelsu.ui.component.pixel.PIXEL_PET_ENABLED_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CONFIG_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_CUSTOM_PRESETS_KEY
 import me.weishu.kernelsu.ui.component.decoration.UI_DECORATION_RECENT_COMPONENTS_KEY
@@ -395,12 +394,6 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var pixelCardMotionEnabled: Boolean
         get() = prefs.getBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, DEFAULT_PIXEL_CARD_MOTION_ENABLED)
         set(value) = prefs.edit { putBoolean(PIXEL_CARD_MOTION_ENABLED_KEY, value) }
-
-    override var pixelPetEnabled: Boolean
-        get() = ksuApp.getSharedPreferences("pixel_pet", Context.MODE_PRIVATE)
-            .getBoolean(PIXEL_PET_ENABLED_KEY, false)
-        set(value) = ksuApp.getSharedPreferences("pixel_pet", Context.MODE_PRIVATE)
-            .edit { putBoolean(PIXEL_PET_ENABLED_KEY, value) }
 
     override val uiDecorationConfig: UiDecorationConfig
         get() = UiDecorationConfig.fromJsonString(prefs.getString(UI_DECORATION_CONFIG_KEY, null))
@@ -1005,6 +998,40 @@ class SettingsRepositoryImpl : SettingsRepository {
     override fun setEpkesuHideEnabled(enabled: Boolean): Boolean = writeEpkesuHideEnabled(enabled)
 
     override fun isLkmMode(): Boolean = Natives.isLkmMode
+
+    override fun applyInterfaceStyle(mode: String, preset: ThemePreset?, preservedColorMode: Int) {
+        val targetUiMode = InterfaceStyle.normalizeValue(mode)
+        val syncStrategy = themeSyncStrategy
+        prefs.edit {
+            putString("ui_mode", targetUiMode)
+            if (preset != null) {
+                writeThemeSnapshot(
+                    ThemeAppearanceSnapshot(
+                        colorMode = preservedColorMode,
+                        miuixMonet = preset.miuixMonet,
+                        keyColor = preset.keyColor,
+                        colorStyle = preset.paletteStyle.name,
+                        colorSpec = preset.colorSpec.name,
+                        monetSurfaceOpacity = preset.monetSurfaceOpacity,
+                        enableBlur = preset.enableBlur,
+                        enableFloatingBottomBar = preset.enableFloatingBottomBar,
+                        enableFloatingBottomBarBlur = preset.enableFloatingBottomBarBlur,
+                        pageScale = preset.pageScale,
+                        fontScale = ThemeAppearanceDefaults.FONT_SCALE,
+                        blurIntensity = ThemeAppearanceDefaults.BLUR_INTENSITY,
+                    ),
+                    targetUiMode,
+                    syncStrategy,
+                )
+            } else {
+                putInt(themeKey("color_mode", syncStrategy, targetUiMode), preservedColorMode)
+            }
+            putString(
+                themeKey("theme_preset", syncStrategy, targetUiMode),
+                ThemePreset.CUSTOM.value,
+            )
+        }
+    }
 
     override fun applyThemePreset(preset: ThemePreset) {
         val targetUiMode = InterfaceStyle.normalizeValue(preset.targetUiMode(uiMode))

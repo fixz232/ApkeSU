@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
-#ifndef __KSU_DYNAMIC_MANAGER_H
-#define __KSU_DYNAMIC_MANAGER_H
+#ifndef __KSU_H_DYNAMIC_MANAGER
+#define __KSU_H_DYNAMIC_MANAGER
 
 #include <linux/errno.h>
 #include <linux/types.h>
 
+#include "manager/manager_sign.h"
 #include "uapi/supercall.h"
 
 #ifdef CONFIG_KSU_DISABLE_MANAGER
@@ -14,40 +15,35 @@ static inline int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd
     return -EOPNOTSUPP;
 }
 
-static inline bool ksu_is_dynamic_manager_appid(uid_t appid)
+static inline bool ksu_is_dynamic_manager_enabled(void)
 {
-    (void)appid;
     return false;
 }
 
-static inline bool ksu_dynamic_manager_get_identity(char *package_name, size_t package_size, uid_t *appid,
-                                                    u64 *revision)
+static inline apk_sign_key_t ksu_get_dynamic_manager_sign(void)
 {
-    (void)package_name;
-    (void)package_size;
-    (void)appid;
-    (void)revision;
+    apk_sign_key_t key = { 0 };
+
+    return key;
+}
+
+static inline bool ksu_dynamic_manager_matches(unsigned size, const char *sha256)
+{
+    (void)size;
+    (void)sha256;
     return false;
 }
 
-static inline bool ksu_dynamic_manager_validate_apk(const char *path)
+static inline u64 ksu_get_dynamic_manager_generation(void)
 {
-    (void)path;
-    return false;
-}
-
-static inline void ksu_dynamic_manager_set_active(uid_t appid, u64 revision, bool active)
-{
-    (void)appid;
-    (void)revision;
-    (void)active;
+    return 0;
 }
 #else
 int ksu_handle_dynamic_manager(struct ksu_dynamic_manager_cmd *cmd);
-bool ksu_is_dynamic_manager_appid(uid_t appid);
-bool ksu_dynamic_manager_get_identity(char *package_name, size_t package_size, uid_t *appid, u64 *revision);
-bool ksu_dynamic_manager_validate_apk(const char *path);
-void ksu_dynamic_manager_set_active(uid_t appid, u64 revision, bool active);
+bool ksu_is_dynamic_manager_enabled(void);
+apk_sign_key_t ksu_get_dynamic_manager_sign(void);
+bool ksu_dynamic_manager_matches(unsigned size, const char *sha256);
+u64 ksu_get_dynamic_manager_generation(void);
 #endif
 
-#endif
+#endif // __KSU_H_DYNAMIC_MANAGER

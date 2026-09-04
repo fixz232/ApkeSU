@@ -67,7 +67,6 @@ internal enum class PixelCardMotionScene {
     VikingSnowfield,
     JiangnanWatertown,
     CloudTown,
-    PetCompanion,
 }
 
 internal fun PixelStyle.cardMotionScene(): PixelCardMotionScene = when (this) {
@@ -88,14 +87,12 @@ internal fun PixelStyle.cardMotionScene(): PixelCardMotionScene = when (this) {
     PixelStyle.VikingSnowfield -> PixelCardMotionScene.VikingSnowfield
     PixelStyle.JiangnanWatertown -> PixelCardMotionScene.JiangnanWatertown
     PixelStyle.CloudTown -> PixelCardMotionScene.CloudTown
-    PixelStyle.PetCompanion -> PixelCardMotionScene.PetCompanion
 }
 
 internal fun DrawScope.drawPixelCardMotionUnderlay(
     style: PixelStyle,
     palette: PixelPalette,
     progress: Float,
-    petHabitat: PixelPetHabitat = PixelPetHabitat.Garden,
 ) {
     if (!hasPixelCardMotionBounds()) return
     val unit = minOf(2.dp.toPx(), size.minDimension / 22f)
@@ -118,7 +115,6 @@ internal fun DrawScope.drawPixelCardMotionUnderlay(
         PixelCardMotionScene.VikingSnowfield -> drawVikingCardMotion(unit, phase, palette)
         PixelCardMotionScene.JiangnanWatertown -> drawJiangnanCardMotion(unit, phase, palette)
         PixelCardMotionScene.CloudTown -> drawCloudTownCardMotion(unit, phase, palette)
-        PixelCardMotionScene.PetCompanion -> drawPetCompanionCardMotion(unit, phase, palette, petHabitat)
     }
 }
 
@@ -126,7 +122,6 @@ internal fun DrawScope.drawPixelCardMotionOverlay(
     style: PixelStyle,
     palette: PixelPalette,
     progress: Float,
-    petHabitat: PixelPetHabitat = PixelPetHabitat.Garden,
 ) {
     if (!hasPixelCardMotionBounds()) return
     val unit = minOf(2.dp.toPx(), size.minDimension / 22f)
@@ -307,31 +302,6 @@ internal fun DrawScope.drawPixelCardMotionOverlay(
             )
         }
 
-        PixelCardMotionScene.PetCompanion -> {
-            val starPulse = pixelPulse(phase, 0.18f)
-            drawPixelSparkle(
-                center = Offset(size.width - unit * 4f, unit * 3f),
-                radius = unit * (0.7f + starPulse * 0.45f),
-                color = palette.highlight.copy(alpha = 0.30f + starPulse * 0.34f),
-                unit = unit,
-            )
-            repeat(3) { index ->
-                val local = (phase * 0.32f + index * 0.29f).normalizedPixelProgress()
-                val heartX = size.width * (0.18f + index * 0.27f)
-                val heartY = size.height * (0.52f - local * 0.22f)
-                drawRect(
-                    palette.secondary.copy(alpha = sin(local * PI.toFloat()).coerceAtLeast(0f) * 0.42f),
-                    Offset(heartX, heartY),
-                    Size(unit * 0.7f, unit * 0.7f),
-                )
-                drawRect(
-                    palette.secondary.copy(alpha = sin(local * PI.toFloat()).coerceAtLeast(0f) * 0.32f),
-                    Offset(heartX + unit * 0.7f, heartY + unit * 0.45f),
-                    Size(unit * 0.7f, unit * 0.7f),
-                )
-            }
-            drawPetCompanionHabitatParticles(unit, phase, palette, petHabitat)
-        }
     }
 }
 
@@ -667,122 +637,6 @@ private fun DrawScope.drawCloudTownCardMotion(unit: Float, phase: Float, palette
     val balloonY = size.height * (0.26f + cos(phase * TAU) * 0.05f)
     drawRect(palette.secondary.copy(alpha = 0.14f), Offset(balloonX, balloonY), Size(unit * 2f, unit * 2f))
     drawRect(palette.outline.copy(alpha = 0.12f), Offset(balloonX + unit * 0.75f, balloonY + unit * 2f), Size(unit * 0.5f, unit * 2f))
-}
-
-private fun DrawScope.drawPetCompanionCardMotion(
-    unit: Float,
-    phase: Float,
-    palette: PixelPalette,
-    habitat: PixelPetHabitat,
-) {
-    val groundY = size.height - unit * 2.2f
-    when (habitat) {
-        PixelPetHabitat.Garden -> {
-            repeat(8) { index ->
-                val x = size.width * (0.06f + index * 0.125f)
-                val sway = if (((phase * 20f).toInt() + index) % 4 < 2) unit * 0.45f else -unit * 0.45f
-                drawLine(
-                    color = palette.primary.copy(alpha = 0.14f + index % 2 * 0.025f),
-                    start = Offset(x, groundY),
-                    end = Offset(x + sway, groundY - unit * (1.3f + index % 3 * 0.45f)),
-                    strokeWidth = unit * 0.3f,
-                )
-            }
-        }
-
-        PixelPetHabitat.Cloud -> {
-            repeat(3) { index ->
-                val local = (phase * 0.20f + index * 0.33f).normalizedPixelProgress()
-                val x = -size.width * 0.20f + local * size.width * 1.35f
-                val y = size.height * (0.18f + index * 0.19f)
-                drawRect(palette.highlight.copy(alpha = 0.10f), Offset(x, y), Size(size.width * 0.24f, unit * 1.1f))
-                drawRect(palette.highlight.copy(alpha = 0.08f), Offset(x + unit * 2f, y - unit), Size(size.width * 0.12f, unit))
-            }
-        }
-
-        PixelPetHabitat.Moon -> {
-            repeat(4) { index ->
-                val sparkle = pixelPulse(phase, index * 0.22f)
-                drawRect(
-                    palette.highlight.copy(alpha = 0.16f + sparkle * 0.26f),
-                    Offset(size.width * (0.10f + index * 0.19f), size.height * (0.16f + index % 2 * 0.18f)),
-                    Size(unit * 0.6f, unit * 0.6f),
-                )
-            }
-        }
-
-        PixelPetHabitat.Lagoon -> {
-            repeat(3) { index ->
-                val local = (phase * 0.46f + index * 0.31f).normalizedPixelProgress()
-                val radius = unit * (1.6f + local * 4f)
-                drawOval(
-                    color = palette.highlight.copy(alpha = sin(local * PI.toFloat()).coerceAtLeast(0f) * 0.28f),
-                    topLeft = Offset(size.width * (0.18f + index * 0.29f) - radius, groundY - radius * 0.18f),
-                    size = Size(radius * 2f, radius * 0.36f),
-                    style = Stroke(width = unit * 0.18f),
-                )
-            }
-        }
-    }
-    val breath = pixelPulse(phase, 0.35f)
-    val petX = size.width * 0.74f
-    val petY = size.height * (0.58f - breath * 0.018f)
-    drawRect(
-        palette.primary.copy(alpha = 0.12f + breath * 0.08f),
-        Offset(petX, petY),
-        Size(unit * 3.2f, unit * 2.2f),
-    )
-    drawRect(
-        palette.secondary.copy(alpha = 0.14f + breath * 0.08f),
-        Offset(petX + unit * 0.55f, petY - unit * 0.75f),
-        Size(unit * 2.1f, unit * 1.25f),
-    )
-}
-
-private fun DrawScope.drawPetCompanionHabitatParticles(
-    unit: Float,
-    phase: Float,
-    palette: PixelPalette,
-    habitat: PixelPetHabitat,
-) {
-    when (habitat) {
-        PixelPetHabitat.Garden -> repeat(3) { index ->
-            val local = (phase * 0.28f + index * 0.31f).normalizedPixelProgress()
-            drawRect(
-                palette.highlight.copy(alpha = sin(local * PI.toFloat()).coerceAtLeast(0f) * 0.28f),
-                Offset(size.width * (0.12f + index * 0.30f), size.height * (0.76f - local * 0.34f)),
-                Size(unit * 0.5f, unit * 0.5f),
-            )
-        }
-
-        PixelPetHabitat.Cloud -> repeat(2) { index ->
-            val local = (phase * 0.22f + index * 0.48f).normalizedPixelProgress()
-            drawRect(
-                palette.highlight.copy(alpha = 0.16f + pixelPulse(local) * 0.18f),
-                Offset(size.width * local, size.height * (0.28f + index * 0.26f)),
-                Size(unit * 2f, unit * 0.45f),
-            )
-        }
-
-        PixelPetHabitat.Moon -> repeat(3) { index ->
-            val pulse = pixelPulse(phase, index * 0.27f)
-            drawPixelSparkle(
-                center = Offset(size.width * (0.18f + index * 0.28f), size.height * (0.22f + index % 2 * 0.18f)),
-                radius = unit * (0.38f + pulse * 0.28f),
-                color = palette.highlight.copy(alpha = 0.16f + pulse * 0.28f),
-                unit = unit,
-            )
-        }
-
-        PixelPetHabitat.Lagoon -> repeat(3) { index ->
-            val local = (phase * 0.38f + index * 0.29f).normalizedPixelProgress()
-            drawCircle(
-                color = palette.highlight.copy(alpha = sin(local * PI.toFloat()).coerceAtLeast(0f) * 0.26f),
-                radius = unit * 0.38f,
-                center = Offset(size.width * (0.16f + index * 0.30f), size.height * (0.78f - local * 0.44f)),
-            )
-        }
-    }
 }
 
 private fun DrawScope.drawPixelSparkle(

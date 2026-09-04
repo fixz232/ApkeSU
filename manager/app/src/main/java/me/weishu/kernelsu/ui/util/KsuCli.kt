@@ -55,9 +55,9 @@ private val managerRegistrationLock = Any()
 private const val MANAGER_REGISTRATION_RETRY_MILLIS = 30_000L
 private const val FIRST_APPLICATION_APPID = 10_000
 private const val LAST_APPLICATION_APPID = 19_999
-private const val DYNAMIC_MANAGER_STATUS_SCHEMA_VERSION = 1
+private const val DYNAMIC_MANAGER_STATUS_SCHEMA_VERSION = 2
 private const val DYNAMIC_MANAGER_MIN_CERTIFICATE_SIZE = 0x100
-private const val DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE = 1024
+private const val DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE = 0x1000
 private val DYNAMIC_MANAGER_CERTIFICATE_SHA256 = Regex("[0-9a-f]{64}")
 private var lastManagerRegistrationFailureKey: String? = null
 private var lastManagerRegistrationFailureAt = 0L
@@ -105,10 +105,9 @@ data class DynamicManagerCliState(
     val supported: Boolean = false,
     val configured: Boolean = false,
     val active: Boolean = false,
-    val packageName: String = "",
-    val appId: Int = 0,
     val certificateSize: Int = 0,
     val certificateSha256: String = "",
+    val managerSignatureIndexes: Map<Int, Int> = emptyMap(),
     val error: String = "",
 )
 
@@ -254,7 +253,7 @@ data class HiddenPathConfigState(
     val savedCount: Int = 0,
     val availableCount: Int = 0,
     val activeCount: Int = 0,
-    val resolvedCount: String = "",
+    val resolvedCount: Int = 0,
     val activeTargetPaths: String = "",
     val missingTargetPaths: List<String> = emptyList(),
     val unresolvedTargetCount: Int = 0,
@@ -268,12 +267,16 @@ data class HiddenPathConfigState(
     val resolvedAppUids: List<String> = emptyList(),
     val unresolvedAppPackages: List<String> = emptyList(),
 ) {
+    val pendingTargetCount: Int
+        get() = missingTargetPaths.size
+            .coerceAtLeast((savedCount - availableCount).coerceAtLeast(0))
+
     val notEffectiveTargetCount: Int
         get() = (missingTargetPaths.size + unresolvedTargetCount)
             .coerceAtLeast((savedCount - activeCount).coerceAtLeast(0))
 
     val isPartial: Boolean
-        get() = loaded && phase == "partial"
+        get() = loaded && (phase == "partial" || unresolvedTargetCount > 0)
 }
 
 data class HiddenPathConfigReadResult(
@@ -846,33 +849,51 @@ internal fun parseDynamicManagerStatusJson(content: String): DynamicManagerCliSt
     val supported = json.optBoolean("supported", false)
     val configured = json.optBoolean("configured", false)
     val active = json.optBoolean("active", false)
-    val packageName = json.optString("packageName", "")
-    val appId = json.optInt("appId", 0)
     val certificateSize = json.optInt("certificateSize", 0)
     val certificateSha256 = json.optString("certificateSha256", "")
+    val managerSignatureIndexes = buildMap {
+        val managers = json.optJSONArray("managers")
+        if (managers != null) {
+            for (index in 0 until managers.length()) {
+                val manager = managers.optJSONObject(index)
+                    ?: throw IllegalArgumentException("Dynamic Manager registry entry is invalid")
+                val appId = manager.optInt("appId", -1)
+                val signatureIndex = manager.optInt("signatureIndex", -1)
+                require(appId in FIRST_APPLICATION_APPID..LAST_APPLICATION_APPID) {
+                    "Dynamic Manager registry App ID is invalid"
+                }
+                require(signatureIndex in 0..255) {
+                    "Dynamic Manager signature index is invalid"
+                }
+                require(putIfAbsent(appId, signatureIndex) == null) {
+                    "Dynamic Manager registry contains a duplicate App ID"
+                }
+            }
+        }
+    }
     require(!active || configured) { "Active Dynamic Manager is not configured" }
+    require(!active || managerSignatureIndexes.containsValue(255)) {
+        "Active Dynamic Manager is missing from the manager registry"
+    }
     if (configured) {
-        require(packageName.isNotBlank() && packageName.length < 256) {
-            "Dynamic Manager package name is invalid"
-        }
-        require(appId in FIRST_APPLICATION_APPID..LAST_APPLICATION_APPID) {
-            "Dynamic Manager App ID is invalid"
-        }
         require(certificateSize in DYNAMIC_MANAGER_MIN_CERTIFICATE_SIZE..DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE) {
             "Dynamic Manager certificate size is invalid"
         }
         require(DYNAMIC_MANAGER_CERTIFICATE_SHA256.matches(certificateSha256)) {
             "Dynamic Manager certificate SHA-256 is invalid"
         }
+    } else {
+        require(certificateSize == 0 && certificateSha256.isEmpty()) {
+            "Unconfigured Dynamic Manager contains certificate data"
+        }
     }
     return DynamicManagerCliState(
         supported = supported,
         configured = configured,
         active = active,
-        packageName = packageName,
-        appId = appId,
         certificateSize = certificateSize,
         certificateSha256 = certificateSha256,
+        managerSignatureIndexes = managerSignatureIndexes,
         error = json.optString("error", "").takeUnless { it == "null" }.orEmpty(),
     )
 }
@@ -891,12 +912,27 @@ suspend fun getDynamicManagerStatus(): Result<DynamicManagerCliState> {
 
 suspend fun setDynamicManagerApk(
     apkPath: String,
-    packageName: String,
-    appId: Int,
 ): Result<Unit> {
     val result = runKsudCommandWithOutput(
-        "kernel dynamic-manager set-apk ${shellQuote(apkPath)} " +
-            "--package ${shellQuote(packageName)} --appid $appId",
+        "kernel dynamic-manager set-apk ${shellQuote(apkPath)}",
+        timeoutMillis = SHELL_JOB_TIMEOUT_MILLIS * 2,
+    )
+    return if (result.success) {
+        Result.success(Unit)
+    } else {
+        Result.failure(
+            IllegalStateException(
+                result.stderr.trim().ifBlank { "ksud exited with code ${result.code}" },
+            ),
+        )
+    }
+}
+
+suspend fun setDynamicManagerCertificate(certificateSize: Int, certificateSha256: String): Result<Unit> {
+    require(certificateSize in DYNAMIC_MANAGER_MIN_CERTIFICATE_SIZE..DYNAMIC_MANAGER_MAX_CERTIFICATE_SIZE)
+    require(DYNAMIC_MANAGER_CERTIFICATE_SHA256.matches(certificateSha256))
+    val result = runKsudCommandWithOutput(
+        "kernel dynamic-manager set $certificateSize ${shellQuote(certificateSha256)}",
         timeoutMillis = SHELL_JOB_TIMEOUT_MILLIS * 2,
     )
     return if (result.success) {
@@ -1673,45 +1709,12 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
             return@runCatching HiddenPathConfigReadResult(error = error)
         }
 
-        val obj = JSONObject(stdout.joinToString("\n"))
-        val statusError = obj.optString("error", "").trim()
-        if (statusError.isNotBlank()) {
-            return@runCatching HiddenPathConfigReadResult(
-                error = statusError,
-                errorCode = obj.optString("errorCode", "pathmask.status_failed"),
-            )
+        val parsed = parseHiddenPathStatusJson(stdout.joinToString("\n"))
+        if (parsed.errorCode == "pathmask.status_parse_failed") {
+            Log.w(TAG, "pathmask status returned malformed output; resetting root shell")
+            KsuCli.reset()
         }
-        HiddenPathConfigReadResult(config = HiddenPathConfigState(
-            targetPaths = obj.optJSONArray("targetPaths").toStringList(),
-            appPackages = obj.optJSONArray("appPackages").toStringList(),
-            useAppScope = obj.optBoolean("useAppScope", true),
-            hideDirents = obj.optBoolean("hideDirents", true),
-            hideIsolated = obj.optBoolean("hideIsolated", true),
-            autoLoadEnabled = obj.optBoolean("autoLoadEnabled", true),
-            autoLoadDelaySeconds = obj.optInt("autoLoadDelaySeconds", 0)
-                .coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS),
-            autoLoadRemainingSeconds = obj.optInt("autoLoadRemainingSeconds", 0)
-                .coerceAtLeast(0),
-            loaded = obj.optBoolean("loaded", false),
-            currentKmi = obj.optString("currentKmi", ""),
-            phase = obj.optString("phase", "unconfigured"),
-            savedCount = obj.optInt("savedCount", 0),
-            availableCount = obj.optInt("availableCount", 0),
-            activeCount = obj.optInt("activeCount", 0),
-            resolvedCount = obj.optString("resolvedCount", ""),
-            activeTargetPaths = obj.optString("activeTargetPaths", ""),
-            missingTargetPaths = obj.optJSONArray("missingTargetPaths").toStringList(),
-            unresolvedTargetCount = obj.optInt("unresolvedTargetCount", 0).coerceAtLeast(0),
-            unresolvedTargetPaths = obj.optJSONArray("unresolvedTargetPaths").toStringList(),
-            requiresReload = obj.optBoolean("requiresReload", false),
-            requiresReboot = obj.optBoolean("requiresReboot", false),
-            hasPendingCandidate = obj.optBoolean("hasPendingCandidate", false),
-            lastErrorCode = obj.optString("lastErrorCode", ""),
-            lastErrorMessage = obj.optString("lastErrorMessage", ""),
-            lastLog = obj.optString("lastLog", ""),
-            resolvedAppUids = obj.optJSONArray("resolvedAppUids").toStringList(),
-            unresolvedAppPackages = obj.optJSONArray("unresolvedAppPackages").toStringList(),
-        ))
+        parsed
     }.getOrElse {
         Log.w(TAG, "pathmask status unavailable", it)
         KsuCli.reset()
@@ -1719,6 +1722,116 @@ suspend fun readHiddenPathConfig(): HiddenPathConfigReadResult = withContext(Dis
             error = it.message ?: "pathmask status unavailable",
             errorCode = "pathmask.status_unavailable",
         )
+    }
+}
+
+internal fun parseHiddenPathStatusJson(raw: String): HiddenPathConfigReadResult {
+    val obj = runCatching { parseJsonObjectPayload(raw) }.getOrElse { error ->
+        return HiddenPathConfigReadResult(
+            error = error.message.orEmpty().ifBlank { "invalid pathmask status JSON" },
+            errorCode = "pathmask.status_parse_failed",
+        )
+    }
+    val statusError = obj.optString("error", "").trim()
+    if (statusError.isNotBlank()) {
+        return HiddenPathConfigReadResult(
+            error = statusError,
+            errorCode = obj.optString("errorCode", "pathmask.status_failed"),
+        )
+    }
+
+    return HiddenPathConfigReadResult(config = HiddenPathConfigState(
+        targetPaths = obj.optJSONArray("targetPaths").toStringList(),
+        appPackages = obj.optJSONArray("appPackages").toStringList(),
+        useAppScope = obj.optBoolean("useAppScope", true),
+        hideDirents = obj.optBoolean("hideDirents", true),
+        hideIsolated = obj.optBoolean("hideIsolated", true),
+        autoLoadEnabled = obj.optBoolean("autoLoadEnabled", true),
+        autoLoadDelaySeconds = obj.readNonNegativeInt("autoLoadDelaySeconds")
+            .coerceIn(0, HIDDEN_PATH_MAX_AUTO_LOAD_DELAY_SECONDS),
+        autoLoadRemainingSeconds = obj.readNonNegativeInt("autoLoadRemainingSeconds"),
+        loaded = obj.optBoolean("loaded", false),
+        currentKmi = obj.optString("currentKmi", ""),
+        phase = obj.optString("phase", "unconfigured"),
+        savedCount = obj.readNonNegativeInt("savedCount"),
+        availableCount = obj.readNonNegativeInt("availableCount"),
+        activeCount = obj.readNonNegativeInt("activeCount"),
+        resolvedCount = obj.readNonNegativeInt("resolvedCount"),
+        activeTargetPaths = obj.readStringOrArray("activeTargetPaths"),
+        missingTargetPaths = obj.optJSONArray("missingTargetPaths").toStringList(),
+        unresolvedTargetCount = obj.readNonNegativeInt("unresolvedTargetCount"),
+        unresolvedTargetPaths = obj.optJSONArray("unresolvedTargetPaths").toStringList(),
+        requiresReload = obj.optBoolean("requiresReload", false),
+        requiresReboot = obj.optBoolean("requiresReboot", false),
+        hasPendingCandidate = obj.optBoolean("hasPendingCandidate", false),
+        lastErrorCode = obj.optString("lastErrorCode", ""),
+        lastErrorMessage = obj.optString("lastErrorMessage", ""),
+        lastLog = obj.optString("lastLog", ""),
+        resolvedAppUids = obj.optJSONArray("resolvedAppUids").toStringList(),
+        unresolvedAppPackages = obj.optJSONArray("unresolvedAppPackages").toStringList(),
+    ))
+}
+
+private fun parseJsonObjectPayload(raw: String): JSONObject {
+    val trimmed = raw.trim()
+    runCatching { JSONObject(trimmed) }.getOrNull()?.let { return it }
+
+    var objectStart = -1
+    var depth = 0
+    var inString = false
+    var escaped = false
+    var lastObject: JSONObject? = null
+    raw.forEachIndexed { index, character ->
+        if (inString) {
+            when {
+                escaped -> escaped = false
+                character == '\\' -> escaped = true
+                character == '"' -> inString = false
+            }
+            return@forEachIndexed
+        }
+
+        when (character) {
+            '"' -> if (depth > 0) inString = true
+            '{' -> {
+                if (depth == 0) objectStart = index
+                depth += 1
+            }
+            '}' -> if (depth > 0) {
+                depth -= 1
+                if (depth == 0 && objectStart >= 0) {
+                    runCatching { JSONObject(raw.substring(objectStart, index + 1)) }
+                        .getOrNull()
+                        ?.let { lastObject = it }
+                    objectStart = -1
+                }
+            }
+        }
+    }
+    lastObject?.let { return it }
+    error("invalid pathmask status JSON")
+}
+
+private fun JSONObject.readNonNegativeInt(name: String): Int {
+    val value = opt(name)
+    val parsed = if (value is Number) {
+        value.toLong()
+    } else if (value is String) {
+        value.trim().toLongOrNull()
+    } else {
+        null
+    } ?: 0L
+    return parsed.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+}
+
+private fun JSONObject.readStringOrArray(name: String): String {
+    val value = opt(name)
+    return if (value is JSONArray) {
+        value.toStringList().joinToString(",")
+    } else if (value is String) {
+        value.trim()
+    } else {
+        ""
     }
 }
 

@@ -2170,7 +2170,7 @@
     <string name="hidden_path_apply_failed">Error al aplicar. Verifique los registros.</string>
     <string name="hidden_path_unload_success">Se eliminaron las rutas actualmente ocultas por el kernel</string>
     <string name="hidden_path_unload_failed">Error en la eliminación. Verifique los registros.</string>
-    <string name="hidden_path_import_success">Configuración importada. Aplica rutas ocultas para activarlo.</string>
+    <string name="hidden_path_import_success">Configuración importada y aplicada</string>
     <string name="hidden_path_import_failed">Error en la importación. Verifique el archivo de configuración.</string>
     <string name="hidden_path_export_success">Configuración exportada</string>
     <string name="hidden_path_export_failed">Exportación fallida</string>
@@ -2234,7 +2234,7 @@
     <string name="hidden_path_help_absolute_paths">Utilice rutas absolutas. Se pasan varias rutas al LKM a través del parámetro target_paths.</string>
     <string name="hidden_path_help_app_scope">La selección de aplicaciones acepta nombres de paquetes o UID. El alcance por aplicación se resuelve en deny_uids.</string>
     <string name="hidden_path_help_managed_paths">Para evitar que la administración de módulos se interrumpa, /data/adb/modules, /data/adb/ksu, /data/adb/ap y directorios de administración similares requieren Ocultar por UID de la aplicación y no se pueden ocultar globalmente.</string>
-    <string name="hidden_path_help_apply">Después de la aplicación, ksud espera a que aparezcan las rutas de destino y luego recarga en caliente la máscara de ruta con la nueva configuración.</string>
+    <string name="hidden_path_help_apply">Al guardar o importar, la configuración se aplica de inmediato. Las rutas montadas más tarde se cargarán en la siguiente fase de inicio.</string>
     <string name="hidden_path_help_debug">Si ocultar no tiene ningún efecto, inspeccione la salida de resolve_count, KMI y kernel dmesg en los registros.</string>
     <string name="hidden_path_added">Agregado</string>
     <string name="hidden_path_logs_empty">No hay registros de ruta ocultos</string>

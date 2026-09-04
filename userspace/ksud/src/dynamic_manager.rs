@@ -3,54 +3,38 @@ use serde_json::{Value, json};
 use std::fs::{self, Permissions};
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::{apk_sign, defs, ksucalls};
 
-const SCHEMA_VERSION: u32 = 1;
-const PER_USER_RANGE: u32 = 100_000;
-const FIRST_APPLICATION_APPID: u32 = 10_000;
-const LAST_APPLICATION_APPID: u32 = 19_999;
+const STATUS_SCHEMA_VERSION: u32 = 2;
 const MIN_CERT_SIZE: u32 = 0x100;
-const MAX_CERT_SIZE: u32 = 1024;
+const MAX_CERT_SIZE: u32 = 0x1000;
+const DYNAMIC_MANAGER_SIGNATURE_INDEX: u8 = 255;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DynamicManagerConfig {
-    pub enabled: bool,
-    pub package_name: String,
-    pub appid: u32,
-    pub cert_size: u32,
-    pub cert_sha256: String,
+struct Config {
+    size: u32,
+    hash: String,
 }
 
-impl DynamicManagerConfig {
+impl Config {
     const fn disabled() -> Self {
         Self {
-            enabled: false,
-            package_name: String::new(),
-            appid: 0,
-            cert_size: 0,
-            cert_sha256: String::new(),
+            size: 0,
+            hash: String::new(),
         }
     }
 
     fn validate(&self) -> Result<()> {
-        if !self.enabled {
-            return Ok(());
-        }
-        validate_package_name(&self.package_name)?;
         ensure!(
-            (FIRST_APPLICATION_APPID..=LAST_APPLICATION_APPID).contains(&self.appid),
-            "dynamic manager App ID must be an Android application ID"
-        );
-        ensure!(
-            (MIN_CERT_SIZE..=MAX_CERT_SIZE).contains(&self.cert_size),
+            (MIN_CERT_SIZE..=MAX_CERT_SIZE).contains(&self.size),
             "dynamic manager certificate size is outside the supported range"
         );
         ensure!(
-            self.cert_sha256.len() == 64
+            self.hash.len() == 64
                 && self
-                    .cert_sha256
+                    .hash
                     .bytes()
                     .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value)),
             "dynamic manager certificate SHA-256 must be 64 lowercase hexadecimal characters"
@@ -58,147 +42,92 @@ impl DynamicManagerConfig {
         Ok(())
     }
 
-    fn to_json(&self) -> Value {
-        json!({
-            "schemaVersion": SCHEMA_VERSION,
-            "enabled": self.enabled,
-            "packageName": self.package_name,
-            "appId": self.appid,
-            "certificateSize": self.cert_size,
-            "certificateSha256": self.cert_sha256,
+    fn hash_bytes(&self) -> Result<[u8; 64]> {
+        self.validate()?;
+        self.hash.as_bytes().try_into().map_err(|_| {
+            anyhow::anyhow!("dynamic manager certificate SHA-256 has an invalid length")
         })
     }
 
-    fn from_json(value: &Value) -> Result<Self> {
-        ensure!(
-            value.get("schemaVersion").and_then(Value::as_u64) == Some(u64::from(SCHEMA_VERSION)),
-            "unsupported or missing dynamic manager schema version"
-        );
-        let enabled = value
-            .get("enabled")
-            .and_then(Value::as_bool)
-            .context("dynamic manager enabled field is missing")?;
-        let config = Self {
-            enabled,
-            package_name: value
-                .get("packageName")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            appid: value
-                .get("appId")
-                .and_then(Value::as_u64)
-                .and_then(|value| u32::try_from(value).ok())
-                .unwrap_or_default(),
-            cert_size: value
-                .get("certificateSize")
-                .and_then(Value::as_u64)
-                .and_then(|value| u32::try_from(value).ok())
-                .unwrap_or_default(),
-            cert_sha256: value
-                .get("certificateSha256")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-        };
-        config.validate()?;
-        Ok(config)
+    const fn is_disabled(&self) -> bool {
+        self.size == 0 && self.hash.is_empty()
     }
 }
 
-fn validate_package_name(package_name: &str) -> Result<()> {
-    ensure!(!package_name.is_empty(), "package name is empty");
-    ensure!(package_name.len() < 256, "package name is too long");
-    ensure!(
-        !package_name.starts_with('.')
-            && !package_name.ends_with('.')
-            && !package_name.contains(".."),
-        "package name contains an empty component"
-    );
-    ensure!(
-        package_name
-            .bytes()
-            .all(|value| value.is_ascii_alphanumeric() || value == b'_' || value == b'.'),
-        "package name contains unsupported characters"
-    );
-    ensure!(
-        !defs::is_trusted_manager_package(package_name),
-        "the built-in ApkeSU manager cannot be selected as a dynamic manager"
-    );
-    Ok(())
-}
-
-fn package_from_apk_path(path: &Path) -> Option<&str> {
-    let directory = path.parent()?.file_name()?.to_str()?;
-    directory
-        .split_once('-')
-        .map_or(Some(directory), |(package, _)| Some(package))
-}
-
-fn validate_packages_list(packages: &str, package_name: &str, appid: u32) -> Result<()> {
-    let mut identity_exists = false;
-    let mut appid_shared = false;
-    for line in packages.lines() {
-        let mut fields = line.split_whitespace();
-        let package = fields.next();
-        let uid = fields.next().and_then(|value| value.parse::<u32>().ok());
-        if uid.is_none_or(|uid| uid % PER_USER_RANGE != appid) {
-            continue;
-        }
-        if package == Some(package_name) {
-            identity_exists = true;
-        } else {
-            appid_shared = true;
-        }
-    }
-    ensure!(
-        identity_exists,
-        "package name and App ID do not match packages.list"
-    );
-    ensure!(
-        !appid_shared,
-        "dynamic manager App ID is shared by another package"
-    );
-    Ok(())
-}
-
-fn validate_installed_identity(package_name: &str, appid: u32) -> Result<()> {
-    let packages = fs::read_to_string("/data/system/packages.list")
-        .context("failed to read Android packages.list")?;
-    validate_packages_list(&packages, package_name, appid)
-}
-
-fn canonical_installed_apk(apk: &str, package_name: &str) -> Result<PathBuf> {
-    let path =
-        fs::canonicalize(apk).with_context(|| format!("failed to resolve APK path {apk}"))?;
-    ensure!(path.is_file(), "dynamic manager APK is not a regular file");
-    ensure!(
-        path.starts_with("/data/app")
-            && path.file_name().and_then(|name| name.to_str()) == Some("base.apk"),
-        "dynamic manager APK must be an installed /data/app base.apk"
-    );
-    ensure!(
-        package_from_apk_path(&path) == Some(package_name),
-        "APK path does not belong to the requested package"
-    );
-    Ok(path)
-}
-
-fn read_config() -> Result<Option<DynamicManagerConfig>> {
-    let path = Path::new(defs::DYNAMIC_MANAGER_CONFIG);
-    let content = match fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(error).with_context(|| format!("failed to read {}", path.display()));
-        }
+fn parse_config(content: &str) -> Result<Option<Config>> {
+    let value: Value = serde_json::from_str(content).context("invalid dynamic manager JSON")?;
+    let config = Config {
+        size: value
+            .get("size")
+            .and_then(Value::as_u64)
+            .and_then(|size| u32::try_from(size).ok())
+            .context("dynamic manager certificate size is missing")?,
+        hash: value
+            .get("hash")
+            .and_then(Value::as_str)
+            .context("dynamic manager certificate SHA-256 is missing")?
+            .to_owned(),
     };
-    let value: Value = serde_json::from_str(&content).context("invalid dynamic manager JSON")?;
-    DynamicManagerConfig::from_json(&value).map(Some)
+    if config.is_disabled() {
+        return Ok(None);
+    }
+    config.validate()?;
+    Ok(Some(config))
 }
 
-fn write_config(config: &DynamicManagerConfig) -> Result<()> {
-    let path = Path::new(defs::DYNAMIC_MANAGER_CONFIG);
+fn parse_legacy_config(content: &str) -> Result<Option<Config>> {
+    let value: Value =
+        serde_json::from_str(content).context("invalid legacy dynamic manager JSON")?;
+    ensure!(
+        value.get("schemaVersion").and_then(Value::as_u64) == Some(1),
+        "unsupported legacy dynamic manager schema"
+    );
+    if !value
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Ok(None);
+    }
+    let config = Config {
+        size: value
+            .get("certificateSize")
+            .and_then(Value::as_u64)
+            .and_then(|size| u32::try_from(size).ok())
+            .context("legacy dynamic manager certificate size is missing")?,
+        hash: value
+            .get("certificateSha256")
+            .and_then(Value::as_str)
+            .context("legacy dynamic manager certificate SHA-256 is missing")?
+            .to_owned(),
+    };
+    config.validate()?;
+    Ok(Some(config))
+}
+
+fn read_optional(path: &Path) -> Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(content) => Ok(Some(content)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| format!("failed to read {}", path.display())),
+    }
+}
+
+fn read_config() -> Result<(Option<Config>, bool)> {
+    let path = Path::new(defs::DYNAMIC_MANAGER);
+    if let Some(content) = read_optional(path)? {
+        return parse_config(&content).map(|config| (config, false));
+    }
+
+    let legacy_path = Path::new(defs::LEGACY_DYNAMIC_MANAGER_CONFIG);
+    let Some(content) = read_optional(legacy_path)? else {
+        return Ok((None, false));
+    };
+    parse_legacy_config(&content).map(|config| (config, true))
+}
+
+fn write_config(config: &Config) -> Result<()> {
+    let path = Path::new(defs::DYNAMIC_MANAGER);
     let parent = path
         .parent()
         .context("dynamic manager config has no parent")?;
@@ -209,8 +138,13 @@ fn write_config(config: &DynamicManagerConfig) -> Result<()> {
         .as_file()
         .set_permissions(Permissions::from_mode(0o600))
         .context("failed to secure temporary dynamic manager config")?;
-    let content = serde_json::to_vec_pretty(&config.to_json())?;
-    temporary.write_all(&content)?;
+    serde_json::to_writer_pretty(
+        &mut temporary,
+        &json!({
+            "size": config.size,
+            "hash": config.hash,
+        }),
+    )?;
     temporary.write_all(b"\n")?;
     temporary.as_file().sync_all()?;
     temporary
@@ -224,49 +158,33 @@ fn write_config(config: &DynamicManagerConfig) -> Result<()> {
     Ok(())
 }
 
-fn apply_to_kernel(config: &DynamicManagerConfig) -> Result<ksucalls::DynamicManagerKernelState> {
-    config.validate()?;
-    ensure!(config.enabled, "dynamic manager config is disabled");
-    ksucalls::set_dynamic_manager(
-        config.appid,
-        &config.package_name,
-        config.cert_size,
-        &config.cert_sha256,
-    )
-    .context("kernel rejected dynamic manager configuration")?;
-    let state =
-        ksucalls::get_dynamic_manager().context("failed to verify kernel dynamic manager state")?;
-    ensure!(
-        state.enabled
-            && state.active
-            && state.appid == config.appid
-            && state.package_name == config.package_name
-            && state.cert_size == config.cert_size
-            && state.cert_sha256 == config.cert_sha256,
-        "kernel could not verify the selected package identity"
-    );
-    Ok(state)
+fn apply_to_kernel(config: &Config, synchronous: bool) -> Result<()> {
+    let hash = config.hash_bytes()?;
+    ksucalls::set_dynamic_manager(config.size, hash, synchronous)
+        .context("kernel rejected dynamic manager configuration")
 }
 
-pub fn set_apk(apk: &str, package_name: &str, appid: u32) -> Result<()> {
-    validate_package_name(package_name)?;
-    ensure!(
-        (FIRST_APPLICATION_APPID..=LAST_APPLICATION_APPID).contains(&appid),
-        "invalid Android application ID"
-    );
-    validate_installed_identity(package_name, appid)?;
-    let apk_path = canonical_installed_apk(apk, package_name)?;
-    let (cert_size, cert_sha256) =
-        apk_sign::get_apk_signature(apk_path.to_str().context("APK path is not valid UTF-8")?)?;
-    let config = DynamicManagerConfig {
-        enabled: true,
-        package_name: package_name.to_owned(),
-        appid,
-        cert_size,
-        cert_sha256,
+pub fn parse_hash(value: &str) -> std::result::Result<[u8; 64], String> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err("hash must contain exactly 64 lowercase hexadecimal characters".to_owned());
+    }
+    value
+        .as_bytes()
+        .try_into()
+        .map_err(|_| "hash has an invalid length".to_owned())
+}
+
+pub fn set(size: u32, hash: [u8; 64]) -> Result<()> {
+    let config = Config {
+        size,
+        hash: String::from_utf8(hash.to_vec()).context("dynamic manager hash is not UTF-8")?,
     };
     config.validate()?;
-    apply_to_kernel(&config)?;
+    apply_to_kernel(&config, true)?;
     if let Err(error) = write_config(&config) {
         let _ = ksucalls::clear_dynamic_manager();
         return Err(error);
@@ -274,73 +192,95 @@ pub fn set_apk(apk: &str, package_name: &str, appid: u32) -> Result<()> {
     Ok(())
 }
 
+pub fn set_apk(apk: &str) -> Result<()> {
+    let (size, hash) = apk_sign::get_apk_signature(apk)?;
+    set(size, parse_hash(&hash).map_err(anyhow::Error::msg)?)
+}
+
 pub fn clear() -> Result<()> {
-    write_config(&DynamicManagerConfig::disabled())?;
+    write_config(&Config::disabled())?;
     ksucalls::clear_dynamic_manager().context("failed to clear kernel dynamic manager state")
 }
 
 pub fn restore_at_boot() -> Result<()> {
-    let Some(config) = read_config()? else {
+    let (config, migrated) = read_config()?;
+    let Some(config) = config else {
         return Ok(());
     };
-    if !config.enabled {
-        return Ok(());
+    apply_to_kernel(&config, false)?;
+    if migrated {
+        write_config(&config).context("failed to migrate legacy dynamic manager configuration")?;
     }
-    apply_to_kernel(&config).map(|_| ())
+    Ok(())
+}
+
+fn ioctl_is_unsupported(error: &std::io::Error) -> bool {
+    matches!(
+        error.raw_os_error(),
+        Some(code) if code == libc::ENOTTY || code == libc::ENOSYS || code == libc::EOPNOTSUPP
+    )
 }
 
 pub fn print_status() -> Result<()> {
     let mut errors = Vec::new();
     let stored = match read_config() {
-        Ok(config) => config,
+        Ok((config, _)) => config,
         Err(error) => {
             errors.push(format!("stored configuration: {error:#}"));
             None
         }
     };
+
     let (supported, kernel) = match ksucalls::get_dynamic_manager() {
         Ok(state) => (true, Some(state)),
+        Err(error) if error.raw_os_error() == Some(libc::ENODATA) => (true, None),
+        Err(error) if ioctl_is_unsupported(&error) => (false, None),
         Err(error) => {
             errors.push(format!("kernel runtime: {error}"));
-            (false, None)
+            (true, None)
         }
     };
-    let configured = stored.as_ref().is_some_and(|config| config.enabled);
-    let source = kernel.as_ref().filter(|state| state.enabled).map_or_else(
-        || {
-            stored
-                .as_ref()
-                .filter(|config| config.enabled)
-                .map(|config| {
-                    json!({
-                        "packageName": config.package_name,
-                        "appId": config.appid,
-                        "certificateSize": config.cert_size,
-                        "certificateSha256": config.cert_sha256,
-                    })
-                })
-        },
-        |state| {
-            Some(json!({
-                "packageName": state.package_name,
-                "appId": state.appid,
-                "certificateSize": state.cert_size,
-                "certificateSha256": state.cert_sha256,
-            }))
-        },
-    );
-    let mut output = json!({
-        "schemaVersion": SCHEMA_VERSION,
+
+    let managers = if supported {
+        match ksucalls::get_managers() {
+            Ok(managers) => managers,
+            Err(error) => {
+                errors.push(format!("manager registry: {error}"));
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    let dynamic_appids: Vec<u32> = managers
+        .iter()
+        .filter(|manager| manager.signature_index == DYNAMIC_MANAGER_SIGNATURE_INDEX)
+        .map(|manager| manager.appid)
+        .collect();
+    let effective_size = kernel
+        .as_ref()
+        .map(|state| state.cert_size)
+        .or_else(|| stored.as_ref().map(|config| config.size));
+    let effective_hash = kernel
+        .as_ref()
+        .map(|state| String::from_utf8_lossy(&state.cert_sha256).into_owned())
+        .or_else(|| stored.as_ref().map(|config| config.hash.clone()));
+    let configured = effective_size.is_some() && effective_hash.is_some();
+
+    let output = json!({
+        "schemaVersion": STATUS_SCHEMA_VERSION,
         "supported": supported,
-        "configured": configured || kernel.as_ref().is_some_and(|state| state.enabled),
-        "active": kernel.as_ref().is_some_and(|state| state.active),
+        "configured": configured,
+        "active": !dynamic_appids.is_empty(),
+        "certificateSize": effective_size.unwrap_or_default(),
+        "certificateSha256": effective_hash.unwrap_or_default(),
+        "dynamicManagerAppIds": dynamic_appids,
+        "managers": managers.iter().map(|manager| json!({
+            "appId": manager.appid,
+            "signatureIndex": manager.signature_index,
+        })).collect::<Vec<_>>(),
         "error": if errors.is_empty() { Value::Null } else { Value::String(errors.join("; ")) },
     });
-    if let (Some(object), Some(source)) = (output.as_object_mut(), source)
-        && let Some(source) = source.as_object()
-    {
-        object.extend(source.clone());
-    }
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
 }
@@ -350,43 +290,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validates_safe_package_names() {
-        assert!(validate_package_name("com.example.manager").is_ok());
-        assert!(validate_package_name("com..example").is_err());
-        assert!(validate_package_name("com.example-manager").is_err());
-        assert!(validate_package_name(defs::DEFAULT_MANAGER_PACKAGE).is_err());
-    }
-
-    #[test]
-    fn rejects_legacy_unversioned_config() {
-        let legacy = json!({"size": 744, "hash": "0".repeat(64)});
-        assert!(DynamicManagerConfig::from_json(&legacy).is_err());
-    }
-
-    #[test]
-    fn config_round_trip_preserves_identity() {
-        let config = DynamicManagerConfig {
-            enabled: true,
-            package_name: "com.example.manager".to_owned(),
-            appid: 10_123,
-            cert_size: 744,
-            cert_sha256: "a".repeat(64),
-        };
+    fn config_round_trip_matches_resukisu_format() {
+        let content = format!(r#"{{"size":744,"hash":"{}"}}"#, "a".repeat(64));
         assert_eq!(
-            DynamicManagerConfig::from_json(&config.to_json()).unwrap(),
-            config
+            parse_config(&content).unwrap(),
+            Some(Config {
+                size: 744,
+                hash: "a".repeat(64),
+            })
         );
     }
 
     #[test]
-    fn packages_list_requires_an_exact_unique_appid() {
-        let packages = "com.example.manager 10123 0 /data/user/0/com.example.manager default:targetSdkVersion=36 none 0 1\n";
-        assert!(validate_packages_list(packages, "com.example.manager", 10_123).is_ok());
-        assert!(validate_packages_list(packages, "com.example.other", 10_123).is_err());
-
-        let shared = format!(
-            "{packages}com.example.shared 10123 0 /data/user/0/com.example.shared default:targetSdkVersion=36 none 0 1\n"
+    fn migrates_apkesu_package_bound_config() {
+        let content = json!({
+            "schemaVersion": 1,
+            "enabled": true,
+            "packageName": "com.example.manager",
+            "appId": 10_123,
+            "certificateSize": 744,
+            "certificateSha256": "b".repeat(64),
+        })
+        .to_string();
+        assert_eq!(
+            parse_legacy_config(&content).unwrap(),
+            Some(Config {
+                size: 744,
+                hash: "b".repeat(64),
+            })
         );
-        assert!(validate_packages_list(&shared, "com.example.manager", 10_123).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_hashes() {
+        assert!(parse_hash(&"a".repeat(64)).is_ok());
+        assert!(parse_hash(&"A".repeat(64)).is_err());
+        assert!(parse_hash("abc").is_err());
     }
 }

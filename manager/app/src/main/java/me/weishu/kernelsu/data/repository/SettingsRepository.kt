@@ -67,7 +67,6 @@ interface SettingsRepository {
     var rainCardMotionEnabled: Boolean
     var pixelStyle: String
     var pixelCardMotionEnabled: Boolean
-    var pixelPetEnabled: Boolean
     val uiDecorationConfig: UiDecorationConfig
     fun saveUiDecorationConfig(config: UiDecorationConfig): Boolean
     fun getCustomUiDecorationPresets(): List<CustomUiDecorationPreset>
@@ -172,6 +171,8 @@ interface SettingsRepository {
 
     fun isLkmMode(): Boolean
 
+    /** Switches style and its shared appearance values in one preferences transaction. */
+    fun applyInterfaceStyle(mode: String, preset: ThemePreset?, preservedColorMode: Int)
     fun applyThemePreset(preset: ThemePreset)
     fun saveCustomThemePreset(name: String): CustomThemePreset?
     fun applyCustomThemePreset(presetId: String): Boolean

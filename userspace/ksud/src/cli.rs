@@ -666,13 +666,13 @@ enum Pathmask {
     /// Print pathmask config and runtime status as JSON
     Status,
 
-    /// Import pathmask config JSON from file
+    /// Atomically import and apply pathmask config JSON from file
     Import {
         /// config JSON file path
         file: PathBuf,
     },
 
-    /// Import pathmask config JSON from an argument
+    /// Atomically import and apply pathmask config JSON from an argument
     ImportJson {
         /// config JSON content
         json: String,
@@ -810,7 +810,7 @@ enum Kernel {
         #[command(subcommand)]
         command: UmountOp,
     },
-    /// Manage the package-bound secondary Manager identity
+    /// Manage the certificate-based secondary Manager identity
     DynamicManager {
         #[command(subcommand)]
         command: DynamicManagerOp,
@@ -823,18 +823,20 @@ enum Kernel {
 enum DynamicManagerOp {
     /// Print persisted and kernel runtime state as JSON
     Status,
-    /// Verify an installed Manager APK and grant it secondary Manager authority
-    SetApk {
-        /// Installed /data/app/.../base.apk path
-        apk: String,
-        /// Exact Android package name
-        #[arg(long)]
-        package: String,
-        /// Normalized Android application ID (UID modulo 100000)
-        #[arg(long)]
-        appid: u32,
+    /// Configure the dynamic Manager certificate manually
+    Set {
+        /// APK v2 signer certificate size
+        size: u32,
+        /// Lowercase SHA-256 certificate hash
+        #[arg(value_parser = dynamic_manager::parse_hash)]
+        hash: [u8; 64],
     },
-    /// Revoke the secondary Manager and persist the disabled state
+    /// Read an APK signature and configure it as the dynamic Manager
+    SetApk {
+        /// Manager APK path
+        apk: String,
+    },
+    /// Revoke the dynamic Manager and persist the disabled state
     Clear,
 }
 
@@ -1376,11 +1378,8 @@ pub fn run() -> Result<()> {
             },
             Kernel::DynamicManager { command } => match command {
                 DynamicManagerOp::Status => dynamic_manager::print_status(),
-                DynamicManagerOp::SetApk {
-                    apk,
-                    package,
-                    appid,
-                } => dynamic_manager::set_apk(&apk, &package, appid),
+                DynamicManagerOp::Set { size, hash } => dynamic_manager::set(size, hash),
+                DynamicManagerOp::SetApk { apk } => dynamic_manager::set_apk(&apk),
                 DynamicManagerOp::Clear => dynamic_manager::clear(),
             },
             Kernel::NotifyModuleMounted => {

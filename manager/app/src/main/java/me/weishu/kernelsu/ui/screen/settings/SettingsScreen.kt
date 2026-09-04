@@ -144,7 +144,6 @@ fun SettingPager(
         onOpenNavigationIcons = { navigator.push(Route.NavigationIcons) },
         onOpenHomeLayout = { navigator.push(Route.HomeLayout) },
         onOpenHomeCardWallpapers = { navigator.push(Route.HomeCardWallpapers) },
-        onOpenPixelPet = { navigator.push(Route.PixelPet) },
         onOpenVisualEffects = { navigator.push(Route.VisualEffects) },
         onOpenUiDecorationLibrary = { navigator.push(Route.UiDecorationLibrary) },
         onPickWallpaper = { wallpaperLauncher.launch(CUSTOM_BACKGROUND_MIME_TYPES) },
